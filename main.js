@@ -5674,3 +5674,64 @@ window.addEventListener('load', async () => {
     renderLobbyListV27('battle');
   }
 });
+
+
+
+
+// ================= ONLINE SYSTEM =================
+
+async function setPlayerOnline(status = "lobby", roomId = null) {
+  if (!window.supabaseClient || !player?.id) return;
+
+  const payload = {
+    player_id: String(player.id),
+    nickname: player.nickname || "Commander",
+    room_id: roomId,
+    status,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await window.supabaseClient
+    .from("online_players")
+    .upsert(payload);
+
+  if (error) console.error("online error:", error);
+}
+
+async function setPlayerOffline() {
+  if (!window.supabaseClient || !player?.id) return;
+
+  await window.supabaseClient
+    .from("online_players")
+    .delete()
+    .eq("player_id", String(player.id));
+}
+
+async function loadOnlinePlayers() {
+  const { data } = await window.supabaseClient
+    .from("online_players")
+    .select("*");
+
+  return data || [];
+}
+
+async function renderOnlinePlayers() {
+  const list = document.getElementById("online-list");
+  if (!list) return;
+
+  const players = await loadOnlinePlayers();
+  list.innerHTML = "";
+
+  players.forEach(p => {
+    const el = document.createElement("div");
+    el.className = "online-player";
+    el.textContent = `${p.nickname} — ${p.status}`;
+    list.appendChild(el);
+  });
+}
+
+setInterval(renderOnlinePlayers, 3000);
+
+window.addEventListener("beforeunload", () => {
+  setPlayerOffline();
+});
