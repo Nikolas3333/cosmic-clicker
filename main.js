@@ -5678,60 +5678,117 @@ window.addEventListener('load', async () => {
 
 
 
-// ================= ONLINE SYSTEM =================
+// ================= ONLINE PLAYERS (SUPABASE) =================
 
-async function setPlayerOnline(status = "lobby", roomId = null) {
-  if (!window.supabaseClient || !player?.id) return;
+async function setPlayerOnlineStatus(status = 'lobby', roomId = null){
+    if(!window.supabaseClient) return;
 
-  const payload = {
-    player_id: String(player.id),
-    nickname: player.nickname || "Commander",
-    room_id: roomId,
-    status,
-    updated_at: new Date().toISOString()
-  };
+    const playerId =
+        (typeof authState !== 'undefined' && authState?.playerId)
+        ? String(authState.playerId)
+        : (typeof player !== 'undefined' && player?.id ? String(player.id) : null);
 
-  const { error } = await window.supabaseClient
-    .from("online_players")
-    .upsert(payload);
+    const nickname =
+        (typeof player !== 'undefined' && player?.nickname)
+        ? player.nickname
+        : 'Commander';
 
-  if (error) console.error("online error:", error);
+    if(!playerId) return;
+
+    const { error } = await window.supabaseClient
+        .from('online_players')
+        .upsert({
+            player_id: playerId,
+            nickname: nickname,
+            room_id: roomId,
+            status: status,
+            updated_at: new Date().toISOString()
+        });
+
+    if(error){
+        console.error('Ошибка записи online_players:', error);
+    }
 }
 
-async function setPlayerOffline() {
-  if (!window.supabaseClient || !player?.id) return;
+async function removePlayerFromOnline(){
+    if(!window.supabaseClient) return;
 
-  await window.supabaseClient
-    .from("online_players")
-    .delete()
-    .eq("player_id", String(player.id));
+    const playerId =
+        (typeof authState !== 'undefined' && authState?.playerId)
+        ? String(authState.playerId)
+        : (typeof player !== 'undefined' && player?.id ? String(player.id) : null);
+
+    if(!playerId) return;
+
+    const { error } = await window.supabaseClient
+        .from('online_players')
+        .delete()
+        .eq('player_id', playerId);
+
+    if(error){
+        console.error('Ошибка удаления online_players:', error);
+    }
 }
 
-async function loadOnlinePlayers() {
-  const { data } = await window.supabaseClient
-    .from("online_players")
-    .select("*");
+async function loadOnlinePlayersFromSupabase(){
+    if(!window.supabaseClient) return [];
 
-  return data || [];
+    const { data, error } = await window.supabaseClient
+        .from('online_players')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+    if(error){
+        console.error('Ошибка загрузки online_players:', error);
+        return [];
+    }
+
+    return data || [];
 }
 
-async function renderOnlinePlayers() {
-  const list = document.getElementById("online-list");
-  if (!list) return;
+async function renderOnlinePlayers(){
+    const list = document.getElementById('online-list');
+    if(!list) return;
 
-  const players = await loadOnlinePlayers();
-  list.innerHTML = "";
+    const players = await loadOnlinePlayersFromSupabase();
+    list.innerHTML = '';
 
-  players.forEach(p => {
-    const el = document.createElement("div");
-    el.className = "online-player";
-    el.textContent = `${p.nickname} — ${p.status}`;
-    list.appendChild(el);
-  });
+    for(const p of players){
+        const row = document.createElement('div');
+        row.className = 'online-player';
+        row.textContent = `${p.nickname} — ${p.status}`;
+        list.appendChild(row);
+    }
 }
 
-setInterval(renderOnlinePlayers, 3000);
+const previousSwitchStateOnline = window.switchState || switchState;
+switchState = function(newState){
+    previousSwitchStateOnline(newState);
 
-window.addEventListener("beforeunload", () => {
-  setPlayerOffline();
+    if(newState === 'LOBBY'){
+        setPlayerOnlineStatus('lobby', null);
+        setTimeout(renderOnlinePlayers, 300);
+    }
+
+    if(newState === 'BATTLE'){
+        setPlayerOnlineStatus('battle', currentRoom?.id || null);
+    }
+
+    if(newState === 'OBSERVE'){
+        setPlayerOnlineStatus('observe', currentRoom?.id || null);
+    }
+
+    if(newState === 'ORBIT'){
+        setPlayerOnlineStatus('orbit', null);
+    }
+};
+
+window.switchState = switchState;
+
+window.addEventListener('beforeunload', () => {
+    removePlayerFromOnline();
 });
+
+setInterval(() => {
+    renderOnlinePlayers();
+}, 3000);
