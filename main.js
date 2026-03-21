@@ -4733,6 +4733,10 @@ function limitBattleArea(){
         if(soloTab && !soloTab.dataset.v26Bound){
             soloTab.dataset.v26Bound = '1';
             soloTab.onclick = () => {
+                if(isGuestAccount()){
+                    showGuestOnlyPvpMessage();
+                    return;
+                }
                 if(gameState !== 'LOBBY') switchState('LOBBY');
                 renderLobbyList('solo');
             };
@@ -5135,11 +5139,23 @@ function limitBattleArea(){
         }
         if(soloTab && !soloTab.dataset.v27Bound){
             soloTab.dataset.v27Bound = '1';
-            soloTab.onclick = () => renderLobbyListV27('solo');
+            soloTab.onclick = () => {
+                if(isGuestAccount()){
+                    showGuestOnlyPvpMessage();
+                    return;
+                }
+                renderLobbyListV27('solo');
+            };
         }
         if(tournamentTab && !tournamentTab.dataset.v27Bound){
             tournamentTab.dataset.v27Bound = '1';
-            tournamentTab.onclick = () => renderLobbyListV27('tournament');
+            tournamentTab.onclick = () => {
+                if(isGuestAccount()){
+                    showGuestOnlyPvpMessage();
+                    return;
+                }
+                renderLobbyListV27('tournament');
+            };
         }
     }
 
@@ -5151,6 +5167,10 @@ function limitBattleArea(){
             createBtn.dataset.v27Bound = '1';
             createBtn.addEventListener('click', () => {
                 if(lobbyModeV27 === 'tournament'){
+                    if(isGuestAccount()){
+                        showGuestOnlyPvpMessage();
+                        return;
+                    }
                     openTournamentWindow();
                 }else if(lobbyModeV27 === 'battle'){
                     document.getElementById('create-match-window')?.classList.remove('hidden');
@@ -5165,11 +5185,19 @@ function limitBattleArea(){
             joinBtn.addEventListener('click', () => {
                 if(!selectedLobbyMap) return;
                 if(lobbyModeV27 === 'solo'){
+                    if(isGuestAccount()){
+                        showGuestOnlyPvpMessage();
+                        return;
+                    }
                     currentRoom = { ...selectedLobbyMap, solo:true, state:'solo', players:[getDisplayPlayerTag()] };
                     switchState('BATTLE');
                     return;
                 }
                 if(lobbyModeV27 === 'tournament'){
+                    if(isGuestAccount()){
+                        showGuestOnlyPvpMessage();
+                        return;
+                    }
                     const room = tournamentRooms.find(r => r.id === selectedLobbyMap.id) || selectedLobbyMap;
                     if(!room.currentPlayers.includes(getDisplayPlayerTag())){
                         room.currentPlayers.push(getDisplayPlayerTag());
@@ -5678,6 +5706,15 @@ window.addEventListener('load', async () => {
 
 
 
+
+function isGuestAccount(){
+    return authState?.mode === 'guest';
+}
+
+function showGuestOnlyPvpMessage(){
+    alert('Гостям доступен только PvP режим.');
+}
+
 // ================= ONLINE PLAYERS (SUPABASE) =================
 
 async function setPlayerOnlineStatus(status = 'lobby', roomId = null){
@@ -5736,6 +5773,7 @@ async function loadOnlinePlayersFromSupabase(){
     const { data, error } = await window.supabaseClient
         .from('online_players')
         .select('*')
+        .eq('status', 'lobby')
         .order('updated_at', { ascending: false });
 
     if(error){
@@ -5756,37 +5794,46 @@ async function renderOnlinePlayers(){
     for(const p of players){
         const row = document.createElement('div');
         row.className = 'online-player';
-        row.textContent = `${p.nickname} — ${p.status}`;
+        row.textContent = p.nickname;
         list.appendChild(row);
     }
 }
 
 const previousSwitchStateOnline = window.switchState || switchState;
 switchState = function(newState){
+    if(isGuestAccount() && (newState === 'ORBIT' || newState === 'INVENTORY' || newState === 'COMBAT')){
+        showGuestOnlyPvpMessage();
+        previousSwitchStateOnline('LOBBY');
+        setPlayerOnlineStatus('lobby', null);
+        setTimeout(renderOnlinePlayers, 300);
+        return;
+    }
+
     previousSwitchStateOnline(newState);
 
     if(newState === 'LOBBY'){
         setPlayerOnlineStatus('lobby', null);
         setTimeout(renderOnlinePlayers, 300);
+        return;
     }
 
-    if(newState === 'BATTLE'){
-        setPlayerOnlineStatus('battle', currentRoom?.id || null);
-    }
-
-    if(newState === 'OBSERVE'){
-        setPlayerOnlineStatus('observe', currentRoom?.id || null);
-    }
-
-    if(newState === 'ORBIT'){
-        setPlayerOnlineStatus('orbit', null);
-    }
+    removePlayerFromOnline();
 };
 
 window.switchState = switchState;
 
 window.addEventListener('beforeunload', () => {
     removePlayerFromOnline();
+});
+
+window.addEventListener('pagehide', () => {
+    removePlayerFromOnline();
+});
+
+document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'hidden'){
+        removePlayerFromOnline();
+    }
 });
 
 setInterval(() => {
