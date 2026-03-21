@@ -2401,6 +2401,14 @@ console.log('🔥 Supabase подключен и готов к работе');
 </script>
 
 <script type="module" src="main.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script>
+const SUPABASE_URL = "PASTE_URL";
+const SUPABASE_KEY = "PASTE_KEY";
+window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+</script>
+
 </body>
 </html>
 
