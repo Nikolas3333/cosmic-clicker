@@ -5881,3 +5881,53 @@ window.addEventListener("load", () => {
     if(buttons[0]) buttons[0].addEventListener("click", loginUser);
     if(buttons[1]) buttons[1].addEventListener("click", registerUser);
 });
+
+
+
+// ===== SUPABASE AUTH OVERRIDE (FIX) =====
+
+// Полностью заменяем локальную систему
+async function registerLocalAccount(){
+    const email = document.querySelector('#auth-screen input[type="email"]').value;
+    const password = document.querySelectorAll('#auth-screen input[type="password"]')[0].value;
+
+    const { data, error } = await window.supabaseClient.auth.signUp({
+        email,
+        password
+    });
+
+    if(error){
+        showAuthMessage("Ошибка: " + error.message);
+        return;
+    }
+
+    await window.supabaseClient.from('players').insert({
+        auth_id: data.user.id,
+        email: data.user.email,
+        nickname: "Commander"
+    });
+
+    showAuthMessage("Регистрация успешна!");
+}
+
+async function loginLocalAccount(){
+    const email = document.querySelector('#auth-screen input[type="email"]').value;
+    const password = document.querySelectorAll('#auth-screen input[type="password"]')[0].value;
+
+    const { error } = await window.supabaseClient.auth.signInWithPassword({
+        email,
+        password
+    });
+
+    if(error){
+        showAuthMessage("Ошибка входа: " + error.message);
+        return;
+    }
+
+    switchState("LOBBY");
+}
+
+// убираем подтверждение кода полностью
+function confirmEmailCode(){
+    showAuthMessage("Код не нужен");
+}
