@@ -107,9 +107,9 @@ function getDisplayPlayerTag(){
 
 
 function getActiveSaveKey(){
-    if(authState.mode === 'account' && authState.email){
-        const safeEmail = authState.email.trim().toLowerCase();
-        return `galaxySave:${safeEmail}`;
+    if(authState.mode === 'account'){
+        const accountKey = authState.playerId ? String(authState.playerId) : (authState.email || '').trim().toLowerCase();
+        if(accountKey) return `galaxySave:${accountKey}`;
     }
     return null;
 }
@@ -1847,37 +1847,103 @@ createDebugMenu();
 
 /* ================= SAVE SYSTEM ================= */
 
-function loadGame(){
-const saveKey = getActiveSaveKey();
-if(!saveKey) return;
-const data = localStorage.getItem(saveKey);
-if(!data) return;
-const save = JSON.parse(data);
-currentLevel = save.level || 1;
-damage = save.damage || 1;
-for(let i=0;i<planets.length;i++){
-    planets[i].unlocked = i < currentLevel;
+function applySaveData(save){
+    if(!save || typeof save !== 'object') return;
+    currentLevel = Number(save.level || 1);
+    damage = Number(save.damage || 1);
+    player.level = Number(save.playerLevel || currentLevel || 1);
+    player.credits = Number(save.credits || player.credits || 0);
+    if(save.nickname) player.nickname = String(save.nickname).slice(0, 20);
+    if(save.playerResources){
+        for(const key in playerResources){
+            if(typeof save.playerResources[key] === 'number') playerResources[key] = save.playerResources[key];
+        }
+    }
+    for(let i=0;i<planets.length;i++) planets[i].unlocked = i < currentLevel;
+    updatePremiumAccountInfo?.();
+    updateHUD?.();
+    updateUI?.();
 }
-if(save.playerResources){
-    for(const key in playerResources){
-        if(typeof save.playerResources[key] === 'number') playerResources[key] = save.playerResources[key];
+
+async function loadRemoteSaveFromSupabase(){
+    if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return null;
+    try{
+        const { data, error } = await window.supabaseClient
+            .from('player_saves')
+            .select('save_data')
+            .eq('player_public_id', authState.playerId)
+            .maybeSingle();
+        if(error){
+            console.warn('Не удалось загрузить remote save:', error.message);
+            return null;
+        }
+        return data?.save_data || null;
+    }catch(error){
+        console.warn('Remote save load error:', error?.message || error);
+        return null;
     }
 }
-updateHUD();
-updateUI();
+
+async function loadGame(){
+    const saveKey = getActiveSaveKey();
+    if(saveKey){
+        const localData = localStorage.getItem(saveKey);
+        if(localData){
+            try{ applySaveData(JSON.parse(localData)); }catch(error){ console.warn('Ошибка чтения local save:', error); }
+        }
+    }
+    const remoteSave = await loadRemoteSaveFromSupabase();
+    if(remoteSave) applySaveData(remoteSave);
+}
+
+function buildSavePayload(){
+    return {
+        level: currentLevel,
+        damage: damage,
+        credits: player.credits,
+        playerLevel: player.level,
+        nickname: player.nickname,
+        playerResources: playerResources
+    };
+}
+
+async function saveRemoteProgress(){
+    if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return;
+    const payload = buildSavePayload();
+    try{
+        await window.supabaseClient.from('players').update({
+            nickname: player.nickname,
+            level: player.level,
+            credits: player.credits
+        }).eq('public_id', authState.playerId);
+
+        const { error } = await window.supabaseClient.from('player_saves').upsert({
+            player_public_id: authState.playerId,
+            save_data: payload,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'player_public_id' });
+        if(error) console.warn('Не удалось сохранить remote progress:', error.message);
+    }catch(error){
+        console.warn('Remote progress save error:', error?.message || error);
+    }
 }
 
 function saveGame(){
-const saveKey = getActiveSaveKey();
-if(!saveKey) return;
-localStorage.setItem(saveKey,
-JSON.stringify({
-level:currentLevel,
-damage:damage,
-playerResources: playerResources
-})
-);
+    const saveKey = getActiveSaveKey();
+    const payload = buildSavePayload();
+    if(saveKey){
+        localStorage.setItem(saveKey, JSON.stringify(payload));
+    }
+    saveRemoteProgress();
 }
+
+setInterval(() => {
+    if(authState?.isAuthenticated) saveGame();
+}, 20000);
+
+window.addEventListener('beforeunload', () => {
+    try{ saveGame(); }catch(_e){}
+});
 
 /* ================= ZOOM ================= */
 
@@ -1932,7 +1998,6 @@ renderer.domElement.addEventListener("mousemove",(e)=>{
 
     const deltaX = e.clientX - previousMouseX;
     const deltaY = e.clientY - previousMouseY;
-
     previousMouseX = e.clientX;
     previousMouseY = e.clientY;
 
@@ -3737,14 +3802,17 @@ initBattleChat();
 function renderProfileStats(){
     const profileInfo = document.getElementById('profile-info');
     if(!profileInfo) return;
+    const totalResources = Object.values(playerResources || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
     profileInfo.innerHTML = `
       <h2 class="profile-title">Пилот ${player.nickname}</h2>
       <div class="profile-grid">
+        <div class="stat-card"><div class="cosmic-badge">Игровой ID</div><div>${authState.playerId || 0}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Email</div><div>${authState.email || 'Гость'}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${player.level}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кредиты</div><div>${player.credits}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Фраги</div><div>${battleStats.playerKills}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Смерти</div><div>${battleStats.playerDeaths}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">ID</div><div>${player.id}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${player.ships.length}</div></div>
       </div>`;
 }
@@ -4099,6 +4167,10 @@ function updatePremiumAccountInfo(){
     const idEl = document.getElementById('premium-player-id');
     if(nameEl) nameEl.textContent = player?.nickname || 'Commander';
     if(idEl) idEl.textContent = `ID: ${authState.playerId || 0}`;
+    const crystalEl = document.getElementById('premium-crystals');
+    const coinsEl = document.getElementById('premium-coins');
+    if(crystalEl) crystalEl.textContent = `💎 ${playerResources?.crystals || 0}`;
+    if(coinsEl) coinsEl.textContent = `🪙 ${playerResources?.coins || 0}`;
 }
 function updateNicknameSettingsState(message=''){
     const nicknameInput = document.getElementById('nickname-input');
@@ -4116,6 +4188,7 @@ function logoutToAuth(message='Возврат в меню входа.'){
     authState.emailVerified = false;
     authState.pendingVerificationEmail = '';
     authState.pendingVerificationCode = '';
+    try{ saveGame(); }catch(_e){}
     resetBattleInputState();
     applyAuthUIState(message);
     switchState('AUTH');
@@ -4125,16 +4198,15 @@ function saveNicknameFromSettings(){
     const nextNickname = nicknameInput?.value?.trim() || '';
     if(!nextNickname){ updateNicknameSettingsState('Введите ник'); return; }
     player.nickname = nextNickname.slice(0, 20);
-    if(authState.mode === 'account' && authState.email){
-        const accounts = getStoredAccounts();
-        const account = accounts.find(acc => acc.email.toLowerCase() === authState.email.toLowerCase());
-        if(account){
-            account.nickname = player.nickname;
-            saveStoredAccounts(accounts);
-        }
-    }
     updateNicknameSettingsState('Сохранено');
     updateHUD?.();
+    updatePremiumAccountInfo?.();
+    if(authState.mode === 'account' && authState.playerId && window.supabaseClient){
+        window.supabaseClient.from('players').update({ nickname: player.nickname }).eq('public_id', authState.playerId)
+            .then(({error}) => { if(error) console.warn('Не удалось сохранить ник:', error.message); else saveGame(); });
+    } else {
+        saveGame();
+    }
 }
 function applyAuthUIState(message=''){
     const loginEmail = document.getElementById('login-email');
@@ -4176,42 +4248,15 @@ function registerLocalAccount(){
 
     (async () => {
         try{
-            const { data, error } = await window.supabaseClient.auth.signUp({
-                email,
-                password
-            });
-
+            const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
             if(error){
                 showAuthMessage('Ошибка: ' + error.message);
                 return;
             }
-
-            const nickname = email.split('@')[0] || 'Pilot';
-
-            if(data?.user?.id){
-                const { error: playerError } = await window.supabaseClient
-                    .from('players')
-                    .upsert({
-                        auth_id: data.user.id,
-                        email: data.user.email || email,
-                        nickname: nickname
-                    }, {
-                        onConflict: 'auth_id'
-                    });
-
-                if(playerError){
-                    console.warn('Ошибка создания игрока в players:', playerError.message);
-                }
-            }
-
-            authState.pendingVerificationEmail = '';
-            authState.pendingVerificationCode = '';
-
             const loginEmail = document.getElementById('login-email');
             const loginPassword = document.getElementById('login-password');
             if(loginEmail) loginEmail.value = email;
             if(loginPassword) loginPassword.value = password;
-
             showAuthMessage('Регистрация успешна. Теперь войди в аккаунт.');
         }catch(err){
             showAuthMessage('Ошибка: ' + (err?.message || err));
@@ -4219,7 +4264,7 @@ function registerLocalAccount(){
     })();
 }
 function confirmEmailCode(){
-    showAuthMessage('Подтверждение кодом отключено. Используй обычную регистрацию и вход.');
+    showAuthMessage('Код подтверждения больше не используется. Просто войди в аккаунт.');
 }
 function loginLocalAccount(){
     const email = document.getElementById('login-email')?.value?.trim() || '';
@@ -4233,11 +4278,7 @@ function loginLocalAccount(){
 
     (async () => {
         try{
-            const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-                email,
-                password
-            });
-
+            const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
             if(error){
                 showAuthMessage('Ошибка входа: ' + error.message);
                 return;
@@ -4252,40 +4293,46 @@ function loginLocalAccount(){
             authState.pendingVerificationEmail = '';
             authState.pendingVerificationCode = '';
 
-            const { data: playerRow, error: playerReadError } = await window.supabaseClient
+            const nickname = email.split('@')[0] || 'Pilot';
+            let playerRow = null;
+
+            const existingRes = await window.supabaseClient
                 .from('players')
-                .select('public_id,nickname,email,auth_id')
+                .select('public_id,nickname,email,auth_id,level,credits,created_at')
                 .eq('auth_id', user?.id || '')
                 .maybeSingle();
 
-            if(playerReadError){
-                console.warn('Ошибка чтения players:', playerReadError.message);
+            if(existingRes.error){
+                console.warn('Ошибка чтения players:', existingRes.error.message);
             }
+            playerRow = existingRes.data || null;
 
-            if(playerRow){
-                authState.playerId = Number(playerRow.public_id) || 0;
-                player.nickname = playerRow.nickname || (email.split('@')[0] || 'Pilot');
-            }else{
-                const nickname = email.split('@')[0] || 'Pilot';
-                const { data: insertedPlayer, error: playerInsertError } = await window.supabaseClient
+            if(!playerRow){
+                const insertRes = await window.supabaseClient
                     .from('players')
                     .insert({
                         auth_id: user?.id,
                         email,
-                        nickname
+                        nickname,
+                        level: player.level || 1,
+                        credits: player.credits || 500,
+                        created_at: new Date().toISOString()
                     })
-                    .select('public_id,nickname')
+                    .select('public_id,nickname,email,auth_id,level,credits,created_at')
                     .single();
 
-                if(playerInsertError){
-                    console.warn('Ошибка создания players при входе:', playerInsertError.message);
-                    authState.playerId = 0;
-                    player.nickname = nickname;
+                if(insertRes.error){
+                    console.warn('Ошибка создания players при входе:', insertRes.error.message);
                 }else{
-                    authState.playerId = Number(insertedPlayer?.public_id) || 0;
-                    player.nickname = insertedPlayer?.nickname || nickname;
+                    playerRow = insertRes.data;
                 }
             }
+
+            authState.playerId = Number(playerRow?.public_id) || 0;
+            player.id = authState.playerId || user?.id || 'local_player';
+            player.nickname = playerRow?.nickname || nickname;
+            player.level = Number(playerRow?.level || player.level || 1);
+            player.credits = Number(playerRow?.credits || player.credits || 500);
 
             if(remember?.checked){
                 localStorage.setItem('cosmicRememberedEmail', email);
@@ -4296,10 +4343,12 @@ function loginLocalAccount(){
             }
 
             resetPlayerProgress();
-            loadGame();
+            await loadGame();
             updateNicknameSettingsState();
             updatePremiumAccountInfo();
+            renderProfileStats?.();
             switchState('LOBBY');
+            saveGame();
         }catch(err){
             showAuthMessage('Ошибка входа: ' + (err?.message || err));
         }
@@ -4307,11 +4356,8 @@ function loginLocalAccount(){
 }
 function showForgotPassword(){
     const email = document.getElementById('login-email')?.value?.trim() || '';
-    const account = getStoredAccounts().find(acc => acc.email.toLowerCase() === email.toLowerCase());
     if(!email){ showAuthMessage('Сначала введи email, затем нажми «Забыли пароль?»'); return; }
-    if(!account){ showAuthMessage('Аккаунт с таким email не найден.'); return; }
-    const verifiedText = account.emailVerified ? 'почта подтверждена' : 'почта не подтверждена';
-    showAuthMessage(`Локальное восстановление: пароль для ${email} — ${account.password} (${verifiedText}).`);
+    showAuthMessage(`Для ${email} используй восстановление пароля через Supabase Dashboard или настрой SMTP позже.`);
 }
 function initAuthScreen(){
     ensureDeveloperAccount();
@@ -5513,42 +5559,38 @@ async function savePlayerToSupabase(playerData) {
     console.warn('Supabase не готов');
     return null;
   }
-
-  const { data: existing, error: existingError } = await window.supabaseClient
-    .from('players')
-    .select('*')
-    .eq('nickname', playerData.nickname)
-    .limit(1);
-
-  if (existingError) {
-    console.error('Ошибка проверки игрока:', existingError);
+  if (authState?.mode !== 'account' || !authState?.isAuthenticated) {
     return null;
   }
 
-  if (existing && existing.length > 0) {
-    console.log('Игрок уже есть в Supabase');
-    return existing[0];
-  }
+  const payload = {
+    auth_id: typeof playerData.auth_id !== 'undefined' ? playerData.auth_id : null,
+    email: playerData.email || authState.email || null,
+    nickname: playerData.nickname || player.nickname || 'Commander',
+    level: Number(playerData.level || player.level || 1),
+    credits: Number(playerData.credits || player.credits || 0)
+  };
 
   const { data, error } = await window.supabaseClient
     .from('players')
-    .insert([
-      {
-        nickname: playerData.nickname,
-        level: playerData.level,
-        credits: playerData.credits,
-        created_at: new Date().toISOString()
-      }
-    ])
-    .select();
+    .upsert(payload, { onConflict: 'auth_id' })
+    .select('public_id,nickname,level,credits,auth_id,email')
+    .single();
 
   if (error) {
     console.error('Ошибка сохранения игрока:', error);
     return null;
   }
 
-  console.log('Игрок сохранён в Supabase:', data);
-  return data[0];
+  if(data?.public_id){
+    authState.playerId = Number(data.public_id) || 0;
+    player.id = authState.playerId;
+  }
+  if(data?.nickname) player.nickname = data.nickname;
+  if(typeof data?.level !== 'undefined') player.level = Number(data.level) || 1;
+  if(typeof data?.credits !== 'undefined') player.credits = Number(data.credits) || 0;
+  updatePremiumAccountInfo?.();
+  return data;
 }
 
 async function ensureDefaultBattleRoomsInSupabase() {
@@ -5762,12 +5804,6 @@ window.addEventListener('load', async () => {
     return;
   }
 
-  await savePlayerToSupabase({
-    nickname: player.nickname,
-    level: player.level,
-    credits: player.credits
-  });
-
   await loadRoomsFromSupabase();
 
   if (typeof gameState !== 'undefined' && gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function') {
@@ -5911,5 +5947,4 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
     renderOnlinePlayers();
 }, 3000);
-
 
