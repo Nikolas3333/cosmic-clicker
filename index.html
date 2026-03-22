@@ -1974,9 +1974,7 @@ body.state-observe #ui{ display:none !important; }
         <input id="register-email" type="email" placeholder="Email">
         <input id="register-password" type="password" placeholder="Пароль">
         <button id="register-btn" class="auth-btn primary">Зарегистрироваться</button>
-        <input id="verify-code" type="text" placeholder="Код подтверждения из письма">
-        <button id="verify-email-btn" class="auth-btn ghost">Подтвердить почту</button>
-        <div class="auth-note">Подтверждение почты обязательно перед входом. В этой локальной версии письмо имитируется внутри игры.</div>
+        <div class="auth-note">После регистрации выполни обычный вход через Email и пароль.</div>
         <div class="auth-divider">или</div>
         <button id="guest-login-btn" class="auth-btn guest">Войти как гость</button>
         <div class="auth-note">У гостя прогресс не сохраняется.</div>
@@ -2113,6 +2111,7 @@ body.state-observe #ui{ display:none !important; }
   <div class="profile-content">
     <h2>Профиль</h2>
     <div id="profile-info"></div>
+    <div class="auth-note">Профиль, ID игрока и базовая статистика синхронизируются через Supabase.</div>
     <br>
     <button id="close-profile">Закрыть</button>
   </div>
@@ -2402,12 +2401,6 @@ console.log('🔥 Supabase подключен и готов к работе');
 
 <script type="module" src="main.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<script>
-const SUPABASE_URL = "https://htflrhpqrbwqvlyxgbpu.supabase.co";
-const SUPABASE_KEY = "sb_publishable_SWbPj79rY6fTYjaoHODtDg_0KNOSRLb";
-window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-</script>
 
 </body>
 </html>
