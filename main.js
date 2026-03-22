@@ -4169,69 +4169,141 @@ function openGameAsGuest(){
 function registerLocalAccount(){
     const email = document.getElementById('register-email')?.value?.trim() || '';
     const password = document.getElementById('register-password')?.value || '';
-    if(!email || !password){ showAuthMessage('Введите email и пароль для регистрации.'); return; }
-    const accounts = getStoredAccounts();
-    if(accounts.some(acc => acc.email.toLowerCase() === email.toLowerCase())){ showAuthMessage('Такой email уже зарегистрирован.'); return; }
-    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
-    const newAccount = {
-        email,
-        password,
-        nickname: email.split('@')[0] || 'Pilot',
-        id: getNextAccountId(accounts),
-        emailVerified: false,
-        verificationCode
-    };
-    accounts.push(newAccount);
-    saveStoredAccounts(accounts);
-    authState.pendingVerificationEmail = email;
-    authState.pendingVerificationCode = verificationCode;
-    const loginEmail = document.getElementById('login-email');
-    const loginPassword = document.getElementById('login-password');
-    if(loginEmail) loginEmail.value = email;
-    if(loginPassword) loginPassword.value = password;
-    showAuthMessage(`Письмо подтверждения отправлено для ${email}. Локальный код: ${verificationCode}`);
+    if(!email || !password){
+        showAuthMessage('Введите email и пароль для регистрации.');
+        return;
+    }
+
+    (async () => {
+        try{
+            const { data, error } = await window.supabaseClient.auth.signUp({
+                email,
+                password
+            });
+
+            if(error){
+                showAuthMessage('Ошибка: ' + error.message);
+                return;
+            }
+
+            const nickname = email.split('@')[0] || 'Pilot';
+
+            if(data?.user?.id){
+                const { error: playerError } = await window.supabaseClient
+                    .from('players')
+                    .upsert({
+                        auth_id: data.user.id,
+                        email: data.user.email || email,
+                        nickname: nickname
+                    }, {
+                        onConflict: 'auth_id'
+                    });
+
+                if(playerError){
+                    console.warn('Ошибка создания игрока в players:', playerError.message);
+                }
+            }
+
+            authState.pendingVerificationEmail = '';
+            authState.pendingVerificationCode = '';
+
+            const loginEmail = document.getElementById('login-email');
+            const loginPassword = document.getElementById('login-password');
+            if(loginEmail) loginEmail.value = email;
+            if(loginPassword) loginPassword.value = password;
+
+            showAuthMessage('Регистрация успешна. Теперь войди в аккаунт.');
+        }catch(err){
+            showAuthMessage('Ошибка: ' + (err?.message || err));
+        }
+    })();
 }
 function confirmEmailCode(){
-    const email = document.getElementById('register-email')?.value?.trim() || authState.pendingVerificationEmail || '';
-    const code = document.getElementById('verify-code')?.value?.trim() || '';
-    if(!email || !code){ showAuthMessage('Введи email и код подтверждения.'); return; }
-    const accounts = getStoredAccounts();
-    const account = accounts.find(acc => acc.email.toLowerCase() === email.toLowerCase());
-    if(!account){ showAuthMessage('Аккаунт для подтверждения не найден.'); return; }
-    if(String(account.verificationCode || '') !== code){ showAuthMessage('Неверный код подтверждения.'); return; }
-    account.emailVerified = true;
-    account.verificationCode = '';
-    saveStoredAccounts(accounts);
-    authState.pendingVerificationEmail = '';
-    authState.pendingVerificationCode = '';
-    showAuthMessage(`Почта ${email} подтверждена. Теперь можно выполнить вход.`);
+    showAuthMessage('Подтверждение кодом отключено. Используй обычную регистрацию и вход.');
 }
 function loginLocalAccount(){
     const email = document.getElementById('login-email')?.value?.trim() || '';
     const password = document.getElementById('login-password')?.value || '';
     const remember = document.getElementById('remember-password');
-    const account = getStoredAccounts().find(acc => acc.email.toLowerCase() === email.toLowerCase() && acc.password === password);
-    if(!account){ showAuthMessage('Неверный email или пароль.'); return; }
-    if(!account.emailVerified){ showAuthMessage('Сначала подтверди почту кодом из письма.'); return; }
-    authState.mode='account';
-    authState.email=email;
-    authState.password=password;
-    authState.isAuthenticated=true;
-    authState.playerId = Number(account.id) || 0;
-    authState.emailVerified = !!account.emailVerified;
-    player.nickname = account.nickname || email.split('@')[0] || 'Pilot';
-    if(remember?.checked){
-        localStorage.setItem('cosmicRememberedEmail', email);
-        localStorage.setItem('cosmicRememberedPassword', password);
-    } else {
-        localStorage.removeItem('cosmicRememberedEmail');
-        localStorage.removeItem('cosmicRememberedPassword');
+
+    if(!email || !password){
+        showAuthMessage('Введите email и пароль.');
+        return;
     }
-    resetPlayerProgress();
-    loadGame();
-    updateNicknameSettingsState();
-    updatePremiumAccountInfo();
-    switchState('LOBBY');
+
+    (async () => {
+        try{
+            const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+                email,
+                password
+            });
+
+            if(error){
+                showAuthMessage('Ошибка входа: ' + error.message);
+                return;
+            }
+
+            const user = data?.user;
+            authState.mode = 'account';
+            authState.email = email;
+            authState.password = password;
+            authState.isAuthenticated = true;
+            authState.emailVerified = true;
+            authState.pendingVerificationEmail = '';
+            authState.pendingVerificationCode = '';
+
+            const { data: playerRow, error: playerReadError } = await window.supabaseClient
+                .from('players')
+                .select('public_id,nickname,email,auth_id')
+                .eq('auth_id', user?.id || '')
+                .maybeSingle();
+
+            if(playerReadError){
+                console.warn('Ошибка чтения players:', playerReadError.message);
+            }
+
+            if(playerRow){
+                authState.playerId = Number(playerRow.public_id) || 0;
+                player.nickname = playerRow.nickname || (email.split('@')[0] || 'Pilot');
+            }else{
+                const nickname = email.split('@')[0] || 'Pilot';
+                const { data: insertedPlayer, error: playerInsertError } = await window.supabaseClient
+                    .from('players')
+                    .insert({
+                        auth_id: user?.id,
+                        email,
+                        nickname
+                    })
+                    .select('public_id,nickname')
+                    .single();
+
+                if(playerInsertError){
+                    console.warn('Ошибка создания players при входе:', playerInsertError.message);
+                    authState.playerId = 0;
+                    player.nickname = nickname;
+                }else{
+                    authState.playerId = Number(insertedPlayer?.public_id) || 0;
+                    player.nickname = insertedPlayer?.nickname || nickname;
+                }
+            }
+
+            if(remember?.checked){
+                localStorage.setItem('cosmicRememberedEmail', email);
+                localStorage.setItem('cosmicRememberedPassword', password);
+            }else{
+                localStorage.removeItem('cosmicRememberedEmail');
+                localStorage.removeItem('cosmicRememberedPassword');
+            }
+
+            resetPlayerProgress();
+            loadGame();
+            updateNicknameSettingsState();
+            updatePremiumAccountInfo();
+            switchState('LOBBY');
+        }catch(err){
+            showAuthMessage('Ошибка входа: ' + (err?.message || err));
+        }
+    })();
 }
 function showForgotPassword(){
     const email = document.getElementById('login-email')?.value?.trim() || '';
@@ -4243,7 +4315,7 @@ function showForgotPassword(){
 }
 function initAuthScreen(){
     ensureDeveloperAccount();
-    applyAuthUIState('Для разработчика почта calean3@gmail.com уже подтверждена локально.');
+    applyAuthUIState('Вход и регистрация работают через Supabase.');
     const loginBtn = document.getElementById('login-btn');
     const registerBtn = document.getElementById('register-btn');
     const guestBtn = document.getElementById('guest-login-btn');
@@ -5841,93 +5913,3 @@ setInterval(() => {
 }, 3000);
 
 
-// ===== AUTH SYSTEM =====
-async function registerUser(){
-    const email = document.querySelector('#auth-screen input[type="email"]').value;
-    const password = document.querySelectorAll('#auth-screen input[type="password"]')[0].value;
-
-    const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
-
-    if(error){
-        showAuthMessage("Ошибка: " + error.message);
-        return;
-    }
-
-    await window.supabaseClient.from('players').insert({
-        auth_id: data.user.id,
-        email: data.user.email,
-        nickname: "Commander"
-    });
-
-    showAuthMessage("Регистрация успешна!");
-}
-
-async function loginUser(){
-    const email = document.querySelector('#auth-screen input[type="email"]').value;
-    const password = document.querySelectorAll('#auth-screen input[type="password"]')[0].value;
-
-    const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
-
-    if(error){
-        showAuthMessage("Ошибка входа: " + error.message);
-        return;
-    }
-
-    switchState("LOBBY");
-}
-
-window.addEventListener("load", () => {
-    const buttons = document.querySelectorAll(".auth-btn");
-    if(buttons[0]) buttons[0].addEventListener("click", loginUser);
-    if(buttons[1]) buttons[1].addEventListener("click", registerUser);
-});
-
-
-
-// ===== SUPABASE AUTH OVERRIDE (FIX) =====
-
-// Полностью заменяем локальную систему
-async function registerLocalAccount(){
-    const email = document.querySelector('#auth-screen input[type="email"]').value;
-    const password = document.querySelectorAll('#auth-screen input[type="password"]')[0].value;
-
-    const { data, error } = await window.supabaseClient.auth.signUp({
-        email,
-        password
-    });
-
-    if(error){
-        showAuthMessage("Ошибка: " + error.message);
-        return;
-    }
-
-    await window.supabaseClient.from('players').insert({
-        auth_id: data.user.id,
-        email: data.user.email,
-        nickname: "Commander"
-    });
-
-    showAuthMessage("Регистрация успешна!");
-}
-
-async function loginLocalAccount(){
-    const email = document.querySelector('#auth-screen input[type="email"]').value;
-    const password = document.querySelectorAll('#auth-screen input[type="password"]')[0].value;
-
-    const { error } = await window.supabaseClient.auth.signInWithPassword({
-        email,
-        password
-    });
-
-    if(error){
-        showAuthMessage("Ошибка входа: " + error.message);
-        return;
-    }
-
-    switchState("LOBBY");
-}
-
-// убираем подтверждение кода полностью
-function confirmEmailCode(){
-    showAuthMessage("Код не нужен");
-}
