@@ -763,6 +763,100 @@ const playerResources = {
   crystals: 0
 }
 
+
+const RESOURCE_SYNC_KEYS = [
+  'mercury_ore',
+  'venus_gas',
+  'earth_water',
+  'mars_crystal',
+  'jupiter_hydrogen',
+  'saturn_ice',
+  'uranus_ammonia',
+  'neptune_methane',
+  'solar_energy',
+  'crystals'
+];
+
+let remotePlayerSyncTimer = null;
+
+function applyPlayerResourcesFromRow(row = {}) {
+  if(!row || typeof row !== 'object') return;
+
+  RESOURCE_SYNC_KEYS.forEach(key => {
+    if(typeof row[key] !== 'undefined' && row[key] !== null){
+      playerResources[key] = Number(row[key]) || 0;
+    }
+  });
+
+  if(typeof row.credits !== 'undefined' && row.credits !== null){
+    const creditsValue = Number(row.credits) || 0;
+    player.credits = creditsValue;
+    playerResources.coins = creditsValue;
+  }
+
+  updatePremiumAccountInfo?.();
+  updateHUD?.();
+  updateUI?.();
+  inventory.syncFromPlayerResources?.();
+  inventory.render?.();
+}
+
+function getPlayerResourceColumnsSelect(){
+  return ['credits', ...RESOURCE_SYNC_KEYS, 'is_banned', 'ban_reason', 'ban_until', 'is_muted', 'mute_reason', 'mute_until'].join(',');
+}
+
+async function loadPlayerResourcesFromSupabase(){
+  if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return null;
+
+  try{
+    const { data, error } = await window.supabaseClient
+      .from('players')
+      .select(getPlayerResourceColumnsSelect())
+      .eq('public_id', authState.playerId)
+      .maybeSingle();
+
+    if(error){
+      console.warn('Не удалось загрузить ресурсы игрока:', error.message);
+      return null;
+    }
+
+    if(data){
+      applyPlayerResourcesFromRow(data);
+
+      if(data.is_banned){
+        const banText = 'Аккаунт заблокирован: ' + (data.ban_reason || 'без причины');
+        showAuthMessage?.(banText);
+        stopRemotePlayerSync();
+        if(authState.isAuthenticated){
+          setTimeout(() => logoutToAuth(banText), 50);
+        }
+        return data || null;
+      }
+      window.playerMuted = !!data.is_muted;
+    }
+
+    return data || null;
+  }catch(error){
+    console.warn('Ошибка загрузки ресурсов игрока:', error?.message || error);
+    return null;
+  }
+}
+
+function startRemotePlayerSync(){
+  if(remotePlayerSyncTimer) clearInterval(remotePlayerSyncTimer);
+  if(authState.mode !== 'account' || !authState.playerId) return;
+  remotePlayerSyncTimer = setInterval(() => {
+    loadPlayerResourcesFromSupabase();
+  }, 3000);
+}
+
+function stopRemotePlayerSync(){
+  if(remotePlayerSyncTimer){
+    clearInterval(remotePlayerSyncTimer);
+    remotePlayerSyncTimer = null;
+  }
+}
+
 // Active planet (стартуем с Меркурия)
 let activePlanet = PLANETS.mercury
 
