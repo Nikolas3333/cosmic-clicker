@@ -328,19 +328,15 @@ function initBattleChat(){
         if(e.key === 'Enter' && !battleObserverMode){
             if(!battleChatOpen){
                 e.preventDefault();
-                if(window.playerMuted || player?.isMuted){
-                    alert('🚫 Чат временно недоступен: на аккаунте активен мут');
-                    return;
-                }
                 setBattleChatOpen(true);
             }else{
                 e.preventDefault();
-                if(window.playerMuted || player?.isMuted){
-                    alert('🚫 Чат временно недоступен: на аккаунте активен мут');
+                const text = input.value.trim();
+                if(window.playerMuted || player.isMuted){
+                    pushKillFeed('🔇 Мут активен. Сообщение не отправлено.', 'chat');
                     setBattleChatOpen(false);
                     return;
                 }
-                const text = input.value.trim();
                 if(text) pushBattleChatMessage(getDisplayPlayerTag(), text);
                 setBattleChatOpen(false);
             }
@@ -830,19 +826,16 @@ async function loadPlayerResourcesFromSupabase(){
 
     if(data){
       applyPlayerResourcesFromRow(data);
+      const isMutedNow = !!data.is_muted && (!data.mute_until || new Date(data.mute_until).getTime() > Date.now());
+      window.playerMuted = isMutedNow;
+      player.isMuted = isMutedNow;
+      player.muteReason = data.mute_reason || '';
+      player.muteUntil = data.mute_until || null;
 
-      const mutedNow = !!data.is_muted && (!data.mute_until || new Date(data.mute_until) > new Date());
-      window.playerMuted = mutedNow;
-      player.isMuted = mutedNow;
-
-      const bannedNow = !!data.is_banned && (!data.ban_until || new Date(data.ban_until) > new Date());
-      if(bannedNow){
+      if(data.is_banned && (!data.ban_until || new Date(data.ban_until).getTime() > Date.now())){
         stopRemotePlayerSync();
         showAuthMessage?.('Аккаунт заблокирован: ' + (data.ban_reason || 'без причины'));
-        if(gameState !== 'AUTH'){
-          setTimeout(() => logoutToAuth('Аккаунт заблокирован: ' + (data.ban_reason || 'без причины')), 50);
-        }
-        return data || null;
+        setTimeout(() => logoutToAuth('Аккаунт заблокирован: ' + (data.ban_reason || 'без причины')), 50);
       }
     }
 
@@ -2889,9 +2882,8 @@ const chatData = {
 };
 
 function sendMessage() {
-
-    if(window.playerMuted || player?.isMuted){
-        alert('🚫 Чат временно недоступен: на аккаунте активен мут');
+    if(window.playerMuted || player.isMuted){
+        alert('🔇 Мут активен. Вы не можете писать в чат.');
         return;
     }
 
@@ -4297,7 +4289,9 @@ function updateNicknameSettingsState(message=''){
     updatePremiumAccountInfo();
 }
 function logoutToAuth(message='Возврат в меню входа.'){
-    stopRemotePlayerSync();
+    stopRemotePlayerSync?.();
+    window.playerMuted = false;
+    player.isMuted = false;
     authState.mode = 'guest';
     authState.email = '';
     authState.password = '';
@@ -4345,7 +4339,9 @@ function applyAuthUIState(message=''){
     if(authMessage) authMessage.textContent = message;
 }
 function openGameAsGuest(){
-    stopRemotePlayerSync();
+    stopRemotePlayerSync?.();
+    window.playerMuted = false;
+    player.isMuted = false;
     authState.mode='guest';
     authState.email='';
     authState.password='';
