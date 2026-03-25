@@ -328,17 +328,107 @@ function initBattleChat(){
         if(e.key === 'Enter' && !battleObserverMode){
             if(!battleChatOpen){
                 e.preventDefault();
-                setBattleChatOpen(true);
+                if(canPlayerSendChat(false)) setBattleChatOpen(true);
+                else pushKillFeed('🚫 Чат недоступен из-за мута', 'chat');
             }else{
                 e.preventDefault();
                 const text = input.value.trim();
-                if(text) pushBattleChatMessage(getDisplayPlayerTag(), text);
+                if(text) sendBattleChatMessage(text);
                 setBattleChatOpen(false);
             }
         } else if(e.key === 'Escape' && battleChatOpen){
             setBattleChatOpen(false);
         }
     });
+}
+
+function appendBattleChatMessage(messageData){
+    const log = document.getElementById('battle-chat-log');
+    if(!log) return;
+    const row = document.createElement('div');
+    row.dataset.messageId = messageData.id || '';
+    const authorSpan = document.createElement('span');
+    authorSpan.style.color = '#8deaff';
+    authorSpan.textContent = `${messageData.author}: `;
+    row.appendChild(authorSpan);
+    row.appendChild(document.createTextNode(messageData.text));
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+    while(log.children.length > 20){
+        log.removeChild(log.firstChild);
+    }
+}
+
+async function loadBattleChatMessages(){
+    if(!window.supabaseReady || !window.supabaseClient || !activeBattleChatRoomKey) return;
+    try{
+        const { data, error } = await window.supabaseClient
+            .from('chat_messages')
+            .select('*')
+            .eq('channel', 'battle')
+            .eq('room_key', activeBattleChatRoomKey)
+            .order('created_at', { ascending: true })
+            .limit(30);
+        if(error){
+            console.warn('Ошибка загрузки battle-чата:', error.message);
+            return;
+        }
+        const log = document.getElementById('battle-chat-log');
+        if(log) log.innerHTML = '';
+        (data || []).forEach(row => appendBattleChatMessage({
+            id: row.id,
+            author: row.nickname || 'Unknown',
+            text: row.message || ''
+        }));
+    }catch(error){
+        console.warn('Ошибка загрузки battle-чата:', error?.message || error);
+    }
+}
+
+function ensureBattleChatRealtime(){
+    if(!window.supabaseReady || !window.supabaseClient || !activeBattleChatRoomKey) return;
+    if(battleChatRealtimeChannel){
+        window.supabaseClient.removeChannel(battleChatRealtimeChannel);
+        battleChatRealtimeChannel = null;
+    }
+    battleChatRealtimeChannel = window.supabaseClient
+        .channel(`public:chat_messages:battle:${activeBattleChatRoomKey}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, payload => {
+            const row = payload?.new;
+            if(!row || row.channel !== 'battle' || row.room_key !== activeBattleChatRoomKey) return;
+            const log = document.getElementById('battle-chat-log');
+            if(log && row.id && log.querySelector(`[data-message-id="${row.id}"]`)) return;
+            appendBattleChatMessage({ id: row.id, author: row.nickname || 'Unknown', text: row.message || '' });
+            pushKillFeed(`${row.nickname || 'Unknown'}: ${row.message || ''}`, 'chat');
+        })
+        .subscribe();
+}
+
+function setupBattleChatRealtime(){
+    activeBattleChatRoomKey = getBattleChatRoomKey();
+    loadBattleChatMessages();
+    ensureBattleChatRealtime();
+}
+
+async function sendBattleChatMessage(text){
+    if(!text) return;
+    if(!canPlayerSendChat(true)) return;
+    if(window.supabaseReady && window.supabaseClient){
+        const payload = {
+            channel: 'battle',
+            room_key: getBattleChatRoomKey(),
+            player_public_id: authState.playerId || null,
+            nickname: getChatAuthorName(),
+            message: text
+        };
+        const { error } = await window.supabaseClient.from('chat_messages').insert(payload);
+        if(error){
+            console.warn('Ошибка battle-чата:', error.message);
+            pushKillFeed('Не удалось отправить сообщение', 'chat');
+        }
+        return;
+    }
+    pushBattleChatMessage(getDisplayPlayerTag(), text);
 }
 
 // ===== LOBBY STATIC BACKGROUNDS + LIGHT PARALLAX =====
@@ -501,6 +591,11 @@ function clearBattleScene(){
     setBattleChatOpen(false);
     const feed = document.getElementById('kill-feed'); if(feed) feed.innerHTML = "";
     const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = "";
+    activeBattleChatRoomKey = null;
+    if(battleChatRealtimeChannel && window.supabaseClient){
+        window.supabaseClient.removeChannel(battleChatRealtimeChannel);
+        battleChatRealtimeChannel = null;
+    }
 }
 
 function switchState(newState){
@@ -600,6 +695,7 @@ if(gameState === "BATTLE"){
     battleObserverMode = false;
     enterBattleMap(targetMap);
     initBattleChat();
+    setupBattleChatRealtime();
     if(battleObserverMode){
         setupObserverBattle(targetMap);
         const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
@@ -627,6 +723,7 @@ if(gameState === "OBSERVE"){
     }
     const targetMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "Земля";
     setupObserverBattle(targetMap);
+    setupBattleChatRealtime();
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
@@ -832,7 +929,12 @@ async function loadPlayerResourcesFromSupabase(){
         }
         return data || null;
       }
-      window.playerMuted = !!data.is_muted;
+      const muteUntilMs = data.mute_until ? new Date(data.mute_until).getTime() : 0;
+      const muteActive = !!data.is_muted && (!muteUntilMs || muteUntilMs > Date.now());
+      window.playerMuted = muteActive;
+      window.playerMuteUntil = muteActive ? data.mute_until || null : null;
+      window.playerMuteReason = muteActive ? (data.mute_reason || '') : '';
+      updateMutedChatState?.();
     }
 
     return data || null;
@@ -2019,8 +2121,7 @@ async function saveRemoteProgress(){
             uranus_ammonia: Number(playerResources.uranus_ammonia || 0),
             neptune_methane: Number(playerResources.neptune_methane || 0),
             solar_energy: Number(playerResources.solar_energy || 0),
-            crystals: Number(playerResources.crystals || 0),
-            is_muted: !!window.playerMuted
+            crystals: Number(playerResources.crystals || 0)
         };
 
         await window.supabaseClient.from('players').update(playerRowUpdate).eq('public_id', authState.playerId);
@@ -2874,45 +2975,103 @@ const chatSend = document.getElementById("chat-send");
 const chatMessages = document.getElementById("chat-messages");
 
 let currentChat = "general";
+let chatRealtimeChannel = null;
+let battleChatRealtimeChannel = null;
+let activeBattleChatRoomKey = null;
 
 const chatData = {
     general: [],
     private: []
 };
 
-function sendMessage() {
+function escapeChatHtml(value){
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+}
 
-    const text = chatInput.value.trim();
-    if(text === "") return;
+function getNowTimeString(dateValue = new Date()){
+    const now = new Date(dateValue);
+    return now.getHours().toString().padStart(2,"0") + ":" +
+           now.getMinutes().toString().padStart(2,"0");
+}
 
-    const now = new Date();
-    const time = now.getHours().toString().padStart(2,"0") + ":" +
-                 now.getMinutes().toString().padStart(2,"0");
+function getChatAuthorName(){
+    return (player?.nickname || 'Commander').trim() || 'Commander';
+}
 
-    chatData[currentChat].push({
-        time: time,
-        author: getDisplayPlayerTag(),
-        text: text
-    });
+function getGeneralChatRoomKey(){
+    return 'global_lobby';
+}
 
-    chatInput.value = "";
+function getBattleChatRoomKey(){
+    return String(currentRoom?.id || currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || 'global_battle');
+}
 
-    renderMessages();
+function canPlayerSendChat(showMessage = true){
+    const muteUntilMs = window.playerMuteUntil ? new Date(window.playerMuteUntil).getTime() : 0;
+    if(window.playerMuted && muteUntilMs && muteUntilMs <= Date.now()){
+        window.playerMuted = false;
+        window.playerMuteUntil = null;
+        window.playerMuteReason = '';
+        updateMutedChatState?.();
+    }
+    if(window.playerMuted){
+        const muteText = window.playerMuteUntil ? ` до ${new Date(window.playerMuteUntil).toLocaleString()}` : '';
+        const reasonText = window.playerMuteReason ? ` (${window.playerMuteReason})` : '';
+        const text = `🚫 Чат заблокирован${muteText}${reasonText}`;
+        if(showMessage){
+            if(gameState === 'BATTLE'){
+                pushKillFeed(text, 'chat');
+            }else{
+                receiveMessage('general', 'SYSTEM', text);
+            }
+        }
+        return false;
+    }
+    return true;
+}
+
+function updateMutedChatState(){
+    const muted = !!window.playerMuted;
+    if(chatInput){
+        chatInput.disabled = muted;
+        chatInput.placeholder = muted ? 'Чат временно недоступен из-за мута' : 'Введите сообщение...';
+    }
+    if(chatSend) chatSend.disabled = muted;
+    const battleInput = document.getElementById('battle-chat-input');
+    if(battleInput){
+        battleInput.disabled = muted;
+        battleInput.placeholder = muted ? 'Мут активен' : 'Введите сообщение...';
+    }
+}
+
+function addChatMessageLocal(chatType, messageData){
+    if(!chatData[chatType]) chatData[chatType] = [];
+    const exists = chatData[chatType].some(msg => msg.id && messageData.id && msg.id === messageData.id);
+    if(exists) return;
+    chatData[chatType].push(messageData);
+    chatData[chatType].sort((a,b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    if(chatData[chatType].length > 80){
+        chatData[chatType] = chatData[chatType].slice(-80);
+    }
 }
 
 function renderMessages(){
-
+    if(!chatMessages) return;
     chatMessages.innerHTML = "";
 
     chatData[currentChat].forEach(msg => {
-
         const message = document.createElement("div");
-        message.className = "chat-message";
+        message.className = "chat-message" + (msg.author === 'SYSTEM' ? ' system' : '');
 
         message.innerHTML = `
-            <span class="chat-time">[${msg.time}]</span>
-            <span class="chat-author">${msg.author}:</span>
-            ${msg.text}
+            <span class="chat-time">[${escapeChatHtml(msg.time || getNowTimeString(msg.created_at))}]</span>
+            <span class="chat-author">${escapeChatHtml(msg.author || 'Unknown')}:</span>
+            ${escapeChatHtml(msg.text || '')}
         `;
 
         chatMessages.appendChild(message);
@@ -2921,70 +3080,115 @@ function renderMessages(){
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Переключение вкладок
-const tabs = document.querySelectorAll(".chat-tab");
-
-tabs.forEach((tab, index) => {
-
-    tab.addEventListener("click", () => {
-
-        tabs.forEach(t => {
-            t.classList.remove("active");
-            t.classList.remove("notify");
-        });
-
-        tab.classList.add("active");
-        currentChat = index === 0 ? "general" : "private";
+async function loadChatMessagesFromSupabase(){
+    if(!window.supabaseReady || !window.supabaseClient || !chatMessages) return;
+    try{
+        const { data, error } = await window.supabaseClient
+            .from('chat_messages')
+            .select('*')
+            .eq('channel', 'general')
+            .eq('room_key', getGeneralChatRoomKey())
+            .order('created_at', { ascending: true })
+            .limit(60);
+        if(error){
+            console.warn('Ошибка загрузки чата:', error.message);
+            return;
+        }
+        chatData.general = (data || []).map(msg => ({
+            id: msg.id,
+            time: getNowTimeString(msg.created_at),
+            author: msg.nickname || 'Unknown',
+            text: msg.message || '',
+            created_at: msg.created_at
+        }));
         renderMessages();
-    });
-
-});
-
-if(chatSend){
-  chatSend.addEventListener("click", sendMessage);
+    }catch(error){
+        console.warn('Ошибка realtime чата:', error?.message || error);
+    }
 }
 
-if(chatInput){
-  chatInput.addEventListener("keydown", function(e){
-      if(e.key === "Enter"){
-          sendMessage();
-      }
-  });
+function ensureGeneralChatRealtime(){
+    if(!window.supabaseReady || !window.supabaseClient) return;
+    if(chatRealtimeChannel){
+        window.supabaseClient.removeChannel(chatRealtimeChannel);
+        chatRealtimeChannel = null;
+    }
+    chatRealtimeChannel = window.supabaseClient
+        .channel('public:chat_messages:general')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, payload => {
+            const row = payload?.new;
+            if(!row || row.channel !== 'general' || row.room_key !== getGeneralChatRoomKey()) return;
+            addChatMessageLocal('general', {
+                id: row.id,
+                time: getNowTimeString(row.created_at),
+                author: row.nickname || 'Unknown',
+                text: row.message || '',
+                created_at: row.created_at
+            });
+            if(currentChat !== 'general'){
+                tabs[0]?.classList.add('notify');
+            }else{
+                renderMessages();
+            }
+        })
+        .subscribe();
 }
 
+async function sendMessage() {
+    if(!chatInput) return;
+    const text = chatInput.value.trim();
+    if(text === "") return;
+    if(!canPlayerSendChat(true)) return;
+
+    if(window.supabaseReady && window.supabaseClient){
+        const payload = {
+            channel: 'general',
+            room_key: getGeneralChatRoomKey(),
+            player_public_id: authState.playerId || null,
+            nickname: getChatAuthorName(),
+            message: text
+        };
+        const { error } = await window.supabaseClient.from('chat_messages').insert(payload);
+        if(error){
+            console.warn('Ошибка отправки чата:', error.message);
+            receiveMessage('general', 'SYSTEM', 'Не удалось отправить сообщение');
+            return;
+        }
+    }else{
+        addChatMessageLocal(currentChat, {
+            id: `local-${Date.now()}`,
+            time: getNowTimeString(),
+            author: getDisplayPlayerTag(),
+            text,
+            created_at: new Date().toISOString()
+        });
+        renderMessages();
+    }
+
+    chatInput.value = "";
+}
 // ================= NOTIFICATION SYSTEM =================
 
 // Функция получения сообщения (имитация входящего)
 function receiveMessage(chatType, author, text){
-
-    const now = new Date();
-    const time = now.getHours().toString().padStart(2,"0") + ":" +
-                 now.getMinutes().toString().padStart(2,"0");
-
-    chatData[chatType].push({
-        time: time,
+    addChatMessageLocal(chatType, {
+        id: `local-${chatType}-${Date.now()}-${Math.random()}`,
+        time: getNowTimeString(),
         author: author,
-        text: text
+        text: text,
+        created_at: new Date().toISOString()
     });
 
     if(chatType !== currentChat){
-
         if(chatType === "general"){
-            tabs[0].classList.add("notify");
+            tabs[0]?.classList.add("notify");
         } else {
-            tabs[1].classList.add("notify");
+            tabs[1]?.classList.add("notify");
         }
-
     } else {
         renderMessages();
     }
 }
-
-
-// ТЕСТ (можешь потом удалить)
-setTimeout(() => {
-    receiveMessage("private", "Николас", "Привет, это ЛС 👀");
-}, 3000);
 
 
 // ===== EMOJI CLICK SYSTEM =====
@@ -4031,6 +4235,11 @@ function clearBattleObstacles(){
     setBattleChatOpen(false);
     const feed = document.getElementById('kill-feed'); if(feed) feed.innerHTML = "";
     const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = "";
+    activeBattleChatRoomKey = null;
+    if(battleChatRealtimeChannel && window.supabaseClient){
+        window.supabaseClient.removeChannel(battleChatRealtimeChannel);
+        battleChatRealtimeChannel = null;
+    }
 }
 
 function createBattleObstacles(mapKey){
@@ -4289,7 +4498,17 @@ function updateNicknameSettingsState(message=''){
 }
 function logoutToAuth(message='Возврат в меню входа.'){
     stopRemotePlayerSync();
+    if(chatRealtimeChannel && window.supabaseClient){
+        window.supabaseClient.removeChannel(chatRealtimeChannel);
+        chatRealtimeChannel = null;
+    }
+    if(battleChatRealtimeChannel && window.supabaseClient){
+        window.supabaseClient.removeChannel(battleChatRealtimeChannel);
+        battleChatRealtimeChannel = null;
+    }
     window.playerMuted = false;
+    window.playerMuteUntil = null;
+    window.playerMuteReason = '';
     authState.mode = 'guest';
     authState.email = '';
     authState.password = '';
@@ -4348,6 +4567,9 @@ function openGameAsGuest(){
     player.nickname='Guest Pilot';
     resetPlayerProgress();
     updatePremiumAccountInfo();
+    loadChatMessagesFromSupabase?.();
+    ensureGeneralChatRealtime?.();
+    updateMutedChatState?.();
     switchState('LOBBY');
 }
 function registerLocalAccount(){
@@ -4459,6 +4681,9 @@ function loginLocalAccount(){
             applyPlayerResourcesFromRow(playerRow || {});
             await loadGame();
             startRemotePlayerSync();
+            await loadChatMessagesFromSupabase();
+            ensureGeneralChatRealtime();
+            updateMutedChatState();
             updateNicknameSettingsState();
             updatePremiumAccountInfo();
             renderProfileStats?.();
