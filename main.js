@@ -763,93 +763,6 @@ const playerResources = {
   crystals: 0
 }
 
-const RESOURCE_SYNC_KEYS = [
-  'mercury_ore',
-  'venus_gas',
-  'earth_water',
-  'mars_crystal',
-  'jupiter_hydrogen',
-  'saturn_ice',
-  'uranus_ammonia',
-  'neptune_methane',
-  'solar_energy',
-  'crystals'
-];
-
-let remotePlayerSyncTimer = null;
-
-function applyPlayerResourcesFromRow(row = {}) {
-  if(!row || typeof row !== 'object') return;
-
-  RESOURCE_SYNC_KEYS.forEach(key => {
-    if(typeof row[key] !== 'undefined' && row[key] !== null){
-      playerResources[key] = Number(row[key]) || 0;
-    }
-  });
-
-  if(typeof row.credits !== 'undefined' && row.credits !== null){
-    const creditsValue = Number(row.credits) || 0;
-    player.credits = creditsValue;
-    playerResources.coins = creditsValue;
-  }
-
-  updatePremiumAccountInfo?.();
-  updateHUD?.();
-  updateUI?.();
-  inventory.syncFromPlayerResources?.();
-  inventory.render?.();
-}
-
-function getPlayerResourceColumnsSelect(){
-  return ['credits', ...RESOURCE_SYNC_KEYS, 'is_banned', 'ban_reason', 'ban_until', 'is_muted', 'mute_reason', 'mute_until'].join(',');
-}
-
-async function loadPlayerResourcesFromSupabase(){
-  if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return null;
-
-  try{
-    const { data, error } = await window.supabaseClient
-      .from('players')
-      .select(getPlayerResourceColumnsSelect())
-      .eq('public_id', authState.playerId)
-      .maybeSingle();
-
-    if(error){
-      console.warn('Не удалось загрузить ресурсы игрока:', error.message);
-      return null;
-    }
-
-    if(data){
-      applyPlayerResourcesFromRow(data);
-
-      if(data.is_banned){
-        showAuthMessage?.('Аккаунт заблокирован: ' + (data.ban_reason || 'без причины'));
-      }
-      window.playerMuted = !!data.is_muted;
-    }
-
-    return data || null;
-  }catch(error){
-    console.warn('Ошибка загрузки ресурсов игрока:', error?.message || error);
-    return null;
-  }
-}
-
-function startRemotePlayerSync(){
-  if(remotePlayerSyncTimer) clearInterval(remotePlayerSyncTimer);
-  if(authState.mode !== 'account' || !authState.playerId) return;
-  remotePlayerSyncTimer = setInterval(() => {
-    loadPlayerResourcesFromSupabase();
-  }, 3000);
-}
-
-function stopRemotePlayerSync(){
-  if(remotePlayerSyncTimer){
-    clearInterval(remotePlayerSyncTimer);
-    remotePlayerSyncTimer = null;
-  }
-}
-
 // Active planet (стартуем с Меркурия)
 let activePlanet = PLANETS.mercury
 
@@ -1940,7 +1853,6 @@ function applySaveData(save){
     damage = Number(save.damage || 1);
     player.level = Number(save.playerLevel || currentLevel || 1);
     player.credits = Number(save.credits || player.credits || 0);
-    playerResources.coins = Number(save.credits || playerResources.coins || player.credits || 0);
     if(save.nickname) player.nickname = String(save.nickname).slice(0, 20);
     if(save.playerResources){
         for(const key in playerResources){
@@ -1982,6 +1894,7 @@ async function loadGame(){
     }
     const remoteSave = await loadRemoteSaveFromSupabase();
     if(remoteSave) applySaveData(remoteSave);
+    await loadPlayerResourcesFromSupabase();
 }
 
 function buildSavePayload(){
@@ -1999,10 +1912,10 @@ async function saveRemoteProgress(){
     if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return;
     const payload = buildSavePayload();
     try{
-        await window.supabaseClient.from('players').update({
+        const playerRowUpdate = {
             nickname: player.nickname,
             level: player.level,
-            credits: Number(playerResources.coins || player.credits || 0),
+            credits: player.credits,
             mercury_ore: Number(playerResources.mercury_ore || 0),
             venus_gas: Number(playerResources.venus_gas || 0),
             earth_water: Number(playerResources.earth_water || 0),
@@ -2012,8 +1925,11 @@ async function saveRemoteProgress(){
             uranus_ammonia: Number(playerResources.uranus_ammonia || 0),
             neptune_methane: Number(playerResources.neptune_methane || 0),
             solar_energy: Number(playerResources.solar_energy || 0),
-            crystals: Number(playerResources.crystals || 0)
-        }).eq('public_id', authState.playerId);
+            crystals: Number(playerResources.crystals || 0),
+            is_muted: !!window.playerMuted
+        };
+
+        await window.supabaseClient.from('players').update(playerRowUpdate).eq('public_id', authState.playerId);
 
         const { error } = await window.supabaseClient.from('player_saves').upsert({
             player_public_id: authState.playerId,
@@ -4278,6 +4194,8 @@ function updateNicknameSettingsState(message=''){
     updatePremiumAccountInfo();
 }
 function logoutToAuth(message='Возврат в меню входа.'){
+    stopRemotePlayerSync();
+    window.playerMuted = false;
     authState.mode = 'guest';
     authState.email = '';
     authState.password = '';
@@ -4325,6 +4243,8 @@ function applyAuthUIState(message=''){
     if(authMessage) authMessage.textContent = message;
 }
 function openGameAsGuest(){
+    stopRemotePlayerSync();
+    window.playerMuted = false;
     authState.mode='guest';
     authState.email='';
     authState.password='';
@@ -4396,7 +4316,7 @@ function loginLocalAccount(){
 
             const existingRes = await window.supabaseClient
                 .from('players')
-                .select('public_id,nickname,email,auth_id,level,credits,created_at,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                .select('public_id,nickname,email,auth_id,level,credits,created_at,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals,is_banned,ban_reason,ban_until,is_muted,mute_reason,mute_until')
                 .eq('auth_id', user?.id || '')
                 .maybeSingle();
 
@@ -4413,20 +4333,10 @@ function loginLocalAccount(){
                         email,
                         nickname,
                         level: player.level || 1,
-                        credits: Number(playerResources.coins || player.credits || 500),
-                        mercury_ore: Number(playerResources.mercury_ore || 0),
-                        venus_gas: Number(playerResources.venus_gas || 0),
-                        earth_water: Number(playerResources.earth_water || 0),
-                        mars_crystal: Number(playerResources.mars_crystal || 0),
-                        jupiter_hydrogen: Number(playerResources.jupiter_hydrogen || 0),
-                        saturn_ice: Number(playerResources.saturn_ice || 0),
-                        uranus_ammonia: Number(playerResources.uranus_ammonia || 0),
-                        neptune_methane: Number(playerResources.neptune_methane || 0),
-                        solar_energy: Number(playerResources.solar_energy || 0),
-                        crystals: Number(playerResources.crystals || 0),
+                        credits: player.credits || 500,
                         created_at: new Date().toISOString()
                     })
-                    .select('public_id,nickname,email,auth_id,level,credits,created_at,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                    .select('public_id,nickname,email,auth_id,level,credits,created_at,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals,is_banned,ban_reason,ban_until,is_muted,mute_reason,mute_until')
                     .single();
 
                 if(insertRes.error){
@@ -4441,6 +4351,7 @@ function loginLocalAccount(){
             player.nickname = playerRow?.nickname || nickname;
             player.level = Number(playerRow?.level || player.level || 1);
             player.credits = Number(playerRow?.credits || player.credits || 500);
+            applyPlayerResourcesFromRow(playerRow || {});
 
             if(remember?.checked){
                 localStorage.setItem('cosmicRememberedEmail', email);
@@ -4451,8 +4362,8 @@ function loginLocalAccount(){
             }
 
             resetPlayerProgress();
+            applyPlayerResourcesFromRow(playerRow || {});
             await loadGame();
-            await loadPlayerResourcesFromSupabase();
             startRemotePlayerSync();
             updateNicknameSettingsState();
             updatePremiumAccountInfo();
@@ -5678,23 +5589,13 @@ async function savePlayerToSupabase(playerData) {
     email: playerData.email || authState.email || null,
     nickname: playerData.nickname || player.nickname || 'Commander',
     level: Number(playerData.level || player.level || 1),
-    credits: Number(playerData.credits || playerResources.coins || player.credits || 0),
-    mercury_ore: Number(playerResources.mercury_ore || 0),
-    venus_gas: Number(playerResources.venus_gas || 0),
-    earth_water: Number(playerResources.earth_water || 0),
-    mars_crystal: Number(playerResources.mars_crystal || 0),
-    jupiter_hydrogen: Number(playerResources.jupiter_hydrogen || 0),
-    saturn_ice: Number(playerResources.saturn_ice || 0),
-    uranus_ammonia: Number(playerResources.uranus_ammonia || 0),
-    neptune_methane: Number(playerResources.neptune_methane || 0),
-    solar_energy: Number(playerResources.solar_energy || 0),
-    crystals: Number(playerResources.crystals || 0)
+    credits: Number(playerData.credits || player.credits || 0)
   };
 
   const { data, error } = await window.supabaseClient
     .from('players')
     .upsert(payload, { onConflict: 'auth_id' })
-    .select('public_id,nickname,level,credits,auth_id,email,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+    .select('public_id,nickname,level,credits,auth_id,email')
     .single();
 
   if (error) {
@@ -5709,7 +5610,6 @@ async function savePlayerToSupabase(playerData) {
   if(data?.nickname) player.nickname = data.nickname;
   if(typeof data?.level !== 'undefined') player.level = Number(data.level) || 1;
   if(typeof data?.credits !== 'undefined') player.credits = Number(data.credits) || 0;
-  applyPlayerResourcesFromRow(data || {});
   updatePremiumAccountInfo?.();
   return data;
 }
