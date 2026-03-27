@@ -280,13 +280,7 @@ function pushKillFeed(text, type='kill'){
     }
     setTimeout(() => item.remove(), type === 'chat' ? 9000 : 7000);
 }
-function pushBattleChatMessage(author, text){
-    const log = document.getElementById('battle-chat-log');
-    if(log){
-        const row = document.createElement('div');
-        const authorSpan = document.createElement('span');
-        authorSpan.style.color = '#8deaff';
-        authorSpan.textContent = `${author}: `;
+: `;
         row.appendChild(authorSpan);
         row.appendChild(document.createTextNode(text));
         log.appendChild(row);
@@ -319,17 +313,7 @@ function setBattleChatOpen(open){
         }
     }
 }
-function initBattleChat(){
-    const input = document.getElementById('battle-chat-input');
-    if(!input || input.dataset.bound) return;
-    input.dataset.bound = '1';
-    document.addEventListener('keydown', (e) => {
-        if(gameState !== 'BATTLE') return;
-        if(e.key === 'Enter' && !battleObserverMode){
-            if(!battleChatOpen){
-                e.preventDefault();
-                setBattleChatOpen(true);
-            }else{
+else{
                 e.preventDefault();
                 const text = input.value.trim();
                 if(window.playerMuted || player.isMuted){
@@ -3099,16 +3083,6 @@ function startRealtimeChat() {
         });
 }
 
-function getValidChatPlayerId(){
-    const rawId = player?.id ?? null;
-    if(rawId === null || typeof rawId === "undefined") return null;
-
-    const value = String(rawId).trim();
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    return uuidRegex.test(value) ? value : null;
-}
-
 async function sendMessage(forcedScopeName = null, explicitText = null) {
     if (!window.supabaseClient) {
         addSystemLobbyChatMessage("Supabase ещё не готов для чата.");
@@ -3160,7 +3134,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     const payload = {
         channel: scope.channel,
         room_id: scope.channel === "battle" ? String(scope.roomId) : null,
-        player_id: getValidChatPlayerId(),
+        player_id: player?.id ? String(player.id) : null,
         player_nickname: typeof getDisplayPlayerTag === "function" ? getDisplayPlayerTag() : (player?.nickname || "Commander"),
         message: text
     };
