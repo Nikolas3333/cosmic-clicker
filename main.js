@@ -2898,6 +2898,11 @@ const chatCache = {
     pm: {}
 };
 const privateChatTabs = {};
+const chatUnread = {
+    global: false,
+    battle: false,
+    pm: {}
+};
 
 function escapeChatHtml(text = "") {
     return String(text)
@@ -2908,12 +2913,13 @@ function escapeChatHtml(text = "") {
         .replace(/'/g, "&#039;");
 }
 
+function canUsePrivateChat() {
+    return !!(typeof authState !== "undefined" && authState?.mode === "account" && authState?.playerId);
+}
+
 function getOwnPublicChatId() {
-    if (typeof authState !== "undefined" && authState?.playerId) {
+    if (canUsePrivateChat()) {
         return String(authState.playerId);
-    }
-    if (player?.id && /^\d+$/.test(String(player.id))) {
-        return String(player.id);
     }
     return null;
 }
@@ -2953,9 +2959,7 @@ function parseChatScope(scopeName = currentChat) {
 }
 
 function getChatCacheList(scope) {
-    if (scope.channel === "battle") {
-        return chatCache.battle;
-    }
+    if (scope.channel === "battle") return chatCache.battle;
     if (scope.channel === "pm") {
         const peerId = String(scope.peerId || "");
         if (!chatCache.pm[peerId]) chatCache.pm[peerId] = [];
@@ -2969,19 +2973,13 @@ function pushChatToCache(scope, msg) {
     if (list.some(item => String(item.id) === String(msg.id))) return false;
     list.push(msg);
     list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    while (list.length > CHAT_MESSAGE_LIMIT) {
-        list.shift();
-    }
+    while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
     return true;
 }
 
 function formatChatTime(dateStr) {
     const d = new Date(dateStr || Date.now());
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function getPmPeerLabel(peerId) {
-    return privateChatTabs[String(peerId)]?.label || `ID ${peerId}`;
 }
 
 function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
@@ -3038,6 +3036,28 @@ function addSystemBattleChatMessage(text) {
     battleLog.scrollTop = battleLog.scrollHeight;
 }
 
+function resetPrivateChatState() {
+    Object.keys(privateChatTabs).forEach(key => delete privateChatTabs[key]);
+    Object.keys(chatCache.pm).forEach(key => delete chatCache.pm[key]);
+    Object.keys(chatUnread.pm).forEach(key => delete chatUnread.pm[key]);
+    currentChat = "global";
+}
+
+function setUnreadForScope(scopeName, state = true) {
+    const scope = parseChatScope(scopeName);
+    if (scope.channel === "battle") {
+        chatUnread.battle = !!state;
+    } else if (scope.channel === "pm") {
+        chatUnread.pm[String(scope.peerId)] = !!state;
+    } else {
+        chatUnread.global = !!state;
+    }
+}
+
+function clearUnreadForCurrentScope() {
+    setUnreadForScope(currentChat, false);
+}
+
 function ensurePmTab(peerId, label = null) {
     const key = String(peerId || "").trim();
     if (!key) return;
@@ -3076,14 +3096,15 @@ function renderChatTabs() {
         .sort((a, b) => (b[1]?.updatedAt || 0) - (a[1]?.updatedAt || 0));
 
     let html = `
-      <button class="chat-tab${currentChat === "global" ? " active" : ""}" data-scope="global" type="button">Global</button>
-      <button class="chat-tab${currentChat === "battle" ? " active" : ""}" data-scope="battle" type="button">Battle</button>
+      <button class="chat-tab${currentChat === "global" ? " active" : ""}${chatUnread.global && currentChat !== "global" ? " notify" : ""}" data-scope="global" type="button">Global</button>
+      <button class="chat-tab${currentChat === "battle" ? " active" : ""}${chatUnread.battle && currentChat !== "battle" ? " notify" : ""}" data-scope="battle" type="button">Battle</button>
     `;
 
     pmEntries.forEach(([peerId, meta]) => {
         const label = escapeChatHtml(meta?.label || `ID ${peerId}`);
         const scope = getPrivateScopeKey(peerId);
-        html += `<button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}" data-scope="${scope}" type="button">${label}</button>`;
+        const notify = chatUnread.pm[String(peerId)] && currentChat !== scope ? " notify" : "";
+        html += `<button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}" data-scope="${scope}" type="button">${label}</button>`;
     });
 
     chatTabsWrap.innerHTML = html;
@@ -3091,6 +3112,7 @@ function renderChatTabs() {
     chatTabsWrap.querySelectorAll(".chat-tab").forEach((tab) => {
         tab.addEventListener("click", async () => {
             currentChat = tab.dataset.scope || "global";
+            clearUnreadForCurrentScope();
             renderChatTabs();
             await loadChatHistory(currentChat);
             renderLobbyMessages();
@@ -3137,11 +3159,8 @@ async function loadChatHistory(scopeName = currentChat) {
 
     if (error) {
         console.error("❌ Ошибка загрузки чата:", error);
-        if (scope.channel === "battle") {
-            addSystemBattleChatMessage("Ошибка загрузки боевого чата");
-        } else {
-            addSystemLobbyChatMessage("Ошибка загрузки чата");
-        }
+        if (scope.channel === "battle") addSystemBattleChatMessage("Ошибка загрузки боевого чата");
+        else addSystemLobbyChatMessage("Ошибка загрузки чата");
         return;
     }
 
@@ -3157,12 +3176,10 @@ async function loadChatHistory(scopeName = currentChat) {
         }
     }
 
-    if (currentChat === scopeName) {
-        renderLobbyMessages();
-    }
-    if (scope.channel === "battle") {
-        renderBattleMessages();
-    }
+    if (scopeName === currentChat) clearUnreadForCurrentScope();
+
+    if (currentChat === scopeName) renderLobbyMessages();
+    if (scope.channel === "battle") renderBattleMessages();
 }
 
 function handleIncomingRealtimeMessage(msg) {
@@ -3171,15 +3188,19 @@ function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "global") {
         const scope = { key: "global", channel: "global" };
         if (!pushChatToCache(scope, msg)) return;
+        if (currentChat !== "global") setUnreadForScope("global", true);
         if (currentChat === "global") renderLobbyMessages();
+        renderChatTabs();
         return;
     }
 
     if (msg.channel === "battle") {
         const scope = { key: "battle", channel: "battle" };
         if (!pushChatToCache(scope, msg)) return;
+        if (currentChat !== "battle") setUnreadForScope("battle", true);
         if (currentChat === "battle") renderLobbyMessages();
         if (gameState === "BATTLE") renderBattleMessages();
+        renderChatTabs();
         return;
     }
 
@@ -3193,10 +3214,10 @@ function handleIncomingRealtimeMessage(msg) {
         if (!pushChatToCache(scope, msg)) return;
 
         ensurePmTab(peerId, getPeerLabelFromPmMessage(msg, peerId));
+        if (currentChat !== scope.key) setUnreadForScope(scope.key, true);
 
-        if (currentChat === scope.key) {
-            renderLobbyMessages();
-        }
+        if (currentChat === scope.key) renderLobbyMessages();
+        renderChatTabs();
     }
 }
 
@@ -3240,6 +3261,11 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     const scope = parseChatScope(scopeName);
     const ownPublicId = getOwnPublicChatId();
 
+    if (scope.channel === "pm" && !canUsePrivateChat()) {
+        addSystemLobbyChatMessage("⚠ ЛС доступны только для аккаунтов, не для гостя.");
+        return false;
+    }
+
     const payload = {
         channel: scope.channel,
         room_id: null,
@@ -3261,30 +3287,33 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
 
     if (error) {
         console.error("❌ Ошибка отправки сообщения:", error);
-        if (scope.channel === "battle") {
-            addSystemBattleChatMessage("Ошибка отправки сообщения");
-        } else {
-            addSystemLobbyChatMessage("Ошибка отправки сообщения");
-        }
+        if (scope.channel === "battle") addSystemBattleChatMessage("Ошибка отправки сообщения");
+        else addSystemLobbyChatMessage("Ошибка отправки сообщения");
         return false;
     }
 
-    if (!forcedScopeName && chatInput) {
-        chatInput.value = "";
-    }
-
+    if (!forcedScopeName && chatInput) chatInput.value = "";
     return true;
 }
 
 function openPrivateChat(peerId, label = null) {
+    if (!canUsePrivateChat()) {
+        addSystemLobbyChatMessage("⚠ ЛС доступны только после входа в аккаунт.");
+        return;
+    }
+
     const safePeerId = String(peerId || "").trim();
-    if (!safePeerId) return;
+    if (!safePeerId || !/^\d+$/.test(safePeerId)) {
+        addSystemLobbyChatMessage("⚠ Для гостя ЛС недоступны.");
+        return;
+    }
 
     const ownId = getOwnPublicChatId();
     if (ownId && ownId === safePeerId) return;
 
     ensurePmTab(safePeerId, label || `ID ${safePeerId}`);
     currentChat = getPrivateScopeKey(safePeerId);
+    clearUnreadForCurrentScope();
     renderChatTabs();
     loadChatHistory(currentChat);
 }
@@ -3312,23 +3341,33 @@ if(chatInput){
 }
 
 async function handleChatStateChange() {
+    if (!canUsePrivateChat()) {
+        resetPrivateChatState();
+    }
+
     if (gameState === "BATTLE") {
         currentChat = "battle";
+        clearUnreadForCurrentScope();
         renderChatTabs();
         await loadChatHistory("battle");
         renderBattleMessages();
         return;
     }
 
-    if (currentChat === "battle") {
-        currentChat = "global";
-    }
+    if (currentChat === "battle") currentChat = "global";
+    clearUnreadForCurrentScope();
     renderChatTabs();
     await loadChatHistory(currentChat);
     renderLobbyMessages();
 }
 
 async function initRealtimeChat() {
+    if (!canUsePrivateChat()) {
+        resetPrivateChatState();
+    }
+
+    chatUnread.global = false;
+    chatUnread.battle = false;
     startRealtimeChat();
     renderChatTabs();
     await loadChatHistory("global");
@@ -4676,6 +4715,7 @@ function updateNicknameSettingsState(message=''){
     updatePremiumAccountInfo();
 }
 function logoutToAuth(message='Возврат в меню входа.'){
+    try{ resetPrivateChatState?.(); }catch(_e){}
     stopRemotePlayerSync?.();
     window.playerMuted = false;
     player.isMuted = false;
@@ -6436,12 +6476,18 @@ async function renderOnlinePlayers(){
     for(const p of players){
         const row = document.createElement('div');
         row.className = 'online-player';
-        row.textContent = p.nickname;
-        row.title = 'Нажмите для ЛС';
-        list.appendChild(row);
 
         const targetId = p.player_id ? String(p.player_id) : null;
-        if(targetId && (!myId || targetId !== myId)){
+        const canPmTarget = !!(targetId && /^\d+$/.test(targetId));
+        const isMe = !!(targetId && myId && targetId === myId);
+
+        row.textContent = p.nickname + (!canPmTarget ? ' (guest)' : '');
+        row.title = canPmTarget ? 'Нажмите для ЛС' : 'Для гостя ЛС недоступны';
+        if(!canPmTarget) row.style.opacity = '0.7';
+
+        list.appendChild(row);
+
+        if(canPmTarget && !isMe){
             row.addEventListener('click', () => {
                 if(typeof openPrivateChat === 'function'){
                     openPrivateChat(targetId, p.nickname || `ID ${targetId}`);
