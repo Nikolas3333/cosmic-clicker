@@ -3104,7 +3104,12 @@ function renderChatTabs() {
         const label = escapeChatHtml(meta?.label || `ID ${peerId}`);
         const scope = getPrivateScopeKey(peerId);
         const notify = chatUnread.pm[String(peerId)] && currentChat !== scope ? " notify" : "";
-        html += `<button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}" data-scope="${scope}" type="button">${label}</button>`;
+        html += `
+          <button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}" data-scope="${scope}" type="button">
+            <span class="pm-tab-label">${label}</span>
+            <span class="close-tab" data-close="${peerId}" title="Закрыть ЛС">×</span>
+          </button>
+        `;
     });
 
     chatTabsWrap.innerHTML = html;
@@ -3116,6 +3121,27 @@ function renderChatTabs() {
             renderChatTabs();
             await loadChatHistory(currentChat);
             renderLobbyMessages();
+        });
+    });
+
+    chatTabsWrap.querySelectorAll(".close-tab").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+
+            const peerId = btn.dataset.close;
+            if (!peerId) return;
+
+            delete privateChatTabs[peerId];
+            delete chatCache.pm[peerId];
+            delete chatUnread.pm[peerId];
+
+            if (currentChat === `pm:${peerId}`) {
+                currentChat = "global";
+                await loadChatHistory("global");
+                renderLobbyMessages();
+            }
+
+            renderChatTabs();
         });
     });
 
