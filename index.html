@@ -752,7 +752,10 @@ canvas {
 
 .chat-tab.notify {
   position: relative;
-  color: #00ffcc;
+  color: #ffffff;
+  background: rgba(0,255,200,0.18);
+  box-shadow: 0 0 12px rgba(0,255,200,0.35);
+  animation: chatTabPulse 0.9s infinite alternate;
 }
 
 .chat-tab.notify::after {
@@ -762,7 +765,12 @@ canvas {
   top: 2px;
   color: #ff4444;
   font-size: 18px;
-  animation: blink 1s infinite;
+  animation: blink 0.8s infinite;
+}
+
+@keyframes chatTabPulse {
+  0% { box-shadow: 0 0 6px rgba(0,255,200,0.18); transform: translateY(0); }
+  100% { box-shadow: 0 0 18px rgba(0,255,200,0.55); transform: translateY(-1px); }
 }
 
 @keyframes blink {
