@@ -679,6 +679,32 @@ canvas {
   white-space:nowrap;
 }
 
+.chat-tab.pm-tab{
+  position: relative;
+  padding-right: 24px;
+}
+
+.chat-tab .close-tab{
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  line-height: 1;
+  color: #ff7a7a;
+  cursor: pointer;
+  display: none;
+  user-select: none;
+}
+
+.chat-tab.pm-tab:hover .close-tab{
+  display: block;
+}
+
+.chat-tab .close-tab:hover{
+  color: #ff3b3b;
+}
+
 .chat-tab.disabled{
   opacity:0.45;
   pointer-events:none;
