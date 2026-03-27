@@ -1938,6 +1938,35 @@ body.state-observe #ui{ display:none !important; }
   background:#0e1a32;
 }
 
+
+/* ===== REALTIME CHAT PATCH ===== */
+.chat-line{
+  padding:4px 8px;
+  background:rgba(255,255,255,0.05);
+  border-radius:6px;
+  margin-bottom:6px;
+  max-width:100%;
+  word-break:break-word;
+}
+.chat-line.system{
+  color:#ffd166;
+  font-style:italic;
+}
+.chat-nick{
+  color:#00ffcc;
+  font-weight:700;
+}
+.chat-sep{
+  color:#9dd;
+  margin:0 4px;
+}
+.chat-text{
+  color:#fff;
+}
+.chat-tab.disabled{
+  opacity:0.45;
+}
+
 </style>
 </head>
 
@@ -2030,8 +2059,8 @@ body.state-observe #ui{ display:none !important; }
     <div id="chat-wrapper">
       <div id="chat-panel">
         <div id="chat-tabs">
-          <div class="chat-tab active">General</div>
-          <div class="chat-tab">ЛС</div>
+          <div class="chat-tab active">Global</div>
+          <div class="chat-tab">Battle</div>
         </div>
         <div id="chat-messages">
           <div class="chat-message system">🚀 Добро пожаловать в галактику!</div>
@@ -2399,7 +2428,7 @@ window.supabaseReady = true;
 console.log('🔥 Supabase подключен и готов к работе');
 </script>
 
-<script type="module" src="main.js"></script>
+<script type="module" src="main_cosmic_chat_r1.js"></script>
 
 
 </body>
