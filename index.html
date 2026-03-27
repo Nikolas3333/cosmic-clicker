@@ -667,6 +667,23 @@ canvas {
   border-bottom: 2px solid #00ffcc;
 }
 
+.chat-tab{
+  background:transparent;
+  border:none;
+}
+
+.chat-tab.pm-tab{
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.chat-tab.disabled{
+  opacity:0.45;
+  pointer-events:none;
+}
+
 #chat-messages {
   flex: 1;
   padding: 12px;
@@ -2059,8 +2076,8 @@ body.state-observe #ui{ display:none !important; }
     <div id="chat-wrapper">
       <div id="chat-panel">
         <div id="chat-tabs">
-          <div class="chat-tab active">Global</div>
-          <div class="chat-tab">Battle</div>
+          <button class="chat-tab active" data-scope="global" type="button">Global</button>
+          <button class="chat-tab" data-scope="battle" type="button">Battle</button>
         </div>
         <div id="chat-messages">
           <div class="chat-message system">🚀 Добро пожаловать в галактику!</div>
