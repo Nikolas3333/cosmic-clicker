@@ -280,7 +280,14 @@ function pushKillFeed(text, type='kill'){
     }
     setTimeout(() => item.remove(), type === 'chat' ? 9000 : 7000);
 }
-: `;
+
+function pushBattleChatMessage(author, text){
+    const log = document.getElementById('battle-chat-log');
+    if(log){
+        const row = document.createElement('div');
+        const authorSpan = document.createElement('span');
+        authorSpan.style.color = '#8deaff';
+        authorSpan.textContent = `${author}: `;
         row.appendChild(authorSpan);
         row.appendChild(document.createTextNode(text));
         log.appendChild(row);
@@ -291,6 +298,7 @@ function pushKillFeed(text, type='kill'){
     }
     pushKillFeed(`${author}: ${text}`, 'chat');
 }
+
 function setBattleChatOpen(open){
     battleChatOpen = open;
     const box = document.getElementById('battle-chat-box');
@@ -303,24 +311,39 @@ function setBattleChatOpen(open){
     if(input){
         if(open){
             input.value = '';
-            setTimeout(()=>input.focus(), 0);
+            setTimeout(() => input.focus(), 0);
         }else{
             input.blur();
             if(gameState === 'BATTLE'){
                 const canvas = document.querySelector('canvas');
-                if(canvas) setTimeout(()=>canvas.requestPointerLock?.(), 0);
+                if(canvas) setTimeout(() => canvas.requestPointerLock?.(), 0);
             }
         }
     }
 }
-else{
+
+function initBattleChat(){
+    const input = document.getElementById('battle-chat-input');
+    if(!input || input.dataset.bound) return;
+    input.dataset.bound = '1';
+
+    document.addEventListener('keydown', (e) => {
+        if(gameState !== 'BATTLE') return;
+
+        if(e.key === 'Enter' && !battleObserverMode){
+            if(!battleChatOpen){
+                e.preventDefault();
+                setBattleChatOpen(true);
+            }else{
                 e.preventDefault();
                 const text = input.value.trim();
+
                 if(window.playerMuted || player.isMuted){
                     pushKillFeed('🔇 Мут активен. Сообщение не отправлено.', 'chat');
                     setBattleChatOpen(false);
                     return;
                 }
+
                 if(text) pushBattleChatMessage(getDisplayPlayerTag(), text);
                 setBattleChatOpen(false);
             }
@@ -3083,6 +3106,15 @@ function startRealtimeChat() {
         });
 }
 
+function getValidChatPlayerId(){
+    const rawId = player?.id ?? null;
+    if(rawId === null || typeof rawId === "undefined") return null;
+
+    const value = String(rawId).trim();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value) ? value : null;
+}
+
 async function sendMessage(forcedScopeName = null, explicitText = null) {
     if (!window.supabaseClient) {
         addSystemLobbyChatMessage("Supabase ещё не готов для чата.");
@@ -3134,7 +3166,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     const payload = {
         channel: scope.channel,
         room_id: scope.channel === "battle" ? String(scope.roomId) : null,
-        player_id: player?.id ? String(player.id) : null,
+        player_id: getValidChatPlayerId(),
         player_nickname: typeof getDisplayPlayerTag === "function" ? getDisplayPlayerTag() : (player?.nickname || "Commander"),
         message: text
     };
@@ -3236,56 +3268,9 @@ window.addEventListener("load", () => {
     }, 250);
 });
 
-function pushBattleChatMessage(author, text){
-    const battleLog = document.getElementById('battle-chat-log');
-    if(battleLog){
-        const row = document.createElement('div');
-        row.innerHTML = `<span style="color:#8deaff">${escapeChatHtml(author)}:</span> ${escapeChatHtml(text)}`;
-        battleLog.appendChild(row);
-        battleLog.scrollTop = battleLog.scrollHeight;
-        while(battleLog.children.length > 20){
-            battleLog.removeChild(battleLog.firstChild);
-        }
-    }
-    pushKillFeed(`${author}: ${text}`, 'chat');
-}
 
-function initBattleChat(){
-    const input = document.getElementById('battle-chat-input');
-    if(!input || input.dataset.realtimeBound) return;
-    input.dataset.realtimeBound = '1';
 
-    input.addEventListener('focus', () => {
-        window.isTypingChat = true;
-    });
 
-    input.addEventListener('blur', () => {
-        window.isTypingChat = false;
-    });
-
-    document.addEventListener('keydown', async (e) => {
-        if(gameState !== 'BATTLE') return;
-        if(e.key === 'Enter' && !battleObserverMode){
-            if(!battleChatOpen){
-                e.preventDefault();
-                setBattleChatOpen(true);
-                setTimeout(() => {
-                    renderBattleMessages();
-                }, 0);
-            }else{
-                e.preventDefault();
-                const text = input.value.trim();
-                const sent = await sendMessage('battle', text);
-                if(sent){
-                    input.value = '';
-                    setBattleChatOpen(false);
-                }
-            }
-        } else if(e.key === 'Escape' && battleChatOpen){
-            setBattleChatOpen(false);
-        }
-    });
-}
 
 // ================= NOTIFICATION SYSTEM =================
 
