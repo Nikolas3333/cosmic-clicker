@@ -366,6 +366,12 @@ function resetOrbitView(forcePlanetReset=false){
     }
 }
 
+function setBattleChatOpen(state){
+    const box = document.getElementById('battle-chat-box');
+    if(!box) return;
+    box.classList.toggle('hidden', !state);
+}
+
 function clearBattleScene(){
     resetBattleInputState();
     battleChatOpen = false;
