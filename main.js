@@ -3118,6 +3118,8 @@ function renderChatTabs() {
             renderLobbyMessages();
         });
     });
+
+    console.log("CHAT_NOTIFY_STATE", JSON.stringify(chatUnread), "current=", currentChat);
 }
 
 function renderLobbyMessages() {
@@ -3375,6 +3377,17 @@ async function initRealtimeChat() {
 }
 
 window.openPrivateChat = openPrivateChat;
+
+window.testChatNotify = function(scope = 'global'){
+    if(scope === 'battle'){
+        setUnreadForScope('battle', true);
+    }else if(String(scope).startsWith('pm:')){
+        setUnreadForScope(scope, true);
+    }else{
+        setUnreadForScope('global', true);
+    }
+    renderChatTabs();
+};
 
 window.addEventListener("load", () => {
     setTimeout(() => {
