@@ -2899,10 +2899,11 @@ const chatCache = {
 };
 const privateChatTabs = {};
 const chatUnread = {
-    global: false,
-    battle: false,
+    global: 0,
+    battle: 0,
     pm: {}
 };
+const onlinePmPeers = new Set();
 
 function escapeChatHtml(text = "") {
     return String(text)
@@ -2966,6 +2967,61 @@ function getChatCacheList(scope) {
         return chatCache.pm[peerId];
     }
     return chatCache.global;
+}
+
+function getUnreadCount(scopeName) {
+    const scope = parseChatScope(scopeName);
+    if (scope.channel === "battle") return Number(chatUnread.battle || 0);
+    if (scope.channel === "pm") return Number(chatUnread.pm[String(scope.peerId)] || 0);
+    return Number(chatUnread.global || 0);
+}
+
+function setUnreadCount(scopeName, count = 0) {
+    const safeCount = Math.max(0, Number(count) || 0);
+    const scope = parseChatScope(scopeName);
+    if (scope.channel === "battle") {
+        chatUnread.battle = safeCount;
+    } else if (scope.channel === "pm") {
+        chatUnread.pm[String(scope.peerId)] = safeCount;
+    } else {
+        chatUnread.global = safeCount;
+    }
+}
+
+function incrementUnread(scopeName, amount = 1) {
+    setUnreadCount(scopeName, getUnreadCount(scopeName) + Math.max(1, Number(amount) || 1));
+}
+
+function getLastMessagePreview(scopeName) {
+    const scope = parseChatScope(scopeName);
+    const list = getChatCacheList(scope);
+    const last = list[list.length - 1];
+    if (!last?.message) return "";
+    const trimmed = String(last.message).replace(/\s+/g, ' ').trim();
+    if (!trimmed) return "";
+    return trimmed.length > 32 ? trimmed.slice(0, 32) + '…' : trimmed;
+}
+
+function setPrivateTabPreview(peerId, preview = "") {
+    const key = String(peerId || "").trim();
+    if (!key) return;
+    if (!privateChatTabs[key]) {
+        privateChatTabs[key] = { label: `ID ${key}`, updatedAt: Date.now(), pinned: false, preview: "" };
+    }
+    privateChatTabs[key].preview = preview || "";
+}
+
+function isPmPeerOnline(peerId) {
+    return onlinePmPeers.has(String(peerId || ""));
+}
+
+function syncPrivateTabFromScope(scopeName) {
+    const scope = parseChatScope(scopeName);
+    if (scope.channel !== "pm" || !scope.peerId) return;
+    setPrivateTabPreview(scope.peerId, getLastMessagePreview(scopeName));
+    if (privateChatTabs[String(scope.peerId)]) {
+        privateChatTabs[String(scope.peerId)].updatedAt = Date.now();
+    }
 }
 
 function pushChatToCache(scope, msg) {
@@ -3040,31 +3096,33 @@ function resetPrivateChatState() {
     Object.keys(privateChatTabs).forEach(key => delete privateChatTabs[key]);
     Object.keys(chatCache.pm).forEach(key => delete chatCache.pm[key]);
     Object.keys(chatUnread.pm).forEach(key => delete chatUnread.pm[key]);
+    onlinePmPeers.clear();
     currentChat = "global";
 }
 
 function setUnreadForScope(scopeName, state = true) {
-    const scope = parseChatScope(scopeName);
-    if (scope.channel === "battle") {
-        chatUnread.battle = !!state;
-    } else if (scope.channel === "pm") {
-        chatUnread.pm[String(scope.peerId)] = !!state;
-    } else {
-        chatUnread.global = !!state;
+    if (typeof state === 'number') {
+        setUnreadCount(scopeName, state);
+        return;
     }
+    if (state) incrementUnread(scopeName);
+    else setUnreadCount(scopeName, 0);
 }
 
 function clearUnreadForCurrentScope() {
-    setUnreadForScope(currentChat, false);
+    setUnreadCount(currentChat, 0);
 }
 
 function ensurePmTab(peerId, label = null) {
     const key = String(peerId || "").trim();
     if (!key) return;
-    const safeLabel = (label || privateChatTabs[key]?.label || `ID ${key}`).trim();
+    const previous = privateChatTabs[key] || {};
+    const safeLabel = (label || previous.label || `ID ${key}`).trim();
     privateChatTabs[key] = {
         label: safeLabel,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        pinned: !!previous.pinned,
+        preview: previous.preview || getLastMessagePreview(getPrivateScopeKey(key)) || ""
     };
     renderChatTabs();
 }
@@ -3093,20 +3151,44 @@ function renderChatTabs() {
     if (!chatTabsWrap) return;
 
     const pmEntries = Object.entries(privateChatTabs)
-        .sort((a, b) => (b[1]?.updatedAt || 0) - (a[1]?.updatedAt || 0));
+        .sort((a, b) => {
+            const aPinned = a[1]?.pinned ? 1 : 0;
+            const bPinned = b[1]?.pinned ? 1 : 0;
+            if (bPinned !== aPinned) return bPinned - aPinned;
+            return (b[1]?.updatedAt || 0) - (a[1]?.updatedAt || 0);
+        });
 
     let html = `
-      <button class="chat-tab${currentChat === "global" ? " active" : ""}${chatUnread.global && currentChat !== "global" ? " notify" : ""}" data-scope="global" type="button">Global</button>
-      <button class="chat-tab${currentChat === "battle" ? " active" : ""}${chatUnread.battle && currentChat !== "battle" ? " notify" : ""}" data-scope="battle" type="button">Battle</button>
+      <button class="chat-tab${currentChat === "global" ? " active" : ""}${getUnreadCount("global") > 0 && currentChat !== "global" ? " notify" : ""}" data-scope="global" type="button">
+        <span class="chat-tab-title">Global</span>
+        ${getUnreadCount("global") > 0 && currentChat !== "global" ? `<span class="chat-tab-badge">${getUnreadCount("global") > 99 ? '99+' : getUnreadCount("global")}</span>` : ''}
+      </button>
+      <button class="chat-tab${currentChat === "battle" ? " active" : ""}${getUnreadCount("battle") > 0 && currentChat !== "battle" ? " notify" : ""}" data-scope="battle" type="button">
+        <span class="chat-tab-title">Battle</span>
+        ${getUnreadCount("battle") > 0 && currentChat !== "battle" ? `<span class="chat-tab-badge">${getUnreadCount("battle") > 99 ? '99+' : getUnreadCount("battle")}</span>` : ''}
+      </button>
     `;
 
     pmEntries.forEach(([peerId, meta]) => {
         const label = escapeChatHtml(meta?.label || `ID ${peerId}`);
         const scope = getPrivateScopeKey(peerId);
-        const notify = chatUnread.pm[String(peerId)] && currentChat !== scope ? " notify" : "";
+        const unread = getUnreadCount(scope);
+        const notify = unread > 0 && currentChat !== scope ? " notify" : "";
+        const preview = escapeChatHtml(meta?.preview || "Без сообщений");
+        const pinClass = meta?.pinned ? ' pinned' : '';
+        const onlineClass = isPmPeerOnline(peerId) ? ' online' : '';
         html += `
-          <button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}" data-scope="${scope}" type="button">
-            <span class="pm-tab-label">${label}</span>
+          <button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}${pinClass}${onlineClass}" data-scope="${scope}" type="button">
+            <span class="pm-online-dot" title="Онлайн"></span>
+            <span class="pm-tab-content">
+              <span class="pm-tab-main">
+                <span class="pm-tab-label">${label}</span>
+                ${meta?.pinned ? '<span class="pin-state" title="Закреплён">📌</span>' : ''}
+              </span>
+              <span class="pm-tab-preview">${preview}</span>
+            </span>
+            ${unread > 0 && currentChat !== scope ? `<span class="chat-tab-badge">${unread > 99 ? '99+' : unread}</span>` : ''}
+            <span class="pin-tab" data-pin="${peerId}" title="Закрепить ЛС">📌</span>
             <span class="close-tab" data-close="${peerId}" title="Закрыть ЛС">×</span>
           </button>
         `;
@@ -3124,6 +3206,16 @@ function renderChatTabs() {
         });
     });
 
+    chatTabsWrap.querySelectorAll(".pin-tab").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const peerId = btn.dataset.pin;
+            if (!peerId || !privateChatTabs[peerId]) return;
+            privateChatTabs[peerId].pinned = !privateChatTabs[peerId].pinned;
+            renderChatTabs();
+        });
+    });
+
     chatTabsWrap.querySelectorAll(".close-tab").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
             e.stopPropagation();
@@ -3134,6 +3226,7 @@ function renderChatTabs() {
             delete privateChatTabs[peerId];
             delete chatCache.pm[peerId];
             delete chatUnread.pm[peerId];
+            onlinePmPeers.delete(String(peerId));
 
             if (currentChat === `pm:${peerId}`) {
                 currentChat = "global";
@@ -3201,6 +3294,7 @@ async function loadChatHistory(scopeName = currentChat) {
         if (peerId && list.length) {
             const sample = list[list.length - 1];
             ensurePmTab(peerId, getPeerLabelFromPmMessage(sample, peerId));
+            setPrivateTabPreview(peerId, getLastMessagePreview(scopeName));
         }
     }
 
@@ -3216,7 +3310,7 @@ function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "global") {
         const scope = { key: "global", channel: "global" };
         if (!pushChatToCache(scope, msg)) return;
-        if (currentChat !== "global") setUnreadForScope("global", true);
+        if (currentChat !== "global") incrementUnread("global");
         if (currentChat === "global") renderLobbyMessages();
         renderChatTabs();
         return;
@@ -3225,7 +3319,7 @@ function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "battle") {
         const scope = { key: "battle", channel: "battle" };
         if (!pushChatToCache(scope, msg)) return;
-        if (currentChat !== "battle") setUnreadForScope("battle", true);
+        if (currentChat !== "battle") incrementUnread("battle");
         if (currentChat === "battle") renderLobbyMessages();
         if (gameState === "BATTLE") renderBattleMessages();
         renderChatTabs();
@@ -3242,7 +3336,8 @@ function handleIncomingRealtimeMessage(msg) {
         if (!pushChatToCache(scope, msg)) return;
 
         ensurePmTab(peerId, getPeerLabelFromPmMessage(msg, peerId));
-        if (currentChat !== scope.key) setUnreadForScope(scope.key, true);
+        syncPrivateTabFromScope(scope.key);
+        if (currentChat !== scope.key) incrementUnread(scope.key);
 
         if (currentChat === scope.key) renderLobbyMessages();
         renderChatTabs();
@@ -3343,7 +3438,11 @@ function openPrivateChat(peerId, label = null) {
     currentChat = getPrivateScopeKey(safePeerId);
     clearUnreadForCurrentScope();
     renderChatTabs();
-    loadChatHistory(currentChat);
+    loadChatHistory(currentChat).then(() => {
+        syncPrivateTabFromScope(currentChat);
+        renderLobbyMessages();
+        renderChatTabs();
+    });
 }
 
 if(chatSend){
@@ -3394,8 +3493,8 @@ async function initRealtimeChat() {
         resetPrivateChatState();
     }
 
-    chatUnread.global = false;
-    chatUnread.battle = false;
+    chatUnread.global = 0;
+    chatUnread.battle = 0;
     startRealtimeChat();
     renderChatTabs();
     await loadChatHistory("global");
@@ -3406,11 +3505,11 @@ window.openPrivateChat = openPrivateChat;
 
 window.testChatNotify = function(scope = 'global'){
     if(scope === 'battle'){
-        setUnreadForScope('battle', true);
+        incrementUnread('battle');
     }else if(String(scope).startsWith('pm:')){
-        setUnreadForScope(scope, true);
+        incrementUnread(scope);
     }else{
-        setUnreadForScope('global', true);
+        incrementUnread('global');
     }
     renderChatTabs();
 };
@@ -6504,12 +6603,24 @@ async function loadOnlinePlayersFromSupabase(){
     return data || [];
 }
 
+function refreshPmOnlineState(players = []){
+    onlinePmPeers.clear();
+    for(const p of players || []){
+        const targetId = p?.player_id ? String(p.player_id) : '';
+        if(targetId && /^\d+$/.test(targetId)){
+            onlinePmPeers.add(targetId);
+        }
+    }
+    renderChatTabs();
+}
+
 async function renderOnlinePlayers(){
     const list = document.getElementById('online-list');
     if(!list) return;
 
     const players = await loadOnlinePlayersFromSupabase();
     const myId = (typeof authState !== 'undefined' && authState?.playerId) ? String(authState.playerId) : null;
+    refreshPmOnlineState(players);
     list.innerHTML = '';
 
     for(const p of players){
