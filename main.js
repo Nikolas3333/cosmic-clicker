@@ -654,6 +654,10 @@ if(gameState === "OBSERVE"){
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
+    setTimeout(() => {
+        loadChatHistory?.("battle");
+        renderBattleMessages?.();
+    }, 50);
 }
 
 if(gameState === "INVENTORY"){
@@ -3453,6 +3457,21 @@ function renderBattleMessages() {
     battleLog.scrollTop = battleLog.scrollHeight;
 }
 
+function showBattleAnnouncementInActiveScene(msg) {
+    if (!msg) return;
+    if (gameState !== "BATTLE" && gameState !== "OBSERVE") return;
+
+    const author = msg.player_nickname || msg.nickname || "Unknown";
+    const text = msg.message || "";
+    const line = `${author}: ${text}`;
+
+    pushKillFeed(line, 'chat');
+
+    if (gameState === "BATTLE" || gameState === "OBSERVE") {
+        renderBattleMessages?.();
+    }
+}
+
 async function loadChatHistory(scopeName = currentChat) {
     if (!window.supabaseClient) return;
 
@@ -3500,7 +3519,9 @@ async function loadChatHistory(scopeName = currentChat) {
     if (scopeName === currentChat) clearUnreadForCurrentScope();
 
     if (currentChat === scopeName) renderLobbyMessages();
-    if (scope.channel === "battle" && (gameState === "BATTLE" || gameState === "OBSERVE" || currentChat === "battle")) renderBattleMessages();
+    if (scope.channel === "battle" && (gameState === "BATTLE" || gameState === "OBSERVE" || currentChat === "battle")) {
+        renderBattleMessages();
+    }
 }
 
 async function handleIncomingRealtimeMessage(msg) {
@@ -3521,7 +3542,7 @@ async function handleIncomingRealtimeMessage(msg) {
         if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
         if (currentChat === "battle") renderLobbyMessages();
-        if (gameState === "BATTLE" || gameState === "OBSERVE") renderBattleMessages();
+        showBattleAnnouncementInActiveScene(msg);
         renderChatTabs();
         return;
     }
@@ -3645,12 +3666,10 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
             message: text
         };
         pushChatToCache(scope, optimisticMessage);
-        if (gameState === "BATTLE" || gameState === "OBSERVE") {
-            renderBattleMessages();
-        }
         if (currentChat === "battle") {
             renderLobbyMessages();
         }
+        showBattleAnnouncementInActiveScene(optimisticMessage);
     }
 
     if (!forcedScopeName && chatInput) chatInput.value = "";
