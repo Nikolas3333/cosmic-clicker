@@ -103,7 +103,7 @@ const authState = {
 
 function getDisplayPlayerTag(){
     const safeNickname = (player?.nickname || 'Commander').trim() || 'Commander';
-    return `${safeNickname} | ID: ${authState.playerId || 0}`;
+    return safeNickname;
 }
 
 
@@ -2975,7 +2975,7 @@ function getChatRoleBadgeHtmlByRole(role = "player") {
     const meta = getStaffRoleMeta(role);
     const roleClass = getChatRoleCssClassByRole(role);
     if (!meta.short) return "";
-    return `<span class="chat-role-badge ${roleClass}">[${escapeChatHtml(String(meta.short).toLowerCase())}]</span>`;
+    return `<span class="chat-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
 }
 
 function getChatRoleBadgeHtmlByPublicId(publicId) {
@@ -3184,7 +3184,11 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
 
     return `
       <div class="chat-line${lineClass}" data-message-id="${msg.id}">
-        ${roleBadge}<button class="chat-nick" type="button"${nickAttrs}>${author}</button> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span>
+        ${roleBadge}
+        <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
+        <span class="chat-id">[${escapeChatHtml(publicId || "0")}]</span>
+        <span class="chat-time">[${time}]</span>
+        <span class="chat-text">${text}</span>
       </div>
     `;
 }
@@ -3197,7 +3201,8 @@ function buildBattleChatMessageHtml(msg) {
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
-    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    const safePublicId = escapeChatHtml(publicId || "0");
+    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
 }
 
 function addSystemLobbyChatMessage(text) {
