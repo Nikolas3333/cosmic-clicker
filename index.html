@@ -644,7 +644,6 @@ canvas {
 
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
 
   box-shadow: 0 0 20px rgba(0,255,200,0.3);
 }
@@ -795,7 +794,6 @@ canvas {
   flex: 1;
   padding: 12px;
   overflow-y: auto;
-  overflow-x: hidden;
   font-size: 14px;
 
   display: flex;
@@ -805,9 +803,9 @@ canvas {
 }
 
 .chat-message {
-  padding: 2px 0;
-  background: transparent;
-  border-radius: 0;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
 }
 
 .chat-message.system {
@@ -2112,46 +2110,31 @@ body.state-observe #ui{ display:none !important; }
 .chat-nick-static:hover{
   opacity:0.92;
 }
+.chat-id,
 .chat-time{
-  color:#e3c649;
+  color:#d6d6d6;
   font-size:inherit;
-  margin-left:4px;
+  margin-left:2px;
   margin-right:2px;
 }
 .chat-text{
   color:#ffffff;
-  margin-left:6px;
-  white-space:normal;
-  overflow-wrap:anywhere;
-  word-break:break-word;
-}
-.chat-role-badge{
-  display:inline;
-  margin-right:8px;
-  font-weight:900;
-  letter-spacing:-0.4px;
-  text-transform:none;
-  font-family:Arial Black, Impact, Arial, sans-serif;
-}
-.chat-line{
-  width:100%;
-  white-space:normal;
-  overflow-wrap:anywhere;
-  word-break:break-word;
-  line-height:1.28;
+  margin-left:4px;
 }
 .chat-line.chat-staff.role-mod,
 .chat-line.chat-staff.role-mod .chat-role-badge,
 .chat-line.chat-staff.role-mod .chat-nick,
 .chat-line.chat-staff.role-mod .chat-nick-static,
+.chat-line.chat-staff.role-mod .chat-id,
 .chat-line.chat-staff.role-mod .chat-time,
 .chat-line.chat-staff.role-mod .chat-text{
-  color:#ffcf19;
+  color:#ff2a2a;
 }
 .chat-line.chat-staff.role-adm,
 .chat-line.chat-staff.role-adm .chat-role-badge,
 .chat-line.chat-staff.role-adm .chat-nick,
 .chat-line.chat-staff.role-adm .chat-nick-static,
+.chat-line.chat-staff.role-adm .chat-id,
 .chat-line.chat-staff.role-adm .chat-time,
 .chat-line.chat-staff.role-adm .chat-text{
   color:#ff8a1c;
@@ -2160,12 +2143,37 @@ body.state-observe #ui{ display:none !important; }
 .chat-line.chat-staff.role-owr .chat-role-badge,
 .chat-line.chat-staff.role-owr .chat-nick,
 .chat-line.chat-staff.role-owr .chat-nick-static,
+.chat-line.chat-staff.role-owr .chat-id,
 .chat-line.chat-staff.role-owr .chat-time,
 .chat-line.chat-staff.role-owr .chat-text{
-  color:#ffcf19;
+  color:#ffd400;
 }
 .chat-tab.disabled{
   opacity:0.45;
+}
+
+
+/* === FIX ROLE STYLE === */
+.chat-role, [class^="role-"]{
+  font-weight:700 !important;
+  letter-spacing:0.3px;
+}
+
+/* colors */
+.role-mod{ color:#ff3b3b !important; }
+.role-adm{ color:#ff7a00 !important; }
+.role-owr{ color:#ffd700 !important; }
+
+/* nick normal */
+.chat-nick{
+  font-weight:400 !important;
+}
+
+/* remove horizontal scroll */
+#chat-messages{
+  overflow-x:hidden !important;
+  word-break:break-word;
+  white-space:normal;
 }
 
 </style>
