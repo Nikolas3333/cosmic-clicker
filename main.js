@@ -4494,6 +4494,16 @@ initBattleUI();
 initBattleChat();
 
 
+function setProfileActionsHTML(html = ''){
+    const profileActions = document.getElementById('profile-actions');
+    if(profileActions) profileActions.innerHTML = html;
+}
+
+function openProfileWindow(){
+    const profileWindow = document.getElementById('profile-window');
+    profileWindow?.classList.remove('hidden');
+}
+
 function renderProfileStats(){
     const profileInfo = document.getElementById('profile-info');
     if(!profileInfo) return;
@@ -4510,6 +4520,69 @@ function renderProfileStats(){
         <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${player.ships.length}</div></div>
       </div>`;
+    setProfileActionsHTML('');
+}
+
+async function openPlayerProfileCard(targetId, fallbackNickname = 'Player', options = {}){
+    const profileInfo = document.getElementById('profile-info');
+    if(!profileInfo) return;
+
+    const myId = (typeof authState !== 'undefined' && authState?.playerId) ? String(authState.playerId) : '';
+    const safeId = targetId ? String(targetId) : '';
+    const isGuest = !/^\d+$/.test(safeId);
+    const isMe = !!(safeId && myId && safeId === myId);
+    const statusLabel = options?.status === 'lobby' ? 'В лобби' : (options?.status || 'Онлайн');
+
+    if(isMe){
+        renderProfileStats();
+        openProfileWindow();
+        return;
+    }
+
+    let row = null;
+    if(window.supabaseClient && !isGuest && safeId){
+        try{
+            const { data, error } = await window.supabaseClient
+                .from('players')
+                .select('public_id,nickname,level,credits')
+                .eq('public_id', Number(safeId))
+                .maybeSingle();
+            if(!error && data) row = data;
+        }catch(err){
+            console.warn('Не удалось загрузить профиль игрока:', err);
+        }
+    }
+
+    const nickname = row?.nickname || fallbackNickname || 'Player';
+    const level = Number(row?.level || 1);
+    const credits = Number(row?.credits || 0);
+
+    profileInfo.innerHTML = `
+      <h2 class="profile-title">Профиль игрока</h2>
+      <div class="profile-grid">
+        <div class="stat-card"><div class="cosmic-badge">Ник</div><div>${nickname}${isGuest ? ' (guest)' : ''}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Игровой ID</div><div>${safeId || '—'}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Статус</div><div>${statusLabel}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${isGuest ? '—' : level}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Кредиты</div><div>${isGuest ? '—' : credits}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">ЛС</div><div>${isGuest ? 'Недоступно' : 'Доступно'}</div></div>
+      </div>`;
+
+    if(!isGuest && safeId){
+        setProfileActionsHTML(`
+          <button id="profile-pm-btn" class="profile-action-btn" type="button">✉️ Написать в ЛС</button>
+        `);
+        const pmBtn = document.getElementById('profile-pm-btn');
+        pmBtn?.addEventListener('click', () => {
+            if(typeof openPrivateChat === 'function'){
+                openPrivateChat(safeId, nickname || `ID ${safeId}`);
+            }
+        });
+    }else{
+        setProfileActionsHTML('');
+    }
+
+    openProfileWindow();
 }
 
 function renderHangarCosmic(){
@@ -6652,21 +6725,37 @@ async function renderOnlinePlayers(){
         const targetId = p.player_id ? String(p.player_id) : null;
         const canPmTarget = !!(targetId && /^\d+$/.test(targetId));
         const isMe = !!(targetId && myId && targetId === myId);
+        const displayNickname = p.nickname || (isMe ? player?.nickname : 'Player');
 
-        row.textContent = p.nickname + (!canPmTarget ? ' (guest)' : '');
-        row.title = canPmTarget ? 'Нажмите для ЛС' : 'Для гостя ЛС недоступны';
+        row.textContent = displayNickname + (!canPmTarget ? ' (guest)' : '');
+        row.title = 'Нажмите, чтобы открыть профиль';
         if(!canPmTarget) row.style.opacity = '0.7';
+        if(isMe) row.classList.add('self');
 
         list.appendChild(row);
 
-        if(canPmTarget && !isMe){
-            row.addEventListener('click', () => {
-                if(typeof openPrivateChat === 'function'){
-                    openPrivateChat(targetId, p.nickname || `ID ${targetId}`);
-                }
-            });
-        }
+        row.addEventListener('click', () => {
+            openPlayerProfileCard(targetId, displayNickname, { status: p.status || 'Онлайн' });
+        });
     }
+}
+
+let onlineHeartbeatTimer = null;
+
+function syncOnlinePresence(){
+    if(gameState === 'LOBBY'){
+        setPlayerOnlineStatus('lobby', null);
+        setTimeout(renderOnlinePlayers, 250);
+        return;
+    }
+    removePlayerFromOnline();
+}
+
+function startOnlineHeartbeat(){
+    if(onlineHeartbeatTimer) return;
+    onlineHeartbeatTimer = setInterval(() => {
+        syncOnlinePresence();
+    }, 15000);
 }
 
 const previousSwitchStateOnline = window.switchState || switchState;
@@ -6674,36 +6763,23 @@ switchState = function(newState){
     if(isGuestAccount() && (newState === 'ORBIT' || newState === 'INVENTORY' || newState === 'COMBAT')){
         showGuestOnlyPvpMessage();
         previousSwitchStateOnline('LOBBY');
-        setPlayerOnlineStatus('lobby', null);
-        setTimeout(renderOnlinePlayers, 300);
+        syncOnlinePresence();
         return;
     }
 
     previousSwitchStateOnline(newState);
-
-    if(newState === 'LOBBY'){
-        setPlayerOnlineStatus('lobby', null);
-        setTimeout(renderOnlinePlayers, 300);
-        return;
-    }
-
-    removePlayerFromOnline();
+    syncOnlinePresence();
 };
 
 window.switchState = switchState;
+startOnlineHeartbeat();
 
 window.addEventListener('beforeunload', () => {
     removePlayerFromOnline();
 });
 
-window.addEventListener('pagehide', () => {
-    removePlayerFromOnline();
-});
-
-document.addEventListener('visibilitychange', () => {
-    if(document.visibilityState === 'hidden'){
-        removePlayerFromOnline();
-    }
+window.addEventListener('focus', () => {
+    syncOnlinePresence();
 });
 
 setInterval(() => {
