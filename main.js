@@ -328,14 +328,16 @@ function initBattleChat(){
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
         if(e.key === 'Enter'){
-            if(battleObserverMode && !canWriteInObserverChat()){
-                e.preventDefault();
-                return;
-            }
-
-            if(!battleObserverMode && !canWriteBattleAnnouncementChat()){
-                e.preventDefault();
-                return;
+            if(battleObserverMode){
+                if(!canWriteInObserverChat()){
+                    e.preventDefault();
+                    return;
+                }
+            } else {
+                if(!canWriteBattleAnnouncementChat()){
+                    e.preventDefault();
+                    return;
+                }
             }
 
             if(!battleChatOpen){
@@ -353,10 +355,7 @@ function initBattleChat(){
 
                 if(text){
                     const sent = await sendMessage('battle', text);
-                    if(sent){
-                        input.value = '';
-                        if(gameState === 'BATTLE' || gameState === 'OBSERVE') renderBattleMessages?.();
-                    }
+                    if(sent) input.value = '';
                 }
                 setBattleChatOpen(false);
             }
@@ -3599,9 +3598,13 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         return false;
     }
 
-    if (scope.channel === "battle" && battleObserverMode && !canWriteInObserverChat()) {
-        addSystemBattleChatMessage("🔒 В режиме наблюдения писать могут только MOD / ADM / OWR.");
-        return false;
+    if (scope.channel === "battle") {
+        if (battleObserverMode && !canWriteInObserverChat()) {
+            return false;
+        }
+        if (!battleObserverMode && !canWriteBattleAnnouncementChat()) {
+            return false;
+        }
     }
 
     const payload = {
@@ -3631,6 +3634,25 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     }
 
     markChatMessageSentNow();
+
+    if (scope.channel === "battle") {
+        const optimisticMessage = {
+            id: `local-${Date.now()}`,
+            channel: "battle",
+            created_at: new Date().toISOString(),
+            player_public_id: ownPublicId,
+            player_nickname: getOwnChatLabel(),
+            message: text
+        };
+        pushChatToCache(scope, optimisticMessage);
+        if (gameState === "BATTLE" || gameState === "OBSERVE") {
+            renderBattleMessages();
+        }
+        if (currentChat === "battle") {
+            renderLobbyMessages();
+        }
+    }
+
     if (!forcedScopeName && chatInput) chatInput.value = "";
     return true;
 }
