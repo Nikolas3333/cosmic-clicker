@@ -13,7 +13,8 @@ let player = {
   level: 1,
   experience: 0,
   credits: 500,
-  ships: []
+  ships: [],
+  staff_role: 'player'
 };
 
 // 🔥 ТЕСТОВЫЙ КОРАБЛЬ (можешь потом удалить)
@@ -330,7 +331,13 @@ function initBattleChat(){
     document.addEventListener('keydown', async (e) => {
         if(gameState !== 'BATTLE') return;
 
-        if(e.key === 'Enter' && !battleObserverMode){
+        if(e.key === 'Enter'){
+            if(battleObserverMode && !canWriteInObserverChat()){
+                e.preventDefault();
+                pushKillFeed('🔒 В режиме наблюдения писать могут только MOD / ADM / OWR.', 'chat');
+                return;
+            }
+
             if(!battleChatOpen){
                 e.preventDefault();
                 setBattleChatOpen(true);
@@ -820,7 +827,7 @@ function applyPlayerResourcesFromRow(row = {}) {
 }
 
 function getPlayerResourceColumnsSelect(){
-  return ['credits', ...RESOURCE_SYNC_KEYS, 'is_banned', 'ban_reason', 'ban_until', 'is_muted', 'mute_reason', 'mute_until'].join(',');
+  return ['credits', ...RESOURCE_SYNC_KEYS, 'staff_role', 'is_banned', 'ban_reason', 'ban_until', 'is_muted', 'mute_reason', 'mute_until'].join(',');
 }
 
 async function loadPlayerResourcesFromSupabase(){
@@ -839,6 +846,7 @@ async function loadPlayerResourcesFromSupabase(){
     }
 
     if(data){
+      applyPlayerIdentityRow(data);
       applyPlayerResourcesFromRow(data);
       const isMutedNow = !!data.is_muted && (!data.mute_until || new Date(data.mute_until).getTime() > Date.now());
       window.playerMuted = isMutedNow;
@@ -2905,6 +2913,108 @@ const chatUnread = {
 };
 const onlinePmPeers = new Set();
 
+const playerStaffRoleCache = {};
+const STAFF_ROLE_META = {
+    player: { short: "", label: "Игрок", color: "#9fd7ff" },
+    mod: { short: "MOD", label: "Moderator", color: "#4dd2ff" },
+    adm: { short: "ADM", label: "Admin", color: "#ff6767" },
+    owr: { short: "OWR", label: "Owner", color: "#ffb347" }
+};
+
+function normalizeStaffRole(role = "player") {
+    const value = String(role || "player").trim().toLowerCase();
+    if (value === "mod" || value === "adm" || value === "owr") return value;
+    return "player";
+}
+
+function getStaffRoleMeta(role = "player") {
+    return STAFF_ROLE_META[normalizeStaffRole(role)] || STAFF_ROLE_META.player;
+}
+
+function setCachedStaffRole(publicId, role = "player") {
+    const key = String(publicId || "").trim();
+    if (!key) return;
+    playerStaffRoleCache[key] = normalizeStaffRole(role);
+}
+
+function getCachedStaffRole(publicId) {
+    const key = String(publicId || "").trim();
+    if (!key) return "player";
+    if (authState?.playerId && key === String(authState.playerId)) {
+        return normalizeStaffRole(player?.staff_role || "player");
+    }
+    return normalizeStaffRole(playerStaffRoleCache[key] || "player");
+}
+
+function getOwnStaffRole() {
+    return normalizeStaffRole(player?.staff_role || "player");
+}
+
+function isStaffRole(role = "player") {
+    const normalized = normalizeStaffRole(role);
+    return normalized === "mod" || normalized === "adm" || normalized === "owr";
+}
+
+function canWriteInObserverChat() {
+    return isStaffRole(getOwnStaffRole());
+}
+
+function getChatRoleBadgeHtmlByRole(role = "player") {
+    const meta = getStaffRoleMeta(role);
+    if (!meta.short) return "";
+    return `<span class="chat-role-badge" style="display:inline-flex;align-items:center;justify-content:center;min-width:38px;padding:2px 6px;margin-right:6px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.4px;background:${meta.color};color:#10151f;box-shadow:0 0 10px rgba(0,0,0,0.18);">${meta.short}</span>`;
+}
+
+function getChatRoleBadgeHtmlByPublicId(publicId) {
+    return getChatRoleBadgeHtmlByRole(getCachedStaffRole(publicId));
+}
+
+function applyPlayerIdentityRow(row = {}) {
+    if (!row || typeof row !== "object") return;
+    if (typeof row.staff_role !== "undefined") {
+        player.staff_role = normalizeStaffRole(row.staff_role);
+        if (row.public_id) {
+            setCachedStaffRole(String(row.public_id), player.staff_role);
+        } else if (authState?.playerId) {
+            setCachedStaffRole(String(authState.playerId), player.staff_role);
+        }
+    } else if (!player.staff_role) {
+        player.staff_role = "player";
+    }
+}
+
+async function hydrateStaffRolesForMessages(messages = []) {
+    if (!window.supabaseClient || !Array.isArray(messages) || !messages.length) return;
+
+    const idsToLoad = [...new Set(
+        messages
+            .map(msg => msg?.player_public_id ? String(msg.player_public_id).trim() : "")
+            .filter(Boolean)
+            .filter(id => !(id in playerStaffRoleCache))
+            .filter(id => !(authState?.playerId && id === String(authState.playerId)))
+            .map(id => Number(id))
+            .filter(Number.isFinite)
+    )];
+
+    if (!idsToLoad.length) return;
+
+    const { data, error } = await window.supabaseClient
+        .from('players')
+        .select('public_id,staff_role')
+        .in('public_id', idsToLoad);
+
+    if (error) {
+        console.warn('Не удалось загрузить staff_role для чата:', error.message || error);
+        return;
+    }
+
+    (data || []).forEach(row => {
+        if (row?.public_id) {
+            setCachedStaffRole(String(row.public_id), row.staff_role || 'player');
+        }
+    });
+}
+
 function escapeChatHtml(text = "") {
     return String(text)
         .replace(/&/g, "&amp;")
@@ -3045,6 +3155,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const recipientId = msg.recipient_public_id ? String(msg.recipient_public_id) : null;
     const ownId = getOwnPublicChatId();
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const nickAttrs = publicId
         ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
         : ` data-player-nickname="${author}"`;
@@ -3060,6 +3171,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
       <div class="chat-line" data-message-id="${msg.id}">
         <span class="chat-time">[${time}]</span>
         ${prefix}
+        ${roleBadge}
         <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
         <span class="chat-sep">:</span>
         <span class="chat-text">${text}</span>
@@ -3071,7 +3183,9 @@ function buildBattleChatMessageHtml(msg) {
     const author = escapeChatHtml(msg.player_nickname || "Unknown");
     const text = escapeChatHtml(msg.message || "");
     const time = formatChatTime(msg.created_at);
-    return `<div data-message-id="${msg.id}"><span class="chat-time">[${time}]</span> <span style="color:#8deaff">${author}:</span> ${text}</div>`;
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
+    return `<div data-message-id="${msg.id}"><span class="chat-time">[${time}]</span> ${roleBadge}<span style="color:#8deaff">${author}:</span> ${text}</div>`;
 }
 
 function addSystemLobbyChatMessage(text) {
@@ -3328,6 +3442,8 @@ async function loadChatHistory(scopeName = currentChat) {
         return;
     }
 
+    await hydrateStaffRolesForMessages(data || []);
+
     const list = getChatCacheList(scope);
     list.length = 0;
     (data || []).slice().reverse().forEach(msg => list.push(msg));
@@ -3347,8 +3463,9 @@ async function loadChatHistory(scopeName = currentChat) {
     if (scope.channel === "battle") renderBattleMessages();
 }
 
-function handleIncomingRealtimeMessage(msg) {
+async function handleIncomingRealtimeMessage(msg) {
     if (!msg || !msg.channel) return;
+    await hydrateStaffRolesForMessages([msg]);
 
     if (msg.channel === "global") {
         const scope = { key: "global", channel: "global" };
@@ -3396,8 +3513,8 @@ function startRealtimeChat() {
         .on(
             "postgres_changes",
             { event: "INSERT", schema: "public", table: "chat_messages" },
-            (payload) => {
-                handleIncomingRealtimeMessage(payload.new);
+            async (payload) => {
+                await handleIncomingRealtimeMessage(payload.new);
             }
         )
         .subscribe((status) => {
@@ -3429,6 +3546,11 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
 
     if (scope.channel === "pm" && !canUsePrivateChat()) {
         addSystemLobbyChatMessage("⚠ ЛС доступны только для аккаунтов, не для гостя.");
+        return false;
+    }
+
+    if (scope.channel === "battle" && battleObserverMode && !canWriteInObserverChat()) {
+        addSystemBattleChatMessage("🔒 В режиме наблюдения писать могут только MOD / ADM / OWR.");
         return false;
     }
 
@@ -5023,7 +5145,7 @@ function loginLocalAccount(){
 
             const existingRes = await window.supabaseClient
                 .from('players')
-                .select('public_id,nickname,email,auth_id,level,credits,created_at,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                .select('public_id,nickname,email,auth_id,level,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
                 .eq('auth_id', user?.id || '')
                 .maybeSingle();
 
@@ -5053,7 +5175,7 @@ function loginLocalAccount(){
                         crystals: Number(playerResources.crystals || 0),
                         created_at: new Date().toISOString()
                     })
-                    .select('public_id,nickname,email,auth_id,level,credits,created_at,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                    .select('public_id,nickname,email,auth_id,level,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
                     .single();
 
                 if(insertRes.error){
@@ -5068,6 +5190,7 @@ function loginLocalAccount(){
             player.nickname = playerRow?.nickname || nickname;
             player.level = Number(playerRow?.level || player.level || 1);
             player.credits = Number(playerRow?.credits || player.credits || 500);
+            applyPlayerIdentityRow(playerRow || { public_id: authState.playerId, staff_role: 'player' });
 
             if(remember?.checked){
                 localStorage.setItem('cosmicRememberedEmail', email);
@@ -6326,7 +6449,7 @@ async function savePlayerToSupabase(playerData) {
   const { data, error } = await window.supabaseClient
     .from('players')
     .upsert(payload, { onConflict: 'auth_id' })
-    .select('public_id,nickname,level,credits,auth_id,email,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+    .select('public_id,nickname,level,credits,auth_id,email,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
     .single();
 
   if (error) {
@@ -6341,6 +6464,7 @@ async function savePlayerToSupabase(playerData) {
   if(data?.nickname) player.nickname = data.nickname;
   if(typeof data?.level !== 'undefined') player.level = Number(data.level) || 1;
   if(typeof data?.credits !== 'undefined') player.credits = Number(data.credits) || 0;
+  applyPlayerIdentityRow(data || {});
   applyPlayerResourcesFromRow(data || {});
   updatePremiumAccountInfo?.();
   return data;
@@ -6655,7 +6779,7 @@ async function fetchPlayerProfileData(targetId){
 
     const { data, error } = await window.supabaseClient
         .from('players')
-        .select('public_id,nickname,level,credits,email,crystals,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,created_at')
+        .select('public_id,nickname,level,credits,email,staff_role,crystals,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,created_at')
         .eq('public_id', Number(targetId))
         .maybeSingle();
 
@@ -6685,7 +6809,12 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
     profileWindowEl.classList.remove('hidden');
 
     const data = normalizedId ? await fetchPlayerProfileData(normalizedId) : null;
+    if (data?.public_id) {
+        setCachedStaffRole(String(data.public_id), data.staff_role || 'player');
+    }
     const displayName = data?.nickname || fallbackNickname || 'Player';
+    const profileRole = normalizeStaffRole(data?.staff_role || (normalizedId && normalizedId === myId ? player?.staff_role : 'player'));
+    const roleMeta = getStaffRoleMeta(profileRole);
     const canPm = canUsePrivateChat() && isAccountPublicId(normalizedId) && normalizedId !== myId;
     const totalResources = [
         data?.mercury_ore,
@@ -6704,6 +6833,7 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
       <div class="profile-grid">
         <div class="stat-card"><div class="cosmic-badge">Игровой ID</div><div>${escapeChatHtml(normalizedId || '—')}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Статус</div><div>${isAccountPublicId(normalizedId) ? 'Аккаунт' : 'Гость'}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Роль</div><div>${roleMeta.short || 'PLAYER'}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${Number(data?.level) || 1}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кредиты</div><div>${Number(data?.credits) || 0}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кристаллы</div><div>${Number(data?.crystals) || 0}</div></div>
