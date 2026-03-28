@@ -315,10 +315,6 @@ function setBattleChatOpen(open){
             setTimeout(() => input.focus(), 0);
         }else{
             input.blur();
-            if(gameState === 'BATTLE' || gameState === 'OBSERVE'){
-                const canvas = document.querySelector('canvas');
-                if(canvas) setTimeout(() => canvas.requestPointerLock?.(), 0);
-            }
         }
     }
 }
@@ -334,7 +330,6 @@ function initBattleChat(){
         if(e.key === 'Enter'){
             if(battleObserverMode && !canWriteInObserverChat()){
                 e.preventDefault();
-                pushKillFeed('🔒 В режиме наблюдения писать могут только MOD / ADM / OWR.', 'chat');
                 return;
             }
 
