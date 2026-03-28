@@ -3197,27 +3197,47 @@ function renderChatTabs() {
     chatTabsWrap.innerHTML = html;
 
     chatTabsWrap.querySelectorAll(".chat-tab").forEach((tab) => {
-        tab.addEventListener("click", async () => {
+        tab.addEventListener("click", async (e) => {
+            if (e.target.closest(".pin-tab") || e.target.closest(".close-tab")) return;
+
             currentChat = tab.dataset.scope || "global";
             clearUnreadForCurrentScope();
-            renderChatTabs();
-            await loadChatHistory(currentChat);
-            renderLobbyMessages();
+
+            requestAnimationFrame(async () => {
+                renderChatTabs();
+                await loadChatHistory(currentChat);
+                renderLobbyMessages();
+            });
         });
     });
 
     chatTabsWrap.querySelectorAll(".pin-tab").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+        });
+
         btn.addEventListener("click", (e) => {
+            e.preventDefault();
             e.stopPropagation();
+
             const peerId = btn.dataset.pin;
             if (!peerId || !privateChatTabs[peerId]) return;
+
             privateChatTabs[peerId].pinned = !privateChatTabs[peerId].pinned;
-            renderChatTabs();
+
+            requestAnimationFrame(() => {
+                renderChatTabs();
+            });
         });
     });
 
     chatTabsWrap.querySelectorAll(".close-tab").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+        });
+
         btn.addEventListener("click", async (e) => {
+            e.preventDefault();
             e.stopPropagation();
 
             const peerId = btn.dataset.close;
@@ -3234,7 +3254,9 @@ function renderChatTabs() {
                 renderLobbyMessages();
             }
 
-            renderChatTabs();
+            requestAnimationFrame(() => {
+                renderChatTabs();
+            });
         });
     });
 
