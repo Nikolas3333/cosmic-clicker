@@ -2078,21 +2078,75 @@ body.state-observe #ui{ display:none !important; }
   margin-bottom:6px;
   max-width:100%;
   word-break:break-word;
+  line-height:1.35;
 }
 .chat-line.system{
   color:#ffd166;
   font-style:italic;
 }
-.chat-nick{
-  color:#00ffcc;
+.chat-role-badge{
+  display:inline;
+  margin-right:4px;
+  font-size:12px;
   font-weight:700;
+  letter-spacing:0;
+  text-transform:lowercase;
 }
-.chat-sep{
-  color:#9dd;
-  margin:0 4px;
+.chat-nick,
+.chat-nick-static{
+  display:inline;
+  padding:0;
+  border:none;
+  background:transparent;
+  color:#ffffff;
+  font-weight:700;
+  font-size:inherit;
+  font-family:inherit;
+  text-decoration:none;
+  cursor:pointer;
+  vertical-align:baseline;
+}
+.chat-nick:hover,
+.chat-nick-static:hover{
+  opacity:0.92;
+}
+.chat-id,
+.chat-time{
+  color:#d6d6d6;
+  font-size:inherit;
+  margin-left:2px;
+  margin-right:2px;
 }
 .chat-text{
-  color:#fff;
+  color:#ffffff;
+  margin-left:4px;
+}
+.chat-line.chat-staff.role-mod,
+.chat-line.chat-staff.role-mod .chat-role-badge,
+.chat-line.chat-staff.role-mod .chat-nick,
+.chat-line.chat-staff.role-mod .chat-nick-static,
+.chat-line.chat-staff.role-mod .chat-id,
+.chat-line.chat-staff.role-mod .chat-time,
+.chat-line.chat-staff.role-mod .chat-text{
+  color:#ff2a2a;
+}
+.chat-line.chat-staff.role-adm,
+.chat-line.chat-staff.role-adm .chat-role-badge,
+.chat-line.chat-staff.role-adm .chat-nick,
+.chat-line.chat-staff.role-adm .chat-nick-static,
+.chat-line.chat-staff.role-adm .chat-id,
+.chat-line.chat-staff.role-adm .chat-time,
+.chat-line.chat-staff.role-adm .chat-text{
+  color:#ff8a1c;
+}
+.chat-line.chat-staff.role-owr,
+.chat-line.chat-staff.role-owr .chat-role-badge,
+.chat-line.chat-staff.role-owr .chat-nick,
+.chat-line.chat-staff.role-owr .chat-nick-static,
+.chat-line.chat-staff.role-owr .chat-id,
+.chat-line.chat-staff.role-owr .chat-time,
+.chat-line.chat-staff.role-owr .chat-text{
+  color:#ffd400;
 }
 .chat-tab.disabled{
   opacity:0.45;
