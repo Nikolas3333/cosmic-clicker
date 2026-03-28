@@ -315,7 +315,7 @@ function setBattleChatOpen(open){
             setTimeout(() => input.focus(), 0);
         }else{
             input.blur();
-            if(gameState === 'BATTLE'){
+            if(gameState === 'BATTLE' || gameState === 'OBSERVE'){
                 const canvas = document.querySelector('canvas');
                 if(canvas) setTimeout(() => canvas.requestPointerLock?.(), 0);
             }
@@ -329,7 +329,7 @@ function initBattleChat(){
     input.dataset.bound = '1';
 
     document.addEventListener('keydown', async (e) => {
-        if(gameState !== 'BATTLE') return;
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
         if(e.key === 'Enter'){
             if(battleObserverMode && !canWriteInObserverChat()){
@@ -2959,6 +2959,24 @@ function canWriteInObserverChat() {
     return isStaffRole(getOwnStaffRole());
 }
 
+const chatRateLimitState = {
+    lastSentAt: 0,
+    cooldownMs: 1800
+};
+
+function canBypassChatRateLimit() {
+    return isStaffRole(getOwnStaffRole());
+}
+
+function getChatCooldownRemainingMs() {
+    if (canBypassChatRateLimit()) return 0;
+    return Math.max(0, chatRateLimitState.cooldownMs - (Date.now() - chatRateLimitState.lastSentAt));
+}
+
+function markChatMessageSentNow() {
+    chatRateLimitState.lastSentAt = Date.now();
+}
+
 function getChatRoleCssClassByRole(role = "player") {
     const normalized = normalizeStaffRole(role);
     if (normalized === "mod") return "role-mod";
@@ -3555,6 +3573,15 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     const text = (typeof explicitText === "string" ? explicitText : (chatInput?.value || "")).trim();
     if (!text) return false;
 
+    const cooldownRemainingMs = getChatCooldownRemainingMs();
+    if (cooldownRemainingMs > 0) {
+        const remainSec = (cooldownRemainingMs / 1000).toFixed(1);
+        const spamText = `⏳ Не так быстро. Следующее сообщение через ${remainSec} сек.`;
+        if (forcedScopeName === "battle" || currentChat === "battle") addSystemBattleChatMessage(spamText);
+        else addSystemLobbyChatMessage(spamText);
+        return false;
+    }
+
     const scopeName = forcedScopeName || currentChat;
     const scope = parseChatScope(scopeName);
     const ownPublicId = getOwnPublicChatId();
@@ -3595,6 +3622,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         return false;
     }
 
+    markChatMessageSentNow();
     if (!forcedScopeName && chatInput) chatInput.value = "";
     return true;
 }
