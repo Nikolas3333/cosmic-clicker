@@ -656,53 +656,133 @@ canvas {
 }
 
 .chat-tab {
-  padding: 8px 15px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #aaa;
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  padding:8px 12px;
+  cursor:pointer;
+  font-size:14px;
+  color:#aaa;
+  background:transparent;
+  border:none;
+  text-align:left;
 }
 
 .chat-tab.active {
-  color: #00ffcc;
-  border-bottom: 2px solid #00ffcc;
+  color:#00ffcc;
+  border-bottom:2px solid #00ffcc;
 }
 
-.chat-tab{
-  background:transparent;
-  border:none;
+.chat-tab-title{
+  font-weight:700;
 }
 
 .chat-tab.pm-tab{
-  max-width:180px;
+  max-width:220px;
+  min-width:170px;
+  padding-right:48px;
+}
+
+.pm-online-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.18);
+  box-shadow:none;
+  flex:0 0 auto;
+}
+
+.chat-tab.pm-tab.online .pm-online-dot{
+  background:#40ff88;
+  box-shadow:0 0 10px rgba(64,255,136,0.55);
+}
+
+.pm-tab-content{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  flex:1;
+}
+
+.pm-tab-main{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+
+.pm-tab-label{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-weight:700;
+}
+
+.pm-tab-preview{
+  font-size:11px;
+  opacity:0.72;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
 
-.chat-tab.pm-tab{
-  position: relative;
-  padding-right: 24px;
+.pin-state{
+  font-size:11px;
+}
+
+.chat-tab-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 6px;
+  border-radius:999px;
+  background:#ff3b3b;
+  color:#fff;
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+  box-shadow:0 0 8px rgba(255,59,59,0.6);
+  flex:0 0 auto;
+}
+
+.chat-tab .pin-tab,
+.chat-tab .close-tab{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:12px;
+  line-height:1;
+  cursor:pointer;
+  display:none;
+  user-select:none;
+}
+
+.chat-tab .pin-tab{
+  right:24px;
+  color:#ffd66b;
 }
 
 .chat-tab .close-tab{
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;
-  line-height: 1;
-  color: #ff7a7a;
-  cursor: pointer;
-  display: none;
-  user-select: none;
+  right:6px;
+  color:#ff7a7a;
 }
 
+.chat-tab.pm-tab:hover .pin-tab,
 .chat-tab.pm-tab:hover .close-tab{
-  display: block;
+  display:block;
+}
+
+.chat-tab .pin-tab:hover{
+  color:#fff0a3;
 }
 
 .chat-tab .close-tab:hover{
-  color: #ff3b3b;
+  color:#ff3b3b;
 }
 
 .chat-tab.disabled{
@@ -787,8 +867,8 @@ canvas {
 .chat-tab.notify::after {
   content: "•";
   position: absolute;
-  right: 6px;
-  top: 2px;
+  right: 4px;
+  top: 0;
   color: #ff4444;
   font-size: 18px;
   animation: blink 0.8s infinite;
