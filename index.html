@@ -2255,6 +2255,100 @@ body.state-observe #ui{ display:none !important; }
   min-width:0;
 }
 
+
+/* === V11 CHAT FIXES === */
+#chat-panel,
+#chat-tabs,
+#chat-messages,
+#chat-input-area{
+  overflow-x:hidden !important;
+  max-width:100% !important;
+}
+
+#chat-panel *{
+  box-sizing:border-box;
+}
+
+#chat-tabs{
+  flex-wrap:wrap;
+}
+
+#chat-messages{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  overscroll-behavior-x:none;
+}
+
+.chat-line,
+.chat-message{
+  width:100% !important;
+  max-width:100% !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+.chat-role-badge{
+  position:relative;
+  display:inline-block;
+  margin-right:6px;
+  font-size:18px !important;
+  font-weight:900 !important;
+  letter-spacing:0.4px;
+  line-height:1;
+  text-transform:lowercase;
+  -webkit-text-fill-color:transparent;
+  background-size:100% 240%;
+  background-position:0 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,0.55)) drop-shadow(0 0 5px rgba(255,255,255,0.10));
+  animation: roleSweepUp 2.1s linear infinite;
+}
+
+.chat-role-badge::after{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  pointer-events:none;
+  border-radius:4px;
+  opacity:.15;
+  mix-blend-mode:screen;
+  animation: rolePulseGlow 1.8s ease-in-out infinite;
+}
+
+.chat-line.chat-staff.role-mod .chat-role-badge{
+  background-image:linear-gradient(to top,#711111 0%,#b71a1a 22%,#ff8c8c 42%,#b71a1a 58%,#6c1010 100%) !important;
+}
+.chat-line.chat-staff.role-mod .chat-role-badge::after{
+  box-shadow:0 0 10px rgba(255,60,60,.32);
+}
+
+.chat-line.chat-staff.role-adm .chat-role-badge{
+  background-image:linear-gradient(to top,#73420c 0%,#b8660f 22%,#ffd08b 42%,#b8660f 58%,#653708 100%) !important;
+}
+.chat-line.chat-staff.role-adm .chat-role-badge::after{
+  box-shadow:0 0 10px rgba(255,153,51,.28);
+}
+
+.chat-line.chat-staff.role-owr .chat-role-badge{
+  background-image:linear-gradient(to top,#675200 0%,#b58d00 22%,#fff0a6 42%,#b58d00 58%,#5a4700 100%) !important;
+}
+.chat-line.chat-staff.role-owr .chat-role-badge::after{
+  box-shadow:0 0 11px rgba(255,214,64,.28);
+}
+
+@keyframes roleSweepUp{
+  0%{ background-position:0 130%; }
+  100%{ background-position:0 -80%; }
+}
+
+@keyframes rolePulseGlow{
+  0%,100%{ opacity:.10; transform:translateY(0); }
+  50%{ opacity:.24; transform:translateY(-1px); }
+}
+
 </style>
 </head>
 
