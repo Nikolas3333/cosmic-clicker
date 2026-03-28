@@ -103,7 +103,7 @@ const authState = {
 
 function getDisplayPlayerTag(){
     const safeNickname = (player?.nickname || 'Commander').trim() || 'Commander';
-    return `${safeNickname} | ID: ${authState.playerId || 0}`;
+    return safeNickname;
 }
 
 
