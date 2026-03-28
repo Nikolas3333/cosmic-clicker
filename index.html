@@ -2153,27 +2153,106 @@ body.state-observe #ui{ display:none !important; }
 }
 
 
-/* === FIX ROLE STYLE === */
-.chat-role, [class^="role-"]{
-  font-weight:700 !important;
-  letter-spacing:0.3px;
+/* === FIX ROLE STYLE V10 === */
+#chat-panel{
+  overflow:hidden !important;
 }
 
-/* colors */
-.role-mod{ color:#ff3b3b !important; }
-.role-adm{ color:#ff7a00 !important; }
-.role-owr{ color:#ffd700 !important; }
-
-/* nick normal */
-.chat-nick{
-  font-weight:400 !important;
-}
-
-/* remove horizontal scroll */
 #chat-messages{
+  flex:1;
+  padding:12px;
+  overflow-y:auto !important;
   overflow-x:hidden !important;
-  word-break:break-word;
-  white-space:normal;
+  font-size:16px !important;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:flex-start;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+  white-space:normal !important;
+}
+
+.chat-line{
+  max-width:100%;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+  line-height:1.45;
+}
+
+.chat-message{
+  max-width:100%;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+.chat-role-badge{
+  display:inline-block;
+  margin-right:6px;
+  font-size:18px !important;
+  font-weight:900 !important;
+  letter-spacing:0;
+  text-transform:lowercase;
+  vertical-align:baseline;
+}
+
+.chat-nick,
+.chat-nick-static{
+  font-size:16px !important;
+  font-weight:700 !important;
+}
+
+.chat-time{
+  font-size:15px !important;
+}
+
+.chat-text{
+  font-size:16px !important;
+}
+
+.chat-id{
+  display:none !important;
+}
+
+/* role darker than nick */
+.chat-line.chat-staff.role-mod .chat-role-badge{
+  color:#c61f1f !important;
+}
+.chat-line.chat-staff.role-adm .chat-role-badge{
+  color:#c96a14 !important;
+}
+.chat-line.chat-staff.role-owr .chat-role-badge{
+  color:#c39a00 !important;
+}
+
+/* nick and text remain brighter */
+.chat-line.chat-staff.role-mod .chat-nick,
+.chat-line.chat-staff.role-mod .chat-nick-static,
+.chat-line.chat-staff.role-mod .chat-time,
+.chat-line.chat-staff.role-mod .chat-text{
+  color:#ff2a2a !important;
+}
+.chat-line.chat-staff.role-adm .chat-nick,
+.chat-line.chat-staff.role-adm .chat-nick-static,
+.chat-line.chat-staff.role-adm .chat-time,
+.chat-line.chat-staff.role-adm .chat-text{
+  color:#ff8a1c !important;
+}
+.chat-line.chat-staff.role-owr .chat-nick,
+.chat-line.chat-staff.role-owr .chat-nick-static,
+.chat-line.chat-staff.role-owr .chat-time,
+.chat-line.chat-staff.role-owr .chat-text{
+  color:#ffd400 !important;
+}
+
+#chat-input-area{
+  overflow:hidden !important;
+}
+
+#chat-input{
+  min-width:0;
 }
 
 </style>
