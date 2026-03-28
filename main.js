@@ -333,6 +333,11 @@ function initBattleChat(){
                 return;
             }
 
+            if(!battleObserverMode && !canWriteBattleAnnouncementChat()){
+                e.preventDefault();
+                return;
+            }
+
             if(!battleChatOpen){
                 e.preventDefault();
                 setBattleChatOpen(true);
@@ -348,7 +353,10 @@ function initBattleChat(){
 
                 if(text){
                     const sent = await sendMessage('battle', text);
-                    if(sent) input.value = '';
+                    if(sent){
+                        input.value = '';
+                        if(gameState === 'BATTLE' || gameState === 'OBSERVE') renderBattleMessages?.();
+                    }
                 }
                 setBattleChatOpen(false);
             }
@@ -2954,6 +2962,11 @@ function canWriteInObserverChat() {
     return isStaffRole(getOwnStaffRole());
 }
 
+function canWriteBattleAnnouncementChat() {
+    const role = getOwnStaffRole();
+    return role === "adm" || role === "owr";
+}
+
 const chatRateLimitState = {
     lastSentAt: 0,
     cooldownMs: 1800
@@ -3488,7 +3501,7 @@ async function loadChatHistory(scopeName = currentChat) {
     if (scopeName === currentChat) clearUnreadForCurrentScope();
 
     if (currentChat === scopeName) renderLobbyMessages();
-    if (scope.channel === "battle") renderBattleMessages();
+    if (scope.channel === "battle" && (gameState === "BATTLE" || gameState === "OBSERVE" || currentChat === "battle")) renderBattleMessages();
 }
 
 async function handleIncomingRealtimeMessage(msg) {
@@ -3509,7 +3522,7 @@ async function handleIncomingRealtimeMessage(msg) {
         if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
         if (currentChat === "battle") renderLobbyMessages();
-        if (gameState === "BATTLE") renderBattleMessages();
+        if (gameState === "BATTLE" || gameState === "OBSERVE") renderBattleMessages();
         renderChatTabs();
         return;
     }
