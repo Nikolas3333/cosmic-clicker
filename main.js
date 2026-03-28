@@ -2916,9 +2916,9 @@ const onlinePmPeers = new Set();
 const playerStaffRoleCache = {};
 const STAFF_ROLE_META = {
     player: { short: "", label: "Игрок", color: "#9fd7ff" },
-    mod: { short: "MOD", label: "Moderator", color: "#4dd2ff" },
-    adm: { short: "ADM", label: "Admin", color: "#ff6767" },
-    owr: { short: "OWR", label: "Owner", color: "#ffb347" }
+    mod: { short: "mod", label: "Moderator", color: "#ff2a2a" },
+    adm: { short: "adm", label: "Admin", color: "#ff8a1c" },
+    owr: { short: "owr", label: "Owner", color: "#ffd400" }
 };
 
 function normalizeStaffRole(role = "player") {
@@ -2959,10 +2959,23 @@ function canWriteInObserverChat() {
     return isStaffRole(getOwnStaffRole());
 }
 
+function getChatRoleCssClassByRole(role = "player") {
+    const normalized = normalizeStaffRole(role);
+    if (normalized === "mod") return "role-mod";
+    if (normalized === "adm") return "role-adm";
+    if (normalized === "owr") return "role-owr";
+    return "";
+}
+
+function getChatRoleCssClassByPublicId(publicId) {
+    return getChatRoleCssClassByRole(getCachedStaffRole(publicId));
+}
+
 function getChatRoleBadgeHtmlByRole(role = "player") {
     const meta = getStaffRoleMeta(role);
+    const roleClass = getChatRoleCssClassByRole(role);
     if (!meta.short) return "";
-    return `<span class="chat-role-badge" style="display:inline-flex;align-items:center;justify-content:center;min-width:38px;padding:2px 6px;margin-right:6px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.4px;background:${meta.color};color:#10151f;box-shadow:0 0 10px rgba(0,0,0,0.18);">${meta.short}</span>`;
+    return `<span class="chat-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
 }
 
 function getChatRoleBadgeHtmlByPublicId(publicId) {
@@ -3156,6 +3169,8 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const ownId = getOwnPublicChatId();
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
+    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
     const nickAttrs = publicId
         ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
         : ` data-player-nickname="${author}"`;
@@ -3168,12 +3183,11 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     }
 
     return `
-      <div class="chat-line" data-message-id="${msg.id}">
-        <span class="chat-time">[${time}]</span>
-        ${prefix}
+      <div class="chat-line${lineClass}" data-message-id="${msg.id}">
         ${roleBadge}
         <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
-        <span class="chat-sep">:</span>
+        <span class="chat-id">[${escapeChatHtml(publicId || "0")}]</span>
+        <span class="chat-time">[${time}]</span>
         <span class="chat-text">${text}</span>
       </div>
     `;
@@ -3185,7 +3199,10 @@ function buildBattleChatMessageHtml(msg) {
     const time = formatChatTime(msg.created_at);
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
-    return `<div data-message-id="${msg.id}"><span class="chat-time">[${time}]</span> ${roleBadge}<span style="color:#8deaff">${author}:</span> ${text}</div>`;
+    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
+    const safePublicId = escapeChatHtml(publicId || "0");
+    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
 }
 
 function addSystemLobbyChatMessage(text) {
