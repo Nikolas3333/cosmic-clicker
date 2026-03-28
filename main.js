@@ -3044,6 +3044,10 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const time = formatChatTime(msg.created_at);
     const recipientId = msg.recipient_public_id ? String(msg.recipient_public_id) : null;
     const ownId = getOwnPublicChatId();
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const nickAttrs = publicId
+        ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
+        : ` data-player-nickname="${author}"`;
 
     let prefix = "";
     if (scope.channel === "battle") {
@@ -3056,7 +3060,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
       <div class="chat-line" data-message-id="${msg.id}">
         <span class="chat-time">[${time}]</span>
         ${prefix}
-        <span class="chat-nick">${author}</span>
+        <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
         <span class="chat-sep">:</span>
         <span class="chat-text">${text}</span>
       </div>
@@ -3269,6 +3273,23 @@ function renderLobbyMessages() {
     const list = getChatCacheList(scope);
     chatMessages.innerHTML = list.map(msg => buildLobbyChatMessageHtml(msg, scope)).join("");
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+if (chatMessages && !chatMessages.dataset.playerActionsBound) {
+    chatMessages.dataset.playerActionsBound = '1';
+    chatMessages.addEventListener('click', async (e) => {
+        const nickBtn = e.target.closest('.chat-nick');
+        if (!nickBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const targetId = nickBtn.dataset.playerPublicId ? String(nickBtn.dataset.playerPublicId) : '';
+        const nickname = nickBtn.dataset.playerNickname || nickBtn.textContent || 'Player';
+        if (!targetId) {
+            await openPlayerProfile('', nickname);
+            return;
+        }
+        showPlayerActionMenu(nickBtn, targetId, nickname);
+    });
 }
 
 function renderBattleMessages() {
@@ -4494,16 +4515,6 @@ initBattleUI();
 initBattleChat();
 
 
-function setProfileActionsHTML(html = ''){
-    const profileActions = document.getElementById('profile-actions');
-    if(profileActions) profileActions.innerHTML = html;
-}
-
-function openProfileWindow(){
-    const profileWindow = document.getElementById('profile-window');
-    profileWindow?.classList.remove('hidden');
-}
-
 function renderProfileStats(){
     const profileInfo = document.getElementById('profile-info');
     if(!profileInfo) return;
@@ -4520,69 +4531,6 @@ function renderProfileStats(){
         <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${player.ships.length}</div></div>
       </div>`;
-    setProfileActionsHTML('');
-}
-
-async function openPlayerProfileCard(targetId, fallbackNickname = 'Player', options = {}){
-    const profileInfo = document.getElementById('profile-info');
-    if(!profileInfo) return;
-
-    const myId = (typeof authState !== 'undefined' && authState?.playerId) ? String(authState.playerId) : '';
-    const safeId = targetId ? String(targetId) : '';
-    const isGuest = !/^\d+$/.test(safeId);
-    const isMe = !!(safeId && myId && safeId === myId);
-    const statusLabel = options?.status === 'lobby' ? 'В лобби' : (options?.status || 'Онлайн');
-
-    if(isMe){
-        renderProfileStats();
-        openProfileWindow();
-        return;
-    }
-
-    let row = null;
-    if(window.supabaseClient && !isGuest && safeId){
-        try{
-            const { data, error } = await window.supabaseClient
-                .from('players')
-                .select('public_id,nickname,level,credits')
-                .eq('public_id', Number(safeId))
-                .maybeSingle();
-            if(!error && data) row = data;
-        }catch(err){
-            console.warn('Не удалось загрузить профиль игрока:', err);
-        }
-    }
-
-    const nickname = row?.nickname || fallbackNickname || 'Player';
-    const level = Number(row?.level || 1);
-    const credits = Number(row?.credits || 0);
-
-    profileInfo.innerHTML = `
-      <h2 class="profile-title">Профиль игрока</h2>
-      <div class="profile-grid">
-        <div class="stat-card"><div class="cosmic-badge">Ник</div><div>${nickname}${isGuest ? ' (guest)' : ''}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Игровой ID</div><div>${safeId || '—'}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Статус</div><div>${statusLabel}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${isGuest ? '—' : level}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Кредиты</div><div>${isGuest ? '—' : credits}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">ЛС</div><div>${isGuest ? 'Недоступно' : 'Доступно'}</div></div>
-      </div>`;
-
-    if(!isGuest && safeId){
-        setProfileActionsHTML(`
-          <button id="profile-pm-btn" class="profile-action-btn" type="button">✉️ Написать в ЛС</button>
-        `);
-        const pmBtn = document.getElementById('profile-pm-btn');
-        pmBtn?.addEventListener('click', () => {
-            if(typeof openPrivateChat === 'function'){
-                openPrivateChat(safeId, nickname || `ID ${safeId}`);
-            }
-        });
-    }else{
-        setProfileActionsHTML('');
-    }
-
-    openProfileWindow();
 }
 
 function renderHangarCosmic(){
@@ -6631,6 +6579,147 @@ function showGuestOnlyPvpMessage(){
 
 // ================= ONLINE PLAYERS (SUPABASE) =================
 
+const ONLINE_TTL_MS = 35000;
+const ONLINE_HEARTBEAT_MS = 10000;
+let onlineHeartbeatTimer = null;
+let onlineRenderTimer = null;
+let playerActionMenuEl = null;
+
+function isAccountPublicId(value){
+    return !!(value && /^\d+$/.test(String(value)));
+}
+
+function getOnlineFreshCutoffIso(){
+    return new Date(Date.now() - ONLINE_TTL_MS).toISOString();
+}
+
+function ensurePlayerActionMenu(){
+    if (playerActionMenuEl && document.body.contains(playerActionMenuEl)) return playerActionMenuEl;
+
+    playerActionMenuEl = document.createElement('div');
+    playerActionMenuEl.id = 'player-action-menu';
+    playerActionMenuEl.className = 'hidden';
+    playerActionMenuEl.style.position = 'fixed';
+    playerActionMenuEl.style.zIndex = '99999';
+    playerActionMenuEl.style.minWidth = '180px';
+    playerActionMenuEl.style.padding = '8px';
+    playerActionMenuEl.style.borderRadius = '12px';
+    playerActionMenuEl.style.border = '1px solid rgba(0,255,255,0.35)';
+    playerActionMenuEl.style.background = 'rgba(10,16,30,0.96)';
+    playerActionMenuEl.style.boxShadow = '0 12px 30px rgba(0,0,0,0.45)';
+    document.body.appendChild(playerActionMenuEl);
+
+    playerActionMenuEl.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => hidePlayerActionMenu());
+    window.addEventListener('resize', () => hidePlayerActionMenu());
+    window.addEventListener('scroll', () => hidePlayerActionMenu(), true);
+    return playerActionMenuEl;
+}
+
+function hidePlayerActionMenu(){
+    const menu = ensurePlayerActionMenu();
+    menu.classList.add('hidden');
+    menu.innerHTML = '';
+}
+
+function showPlayerActionMenu(anchorEl, targetId, nickname){
+    const menu = ensurePlayerActionMenu();
+    const safeName = escapeChatHtml(nickname || `ID ${targetId || '?'}`);
+    const canPm = canUsePrivateChat() && isAccountPublicId(targetId) && String(targetId) !== String(authState?.playerId || '');
+
+    menu.innerHTML = `
+      <div style="color:#9fe7ff;font-weight:700;padding:4px 6px 8px;">${safeName}</div>
+      <button type="button" class="player-menu-btn" data-action="profile" style="width:100%;display:block;text-align:left;margin:0 0 6px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#fff;cursor:pointer;">👤 Открыть профиль</button>
+      <button type="button" class="player-menu-btn" data-action="pm" ${canPm ? '' : 'disabled'} style="width:100%;display:block;text-align:left;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:${canPm ? 'rgba(0,180,255,0.16)' : 'rgba(255,255,255,0.04)'};color:${canPm ? '#dff8ff' : '#7f8a96'};cursor:${canPm ? 'pointer' : 'not-allowed'};">✉️ Личное сообщение</button>
+    `;
+
+    const rect = anchorEl.getBoundingClientRect();
+    menu.style.left = `${Math.min(window.innerWidth - 210, Math.max(8, rect.left))}px`;
+    menu.style.top = `${Math.min(window.innerHeight - 120, rect.bottom + 6)}px`;
+    menu.classList.remove('hidden');
+
+    menu.querySelector('[data-action="profile"]')?.addEventListener('click', async () => {
+        hidePlayerActionMenu();
+        await openPlayerProfile(targetId, nickname);
+    });
+
+    menu.querySelector('[data-action="pm"]')?.addEventListener('click', () => {
+        if (!canPm) return;
+        hidePlayerActionMenu();
+        openPrivateChat(String(targetId), nickname || `ID ${targetId}`);
+    });
+}
+
+async function fetchPlayerProfileData(targetId){
+    if(!window.supabaseClient || !targetId) return null;
+
+    const { data, error } = await window.supabaseClient
+        .from('players')
+        .select('public_id,nickname,level,credits,email,crystals,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,created_at')
+        .eq('public_id', Number(targetId))
+        .maybeSingle();
+
+    if(error){
+        console.error('Ошибка загрузки профиля игрока:', error);
+        return null;
+    }
+
+    return data || null;
+}
+
+async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
+    const profileWindowEl = document.getElementById('profile-window');
+    const profileInfoEl = document.getElementById('profile-info');
+    if(!profileWindowEl || !profileInfoEl) return;
+
+    const myId = authState?.playerId ? String(authState.playerId) : '';
+    const normalizedId = targetId ? String(targetId) : '';
+
+    if(normalizedId && myId && normalizedId === myId){
+        if (typeof renderProfileStats === 'function') renderProfileStats();
+        profileWindowEl.classList.remove('hidden');
+        return;
+    }
+
+    profileInfoEl.innerHTML = '<div class="auth-note">Загрузка профиля игрока...</div>';
+    profileWindowEl.classList.remove('hidden');
+
+    const data = normalizedId ? await fetchPlayerProfileData(normalizedId) : null;
+    const displayName = data?.nickname || fallbackNickname || 'Player';
+    const canPm = canUsePrivateChat() && isAccountPublicId(normalizedId) && normalizedId !== myId;
+    const totalResources = [
+        data?.mercury_ore,
+        data?.venus_gas,
+        data?.earth_water,
+        data?.mars_crystal,
+        data?.jupiter_hydrogen,
+        data?.saturn_ice,
+        data?.uranus_ammonia,
+        data?.neptune_methane,
+        data?.solar_energy
+    ].reduce((sum, value) => sum + (Number(value) || 0), 0);
+
+    profileInfoEl.innerHTML = `
+      <h2 class="profile-title">Пилот ${escapeChatHtml(displayName)}</h2>
+      <div class="profile-grid">
+        <div class="stat-card"><div class="cosmic-badge">Игровой ID</div><div>${escapeChatHtml(normalizedId || '—')}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Статус</div><div>${isAccountPublicId(normalizedId) ? 'Аккаунт' : 'Гость'}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${Number(data?.level) || 1}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Кредиты</div><div>${Number(data?.credits) || 0}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Кристаллы</div><div>${Number(data?.crystals) || 0}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
+        ${canPm ? '<button id="profile-pm-btn" type="button" style="padding:10px 14px;border-radius:10px;border:1px solid rgba(0,255,255,0.35);background:rgba(0,180,255,0.18);color:#fff;cursor:pointer;">✉️ Написать в ЛС</button>' : ''}
+      </div>
+      ${!data ? '<div class="auth-note" style="margin-top:12px;">Профиль загружен частично. Полных данных по игроку пока нет.</div>' : ''}
+    `;
+
+    document.getElementById('profile-pm-btn')?.addEventListener('click', () => {
+        openPrivateChat(String(normalizedId), displayName);
+    });
+}
+
 async function setPlayerOnlineStatus(status = 'lobby', roomId = null){
     if(!window.supabaseClient) return;
 
@@ -6681,13 +6770,27 @@ async function removePlayerFromOnline(){
     }
 }
 
+async function cleanupStaleOnlinePlayers(){
+    if(!window.supabaseClient) return;
+    const cutoffIso = getOnlineFreshCutoffIso();
+    const { error } = await window.supabaseClient
+        .from('online_players')
+        .delete()
+        .lt('updated_at', cutoffIso);
+    if(error){
+        console.warn('Не удалось очистить старый online:', error);
+    }
+}
+
 async function loadOnlinePlayersFromSupabase(){
     if(!window.supabaseClient) return [];
+    const cutoffIso = getOnlineFreshCutoffIso();
 
     const { data, error } = await window.supabaseClient
         .from('online_players')
         .select('*')
         .eq('status', 'lobby')
+        .gte('updated_at', cutoffIso)
         .order('updated_at', { ascending: false });
 
     if(error){
@@ -6702,7 +6805,7 @@ function refreshPmOnlineState(players = []){
     onlinePmPeers.clear();
     for(const p of players || []){
         const targetId = p?.player_id ? String(p.player_id) : '';
-        if(targetId && /^\d+$/.test(targetId)){
+        if(targetId && isAccountPublicId(targetId)){
             onlinePmPeers.add(targetId);
         }
     }
@@ -6723,39 +6826,39 @@ async function renderOnlinePlayers(){
         row.className = 'online-player';
 
         const targetId = p.player_id ? String(p.player_id) : null;
-        const canPmTarget = !!(targetId && /^\d+$/.test(targetId));
+        const canPmTarget = isAccountPublicId(targetId);
         const isMe = !!(targetId && myId && targetId === myId);
-        const displayNickname = p.nickname || (isMe ? player?.nickname : 'Player');
 
-        row.textContent = displayNickname + (!canPmTarget ? ' (guest)' : '');
-        row.title = 'Нажмите, чтобы открыть профиль';
+        row.textContent = p.nickname + (!canPmTarget ? ' (guest)' : '');
+        row.title = isMe ? 'Это вы' : 'Нажмите, чтобы открыть профиль';
+        row.dataset.playerId = targetId || '';
+        row.dataset.nickname = p.nickname || '';
         if(!canPmTarget) row.style.opacity = '0.7';
-        if(isMe) row.classList.add('self');
 
         list.appendChild(row);
 
-        row.addEventListener('click', () => {
-            openPlayerProfileCard(targetId, displayNickname, { status: p.status || 'Онлайн' });
-        });
+        if(targetId){
+            row.addEventListener('click', async () => {
+                await openPlayerProfile(targetId, p.nickname || `ID ${targetId}`);
+            });
+        }
     }
 }
 
-let onlineHeartbeatTimer = null;
-
-function syncOnlinePresence(){
-    if(gameState === 'LOBBY'){
-        setPlayerOnlineStatus('lobby', null);
-        setTimeout(renderOnlinePlayers, 250);
-        return;
-    }
-    removePlayerFromOnline();
-}
-
-function startOnlineHeartbeat(){
-    if(onlineHeartbeatTimer) return;
+function startOnlinePresenceHeartbeat(){
+    if(onlineHeartbeatTimer) clearInterval(onlineHeartbeatTimer);
     onlineHeartbeatTimer = setInterval(() => {
-        syncOnlinePresence();
-    }, 15000);
+        if(gameState === 'LOBBY'){
+            setPlayerOnlineStatus('lobby', null);
+        }
+    }, ONLINE_HEARTBEAT_MS);
+}
+
+function startOnlineRenderLoop(){
+    if(onlineRenderTimer) clearInterval(onlineRenderTimer);
+    onlineRenderTimer = setInterval(() => {
+        renderOnlinePlayers();
+    }, 5000);
 }
 
 const previousSwitchStateOnline = window.switchState || switchState;
@@ -6763,26 +6866,62 @@ switchState = function(newState){
     if(isGuestAccount() && (newState === 'ORBIT' || newState === 'INVENTORY' || newState === 'COMBAT')){
         showGuestOnlyPvpMessage();
         previousSwitchStateOnline('LOBBY');
-        syncOnlinePresence();
+        setPlayerOnlineStatus('lobby', null);
+        setTimeout(renderOnlinePlayers, 300);
         return;
     }
 
     previousSwitchStateOnline(newState);
-    syncOnlinePresence();
+
+    if(newState === 'LOBBY'){
+        setPlayerOnlineStatus('lobby', null);
+        setTimeout(renderOnlinePlayers, 300);
+        return;
+    }
+
+    removePlayerFromOnline();
 };
 
 window.switchState = switchState;
-startOnlineHeartbeat();
+window.openPlayerProfile = openPlayerProfile;
 
 window.addEventListener('beforeunload', () => {
     removePlayerFromOnline();
 });
 
-window.addEventListener('focus', () => {
-    syncOnlinePresence();
+window.addEventListener('pagehide', () => {
+    removePlayerFromOnline();
 });
 
-setInterval(() => {
-    renderOnlinePlayers();
-}, 3000);
+document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && gameState === 'LOBBY'){
+        setPlayerOnlineStatus('lobby', null);
+        setTimeout(renderOnlinePlayers, 250);
+    }
+});
 
+window.addEventListener('focus', () => {
+    if(gameState === 'LOBBY'){
+        setPlayerOnlineStatus('lobby', null);
+        setTimeout(renderOnlinePlayers, 250);
+    }
+});
+
+startOnlinePresenceHeartbeat();
+startOnlineRenderLoop();
+cleanupStaleOnlinePlayers();
+renderOnlinePlayers();
+
+
+
+(function ensurePlayerUiHelperStyles(){
+    if (document.getElementById('player-ui-helper-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'player-ui-helper-styles';
+    style.textContent = `
+      .chat-nick{background:none;border:none;padding:0 2px;color:#8deaff;cursor:pointer;font:inherit;font-weight:700;}
+      .chat-nick:hover{text-decoration:underline;color:#c8f4ff;}
+      #player-action-menu.hidden{display:none !important;}
+    `;
+    document.head.appendChild(style);
+})();
