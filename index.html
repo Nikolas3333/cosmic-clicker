@@ -2349,6 +2349,60 @@ body.state-observe #ui{ display:none !important; }
   50%{ opacity:.24; transform:translateY(-1px); }
 }
 
+
+/* === V12 LOWER CHAT SCROLL FIX === */
+#chat-wrapper,
+#chat-panel,
+#chat-tabs,
+#chat-messages,
+#chat-input-area{
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  box-sizing:border-box !important;
+}
+
+#chat-panel{
+  min-width:0 !important;
+}
+
+#chat-tabs{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  row-gap:2px;
+}
+
+.chat-tab,
+.chat-tab.pm-tab,
+.pm-tab-content,
+.pm-tab-main,
+.pm-tab-label,
+.pm-tab-preview{
+  min-width:0 !important;
+  max-width:100% !important;
+}
+
+#chat-messages{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  white-space:normal !important;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+}
+
+.chat-line,
+.chat-message,
+.chat-text{
+  max-width:100% !important;
+  white-space:normal !important;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+}
+
+#chat-input{
+  min-width:0 !important;
+}
+
 </style>
 </head>
 
