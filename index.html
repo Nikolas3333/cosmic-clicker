@@ -2428,6 +2428,48 @@ body.state-observe #ui{ display:none !important; }
   overflow-wrap:anywhere;
 }
 
+
+/* === V16 GLOBAL BATTLE ANNOUNCEMENTS === */
+.kill-feed-item.chat-announcement{
+  max-width:420px;
+  white-space:normal !important;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  padding:4px 8px;
+  border-radius:8px;
+  background:rgba(5,10,22,0.72);
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:0 0 10px rgba(0,0,0,0.22);
+}
+
+.kill-feed-item.chat-announcement .chat-role-badge{
+  font-size:15px !important;
+  margin-right:5px;
+}
+
+.kill-feed-item.chat-announcement .chat-nick-static{
+  font-weight:700;
+}
+
+.kill-feed-item.chat-announcement .chat-sep{
+  margin:0 4px;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-mod .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-mod .chat-text{
+  color:#ff2a2a !important;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-adm .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-adm .chat-text{
+  color:#ff8a1c !important;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-owr .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-owr .chat-text{
+  color:#ffd400 !important;
+}
+
 </style>
 </head>
 
