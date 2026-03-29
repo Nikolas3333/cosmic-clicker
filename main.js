@@ -344,12 +344,22 @@ async function sendSceneMapMessage(text) {
         message: cleanText
     };
 
+    const battlePayload = {
+        channel: "battle",
+        room_id: scenePayload.room_id,
+        player_id: scenePayload.player_id,
+        player_public_id: scenePayload.player_public_id,
+        recipient_public_id: null,
+        player_nickname: scenePayload.player_nickname,
+        message: cleanText
+    };
+
     const { error } = await window.supabaseClient
         .from("chat_messages")
-        .insert(scenePayload);
+        .insert([scenePayload, battlePayload]);
 
     if (error) {
-        console.error("❌ Ошибка отправки scene сообщения:", error);
+        console.error("❌ Ошибка отправки scene/battle сообщения:", error);
         return false;
     }
 
@@ -365,11 +375,18 @@ async function sendSceneMapMessage(text) {
         message: scenePayload.message
     };
 
-    const battleMirrorScope = { key: "battle", channel: "battle" };
-    pushChatToCache(battleMirrorScope, {
-        ...optimisticSceneMessage,
-        channel: "battle"
-    });
+    const optimisticBattleMessage = {
+        id: `battle-local-${Date.now()}`,
+        channel: "battle",
+        room_id: battlePayload.room_id,
+        created_at: nowIso,
+        player_public_id: ownPublicId,
+        player_nickname: battlePayload.player_nickname,
+        message: battlePayload.message
+    };
+
+    const battleScope = { key: "battle", channel: "battle" };
+    pushChatToCache(battleScope, optimisticBattleMessage);
 
     if (currentChat === "battle") {
         renderLobbyMessages();
@@ -3302,7 +3319,7 @@ function buildBattleChatMessageHtml(msg) {
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
-    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">(${safePublicId})</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
 }
 
 function addSystemLobbyChatMessage(text) {
@@ -3540,13 +3557,14 @@ function showBattleAnnouncementInActiveScene(msg) {
     const author = escapeChatHtml(msg.player_nickname || msg.nickname || "Unknown");
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement${lineClass}`;
-    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
     feed.prepend(item);
 
@@ -3572,13 +3590,14 @@ function showSceneMapMessageInActiveScene(msg) {
     const author = escapeChatHtml(msg.player_nickname || msg.nickname || "Unknown");
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
-    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
     feed.prepend(item);
 
