@@ -216,7 +216,7 @@ const canvas = document.querySelector("canvas");
     if(gameState === "OBSERVE" || battleObserverMode){
         observerCameraYaw += event.movementX * 0.0035 * gameSettings.mouseSensitivity;
         const invertFactor = gameSettings.invertY ? -1 : 1;
-        observerCameraPitch -= event.movementY * 0.0026 * gameSettings.mouseSensitivity * invertFactor;
+        observerCameraPitch += event.movementY * 0.0026 * gameSettings.mouseSensitivity * invertFactor;
         observerCameraPitch = THREE.MathUtils.clamp(observerCameraPitch, -1.15, 1.15);
         return;
     }
@@ -392,9 +392,9 @@ async function sendSceneMapMessage(text, options = {}) {
         channel: 'scene',
         room_id: scenePayload.room_id,
         created_at: nowIso,
-        player_public_id: ownPublicId,
+        player_public_id: scenePayload.player_public_id,
         player_nickname: scenePayload.player_nickname,
-        staff_role: getOwnStaffRole(),
+        staff_role: identity.staffRole,
         message: scenePayload.message
     };
     pushChatToCache({ key: 'battle', channel: 'battle' }, { ...optimisticSceneMessage, channel: 'battle' });
@@ -408,8 +408,10 @@ async function sendSceneMapMessage(text, options = {}) {
 
 function initBattleChat(){
     const input = document.getElementById('battle-chat-input');
-    if(!input || input.dataset.bound) return;
-    input.dataset.bound = '1';
+    if(!input) return;
+    if(!input.dataset.bound) input.dataset.bound = '1';
+    if(window.__battleChatKeydownBound) return;
+    window.__battleChatKeydownBound = true;
 
     document.addEventListener('keydown', async (e) => {
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
@@ -434,7 +436,7 @@ function initBattleChat(){
                     if(gameState === 'BATTLE'){
                         sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
                     }else if(gameState === 'OBSERVE'){
-                        sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
+                        sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
                     }
                     if(sent) input.value = '';
                 }
@@ -3288,6 +3290,18 @@ function getOwnChatLabel() {
         : (player?.nickname || "Commander");
 }
 
+function getObserveStaffChatIdentity() {
+    const role = getOwnStaffRole();
+    const meta = getStaffRoleMeta(role);
+    const isObserveStaff = gameState === 'OBSERVE' && isStaffRole(role);
+    return {
+        isObserveStaff,
+        publicId: isObserveStaff ? null : getOwnPublicChatId(),
+        nickname: isObserveStaff ? (meta?.label || 'Staff') : getOwnChatLabel(),
+        staffRole: role
+    };
+}
+
 function getValidChatPlayerId(){
     const rawId = player?.id ?? null;
     if(rawId === null || typeof rawId === "undefined") return null;
@@ -3433,11 +3447,12 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
         prefix = '<span class="chat-sep">→</span> ';
     }
 
+    const idHtml = publicId ? `<span class="chat-id">[${safePublicId}]</span>` : '';
     return `
       <div class="chat-line${lineClass}" data-message-id="${msg.id}">
         ${prefix}${roleBadge}
         <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
-        <span class="chat-id">[${safePublicId}]</span>
+        ${idHtml}
         <span class="chat-time">[${time}]</span>
         <span class="chat-text">${text}</span>
       </div>
@@ -3459,7 +3474,8 @@ function buildBattleChatMessageHtml(msg) {
         return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
     }
 
-    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
+    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml} <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
 }
 
 function addSystemLobbyChatMessage(text) {
@@ -3765,9 +3781,10 @@ function showBattleAnnouncementInActiveScene(msg) {
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement${lineClass}`;
+    const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
     item.innerHTML = shouldHideStaffIdentityInObserve(publicId, msg.staff_role)
         ? `${roleBadge}<span class="chat-text">${text}</span>`
-        : `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+        : `${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
     feed.prepend(item);
 
@@ -3803,9 +3820,10 @@ function showSceneMapMessageInActiveScene(msg) {
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
+    const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
     item.innerHTML = shouldHideStaffIdentityInObserve(publicId, msg.staff_role)
         ? `${visibleRoleBadge}<span class="chat-text">${text}</span>`
-        : `${visibleRoleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+        : `${visibleRoleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
     feed.prepend(item);
 
@@ -4150,6 +4168,15 @@ async function handleChatStateChange() {
     if (gameState === "BATTLE") {
         currentChat = "battle";
         clearUnreadForCurrentScope();
+        renderChatTabs();
+        updateLobbyChatComposerVisibility();
+        await loadChatHistory("battle");
+        renderBattleMessages();
+        return;
+    }
+
+    if (gameState === "OBSERVE") {
+        if (currentChat === "battle") clearUnreadForCurrentScope();
         renderChatTabs();
         updateLobbyChatComposerVisibility();
         await loadChatHistory("battle");
@@ -5572,31 +5599,39 @@ function setupObserverBattle(mapName){
     clearBattleScene();
     battleObserverMode = true;
     observerCameraYaw = 0;
-    observerCameraPitch = -0.22;
+    observerCameraPitch = 0;
     observerCameraDistance = 34;
     enterBattleMap(mapName);
     observerBots = [];
+    observerFreeCameraPosition.set(0, 12, 38);
+    camera.position.copy(observerFreeCameraPosition);
     const hud = document.getElementById('enemy-hud');
     if(hud) hud.style.display = 'none';
 }
 
 function updateObserverBattle(){
-    const focusTargets = Array.from(remoteBattleShips.values())
-        .map(entry => entry?.mesh)
-        .filter(Boolean);
+    const lookEuler = new THREE.Euler(observerCameraPitch, observerCameraYaw, 0, 'YXZ');
+    const lookQuaternion = new THREE.Quaternion().setFromEuler(lookEuler);
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(lookQuaternion).normalize();
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(lookQuaternion).normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    const move = new THREE.Vector3();
+    const flySpeed = 1.15;
 
-    const focus = focusTargets[0] || battleMapPlanet;
-    if(focus){
-        observerCameraTarget.lerp(focus.position, 0.08);
-        const offset = new THREE.Vector3(
-            Math.sin(observerCameraYaw) * Math.cos(observerCameraPitch),
-            Math.sin(observerCameraPitch),
-            Math.cos(observerCameraYaw) * Math.cos(observerCameraPitch)
-        ).multiplyScalar(observerCameraDistance);
-        const camTarget = observerCameraTarget.clone().add(offset);
-        camera.position.lerp(camTarget, 0.09);
-        camera.lookAt(observerCameraTarget);
+    if(keys.w) move.add(forward);
+    if(keys.s) move.addScaledVector(forward, -1);
+    if(keys.d) move.add(right);
+    if(keys.a) move.addScaledVector(right, -1);
+    if(keys.space) move.add(up);
+    if(keys.shift) move.addScaledVector(up, -1);
+
+    if(move.lengthSq() > 0){
+        move.normalize().multiplyScalar(flySpeed);
+        observerFreeCameraPosition.add(move);
     }
+
+    camera.position.copy(observerFreeCameraPosition);
+    camera.lookAt(observerFreeCameraPosition.clone().add(forward.multiplyScalar(80)));
 }
 
 function fireObserverLaser(shooter, target){
