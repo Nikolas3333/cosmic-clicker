@@ -723,6 +723,12 @@ if(gameState === "INVENTORY"){
     alert("📦 Inventory (в разработке)");
 }
 
+if(gameState === 'LOBBY'){
+    startLiveRoomsRefresh();
+}else{
+    stopLiveRoomsRefresh();
+}
+
 setTimeout(() => {
     try{ handleChatStateChange?.(); }catch(_){ }
 }, 0);
@@ -6654,6 +6660,7 @@ function limitBattleArea(){
                 } else {
                     extra = '';
                 }
+                if(entry.id) item.dataset.roomId = entry.id;
                 item.innerHTML =
                     `<span class="map-title">${entry.title}</span>`+
                     `<span class="map-real">${String(entry.real || '').toUpperCase()}</span>`+
@@ -7138,6 +7145,10 @@ async function joinRoomPlayers(roomId) {
     return false;
   }
 
+  await loadRoomsFromSupabase();
+  if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
+    renderLobbyListV27('battle');
+  }
   return true;
 }
 
@@ -7180,6 +7191,10 @@ async function leaveRoomPlayers(roomId) {
     }
   }
 
+  await loadRoomsFromSupabase();
+  if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
+    renderLobbyListV27('battle');
+  }
   return count || 0;
 }
 
@@ -7191,6 +7206,45 @@ async function cleanupCurrentBattleRoom() {
   currentRoom = null;
   window.currentRoomId = null;
   selectedLobbyMap = null;
+}
+
+
+function stopLiveRoomsRefresh(){
+  if(liveRoomsRefreshTimer){
+    clearInterval(liveRoomsRefreshTimer);
+    liveRoomsRefreshTimer = null;
+  }
+}
+
+function startLiveRoomsRefresh(){
+  stopLiveRoomsRefresh();
+  if(!window.supabaseReady || !window.supabaseClient) return;
+  liveRoomsRefreshTimer = setInterval(async () => {
+    if(gameState !== 'LOBBY') return;
+    try{
+      await loadRoomsFromSupabase();
+      if(typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
+        const selectedId = selectedLobbyMap?.id || currentRoom?.id || null;
+        renderLobbyListV27('battle');
+        if(selectedId){
+          const fresh = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find(room => String(room?.id || '') === String(selectedId));
+          if(fresh){
+            selectedLobbyMap = { ...fresh, name: fresh.real };
+            currentRoom = fresh;
+            syncPreview?.(fresh);
+            const list = document.getElementById('match-list');
+            const selectedEl = list?.querySelector(`.match-item[data-room-id="${selectedId}"]`);
+            if(selectedEl){
+              list?.querySelectorAll('.match-item').forEach(el => el.classList.remove('selected'));
+              selectedEl.classList.add('selected');
+            }
+          }
+        }
+      }
+    }catch(error){
+      console.warn('Live refresh rooms error:', error);
+    }
+  }, LIVE_ROOMS_REFRESH_MS);
 }
 
 async function loadRoomsFromSupabase() {
@@ -7318,6 +7372,10 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   }
 
   console.log('Комната создана:', data);
+  await loadRoomsFromSupabase();
+  if(typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
+    renderLobbyListV27('battle');
+  }
   return data;
 }
 /* ================= AUTO LOAD ================= */
@@ -7332,6 +7390,7 @@ window.addEventListener('load', async () => {
 
   if (typeof gameState !== 'undefined' && gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function') {
     renderLobbyListV27('battle');
+    startLiveRoomsRefresh();
   }
 });
 
@@ -7354,6 +7413,8 @@ const ONLINE_HEARTBEAT_MS = 10000;
 let onlineHeartbeatTimer = null;
 let onlineRenderTimer = null;
 let playerActionMenuEl = null;
+let liveRoomsRefreshTimer = null;
+const LIVE_ROOMS_REFRESH_MS = 2500;
 
 function isAccountPublicId(value){
     return !!(value && /^\d+$/.test(String(value)));
