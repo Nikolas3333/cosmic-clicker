@@ -723,11 +723,7 @@ if(gameState === "INVENTORY"){
     alert("📦 Inventory (в разработке)");
 }
 
-if(gameState === 'LOBBY'){
-    startLiveRoomsRefresh();
-}else{
-    stopLiveRoomsRefresh();
-}
+stopLiveRoomsRefresh();
 
 setTimeout(() => {
     try{ handleChatStateChange?.(); }catch(_){ }
@@ -6723,7 +6719,13 @@ function limitBattleArea(){
         const tournamentTab = document.getElementById('lobby-tournament-tab');
         if(battleTab && !battleTab.dataset.v27Bound){
             battleTab.dataset.v27Bound = '1';
-            battleTab.onclick = () => renderLobbyListV27('battle');
+            battleTab.onclick = async () => {
+                if(typeof renderRoomsInLobby === 'function'){
+                    await renderRoomsInLobby(true);
+                }else{
+                    renderLobbyListV27('battle');
+                }
+            };
         }
         if(soloTab && !soloTab.dataset.v27Bound){
             soloTab.dataset.v27Bound = '1';
@@ -7290,7 +7292,7 @@ async function renderRoomsInLobby(forceBattleMode = false) {
   await loadRoomsFromSupabase();
 
   if (typeof renderLobbyListV27 === 'function') {
-    renderLobbyListV27('battle');
+    renderLobbyListV27(forceBattleMode ? 'battle' : lobbyModeV27);
     return;
   }
 
@@ -7390,7 +7392,6 @@ window.addEventListener('load', async () => {
 
   if (typeof gameState !== 'undefined' && gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function') {
     renderLobbyListV27('battle');
-    startLiveRoomsRefresh();
   }
 });
 
