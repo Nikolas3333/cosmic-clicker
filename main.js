@@ -3822,6 +3822,17 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         showBattleAnnouncementInActiveScene(optimisticMessage);
     }
 
+    if (scope.channel === "global" || scope.channel === "pm") {
+        try {
+            await loadChatHistory(scope.key);
+            if (currentChat === scope.key) {
+                renderLobbyMessages();
+            }
+        } catch (e) {
+            console.warn("⚠ Не удалось сразу обновить лобби-чат:", e);
+        }
+    }
+
     if (!forcedScopeName && chatInput) chatInput.value = "";
     return true;
 }
