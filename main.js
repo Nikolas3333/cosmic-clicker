@@ -3240,6 +3240,14 @@ function getValidChatPlayerId(){
     return uuidRegex.test(value) ? value : null;
 }
 
+function sanitizeOnlineRoomId(roomId) {
+    if (roomId === null || typeof roomId === 'undefined') return null;
+    const value = String(roomId).trim();
+    if (!value) return null;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value) ? value : null;
+}
+
 function getPrivateScopeKey(peerId) {
     return `pm:${String(peerId)}`;
 }
@@ -3428,6 +3436,39 @@ function resetPrivateChatState() {
     saveChatUiState();
 }
 
+async function deletePmHistoryWithPeer(peerId) {
+    if (!window.supabaseClient) return;
+    const ownId = getOwnPublicChatId();
+    const peer = String(peerId || '').trim();
+    if (!ownId || !peer) return;
+
+    const { error } = await window.supabaseClient
+        .from('chat_messages')
+        .delete()
+        .eq('channel', 'pm')
+        .or(`and(player_public_id.eq.${ownId},recipient_public_id.eq.${peer}),and(player_public_id.eq.${peer},recipient_public_id.eq.${ownId})`);
+
+    if (error) {
+        console.warn('Не удалось удалить историю PM:', error);
+    }
+}
+
+async function deleteAllOwnPmHistory() {
+    if (!window.supabaseClient) return;
+    const ownId = getOwnPublicChatId();
+    if (!ownId) return;
+
+    const { error } = await window.supabaseClient
+        .from('chat_messages')
+        .delete()
+        .eq('channel', 'pm')
+        .or(`player_public_id.eq.${ownId},recipient_public_id.eq.${ownId}`);
+
+    if (error) {
+        console.warn('Не удалось удалить всю историю PM:', error);
+    }
+}
+
 function setUnreadForScope(scopeName, state = true) {
     if (typeof state === 'number') {
         setUnreadCount(scopeName, state);
@@ -3580,12 +3621,12 @@ function renderChatTabs() {
             const peerId = btn.dataset.close;
             if (!peerId) return;
 
-            await purgePrivateMessagesForPeer(peerId);
             delete privateChatTabs[peerId];
             delete chatCache.pm[peerId];
             delete chatUnread.pm[peerId];
             onlinePmPeers.delete(String(peerId));
             inGamePmPeers.delete(String(peerId));
+            deletePmHistoryWithPeer(peerId);
             saveChatUiState();
 
             if (currentChat === `pm:${peerId}`) {
@@ -3716,59 +3757,6 @@ function showSceneMapMessageInActiveScene(msg) {
     }, 9000);
 }
 
-async function purgePrivateMessagesForPeer(peerId){
-    if(!window.supabaseClient) return false;
-    const ownId = getOwnPublicChatId();
-    const safePeerId = String(peerId || '').trim();
-    if(!ownId || !safePeerId) return false;
-
-    const { error } = await window.supabaseClient
-        .from("chat_messages")
-        .delete()
-        .eq("channel", "pm")
-        .or(`and(player_public_id.eq.${ownId},recipient_public_id.eq.${safePeerId}),and(player_public_id.eq.${safePeerId},recipient_public_id.eq.${ownId})`);
-
-    if(error){
-        console.warn('Не удалось удалить историю ЛС для диалога:', safePeerId, error);
-        return false;
-    }
-
-    delete chatCache.pm[safePeerId];
-    delete chatUnread.pm[safePeerId];
-    if(privateChatTabs[safePeerId]){
-        privateChatTabs[safePeerId].preview = '';
-        privateChatTabs[safePeerId].updatedAt = Date.now();
-    }
-    saveChatUiState();
-    return true;
-}
-
-async function purgeAllPrivateMessages(){
-    if(!window.supabaseClient) return false;
-    const ownId = getOwnPublicChatId();
-    if(!ownId) return false;
-
-    const { error } = await window.supabaseClient
-        .from("chat_messages")
-        .delete()
-        .eq("channel", "pm")
-        .or(`player_public_id.eq.${ownId},recipient_public_id.eq.${ownId}`);
-
-    if(error){
-        console.warn('Не удалось очистить всю историю ЛС:', error);
-        return false;
-    }
-
-    Object.keys(chatCache.pm).forEach(key => delete chatCache.pm[key]);
-    Object.keys(chatUnread.pm).forEach(key => delete chatUnread.pm[key]);
-    Object.keys(privateChatTabs).forEach(key => {
-        privateChatTabs[key].preview = '';
-        privateChatTabs[key].updatedAt = Date.now();
-    });
-    saveChatUiState();
-    return true;
-}
-
 async function loadChatHistory(scopeName = currentChat) {
     if (!window.supabaseClient) return;
 
@@ -3820,6 +3808,7 @@ async function loadChatHistory(scopeName = currentChat) {
             const sample = list[list.length - 1];
             ensurePmTab(peerId, getPeerLabelFromPmMessage(sample, peerId));
             setPrivateTabPreview(peerId, getLastMessagePreview(scopeName));
+            deletePmHistoryWithPeer(peerId);
         }
     }
 
@@ -4099,10 +4088,9 @@ async function initRealtimeChat() {
         resetPrivateChatState();
     }
 
+    await deleteAllOwnPmHistory();
+    resetPrivateChatState();
     restoreChatUiState();
-    if (canUsePrivateChat()) {
-        await purgeAllPrivateMessages();
-    }
     chatUnread.global = 0;
     chatUnread.clan = 0;
     chatUnread.battle = 0;
@@ -4111,9 +4099,6 @@ async function initRealtimeChat() {
     updateLobbyChatComposerVisibility();
     await loadChatHistory("global");
     if (canUseClanChat()) await loadChatHistory("clan");
-    for (const peerId of Object.keys(privateChatTabs)) {
-        await loadChatHistory(getPrivateScopeKey(peerId));
-    }
     if (currentChat !== 'battle') renderLobbyMessages();
     saveChatUiState();
 }
@@ -7319,12 +7304,14 @@ async function setPlayerOnlineStatus(status = 'lobby', roomId = null){
 
     if(!playerId) return;
 
+    const safeRoomId = sanitizeOnlineRoomId(roomId);
+
     const { error } = await window.supabaseClient
         .from('online_players')
         .upsert({
             player_id: playerId,
             nickname: nickname,
-            room_id: roomId,
+            room_id: safeRoomId,
             status: status,
             updated_at: new Date().toISOString()
         });
@@ -7387,27 +7374,12 @@ async function loadOnlinePlayersFromSupabase(){
 function refreshPmOnlineState(players = []){
     onlinePmPeers.clear();
     inGamePmPeers.clear();
-
     for(const p of players || []){
-        const targetId = p?.player_id ? String(p.player_id).trim() : '';
+        const targetId = p?.player_id ? String(p.player_id) : '';
         if(!targetId || !isAccountPublicId(targetId)) continue;
-
-        const rawStatus = String(p?.status || '').trim().toLowerCase();
-        if(rawStatus === 'lobby' || rawStatus === 'online'){
-            onlinePmPeers.add(targetId);
-            continue;
-        }
-
-        if(rawStatus === 'in-game' || rawStatus === 'battle' || rawStatus === 'observe' || rawStatus === 'orbit' || rawStatus === 'combat'){
-            inGamePmPeers.add(targetId);
-            continue;
-        }
-
-        if(rawStatus && rawStatus !== 'offline'){
-            inGamePmPeers.add(targetId);
-        }
+        if (String(p.status || '').toLowerCase() === 'lobby') onlinePmPeers.add(targetId);
+        else inGamePmPeers.add(targetId);
     }
-
     renderChatTabs();
 }
 
@@ -7459,10 +7431,10 @@ function syncCurrentOnlinePresence(){
     }
 
     const roomId = status === 'in-game'
-        ? (currentRoom?.id || currentRoom?.roomId || currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || gameState)
+        ? sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null)
         : null;
 
-    setPlayerOnlineStatus(status, roomId ? String(roomId) : null);
+    setPlayerOnlineStatus(status, roomId);
 }
 
 function startOnlinePresenceHeartbeat(){
@@ -7481,6 +7453,11 @@ function startOnlineRenderLoop(){
 
 const previousSwitchStateOnline = window.switchState || switchState;
 switchState = function(newState){
+    if(newState === 'AUTH'){
+        deleteAllOwnPmHistory();
+        resetPrivateChatState();
+    }
+
     if(isGuestAccount() && (newState === 'ORBIT' || newState === 'INVENTORY' || newState === 'COMBAT')){
         showGuestOnlyPvpMessage();
         previousSwitchStateOnline('LOBBY');
@@ -7491,13 +7468,7 @@ switchState = function(newState){
 
     previousSwitchStateOnline(newState);
     syncCurrentOnlinePresence();
-    setTimeout(() => {
-        syncCurrentOnlinePresence();
-        renderOnlinePlayers();
-    }, 300);
-    setTimeout(() => {
-        renderOnlinePlayers();
-    }, 1200);
+    setTimeout(renderOnlinePlayers, 300);
 };
 
 window.switchState = switchState;
@@ -7505,10 +7476,12 @@ window.openPlayerProfile = openPlayerProfile;
 
 window.addEventListener('beforeunload', () => {
     removePlayerFromOnline();
+    deleteAllOwnPmHistory();
 });
 
 window.addEventListener('pagehide', () => {
     removePlayerFromOnline();
+    deleteAllOwnPmHistory();
 });
 
 document.addEventListener('visibilitychange', () => {
