@@ -6541,17 +6541,30 @@ function limitBattleArea(){
             ? supabaseBattleRoomsCache.filter(room => room && room.id)
             : [];
 
-        if(liveRooms.length){
-            return liveRooms
-                .slice()
-                .sort((a, b) => {
-                    const aTime = new Date(a?.rawRoom?.created_at || 0).getTime();
-                    const bTime = new Date(b?.rawRoom?.created_at || 0).getTime();
-                    return bTime - aTime;
-                });
-        }
+        const sortedLiveRooms = liveRooms
+            .slice()
+            .sort((a, b) => {
+                const aTime = new Date(a?.rawRoom?.created_at || 0).getTime();
+                const bTime = new Date(b?.rawRoom?.created_at || 0).getTime();
+                return bTime - aTime;
+            });
 
-        return [];
+        const baseMaps = (typeof LOBBY_MAP_DATA !== 'undefined' && Array.isArray(LOBBY_MAP_DATA))
+            ? LOBBY_MAP_DATA.map(item => ({
+                ...item,
+                id: null,
+                roomId: null,
+                isBaseMap: true,
+                title: item.title,
+                players: [],
+                currentPlayers: [],
+                maxPlayers: Number(item.maxPlayers || item.playerCount || 8),
+                map: item.real,
+                rawRoom: null
+            }))
+            : [];
+
+        return [...sortedLiveRooms, ...baseMaps];
     }
 
     function getTournamentMaps(){
@@ -6829,6 +6842,15 @@ function limitBattleArea(){
                     if(selectedLobbyMap.id){
                         const joined = await joinRoomPlayers(selectedLobbyMap.id);
                         if(!joined) return;
+                        const freshRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
+                            .find(entry => String(entry?.id || '') === String(selectedLobbyMap.id));
+                        if(freshRoom){
+                            room.players = [...(freshRoom.currentPlayers || freshRoom.players || [])];
+                            room.currentPlayers = [...room.players];
+                            room.maxPlayers = freshRoom.maxPlayers || room.maxPlayers;
+                            room.host = freshRoom.host || room.host;
+                            room.rawRoom = freshRoom.rawRoom || room.rawRoom;
+                        }
                     }
 
                     currentRoom = room;
