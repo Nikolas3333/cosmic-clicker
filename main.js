@@ -363,40 +363,6 @@ async function sendSceneMapMessage(text) {
         return false;
     }
 
-    const nowIso = new Date().toISOString();
-
-    const optimisticSceneMessage = {
-        id: `scene-local-${Date.now()}`,
-        channel: "scene",
-        room_id: scenePayload.room_id,
-        created_at: nowIso,
-        player_public_id: ownPublicId,
-        player_nickname: scenePayload.player_nickname,
-        message: scenePayload.message
-    };
-
-    const optimisticBattleMessage = {
-        id: `battle-local-${Date.now()}`,
-        channel: "battle",
-        room_id: battlePayload.room_id,
-        created_at: nowIso,
-        player_public_id: ownPublicId,
-        player_nickname: battlePayload.player_nickname,
-        message: battlePayload.message
-    };
-
-    const battleScope = { key: "battle", channel: "battle" };
-    pushChatToCache(battleScope, optimisticBattleMessage);
-
-    if (currentChat === "battle") {
-        renderLobbyMessages();
-    }
-
-    if (gameState === "BATTLE" || gameState === "OBSERVE") {
-        renderBattleMessages?.();
-    }
-
-    showSceneMapMessageInActiveScene(optimisticSceneMessage);
     return true;
 }
 
