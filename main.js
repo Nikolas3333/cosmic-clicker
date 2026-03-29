@@ -359,11 +359,14 @@ async function sendSceneMapMessage(text, options = {}) {
             staffRole: getOwnStaffRole?.() || 'player'
         };
 
+    const roomId = String(getSceneChatRoomId() || '').trim();
+    if (!roomId) return false;
+
     const mirrorToBattle = options?.mirrorToBattle !== false && (gameState === 'BATTLE' || gameState === 'OBSERVE');
 
     const scenePayload = {
         channel: "scene",
-        room_id: getSceneChatRoomId(),
+        room_id: roomId,
         player_id: getValidChatPlayerId(),
         player_public_id: identity.publicId || null,
         recipient_public_id: null,
@@ -396,23 +399,6 @@ async function sendSceneMapMessage(text, options = {}) {
         return false;
     }
 
-    const nowIso = new Date().toISOString();
-    const optimisticSceneMessage = {
-        id: `scene-local-${Date.now()}`,
-        channel: 'scene',
-        room_id: scenePayload.room_id,
-        created_at: nowIso,
-        player_public_id: scenePayload.player_public_id,
-        player_nickname: scenePayload.player_nickname,
-        staff_role: scenePayload.staff_role,
-        message: scenePayload.message
-    };
-    pushChatToCache({ key: 'battle', channel: 'battle' }, { ...optimisticSceneMessage, channel: 'battle' });
-    showSceneMapMessageInActiveScene(optimisticSceneMessage);
-    if (mirrorToBattle) {
-        showBattleAnnouncementInActiveScene({ ...optimisticSceneMessage, channel: 'battle' });
-    }
-    renderBattleMessages?.();
     return true;
 }
 
@@ -3955,7 +3941,7 @@ async function handleIncomingRealtimeMessage(msg) {
         if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
         if (currentChat === "battle") renderLobbyMessages();
-        showBattleAnnouncementInActiveScene(msg);
+        renderBattleMessages();
         renderChatTabs();
         return;
     }
@@ -3964,11 +3950,12 @@ async function handleIncomingRealtimeMessage(msg) {
         const activeSceneRoomId = String(getSceneChatRoomId() || '');
         if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
         const scope = { key: "battle", channel: "battle" };
-        if (!pushChatToCache(scope, { ...msg, channel: 'battle' })) return;
+        const mirroredMsg = { ...msg, channel: 'battle' };
+        if (!pushChatToCache(scope, mirroredMsg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
         if (currentChat === "battle") renderLobbyMessages();
-        showSceneMapMessageInActiveScene(msg);
         renderBattleMessages();
+        showSceneMapMessageInActiveScene(msg);
         renderChatTabs();
         return;
     }
@@ -4825,15 +4812,11 @@ async function syncLiveBattlePlayers(){
         const entryId = entry?.player_id ? String(entry.player_id) : '';
         const isMe = !!(entryId && myId && entryId === myId);
         const displayName = entry.nickname || `Pilot`;
-        const shouldHideFromObserveScoreboard = gameState === 'OBSERVE' && isMe;
-
-        if(!shouldHideFromObserveScoreboard){
-            visiblePlayers.push(displayName);
-        }
 
         if(isMe) return;
         if(!entryId) return;
 
+        visiblePlayers.push(displayName);
         activeIds.add(entryId);
         if(!remoteBattleShips.has(entryId)){
             remoteBattleShips.set(entryId, createRemoteBattleShipMesh(displayName, remoteBattleShips.size));
@@ -4847,14 +4830,9 @@ async function syncLiveBattlePlayers(){
     });
 
     if(currentRoom){
-        const fallbackPlayers = gameState === 'OBSERVE' ? [] : [getDisplayPlayerTag()];
-        currentRoom.currentPlayers = visiblePlayers.length ? visiblePlayers : fallbackPlayers;
-        currentRoom.players = [...currentRoom.currentPlayers];
-    }
-
-    if(gameState === 'OBSERVE' && currentRoom){
-        currentRoom.currentPlayers = [...visiblePlayers];
-        currentRoom.players = [...visiblePlayers];
+        const nextPlayers = gameState === 'OBSERVE' ? [...visiblePlayers] : (visiblePlayers.length ? visiblePlayers : [getDisplayPlayerTag()]);
+        currentRoom.currentPlayers = nextPlayers;
+        currentRoom.players = [...nextPlayers];
     }
 
     updateBattleScoreboard();
@@ -6501,6 +6479,10 @@ function limitBattleArea(){
                     try{ safeRequestPointerLock(canvas); }catch(_){ }
                 }, 10);
             }
+            setTimeout(() => {
+                try{ loadChatHistory?.('battle'); }catch(_){ }
+                try{ renderBattleMessages?.(); }catch(_){ }
+            }, 60);
         }
         if(newState === 'LOBBY'){
             bindTopNavModes();
