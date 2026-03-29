@@ -3062,12 +3062,22 @@ function getChatRoleBadgeHtmlByRole(role = "player") {
     return `<span class="chat-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
 }
 
-function getChatRoleBadgeHtmlByPublicId(publicId) {
-    return getChatRoleBadgeHtmlByRole(getCachedStaffRole(publicId));
+function getResolvedStaffRole(publicId, explicitRole = "") {
+    const directRole = String(explicitRole || "").trim().toLowerCase();
+    if (directRole) return directRole;
+    return String(getCachedStaffRole(publicId) || "").trim().toLowerCase();
 }
 
-function shouldHideStaffIdentityInScene(publicId) {
-    return isStaffRole(getCachedStaffRole(publicId));
+function getChatRoleBadgeHtmlByPublicId(publicId, explicitRole = "") {
+    return getChatRoleBadgeHtmlByRole(getResolvedStaffRole(publicId, explicitRole));
+}
+
+function getChatRoleCssClassByPublicIdOrRole(publicId, explicitRole = "") {
+    return getChatRoleCssClassByRole(getResolvedStaffRole(publicId, explicitRole));
+}
+
+function shouldHideStaffIdentityInScene(publicId, explicitRole = "") {
+    return isStaffRole(getResolvedStaffRole(publicId, explicitRole));
 }
 
 function applyPlayerIdentityRow(row = {}) {
@@ -3257,8 +3267,8 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const ownId = getOwnPublicChatId();
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
-    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
     const nickAttrs = publicId
         ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
@@ -3288,8 +3298,8 @@ function buildBattleChatMessageHtml(msg) {
     const time = formatChatTime(msg.created_at);
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
-    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
 
     if (shouldHideStaffIdentityInScene(publicId)) {
@@ -3543,13 +3553,13 @@ function showBattleAnnouncementInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
-    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement${lineClass}`;
-    item.innerHTML = shouldHideStaffIdentityInScene(publicId)
+    item.innerHTML = shouldHideStaffIdentityInScene(publicId, msg.staff_role)
         ? `${roleBadge}<span class="chat-text">${text}</span>`
         : `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
@@ -3578,13 +3588,13 @@ function showSceneMapMessageInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
-    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
-    item.innerHTML = shouldHideStaffIdentityInScene(publicId)
+    item.innerHTML = shouldHideStaffIdentityInScene(publicId, msg.staff_role)
         ? `${roleBadge}<span class="chat-text">${text}</span>`
         : `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
@@ -3662,6 +3672,10 @@ async function handleIncomingRealtimeMessage(msg) {
         if (currentChat === "global") renderLobbyMessages();
         renderChatTabs();
         return;
+    }
+
+    if (msg.player_public_id && msg.staff_role) {
+        cacheStaffRole(String(msg.player_public_id), String(msg.staff_role).toLowerCase());
     }
 
     if (msg.channel === "battle") {
@@ -3790,6 +3804,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
             created_at: new Date().toISOString(),
             player_public_id: ownPublicId,
             player_nickname: getOwnChatLabel(),
+            staff_role: getOwnStaffRole(),
             message: text
         };
         pushChatToCache(scope, optimisticMessage);
