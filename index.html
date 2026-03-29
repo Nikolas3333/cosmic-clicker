@@ -2213,7 +2213,9 @@ body.state-observe #ui{ display:none !important; }
 }
 
 .chat-id{
-  display:none !important;
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
 }
 
 /* role darker than nick */
@@ -2508,6 +2510,20 @@ body.state-observe #ui{ display:none !important; }
 
 
 /* === V21 CHAT ID VISIBLE === */
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  color:#c9d3df !important;
+  font-size:12px !important;
+  margin:0 6px 0 4px !important;
+}
+.kill-feed-item .chat-id{
+  color:#d6dde8 !important;
+}
+
+
+/* === V22 FORCE CHAT IDS === */
 .chat-id{
   display:inline-block !important;
   visibility:visible !important;
