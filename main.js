@@ -246,7 +246,7 @@ document.addEventListener("keydown", (e) => {
 
         if(mouseControl){
             const canvas = document.querySelector("canvas");
-        canvas.requestPointerLock();
+        safeRequestPointerLock(canvas);
         }else{
             document.exitPointerLock();
         }
@@ -266,6 +266,17 @@ document.addEventListener("keyup", (e) => {
 
 const battle = document.getElementById("battle-screen");
 if(battle) battle.style.display = "none";
+
+function safeRequestPointerLock(targetCanvas){
+    const canvas = targetCanvas || document.querySelector('canvas');
+    if(!canvas || document.pointerLockElement === canvas) return;
+    try{
+        const result = canvas.requestPointerLock?.();
+        if(result && typeof result.catch === 'function'){
+            result.catch(() => {});
+        }
+    }catch(_){ }
+}
 
 
 
@@ -566,6 +577,7 @@ function clearBattleScene(){
     debrisPieces = [];
     battleObstacles.forEach(obj => { if(obj) scene.remove(obj); });
     battleObstacles = [];
+    stopLiveBattleSync();
     firing = false;
     setBattleChatOpen(false);
     const feed = document.getElementById('kill-feed'); if(feed) feed.innerHTML = "";
@@ -657,7 +669,7 @@ if(gameState === "BATTLE"){
         canvas.style.display = "block";
 
         setTimeout(() => {
-            canvas.requestPointerLock();
+            safeRequestPointerLock(canvas);
         }, 100);
     }
 
@@ -676,9 +688,9 @@ if(gameState === "BATTLE"){
     } else {
         const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'block';
         spawnPlayer();
-        createEnemyBot();
         updateEnemyHud();
         updateBattleScoreboard();
+        startLiveBattleSync();
     }
 }
 
@@ -689,7 +701,7 @@ if(gameState === "OBSERVE"){
     if(canvas){
         canvas.style.display = "block";
         setTimeout(() => {
-            canvas.requestPointerLock();
+            safeRequestPointerLock(canvas);
         }, 100);
     }
     if(typeof scene !== "undefined" && typeof solarSystem !== "undefined" && scene.children.includes(solarSystem)){
@@ -700,6 +712,7 @@ if(gameState === "OBSERVE"){
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
+    startLiveBattleSync();
     setTimeout(() => {
         loadChatHistory?.("battle");
         renderBattleMessages?.();
@@ -2334,6 +2347,8 @@ function animate(){
 
     // ================= SHIP MOVEMENT =================
 
+    animateRemoteBattleShips();
+
 const BATTLE_LIMIT = 920;
 
 if (gameState === "BATTLE" && playerShip) {
@@ -2405,7 +2420,7 @@ if (gameState === "BATTLE" && playerShip) {
                 pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${enemyBot?.userData?.name || 'Drone_x1'}`);
                 updateEnemyHud();
                 updateBattleScoreboard();
-                setTimeout(() => { if(gameState === 'BATTLE') createEnemyBot(); }, 1500);
+                // live PvP: bot respawn отключен
             }
             continue;
         }
@@ -4537,6 +4552,177 @@ function enterBattleMap(mapName){
     updateBattleScoreboard();
 }
 
+const remoteBattleShips = new Map();
+let liveBattleSyncTimer = null;
+
+function clearRemoteBattleShips(){
+    remoteBattleShips.forEach(entry => {
+        if(entry?.mesh) scene.remove(entry.mesh);
+        if(entry?.labelSprite) entry.mesh?.remove?.(entry.labelSprite);
+    });
+    remoteBattleShips.clear();
+}
+
+function stopLiveBattleSync(){
+    if(liveBattleSyncTimer){
+        clearInterval(liveBattleSyncTimer);
+        liveBattleSyncTimer = null;
+    }
+    clearRemoteBattleShips();
+}
+
+function createRemotePilotLabel(name){
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,256,64);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(10,14,236,34);
+    ctx.strokeStyle = 'rgba(0,255,255,0.35)';
+    ctx.strokeRect(10,14,236,34);
+    ctx.fillStyle = '#dff9ff';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(name || 'Pilot'), 128, 38);
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map:texture, transparent:true, depthWrite:false });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(18, 4.5, 1);
+    sprite.position.set(0, 5.5, 0);
+    return sprite;
+}
+
+function createRemoteBattleShipMesh(name, slotIndex){
+    const shipGroup = new THREE.Group();
+    shipGroup.rotation.order = 'YXZ';
+
+    const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.0, 1.2, 7, 10),
+        new THREE.MeshStandardMaterial({ color: 0x7ee7ff, metalness: 0.45, roughness: 0.32 })
+    );
+    body.rotation.z = Math.PI / 2;
+    shipGroup.add(body);
+
+    const cockpit = new THREE.Mesh(
+        new THREE.SphereGeometry(0.85, 18, 18),
+        new THREE.MeshStandardMaterial({ color: 0x9bd6ff, emissive: 0x113355, metalness: 0.15, roughness: 0.2 })
+    );
+    cockpit.position.set(1.2, 0.25, 0);
+    shipGroup.add(cockpit);
+
+    const wingGeo = new THREE.BoxGeometry(0.25, 3.1, 1.3);
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x3b6ea8, metalness: 0.4, roughness: 0.45 });
+    const wingTop = new THREE.Mesh(wingGeo, wingMat);
+    wingTop.position.set(-0.35, 1.7, 0);
+    const wingBottom = wingTop.clone();
+    wingBottom.position.y = -1.7;
+    shipGroup.add(wingTop, wingBottom);
+
+    const engineMat = new THREE.MeshBasicMaterial({ color: 0xffc66b });
+    const engine1 = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 10), engineMat);
+    engine1.position.set(-3.2, 0.55, 0);
+    const engine2 = engine1.clone();
+    engine2.position.y = -0.55;
+    shipGroup.add(engine1, engine2);
+
+    const labelSprite = createRemotePilotLabel(name);
+    shipGroup.add(labelSprite);
+
+    const side = slotIndex % 2 === 0 ? 1 : -1;
+    const rank = Math.floor(slotIndex / 2);
+    shipGroup.position.set(side * (70 + rank * 28), 8 + ((slotIndex % 3) - 1) * 6, -40 - rank * 26);
+    shipGroup.lookAt(new THREE.Vector3(0, 0, 0));
+    shipGroup.userData = {
+        remote: true,
+        pilotName: String(name || 'Pilot'),
+        orbitSeed: Math.random() * Math.PI * 2,
+        slotIndex,
+        hp: 100,
+        maxHp: 100
+    };
+    scene.add(shipGroup);
+    return { mesh: shipGroup, labelSprite };
+}
+
+async function fetchCurrentRoomLivePlayers(){
+    if(!window.supabaseClient || !currentRoom?.id) return [];
+    const roomId = String(currentRoom.id || currentRoom.roomId || '').trim();
+    if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return [];
+
+    const { data, error } = await window.supabaseClient
+        .from('room_players')
+        .select('player_id,nickname,joined_at')
+        .eq('room_id', roomId)
+        .order('joined_at', { ascending: true });
+
+    if(error){
+        console.warn('Не удалось загрузить игроков комнаты:', error);
+        return [];
+    }
+
+    return (data || []).map((item, index) => ({
+        player_id: item.player_id ? String(item.player_id) : `guest_${index}`,
+        nickname: item.nickname || `Pilot ${index + 1}`,
+        joined_at: item.joined_at || null
+    }));
+}
+
+async function syncLiveBattlePlayers(){
+    if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+
+    const livePlayers = await fetchCurrentRoomLivePlayers();
+    const myId = (typeof authState !== 'undefined' && authState?.playerId)
+        ? String(authState.playerId)
+        : (player?.id ? String(player.id) : null);
+
+    const visiblePlayers = [];
+    livePlayers.forEach(entry => {
+        const entryId = entry?.player_id ? String(entry.player_id) : '';
+        const isMe = !!(entryId && myId && entryId === myId);
+        const displayName = entry.nickname || `Pilot`;
+        visiblePlayers.push(displayName);
+        if(isMe) return;
+        if(!remoteBattleShips.has(entryId)){
+            remoteBattleShips.set(entryId, createRemoteBattleShipMesh(displayName, remoteBattleShips.size));
+        }
+    });
+
+    Array.from(remoteBattleShips.keys()).forEach(entryId => {
+        if(!livePlayers.some(item => String(item?.player_id || '') === String(entryId))){
+            const old = remoteBattleShips.get(entryId);
+            if(old?.mesh) scene.remove(old.mesh);
+            remoteBattleShips.delete(entryId);
+        }
+    });
+
+    if(currentRoom){
+        currentRoom.currentPlayers = visiblePlayers.length ? visiblePlayers : [getDisplayPlayerTag()];
+        currentRoom.players = [...currentRoom.currentPlayers];
+    }
+    updateBattleScoreboard();
+}
+
+function startLiveBattleSync(){
+    stopLiveBattleSync();
+    syncLiveBattlePlayers();
+    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 1800);
+}
+
+function animateRemoteBattleShips(){
+    if(!remoteBattleShips.size) return;
+    const now = Date.now() * 0.001;
+    remoteBattleShips.forEach((entry) => {
+        const mesh = entry?.mesh;
+        if(!mesh) return;
+        const seed = mesh.userData?.orbitSeed || 0;
+        const slotIndex = mesh.userData?.slotIndex || 0;
+        mesh.position.y += ((8 + Math.sin(now + seed) * 2.4 + (slotIndex % 3) * 1.5) - mesh.position.y) * 0.08;
+        mesh.rotation.y += 0.01;
+        mesh.rotation.z = Math.sin(now * 1.3 + seed) * 0.08;
+    });
+}
+
 function createEnemyBot(){
     if(enemyBot){
         scene.remove(enemyBot);
@@ -6100,7 +6286,7 @@ function limitBattleArea(){
                 switchState('OBSERVE');
                 const canvas = document.querySelector('canvas');
                 if(canvas){
-                    try{ canvas.requestPointerLock?.(); }catch(_){ }
+                    try{ safeRequestPointerLock(canvas); }catch(_){ }
                 }
             });
         }
@@ -6149,7 +6335,7 @@ function limitBattleArea(){
             const canvas = document.querySelector('canvas');
             if(canvas){
                 setTimeout(() => {
-                    try{ canvas.requestPointerLock?.(); }catch(_){ }
+                    try{ safeRequestPointerLock(canvas); }catch(_){ }
                 }, 10);
             }
         }
@@ -6165,7 +6351,7 @@ function limitBattleArea(){
         if(gameState !== 'OBSERVE') return;
         const canvas = document.querySelector('canvas');
         if(canvas && document.pointerLockElement !== canvas){
-            try{ canvas.requestPointerLock?.(); }catch(_){ }
+            try{ safeRequestPointerLock(canvas); }catch(_){ }
         }
     }, true);
 
@@ -6304,7 +6490,7 @@ function limitBattleArea(){
         const canvas = document.querySelector('canvas');
         if(canvas){
             setTimeout(() => {
-                try{ canvas.requestPointerLock?.(); }catch(_){ }
+                try{ safeRequestPointerLock(canvas); }catch(_){ }
             }, 40);
         }
     };
@@ -6325,7 +6511,7 @@ function limitBattleArea(){
         if(gameState !== 'OBSERVE') return;
         const canvas = document.querySelector('canvas');
         if(canvas && document.pointerLockElement !== canvas){
-            try{ canvas.requestPointerLock?.(); }catch(_){ }
+            try{ safeRequestPointerLock(canvas); }catch(_){ }
         }
     }, true);
 
@@ -6752,7 +6938,7 @@ function limitBattleArea(){
             const canvas = document.querySelector('canvas');
             if(canvas){
                 setTimeout(() => {
-                    try{ canvas.requestPointerLock?.(); }catch(_){ }
+                    try{ safeRequestPointerLock(canvas); }catch(_){ }
                 }, 30);
             }
         }
@@ -7407,19 +7593,8 @@ async function renderOnlinePlayers(){
     list.innerHTML = '';
 
     const lobbyPlayers = players.filter(item => String(item?.status || '').toLowerCase() === 'lobby');
-    const inGamePlayers = players.filter(item => String(item?.status || '').toLowerCase() === 'in-game');
 
-    const appendSectionTitle = (text) => {
-        const title = document.createElement('div');
-        title.className = 'online-header';
-        title.style.margin = '6px 0 4px';
-        title.style.fontSize = '12px';
-        title.style.opacity = '0.82';
-        title.textContent = text;
-        list.appendChild(title);
-    };
-
-    const appendPlayerRow = (p, suffix = '') => {
+    const appendPlayerRow = (p) => {
         const row = document.createElement('div');
         row.className = 'online-player';
 
@@ -7427,7 +7602,7 @@ async function renderOnlinePlayers(){
         const canPmTarget = isAccountPublicId(targetId);
         const isMe = !!(targetId && myId && targetId === myId);
 
-        row.textContent = `${p.nickname || 'Player'}${suffix}${!canPmTarget ? ' (guest)' : ''}`;
+        row.textContent = `${p.nickname || 'Player'}${!canPmTarget ? ' (guest)' : ''}`;
         row.title = isMe ? 'Это вы' : 'Нажмите, чтобы открыть профиль';
         row.dataset.playerId = targetId || '';
         row.dataset.nickname = p.nickname || '';
@@ -7443,20 +7618,8 @@ async function renderOnlinePlayers(){
     };
 
     if(lobbyPlayers.length){
-        appendSectionTitle('Лобби');
         lobbyPlayers.forEach(p => appendPlayerRow(p));
-    }
-
-    if(inGamePlayers.length){
-        appendSectionTitle('На картах');
-        inGamePlayers.forEach(p => {
-            const room = supabaseBattleRoomsCache.find(item => String(item.id) === String(p.room_id));
-            const mapLabel = room?.title || room?.real || 'Карта';
-            appendPlayerRow(p, ` — ${mapLabel}`);
-        });
-    }
-
-    if(!lobbyPlayers.length && !inGamePlayers.length){
+    } else {
         const empty = document.createElement('div');
         empty.className = 'online-player';
         empty.style.opacity = '0.7';
