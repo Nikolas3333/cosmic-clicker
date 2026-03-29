@@ -216,7 +216,7 @@ const canvas = document.querySelector("canvas");
     if(gameState === "OBSERVE" || battleObserverMode){
         observerCameraYaw += event.movementX * 0.0035 * gameSettings.mouseSensitivity;
         const invertFactor = gameSettings.invertY ? -1 : 1;
-        observerCameraPitch -= event.movementY * 0.0026 * gameSettings.mouseSensitivity * invertFactor;
+        observerCameraPitch += event.movementY * 0.0026 * gameSettings.mouseSensitivity * invertFactor;
         observerCameraPitch = THREE.MathUtils.clamp(observerCameraPitch, -1.15, 1.15);
         return;
     }
@@ -451,9 +451,11 @@ function initBattleChat(){
                     if(sent) input.value = '';
                 }
                 setBattleChatOpen(false);
+                setTimeout(() => setBattleChatOpen(false), 0);
             }
         } else if(e.key === 'Escape' && battleChatOpen){
             setBattleChatOpen(false);
+            setTimeout(() => setBattleChatOpen(false), 0);
         }
     });
 }
@@ -3209,15 +3211,17 @@ function getChatRoleCssClassByPublicIdOrRole(publicId, explicitRole = "") {
 }
 
 function shouldHideStaffIdentityInScene(publicId, explicitRole = "") {
-    return gameState === 'OBSERVE' && isStaffRole(getResolvedStaffRole(publicId, explicitRole));
+    const role = getResolvedStaffRole(publicId, explicitRole);
+    const safeId = String(publicId || '').trim();
+    return isStaffRole(role) && !safeId;
 }
 
 function shouldHideStaffIdentityInObserve(publicId, explicitRole = "") {
-    return gameState === 'OBSERVE' && shouldHideStaffIdentityInScene(publicId, explicitRole);
+    return shouldHideStaffIdentityInScene(publicId, explicitRole);
 }
 
-function shouldShowSceneRoleBadgeInCurrentMode() {
-    return gameState === 'OBSERVE';
+function shouldShowSceneRoleBadgeInCurrentMode(publicId = "", explicitRole = "") {
+    return gameState === 'OBSERVE' || shouldHideStaffIdentityInScene(publicId, explicitRole);
 }
 
 function getSceneRoleBadgeHtml(publicId, explicitRole = "") {
@@ -3475,7 +3479,7 @@ function buildBattleChatMessageHtml(msg) {
     const time = formatChatTime(msg.created_at);
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role);
     const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
@@ -3784,7 +3788,7 @@ function showBattleAnnouncementInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role);
     const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
@@ -3821,7 +3825,7 @@ function showSceneMapMessageInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role);
     const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
@@ -3964,6 +3968,7 @@ async function handleIncomingRealtimeMessage(msg) {
         if (currentChat !== "battle") incrementUnread("battle");
         if (currentChat === "battle") renderLobbyMessages();
         showSceneMapMessageInActiveScene(msg);
+        renderBattleMessages();
         renderChatTabs();
         return;
     }
@@ -4776,6 +4781,8 @@ function buildObserveRoomState(targetMap = ''){
         real: normalizedMap,
         observer: true,
         state: 'observe',
+        currentPlayers: [],
+        players: [],
         title: selectedLobbyMap?.title || currentRoom?.title || normalizedMap
     };
 }
@@ -4835,18 +4842,7 @@ async function syncLiveBattlePlayers(){
 
     Array.from(remoteBattleShips.keys()).forEach(entryId => {
         if(!activeIds.has(String(entryId))){
-            const old = remoteBattleShips.get(entryId);
-            if(old?.mesh){
-                scene.remove(old.mesh);
-                old.mesh.traverse?.((child) => {
-                    if(child?.geometry) child.geometry.dispose?.();
-                    if(child?.material){
-                        if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
-                        else child.material.dispose?.();
-                    }
-                });
-            }
-            remoteBattleShips.delete(entryId);
+            removeRemoteBattleShipById(entryId);
         }
     });
 
@@ -4855,7 +4851,31 @@ async function syncLiveBattlePlayers(){
         currentRoom.currentPlayers = visiblePlayers.length ? visiblePlayers : fallbackPlayers;
         currentRoom.players = [...currentRoom.currentPlayers];
     }
+
+    if(gameState === 'OBSERVE' && currentRoom){
+        currentRoom.currentPlayers = [...visiblePlayers];
+        currentRoom.players = [...visiblePlayers];
+    }
+
     updateBattleScoreboard();
+}
+
+
+function removeRemoteBattleShipById(entryId){
+    const key = String(entryId || '').trim();
+    if(!key || !remoteBattleShips.has(key)) return;
+    const old = remoteBattleShips.get(key);
+    if(old?.mesh){
+        scene.remove(old.mesh);
+        old.mesh.traverse?.((child) => {
+            if(child?.geometry) child.geometry.dispose?.();
+            if(child?.material){
+                if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+                else child.material.dispose?.();
+            }
+        });
+    }
+    remoteBattleShips.delete(key);
 }
 
 function startLiveBattleSync(){
@@ -4937,7 +4957,14 @@ function updateBattleScoreboard(){
         ? currentRoom.currentPlayers
         : (Array.isArray(currentRoom?.players) ? currentRoom.players : []);
 
-    const normalizedPlayers = roomPlayers.length ? roomPlayers : [player?.nickname || 'Commander'];
+    const normalizedPlayers = roomPlayers.length
+        ? roomPlayers
+        : (gameState === 'OBSERVE' ? [] : [player?.nickname || 'Commander']);
+
+    if(gameState === 'OBSERVE' && !normalizedPlayers.length){
+      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span>[---]</span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>-</span><span>-</span></div>';
+      return;
+    }
 
     body.innerHTML = normalizedPlayers.map((name, index) => {
       const safeName = String(name?.name || name || `Pilot ${index + 1}`);
@@ -4948,7 +4975,7 @@ function updateBattleScoreboard(){
         <span>${safeName}</span>
         <span>${isYou ? battleStats.playerKills : 0}</span>
         <span>${isYou ? battleStats.playerDeaths : 0}</span>
-        <span>${player?.level || 1}</span>
+        <span>${isYou ? player?.level || 1 : 'LIVE'}</span>
         <span>${isYou ? (player?.id || '1001') : 'LIVE'}</span>
       </div>`;
     }).join('');
@@ -7414,6 +7441,10 @@ async function leaveRoomPlayers(roomId) {
     console.error('Ошибка выхода из room_players:', deletePlayerError);
     return -1;
   }
+
+  try {
+    removeRemoteBattleShipById(identity.playerId);
+  } catch(_) {}
 
   const { count, error: countError } = await window.supabaseClient
     .from('room_players')
