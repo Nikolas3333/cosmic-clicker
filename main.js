@@ -2953,16 +2953,20 @@ let chatRealtimeChannel = null;
 const CHAT_MESSAGE_LIMIT = 50;
 const chatCache = {
     global: [],
+    clan: [],
     battle: [],
     pm: {}
 };
 const privateChatTabs = {};
 const chatUnread = {
     global: 0,
+    clan: 0,
     battle: 0,
     pm: {}
 };
 const onlinePmPeers = new Set();
+const inGamePmPeers = new Set();
+const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
 
 const playerStaffRoleCache = {};
 const STAFF_ROLE_META = {
@@ -3023,6 +3027,73 @@ function getSceneChatRoomId() {
 
 function canWriteSceneMapChat() {
     return gameState === "BATTLE";
+}
+
+function getPlayerClanChatId() {
+    const directClanId = player?.clan_id || player?.clanId || authState?.clanId || null;
+    if (directClanId !== null && typeof directClanId !== 'undefined' && String(directClanId).trim()) {
+        return String(directClanId).trim();
+    }
+    try {
+        const saved = localStorage.getItem('cosmicClanChatId');
+        if (saved && String(saved).trim()) return String(saved).trim();
+    } catch (_) {}
+    return null;
+}
+
+function canUseClanChat() {
+    return !!getPlayerClanChatId();
+}
+
+function getClanChatRoomId() {
+    const clanId = getPlayerClanChatId();
+    return clanId ? `clan_${clanId}` : null;
+}
+
+function getPmPresenceState(peerId) {
+    const key = String(peerId || '').trim();
+    if (!key) return 'offline';
+    if (inGamePmPeers.has(key)) return 'in-game';
+    if (onlinePmPeers.has(key)) return 'online';
+    return 'offline';
+}
+
+function saveChatUiState() {
+    try {
+        localStorage.setItem(CHAT_UI_STATE_KEY, JSON.stringify({
+            currentChat: currentChat || 'global',
+            privateTabs: privateChatTabs,
+            savedAt: Date.now()
+        }));
+    } catch (error) {
+        console.warn('Не удалось сохранить состояние чата:', error);
+    }
+}
+
+function restoreChatUiState() {
+    try {
+        const raw = localStorage.getItem(CHAT_UI_STATE_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        const tabs = state?.privateTabs && typeof state.privateTabs === 'object' ? state.privateTabs : {};
+        Object.keys(privateChatTabs).forEach(key => delete privateChatTabs[key]);
+        Object.entries(tabs).forEach(([peerId, meta]) => {
+            const safePeerId = String(peerId || '').trim();
+            if (!safePeerId || !/^\d+$/.test(safePeerId)) return;
+            privateChatTabs[safePeerId] = {
+                label: String(meta?.label || `ID ${safePeerId}`),
+                updatedAt: Number(meta?.updatedAt) || Date.now(),
+                pinned: !!meta?.pinned,
+                preview: String(meta?.preview || '')
+            };
+        });
+        const savedCurrent = String(state?.currentChat || 'global');
+        if (savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')) {
+            currentChat = savedCurrent;
+        }
+    } catch (error) {
+        console.warn('Не удалось восстановить состояние чата:', error);
+    }
 }
 
 const chatRateLimitState = {
@@ -3174,6 +3245,9 @@ function getPrivateScopeKey(peerId) {
 }
 
 function parseChatScope(scopeName = currentChat) {
+    if (scopeName === "clan") {
+        return { key: "clan", channel: "clan", roomId: getClanChatRoomId() };
+    }
     if (scopeName === "battle") {
         return { key: "battle", channel: "battle" };
     }
@@ -3189,6 +3263,7 @@ function parseChatScope(scopeName = currentChat) {
 }
 
 function getChatCacheList(scope) {
+    if (scope.channel === "clan") return chatCache.clan;
     if (scope.channel === "battle") return chatCache.battle;
     if (scope.channel === "pm") {
         const peerId = String(scope.peerId || "");
@@ -3200,6 +3275,7 @@ function getChatCacheList(scope) {
 
 function getUnreadCount(scopeName) {
     const scope = parseChatScope(scopeName);
+    if (scope.channel === "clan") return Number(chatUnread.clan || 0);
     if (scope.channel === "battle") return Number(chatUnread.battle || 0);
     if (scope.channel === "pm") return Number(chatUnread.pm[String(scope.peerId)] || 0);
     return Number(chatUnread.global || 0);
@@ -3208,7 +3284,9 @@ function getUnreadCount(scopeName) {
 function setUnreadCount(scopeName, count = 0) {
     const safeCount = Math.max(0, Number(count) || 0);
     const scope = parseChatScope(scopeName);
-    if (scope.channel === "battle") {
+    if (scope.channel === "clan") {
+        chatUnread.clan = safeCount;
+    } else if (scope.channel === "battle") {
         chatUnread.battle = safeCount;
     } else if (scope.channel === "pm") {
         chatUnread.pm[String(scope.peerId)] = safeCount;
@@ -3238,6 +3316,7 @@ function setPrivateTabPreview(peerId, preview = "") {
         privateChatTabs[key] = { label: `ID ${key}`, updatedAt: Date.now(), pinned: false, preview: "" };
     }
     privateChatTabs[key].preview = preview || "";
+    saveChatUiState();
 }
 
 function isPmPeerOnline(peerId) {
@@ -3344,7 +3423,9 @@ function resetPrivateChatState() {
     Object.keys(chatCache.pm).forEach(key => delete chatCache.pm[key]);
     Object.keys(chatUnread.pm).forEach(key => delete chatUnread.pm[key]);
     onlinePmPeers.clear();
+    inGamePmPeers.clear();
     currentChat = "global";
+    saveChatUiState();
 }
 
 function setUnreadForScope(scopeName, state = true) {
@@ -3371,6 +3452,7 @@ function ensurePmTab(peerId, label = null) {
         pinned: !!previous.pinned,
         preview: previous.preview || getLastMessagePreview(getPrivateScopeKey(key)) || ""
     };
+    saveChatUiState();
     renderChatTabs();
 }
 
@@ -3410,6 +3492,10 @@ function renderChatTabs() {
         <span class="chat-tab-title">Global</span>
         ${getUnreadCount("global") > 0 && currentChat !== "global" ? `<span class="chat-tab-badge">${getUnreadCount("global") > 99 ? '99+' : getUnreadCount("global")}</span>` : ''}
       </button>
+      <button class="chat-tab${currentChat === "clan" ? " active" : ""}${getUnreadCount("clan") > 0 && currentChat !== "clan" ? " notify" : ""}${!canUseClanChat() ? " disabled" : ""}" data-scope="clan" type="button" title="${canUseClanChat() ? 'Клановый чат' : 'Сначала нужен clan_id игрока'}">
+        <span class="chat-tab-title">Clan</span>
+        ${getUnreadCount("clan") > 0 && currentChat !== "clan" ? `<span class="chat-tab-badge">${getUnreadCount("clan") > 99 ? '99+' : getUnreadCount("clan")}</span>` : ''}
+      </button>
       <button class="chat-tab${currentChat === "battle" ? " active" : ""}${getUnreadCount("battle") > 0 && currentChat !== "battle" ? " notify" : ""}" data-scope="battle" type="button">
         <span class="chat-tab-title">Battle</span>
         ${getUnreadCount("battle") > 0 && currentChat !== "battle" ? `<span class="chat-tab-badge">${getUnreadCount("battle") > 99 ? '99+' : getUnreadCount("battle")}</span>` : ''}
@@ -3423,10 +3509,12 @@ function renderChatTabs() {
         const notify = unread > 0 && currentChat !== scope ? " notify" : "";
         const preview = escapeChatHtml(meta?.preview || "Без сообщений");
         const pinClass = meta?.pinned ? ' pinned' : '';
-        const onlineClass = isPmPeerOnline(peerId) ? ' online' : '';
+        const presenceState = getPmPresenceState(peerId);
+        const presenceClass = presenceState === 'in-game' ? ' in-game' : (presenceState === 'online' ? ' online' : '');
+        const presenceTitle = presenceState === 'in-game' ? 'В игре' : (presenceState === 'online' ? 'Онлайн' : 'Оффлайн');
         html += `
-          <button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}${pinClass}${onlineClass}" data-scope="${scope}" type="button">
-            <span class="pm-online-dot" title="Онлайн"></span>
+          <button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}${pinClass}${presenceClass}" data-scope="${scope}" type="button">
+            <span class="pm-online-dot" title="${presenceTitle}"></span>
             <span class="pm-tab-content">
               <span class="pm-tab-main">
                 <span class="pm-tab-label">${label}</span>
@@ -3452,6 +3540,7 @@ function renderChatTabs() {
 
             requestAnimationFrame(async () => {
                 renderChatTabs();
+                saveChatUiState();
                 await loadChatHistory(currentChat);
                 renderLobbyMessages();
             });
@@ -3471,6 +3560,7 @@ function renderChatTabs() {
             if (!peerId || !privateChatTabs[peerId]) return;
 
             privateChatTabs[peerId].pinned = !privateChatTabs[peerId].pinned;
+            saveChatUiState();
 
             requestAnimationFrame(() => {
                 renderChatTabs();
@@ -3494,6 +3584,8 @@ function renderChatTabs() {
             delete chatCache.pm[peerId];
             delete chatUnread.pm[peerId];
             onlinePmPeers.delete(String(peerId));
+            inGamePmPeers.delete(String(peerId));
+            saveChatUiState();
 
             if (currentChat === `pm:${peerId}`) {
                 currentChat = "global";
@@ -3507,12 +3599,18 @@ function renderChatTabs() {
         });
     });
 
+    saveChatUiState();
     console.log("CHAT_NOTIFY_STATE", JSON.stringify(chatUnread), "current=", currentChat);
 }
 
 function renderLobbyMessages() {
     if (!chatMessages) return;
     const scope = parseChatScope(currentChat);
+    if (scope.channel === 'clan' && !canUseClanChat()) {
+        chatMessages.innerHTML = '<div class="chat-line system">👥 Клановый чат готов, но для него нужен clan_id игрока/клана из базы.</div>';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return;
+    }
     const list = getChatCacheList(scope);
     chatMessages.innerHTML = list.map(msg => buildLobbyChatMessageHtml(msg, scope)).join("");
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -3522,7 +3620,7 @@ function updateLobbyChatComposerVisibility() {
     const chatInputAreaEl = document.getElementById("chat-input-area");
     if (!chatInputAreaEl) return;
 
-    const shouldHide = currentChat === "battle" && !canWriteBattleAnnouncementChat();
+    const shouldHide = (currentChat === "battle" && !canWriteBattleAnnouncementChat()) || (currentChat === "clan" && !canUseClanChat());
     chatInputAreaEl.classList.toggle("chat-composer-hidden", shouldHide);
 }
 
@@ -3628,6 +3726,16 @@ async function loadChatHistory(scopeName = currentChat) {
         .order("created_at", { ascending: false })
         .limit(CHAT_MESSAGE_LIMIT);
 
+    if (scope.channel === "clan") {
+        if (!scope.roomId) {
+            const list = getChatCacheList(scope);
+            list.length = 0;
+            if (currentChat === scopeName) renderLobbyMessages();
+            return;
+        }
+        query = query.eq('room_id', scope.roomId);
+    }
+
     if (scope.channel === "pm") {
         const ownId = getOwnPublicChatId();
         if (!ownId || !scope.peerId) {
@@ -3683,7 +3791,18 @@ async function handleIncomingRealtimeMessage(msg) {
     }
 
     if (msg.player_public_id && msg.staff_role) {
-        cacheStaffRole(String(msg.player_public_id), String(msg.staff_role).toLowerCase());
+        setCachedStaffRole(String(msg.player_public_id), String(msg.staff_role).toLowerCase());
+    }
+
+    if (msg.channel === "clan") {
+        const activeClanRoomId = getClanChatRoomId();
+        if (!activeClanRoomId || String(msg.room_id || '') !== String(activeClanRoomId)) return;
+        const scope = { key: 'clan', channel: 'clan', roomId: activeClanRoomId };
+        if (!pushChatToCache(scope, msg)) return;
+        if (currentChat !== 'clan') incrementUnread('clan');
+        if (currentChat === 'clan') renderLobbyMessages();
+        renderChatTabs();
+        return;
     }
 
     if (msg.channel === "battle") {
@@ -3768,6 +3887,11 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         return false;
     }
 
+    if (scope.channel === "clan" && !canUseClanChat()) {
+        addSystemLobbyChatMessage('⚠ Клановый чат пока недоступен: у игрока нет clan_id.');
+        return false;
+    }
+
     if (scope.channel === "battle") {
         if (battleObserverMode && !canWriteInObserverChat()) {
             return false;
@@ -3779,13 +3903,18 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
 
     const payload = {
         channel: scope.channel,
-        room_id: null,
+        room_id: scope.channel === 'clan' ? getClanChatRoomId() : null,
         player_id: getValidChatPlayerId(),
         player_public_id: ownPublicId,
         recipient_public_id: scope.channel === "pm" ? String(scope.peerId || "") : null,
         player_nickname: getOwnChatLabel(),
         message: text
     };
+
+    if (scope.channel === 'clan' && !payload.room_id) {
+        addSystemLobbyChatMessage('⚠ Не найден room_id клана для отправки сообщения.');
+        return false;
+    }
 
     if (scope.channel === "pm" && !payload.recipient_public_id) {
         addSystemLobbyChatMessage("⚠ Не выбран получатель для личного сообщения.");
@@ -3822,7 +3951,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         showBattleAnnouncementInActiveScene(optimisticMessage);
     }
 
-    if (scope.channel === "global" || scope.channel === "pm") {
+    if (scope.channel === "global" || scope.channel === "pm" || scope.channel === "clan") {
         try {
             await loadChatHistory(scope.key);
             if (currentChat === scope.key) {
@@ -3857,6 +3986,7 @@ function openPrivateChat(peerId, label = null) {
     clearUnreadForCurrentScope();
     renderChatTabs();
     updateLobbyChatComposerVisibility();
+    saveChatUiState();
     loadChatHistory(currentChat).then(() => {
         syncPrivateTabFromScope(currentChat);
         renderLobbyMessages();
@@ -3902,6 +4032,7 @@ async function handleChatStateChange() {
     }
 
     if (currentChat === "battle") currentChat = "global";
+    if (currentChat === 'clan' && !canUseClanChat()) currentChat = 'global';
     clearUnreadForCurrentScope();
     renderChatTabs();
     updateLobbyChatComposerVisibility();
@@ -3914,13 +4045,20 @@ async function initRealtimeChat() {
         resetPrivateChatState();
     }
 
+    restoreChatUiState();
     chatUnread.global = 0;
+    chatUnread.clan = 0;
     chatUnread.battle = 0;
     startRealtimeChat();
     renderChatTabs();
     updateLobbyChatComposerVisibility();
     await loadChatHistory("global");
-    renderLobbyMessages();
+    if (canUseClanChat()) await loadChatHistory("clan");
+    for (const peerId of Object.keys(privateChatTabs)) {
+        await loadChatHistory(getPrivateScopeKey(peerId));
+    }
+    if (currentChat !== 'battle') renderLobbyMessages();
+    saveChatUiState();
 }
 
 window.openPrivateChat = openPrivateChat;
@@ -3941,6 +4079,8 @@ window.addEventListener("load", () => {
         initRealtimeChat();
     }, 250);
 });
+
+window.addEventListener('beforeunload', saveChatUiState);
 
 // ================= NOTIFICATION SYSTEM =================
 
@@ -4930,7 +5070,7 @@ function renderClansWindow(){
     if(!clansInfo) return;
     clansInfo.innerHTML = `
       <div class="clan-card"><div class="cosmic-badge">Ваш клан</div><div>Пока не выбран</div></div>
-      <div class="clan-card"><div class="cosmic-badge">Возможности</div><div>Создать клан, подать заявку, список участников и клановый чат. Это базовая заготовка под будущую систему.</div></div>
+      <div class="clan-card"><div class="cosmic-badge">Возможности</div><div>Создать клан, подать заявку, список участников и клановый чат. Вкладка Clan уже добавлена в общий чат; для полной работы нужен clan_id игрока в базе.</div></div>
       <div class="clan-card"><div class="cosmic-badge">Топ кланы</div><div>1. Nova Wolves<br>2. Orbit Guard<br>3. Red Comets</div></div>`;
 }
 
@@ -7176,7 +7316,6 @@ async function loadOnlinePlayersFromSupabase(){
     const { data, error } = await window.supabaseClient
         .from('online_players')
         .select('*')
-        .eq('status', 'lobby')
         .gte('updated_at', cutoffIso)
         .order('updated_at', { ascending: false });
 
@@ -7190,11 +7329,12 @@ async function loadOnlinePlayersFromSupabase(){
 
 function refreshPmOnlineState(players = []){
     onlinePmPeers.clear();
+    inGamePmPeers.clear();
     for(const p of players || []){
         const targetId = p?.player_id ? String(p.player_id) : '';
-        if(targetId && isAccountPublicId(targetId)){
-            onlinePmPeers.add(targetId);
-        }
+        if(!targetId || !isAccountPublicId(targetId)) continue;
+        if (String(p.status || '').toLowerCase() === 'lobby') onlinePmPeers.add(targetId);
+        else inGamePmPeers.add(targetId);
     }
     renderChatTabs();
 }
@@ -7208,7 +7348,7 @@ async function renderOnlinePlayers(){
     refreshPmOnlineState(players);
     list.innerHTML = '';
 
-    for(const p of players){
+    for(const p of players.filter(item => String(item?.status || '').toLowerCase() === 'lobby')){
         const row = document.createElement('div');
         row.className = 'online-player';
 
