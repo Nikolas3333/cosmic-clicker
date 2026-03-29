@@ -316,7 +316,7 @@ function setBattleChatOpen(open){
     const box = document.getElementById('battle-chat-box');
     const input = document.getElementById('battle-chat-input');
 
-    const inputOnlyMode = gameState === 'BATTLE' && !canWriteBattleAnnouncementChat();
+    const inputOnlyMode = gameState === 'BATTLE';
 
     if(box){
         box.classList.toggle('hidden', !open);
@@ -406,7 +406,7 @@ function initBattleChat(){
 
                 if(text){
                     let sent = false;
-                    if(gameState === 'BATTLE' && !canWriteBattleAnnouncementChat()){
+                    if(gameState === 'BATTLE'){
                         sent = await sendSceneMapMessage(text);
                     }else{
                         sent = await sendMessage('battle', text);
@@ -3179,7 +3179,7 @@ function shouldHideStaffIdentityInObserve(publicId, explicitRole = "") {
 }
 
 function shouldShowSceneRoleBadgeInCurrentMode() {
-    return gameState !== 'BATTLE';
+    return gameState === 'OBSERVE';
 }
 
 function getSceneRoleBadgeHtml(publicId, explicitRole = "") {
@@ -3611,12 +3611,10 @@ function renderChatTabs() {
             currentChat = tab.dataset.scope || "global";
             clearUnreadForCurrentScope();
 
-            requestAnimationFrame(async () => {
-                renderChatTabs();
-                saveChatUiState();
-                await loadChatHistory(currentChat);
-                renderLobbyMessages();
-            });
+            renderChatTabs();
+            saveChatUiState();
+            await loadChatHistory(currentChat);
+            renderLobbyMessages();
         });
     });
 
@@ -3635,9 +3633,7 @@ function renderChatTabs() {
             privateChatTabs[peerId].pinned = !privateChatTabs[peerId].pinned;
             saveChatUiState();
 
-            requestAnimationFrame(() => {
-                renderChatTabs();
-            });
+            renderChatTabs();
         });
     });
 
@@ -3667,9 +3663,7 @@ function renderChatTabs() {
                 renderLobbyMessages();
             }
 
-            requestAnimationFrame(() => {
-                renderChatTabs();
-            });
+            renderChatTabs();
         });
     });
 
@@ -3733,13 +3727,14 @@ function showBattleAnnouncementInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
-    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
+    const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement${lineClass}`;
-    item.innerHTML = shouldHideStaffIdentityInScene(publicId, msg.staff_role)
+    item.innerHTML = shouldHideStaffIdentityInObserve(publicId, msg.staff_role)
         ? `${roleBadge}<span class="chat-text">${text}</span>`
         : `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
@@ -3768,12 +3763,12 @@ function showSceneMapMessageInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
-    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
+    const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
-    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
-    const visibleRoleBadge = showRoleBadge ? roleBadge : '';
+    const visibleRoleBadge = roleBadge;
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
@@ -7127,9 +7122,8 @@ function rebuildBattleMapOccupants(rooms = [], presenceRows = []){
   (rooms || []).forEach(room => {
     if(!isPublicBattleRoom(room)) return;
     const mapKey = normalizeBattleMapName(room?.map_name || room?.real || room?.map || 'earth');
-    const joinedPlayers = getRoomOccupantsFromRoomPlayers(room);
     const livePlayers = getRoomOccupantsFromPresence(room?.id, presenceRows);
-    const merged = mergeUniquePlayers(next.get(mapKey) || [], mergeUniquePlayers(joinedPlayers, livePlayers));
+    const merged = mergeUniquePlayers(next.get(mapKey) || [], livePlayers);
     next.set(mapKey, merged);
   });
   supabaseBattleMapOccupants = next;
