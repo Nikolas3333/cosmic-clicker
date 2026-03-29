@@ -234,7 +234,7 @@ canvas {
   border: 1px solid rgba(77,166,255,0.6);
   border-radius: 12px;
 
-  padding: 15px;
+  padding: 10px;
   box-sizing: border-box;
 
   box-shadow: 0 0 20px rgba(77,166,255,0.5);
@@ -579,12 +579,7 @@ canvas {
   flex-direction:column;
 }
 
-.online-header {
-  text-align: center;
-  margin-bottom: 15px;
-  font-weight: bold;
-  color: #00ffcc;
-}
+.online-header { display:none; }
 
 #online-list {
   display: flex;
@@ -2681,7 +2676,6 @@ body.state-observe #ui{ display:none !important; }
 
     <!-- ONLINE PANEL -->
     <div id="online-panel">
-      <div class="online-header">🟢 ONLINE</div>
       <div id="online-list"></div>
     </div>
 
