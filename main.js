@@ -331,48 +331,72 @@ async function sendSceneMapMessage(text) {
     if (!canWriteSceneMapChat()) return false;
 
     const ownPublicId = getOwnPublicChatId?.() || "";
-    const payload = {
+    const cleanText = String(text || "").trim();
+    if (!cleanText) return false;
+
+    const scenePayload = {
         channel: "scene",
         room_id: getSceneChatRoomId(),
         player_id: getValidChatPlayerId(),
         player_public_id: ownPublicId,
         recipient_public_id: null,
         player_nickname: getOwnChatLabel(),
-        message: String(text || "").trim()
+        message: cleanText
     };
 
-    if (!payload.message) return false;
+    const battlePayload = {
+        channel: "battle",
+        room_id: scenePayload.room_id,
+        player_id: scenePayload.player_id,
+        player_public_id: scenePayload.player_public_id,
+        recipient_public_id: null,
+        player_nickname: scenePayload.player_nickname,
+        message: cleanText
+    };
 
     const { error } = await window.supabaseClient
         .from("chat_messages")
-        .insert(payload);
+        .insert([scenePayload, battlePayload]);
 
     if (error) {
-        console.error("❌ Ошибка отправки scene-сообщения:", error);
+        console.error("❌ Ошибка отправки scene/battle сообщения:", error);
         return false;
     }
 
-    const optimisticMessage = {
+    const nowIso = new Date().toISOString();
+
+    const optimisticSceneMessage = {
         id: `scene-local-${Date.now()}`,
         channel: "scene",
-        room_id: payload.room_id,
-        created_at: new Date().toISOString(),
+        room_id: scenePayload.room_id,
+        created_at: nowIso,
         player_public_id: ownPublicId,
-        player_nickname: payload.player_nickname,
-        message: payload.message
+        player_nickname: scenePayload.player_nickname,
+        message: scenePayload.message
     };
 
-    const battleMirrorScope = { key: "battle", channel: "battle" };
-    pushChatToCache(battleMirrorScope, {
-        ...optimisticMessage,
-        channel: "battle"
-    });
+    const optimisticBattleMessage = {
+        id: `battle-local-${Date.now()}`,
+        channel: "battle",
+        room_id: battlePayload.room_id,
+        created_at: nowIso,
+        player_public_id: ownPublicId,
+        player_nickname: battlePayload.player_nickname,
+        message: battlePayload.message
+    };
+
+    const battleScope = { key: "battle", channel: "battle" };
+    pushChatToCache(battleScope, optimisticBattleMessage);
 
     if (currentChat === "battle") {
         renderLobbyMessages();
     }
 
-    showSceneMapMessageInActiveScene(optimisticMessage);
+    if (gameState === "BATTLE" || gameState === "OBSERVE") {
+        renderBattleMessages?.();
+    }
+
+    showSceneMapMessageInActiveScene(optimisticSceneMessage);
     return true;
 }
 
@@ -3291,10 +3315,11 @@ function buildBattleChatMessageHtml(msg) {
     const text = escapeChatHtml(msg.message || "");
     const time = formatChatTime(msg.created_at);
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
-    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
 }
 
 function addSystemLobbyChatMessage(text) {
