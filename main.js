@@ -344,22 +344,12 @@ async function sendSceneMapMessage(text) {
         message: cleanText
     };
 
-    const battlePayload = {
-        channel: "battle",
-        room_id: scenePayload.room_id,
-        player_id: scenePayload.player_id,
-        player_public_id: scenePayload.player_public_id,
-        recipient_public_id: null,
-        player_nickname: scenePayload.player_nickname,
-        message: cleanText
-    };
-
     const { error } = await window.supabaseClient
         .from("chat_messages")
-        .insert([scenePayload, battlePayload]);
+        .insert(scenePayload);
 
     if (error) {
-        console.error("❌ Ошибка отправки scene/battle сообщения:", error);
+        console.error("❌ Ошибка отправки scene сообщения:", error);
         return false;
     }
 
@@ -375,18 +365,11 @@ async function sendSceneMapMessage(text) {
         message: scenePayload.message
     };
 
-    const optimisticBattleMessage = {
-        id: `battle-local-${Date.now()}`,
-        channel: "battle",
-        room_id: battlePayload.room_id,
-        created_at: nowIso,
-        player_public_id: ownPublicId,
-        player_nickname: battlePayload.player_nickname,
-        message: battlePayload.message
-    };
-
-    const battleScope = { key: "battle", channel: "battle" };
-    pushChatToCache(battleScope, optimisticBattleMessage);
+    const battleMirrorScope = { key: "battle", channel: "battle" };
+    pushChatToCache(battleMirrorScope, {
+        ...optimisticSceneMessage,
+        channel: "battle"
+    });
 
     if (currentChat === "battle") {
         renderLobbyMessages();
@@ -3319,7 +3302,7 @@ function buildBattleChatMessageHtml(msg) {
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
-    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">(${safePublicId})</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
 }
 
 function addSystemLobbyChatMessage(text) {
