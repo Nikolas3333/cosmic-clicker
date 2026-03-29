@@ -6212,10 +6212,6 @@ function limitBattleArea(){
 
     function renderLobbyList(mode = 'battle'){
         lobbyMode = mode;
-        if(mode === 'battle' && typeof renderRoomsInLobby === 'function'){
-            renderRoomsInLobby(true);
-            return;
-        }
         const matchListEl = document.getElementById('match-list');
         const preview = document.getElementById('planet-preview');
         const playersBox = document.getElementById('map-players');
@@ -6309,13 +6305,9 @@ function limitBattleArea(){
 
         if(battleTab && !battleTab.dataset.v26Bound){
             battleTab.dataset.v26Bound = '1';
-            battleTab.onclick = async () => {
+            battleTab.onclick = () => {
                 if(gameState !== 'LOBBY') switchState('LOBBY');
-                if(typeof renderRoomsInLobby === 'function'){
-                    await renderRoomsInLobby(true);
-                }else{
-                    renderLobbyList('battle');
-                }
+                renderLobbyList('battle');
             };
         }
         if(soloTab && !soloTab.dataset.v26Bound){
@@ -6356,11 +6348,7 @@ function limitBattleArea(){
         if(newState === 'LOBBY'){
             bindTopNavModes();
             rebindLobbyButtons();
-            if((lobbyMode || 'battle') === 'battle' && typeof renderRoomsInLobby === 'function'){
-                renderRoomsInLobby(true);
-            }else{
-                renderLobbyList(lobbyMode || 'battle');
-            }
+            renderLobbyList(lobbyMode || 'battle');
         }
     };
     window.switchState = switchState;
@@ -6377,13 +6365,7 @@ function limitBattleArea(){
         bindTopNavModes();
         rebindLobbyButtons();
         ensureSunBackToOrbit();
-        if(gameState === 'LOBBY'){
-            if(typeof renderRoomsInLobby === 'function'){
-                renderRoomsInLobby(true);
-            }else{
-                renderLobbyList('battle');
-            }
-        }
+        if(gameState === 'LOBBY') renderLobbyList('battle');
     });
 })();
 
@@ -6738,11 +6720,11 @@ function limitBattleArea(){
         if(battleTab && !battleTab.dataset.v27Bound){
             battleTab.dataset.v27Bound = '1';
             battleTab.onclick = async () => {
-                if(typeof renderRoomsInLobby === 'function'){
-                    await renderRoomsInLobby(true);
-                }else{
-                    renderLobbyListV27('battle');
+                lobbyModeV27 = 'battle';
+                if(typeof loadRoomsFromSupabase === 'function'){
+                    await loadRoomsFromSupabase();
                 }
+                renderLobbyListV27('battle');
             };
         }
         if(soloTab && !soloTab.dataset.v27Bound){
@@ -6860,8 +6842,8 @@ function limitBattleArea(){
         if(refreshBtn && !refreshBtn.dataset.v27Bound){
             refreshBtn.dataset.v27Bound = '1';
             refreshBtn.addEventListener('click', async () => {
-                if(typeof renderRoomsInLobby === 'function'){
-                    await renderRoomsInLobby();
+                if(lobbyModeV27 === 'battle' && typeof renderRoomsInLobby === 'function'){
+                    await renderRoomsInLobby(true);
                 }else{
                     renderLobbyListV27(lobbyModeV27);
                 }
@@ -6966,7 +6948,11 @@ function limitBattleArea(){
             bindLobbyModeButtons();
             bindActionButtons();
             bindCreateWindows();
-            renderLobbyListV27(lobbyModeV27);
+            if(lobbyModeV27 === 'battle'){
+                Promise.resolve(renderRoomsInLobby(true)).catch(err => console.warn('LOBBY rooms refresh failed:', err));
+            }else{
+                renderLobbyListV27(lobbyModeV27);
+            }
         }
         if(newState === 'OBSERVE'){
             const canvas = document.querySelector('canvas');
@@ -6991,7 +6977,13 @@ function limitBattleArea(){
         try{
             if(typeof fillLevelSelects === 'function') fillLevelSelects('tournament-min-level','tournament-max-level');
         }catch(_){ }
-        if(gameState === 'LOBBY') renderLobbyListV27(lobbyModeV27);
+        if(gameState === 'LOBBY'){
+            if(lobbyModeV27 === 'battle'){
+                Promise.resolve(renderRoomsInLobby(true)).catch(err => console.warn('Initial rooms refresh failed:', err));
+            }else{
+                renderLobbyListV27(lobbyModeV27);
+            }
+        }
     });
 })();
 
@@ -7166,7 +7158,7 @@ async function joinRoomPlayers(roomId) {
   }
 
   await loadRoomsFromSupabase();
-  if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
+  if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function'){
     renderLobbyListV27('battle');
   }
   return true;
@@ -7212,7 +7204,7 @@ async function leaveRoomPlayers(roomId) {
   }
 
   await loadRoomsFromSupabase();
-  if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
+  if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function'){
     renderLobbyListV27('battle');
   }
   return count || 0;
@@ -7230,41 +7222,11 @@ async function cleanupCurrentBattleRoom() {
 
 
 function stopLiveRoomsRefresh(){
-  if(liveRoomsRefreshTimer){
-    clearInterval(liveRoomsRefreshTimer);
-    liveRoomsRefreshTimer = null;
-  }
+  return;
 }
 
 function startLiveRoomsRefresh(){
-  stopLiveRoomsRefresh();
-  if(!window.supabaseReady || !window.supabaseClient) return;
-  liveRoomsRefreshTimer = setInterval(async () => {
-    if(gameState !== 'LOBBY') return;
-    try{
-      await loadRoomsFromSupabase();
-      if(typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
-        const selectedId = selectedLobbyMap?.id || currentRoom?.id || null;
-        renderLobbyListV27('battle');
-        if(selectedId){
-          const fresh = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find(room => String(room?.id || '') === String(selectedId));
-          if(fresh){
-            selectedLobbyMap = { ...fresh, name: fresh.real };
-            currentRoom = fresh;
-            syncPreview?.(fresh);
-            const list = document.getElementById('match-list');
-            const selectedEl = list?.querySelector(`.match-item[data-room-id="${selectedId}"]`);
-            if(selectedEl){
-              list?.querySelectorAll('.match-item').forEach(el => el.classList.remove('selected'));
-              selectedEl.classList.add('selected');
-            }
-          }
-        }
-      }
-    }catch(error){
-      console.warn('Live refresh rooms error:', error);
-    }
-  }, LIVE_ROOMS_REFRESH_MS);
+  return;
 }
 
 async function loadRoomsFromSupabase() {
@@ -7273,40 +7235,23 @@ async function loadRoomsFromSupabase() {
     return [];
   }
 
-  const cutoffIso = getOnlineFreshCutoffIso();
-
-  const [roomsResponse, onlineResponse] = await Promise.all([
-    window.supabaseClient
-      .from('rooms')
-      .select('*, room_players(player_id,nickname,joined_at)')
-      .order('created_at', { ascending: true }),
-    window.supabaseClient
-      .from('online_players')
-      .select('player_id,nickname,room_id,status,updated_at')
-      .eq('status', 'in-game')
-      .gte('updated_at', cutoffIso)
-  ]);
-
-  const { data, error } = roomsResponse;
-  const { data: onlineData, error: onlineError } = onlineResponse;
+  const { data, error } = await window.supabaseClient
+    .from('rooms')
+    .select('*, room_players(player_id,nickname,joined_at)')
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Ошибка загрузки комнат:', error);
     return [];
   }
 
-  if (onlineError) {
-    console.warn('Не удалось загрузить активных игроков по комнатам:', onlineError);
-  }
-
-  const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
-
-  supabaseBattleRoomsCache = (data || []).map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows));
+  supabaseBattleRoomsCache = (Array.isArray(data) ? data : []).map(room => mapSupabaseRoomToLobbyEntry(room, []));
   console.log('Комнаты из Supabase загружены:', data);
   return supabaseBattleRoomsCache;
 }
 
 async function renderRoomsInLobby(forceBattleMode = false) {
+  if(forceBattleMode) lobbyModeV27 = 'battle';
   await loadRoomsFromSupabase();
 
   if (typeof renderLobbyListV27 === 'function') {
@@ -7392,8 +7337,9 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   }
 
   console.log('Комната создана:', data);
+  lobbyModeV27 = 'battle';
   await loadRoomsFromSupabase();
-  if(typeof renderLobbyListV27 === 'function' && typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 === 'battle'){
+  if(typeof renderLobbyListV27 === 'function'){
     renderLobbyListV27('battle');
   }
   return data;
