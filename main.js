@@ -6556,8 +6556,8 @@ function limitBattleArea(){
                 roomId: null,
                 isBaseMap: true,
                 title: item.title,
-                players: [],
-                currentPlayers: [],
+                players: getBattleMapOccupants(item.real),
+                currentPlayers: getBattleMapOccupants(item.real),
                 maxPlayers: Number(item.maxPlayers || item.playerCount || 8),
                 map: item.real,
                 rawRoom: null
@@ -6627,7 +6627,9 @@ function limitBattleArea(){
                 if(statusNote) statusNote.textContent = `${entry.title} • Ставка: ${feeText} • Победитель получает 80% банка`;
                 return;
             } else {
-                const players = entry.currentPlayers || entry.players || [];
+                const players = entry.isBaseMap
+                    ? getBattleMapOccupants(entry.real || entry.map || entry.name)
+                    : (entry.currentPlayers || entry.players || []);
                 players.forEach((playerName) => {
                     const slot = document.createElement('div');
                     slot.className = 'player-slot';
@@ -6690,9 +6692,12 @@ function limitBattleArea(){
                 item.addEventListener('click', () => {
                     document.querySelectorAll('#match-list .match-item').forEach(el => el.classList.remove('selected'));
                     item.classList.add('selected');
-                    selectedLobbyMap = { ...entry, name: entry.real };
-                    currentRoom = entry;
-                    syncPreview(entry);
+                    const previewEntry = entry.isBaseMap
+                        ? { ...entry, name: entry.real, currentPlayers:getBattleMapOccupants(entry.real || entry.map || entry.name), players:getBattleMapOccupants(entry.real || entry.map || entry.name), isBaseMap:true }
+                        : entry;
+                    selectedLobbyMap = { ...previewEntry, name: previewEntry.real };
+                    currentRoom = entry.id ? previewEntry : null;
+                    syncPreview(previewEntry);
                 });
                 list.appendChild(item);
                 if(index === 0) item.click();
@@ -6842,9 +6847,26 @@ function limitBattleArea(){
                     if(selectedLobbyMap.id){
                         const joined = await joinRoomPlayers(selectedLobbyMap.id);
                         if(!joined) return;
+                        await loadRoomsFromSupabase();
                         const freshRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
                             .find(entry => String(entry?.id || '') === String(selectedLobbyMap.id));
                         if(freshRoom){
+                            room.players = [...(freshRoom.currentPlayers || freshRoom.players || [])];
+                            room.currentPlayers = [...room.players];
+                            room.maxPlayers = freshRoom.maxPlayers || room.maxPlayers;
+                            room.host = freshRoom.host || room.host;
+                            room.rawRoom = freshRoom.rawRoom || room.rawRoom;
+                        }
+                    } else if(selectedLobbyMap.real){
+                        const publicRoomName = `Public ${String(selectedLobbyMap.real || 'earth').toUpperCase()}`;
+                        const createdOrExisting = await createGameRoom(publicRoomName, selectedLobbyMap.real, Number(selectedLobbyMap.maxPlayers || selectedLobbyMap.playerCount || 8), getDisplayPlayerTag());
+                        if(!createdOrExisting?.id) return;
+                        await loadRoomsFromSupabase();
+                        const freshRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
+                            .find(entry => String(entry?.id || '') === String(createdOrExisting.id));
+                        if(freshRoom){
+                            room.id = freshRoom.id;
+                            room.roomId = freshRoom.id;
                             room.players = [...(freshRoom.currentPlayers || freshRoom.players || [])];
                             room.currentPlayers = [...room.players];
                             room.maxPlayers = freshRoom.maxPlayers || room.maxPlayers;
@@ -7017,6 +7039,7 @@ function limitBattleArea(){
 
 let supabaseBattleRoomsCache = [];
 let battleRoomsRenderTimer = null;
+let supabaseBattleMapOccupants = new Map();
 
 const DEFAULT_SUPABASE_BATTLE_ROOMS = [];
 
@@ -7065,6 +7088,31 @@ function mergeUniquePlayers(primary = [], secondary = []){
     result.push(value);
   });
   return result;
+}
+
+function rebuildBattleMapOccupants(rooms = []){
+  const next = new Map();
+  (rooms || []).forEach(room => {
+    const mapKey = normalizeBattleMapName(room?.map_name || room?.real || room?.map || 'earth');
+    const roomPlayers = Array.isArray(room?.room_players)
+      ? room.room_players
+          .slice()
+          .sort((a, b) => new Date(a?.joined_at || 0) - new Date(b?.joined_at || 0))
+          .map(item => item?.nickname || item?.player_id)
+          .filter(Boolean)
+      : [];
+    const merged = mergeUniquePlayers(next.get(mapKey) || [], roomPlayers);
+    next.set(mapKey, merged);
+  });
+  supabaseBattleMapOccupants = next;
+  return next;
+}
+
+function getBattleMapOccupants(mapName){
+  const mapKey = normalizeBattleMapName(mapName);
+  return Array.isArray(supabaseBattleMapOccupants.get(mapKey))
+    ? [...supabaseBattleMapOccupants.get(mapKey)]
+    : [];
 }
 
 function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
@@ -7261,6 +7309,11 @@ async function cleanupCurrentBattleRoom() {
   currentRoom = null;
   window.currentRoomId = null;
   selectedLobbyMap = null;
+
+  if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function'){
+    await loadRoomsFromSupabase();
+    renderLobbyListV27(getLobbyModeSafe());
+  }
 }
 
 
@@ -7308,37 +7361,46 @@ async function loadRoomsFromSupabase() {
     return [];
   }
 
-  const cutoffIso = getOnlineFreshCutoffIso();
-
-  const [roomsResponse, onlineResponse] = await Promise.all([
-    window.supabaseClient
-      .from('rooms')
-      .select('*, room_players(player_id,nickname,joined_at)')
-      .order('created_at', { ascending: true }),
-    window.supabaseClient
-      .from('online_players')
-      .select('player_id,nickname,room_id,status,updated_at')
-      .eq('status', 'in-game')
-      .gte('updated_at', cutoffIso)
-  ]);
-
-  const { data, error } = roomsResponse;
-  const { data: onlineData, error: onlineError } = onlineResponse;
+  const { data, error } = await window.supabaseClient
+    .from('rooms')
+    .select('*, room_players(player_id,nickname,joined_at)')
+    .order('created_at', { ascending: true });
 
   if (error) {
     console.error('Ошибка загрузки комнат:', error);
     return [];
   }
 
-  if (onlineError) {
-    console.warn('Не удалось загрузить активных игроков по комнатам:', onlineError);
+  const allRooms = Array.isArray(data) ? data : [];
+  rebuildBattleMapOccupants(allRooms);
+
+  const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
+  if (emptyRooms.length) {
+    const emptyRoomIds = emptyRooms.map(room => room.id).filter(Boolean);
+    const { error: emptyDeleteError } = await window.supabaseClient
+      .from('rooms')
+      .delete()
+      .in('id', emptyRoomIds);
+    if (emptyDeleteError) {
+      console.warn('Не удалось удалить пустые комнаты:', emptyDeleteError);
+    }
   }
 
-  const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
-  const allRooms = Array.isArray(data) ? data : [];
   const visibleRooms = allRooms.filter(room => room?.id && Array.isArray(room.room_players) && room.room_players.length > 0);
-  supabaseBattleRoomsCache = visibleRooms
-    .map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows));
+  supabaseBattleRoomsCache = visibleRooms.map(room => mapSupabaseRoomToLobbyEntry(room));
+
+  const selectedId = String(selectedLobbyMap?.id || currentRoom?.id || '');
+  if(selectedId){
+    const freshSelected = supabaseBattleRoomsCache.find(room => String(room?.id || '') === selectedId);
+    if(freshSelected){
+      if(selectedLobbyMap?.id) selectedLobbyMap = { ...freshSelected, name: freshSelected.real };
+      if(currentRoom?.id) currentRoom = { ...currentRoom, ...freshSelected, currentPlayers:[...(freshSelected.currentPlayers||[])], players:[...(freshSelected.players||[])] };
+    }
+  } else if(selectedLobbyMap?.isBaseMap || (!selectedLobbyMap?.id && selectedLobbyMap?.real)) {
+    const occupants = getBattleMapOccupants(selectedLobbyMap.real || selectedLobbyMap.map || selectedLobbyMap.name);
+    selectedLobbyMap.currentPlayers = occupants;
+    selectedLobbyMap.players = [...occupants];
+  }
 
   console.log('Комнаты из Supabase загружены:', visibleRooms);
   return supabaseBattleRoomsCache;
@@ -7377,12 +7439,13 @@ async function renderRoomsInLobby(forceBattleMode = false) {
       `<span class="map-title">${entry.title}</span>`+
       `<span class="map-real">${String(entry.real || '').toUpperCase()}</span>`+
       `<span class="map-mode">${entry.mode || 'DM'}</span>`+
-      `<span class="map-players">0/${entry.maxPlayers || 8}</span>`+
+      `<span class="map-players">${getBattleMapOccupants(entry.real || entry.map || entry.name).length}/${entry.maxPlayers || 8}</span>`+
       `<span class="map-level">★ ${entry.minLevel || 1} - ★ ${entry.maxLevel || 120}</span>`;
     el.addEventListener('click', () => {
       document.querySelectorAll('#match-list .match-item').forEach(node => node.classList.remove('selected'));
       el.classList.add('selected');
-      selectedLobbyMap = { ...entry, name: entry.real };
+      const occupants = getBattleMapOccupants(entry.real || entry.map || entry.name);
+      selectedLobbyMap = { ...entry, name: entry.real, currentPlayers:[...occupants], players:[...occupants], isBaseMap:true };
       currentRoom = null;
       const preview = document.getElementById('planet-preview');
       if (preview) {
