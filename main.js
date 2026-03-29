@@ -7027,9 +7027,26 @@ function getRoomMetaFromMapName(mapName){
     : null) || { title: String(mapName || 'Earth'), real: realKey, img: realKey, mode: 'DM' };
 }
 
+function generateUuidV4(){
+  if(globalThis.crypto?.randomUUID){
+    return globalThis.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, ch => {
+    const r = Math.random() * 16 | 0;
+    const v = ch === 'x' ? r : ((r & 0x3) | 0x8);
+    return v.toString(16);
+  });
+}
+
 function getCurrentPlayerIdentity(){
   const fallbackNickname = (typeof player !== 'undefined' && player?.nickname) ? player.nickname : 'Commander';
-  const fallbackId = (typeof player !== 'undefined' && player?.id) ? String(player.id) : fallbackNickname;
+  const accountPublicId = authState?.mode === 'account' && authState?.playerId
+    ? String(authState.playerId)
+    : '';
+  const localPlayerId = (typeof player !== 'undefined' && player?.id)
+    ? String(player.id)
+    : '';
+  const fallbackId = accountPublicId || localPlayerId || fallbackNickname;
   return {
     playerId: fallbackId,
     nickname: fallbackNickname,
@@ -7149,16 +7166,24 @@ async function joinRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return false;
 
   const identity = getCurrentPlayerIdentity();
+  const safeRoomId = String(roomId || '').trim();
+  const safePlayerId = String(identity.playerId || '').trim();
+  const safeNickname = String(identity.displayName || identity.nickname || 'Commander').trim() || 'Commander';
+
+  if(!safeRoomId || !safePlayerId){
+    console.error('joinRoomPlayers: пустой roomId/playerId', { roomId: safeRoomId, playerId: safePlayerId });
+    return false;
+  }
 
   const { data: existingRows, error: existingError } = await window.supabaseClient
     .from('room_players')
     .select('id')
-    .eq('room_id', roomId)
-    .eq('player_id', identity.playerId)
+    .eq('room_id', safeRoomId)
+    .eq('player_id', safePlayerId)
     .limit(1);
 
   if (existingError) {
-    console.error('Ошибка проверки room_players:', existingError);
+    console.error('Ошибка проверки room_players:', existingError, { roomId: safeRoomId, playerId: safePlayerId });
     return false;
   }
 
@@ -7166,21 +7191,23 @@ async function joinRoomPlayers(roomId) {
     return true;
   }
 
+  const insertPayload = {
+    id: generateUuidV4(),
+    room_id: safeRoomId,
+    player_id: safePlayerId,
+    nickname: safeNickname
+  };
+
   const { error } = await window.supabaseClient
     .from('room_players')
-    .insert([
-      {
-        room_id: roomId,
-        player_id: identity.playerId,
-        nickname: identity.displayName
-      }
-    ]);
+    .insert([insertPayload]);
 
   if (error) {
-    console.error('Ошибка входа в room_players:', error);
+    console.error('Ошибка входа в room_players:', error, insertPayload);
     return false;
   }
 
+  console.log('Игрок добавлен в room_players:', insertPayload);
   await loadRoomsFromSupabase();
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
