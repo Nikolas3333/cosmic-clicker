@@ -3080,6 +3080,14 @@ function shouldHideStaffIdentityInScene(publicId, explicitRole = "") {
     return isStaffRole(getResolvedStaffRole(publicId, explicitRole));
 }
 
+function getSceneRoleBadgeHtml(publicId, explicitRole = "") {
+    const role = getResolvedStaffRole(publicId, explicitRole);
+    const meta = getStaffRoleMeta(role);
+    const roleClass = getChatRoleCssClassByRole(role);
+    if (!meta || !meta.short) return "";
+    return `<span class="scene-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
+}
+
 function applyPlayerIdentityRow(row = {}) {
     if (!row || typeof row !== "object") return;
     if (typeof row.staff_role !== "undefined") {
@@ -3267,7 +3275,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const ownId = getOwnPublicChatId();
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
     const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
     const nickAttrs = publicId
@@ -3298,7 +3306,7 @@ function buildBattleChatMessageHtml(msg) {
     const time = formatChatTime(msg.created_at);
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
     const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
 
@@ -3553,7 +3561,7 @@ function showBattleAnnouncementInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
     const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
@@ -3588,7 +3596,7 @@ function showSceneMapMessageInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId, msg.staff_role);
+    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
     const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
