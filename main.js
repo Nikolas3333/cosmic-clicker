@@ -4553,7 +4553,7 @@ function enterBattleMap(mapName){
 }
 
 const remoteBattleShips = new Map();
-let liveBattleSyncTimer = null;
+var liveBattleSyncTimer = null;
 
 function clearRemoteBattleShips(){
     remoteBattleShips.forEach(entry => {
