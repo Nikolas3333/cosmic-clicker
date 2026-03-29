@@ -7413,7 +7413,7 @@ const ONLINE_HEARTBEAT_MS = 10000;
 let onlineHeartbeatTimer = null;
 let onlineRenderTimer = null;
 let playerActionMenuEl = null;
-let liveRoomsRefreshTimer = null;
+var liveRoomsRefreshTimer = null;
 const LIVE_ROOMS_REFRESH_MS = 2500;
 
 function isAccountPublicId(value){
