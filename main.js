@@ -216,7 +216,7 @@ const canvas = document.querySelector("canvas");
     if(gameState === "OBSERVE" || battleObserverMode){
         observerCameraYaw += event.movementX * 0.0035 * gameSettings.mouseSensitivity;
         const invertFactor = gameSettings.invertY ? -1 : 1;
-        observerCameraPitch += event.movementY * 0.0026 * gameSettings.mouseSensitivity * invertFactor;
+        observerCameraPitch -= event.movementY * 0.0026 * gameSettings.mouseSensitivity * invertFactor;
         observerCameraPitch = THREE.MathUtils.clamp(observerCameraPitch, -1.15, 1.15);
         return;
     }
@@ -347,19 +347,28 @@ async function sendSceneMapMessage(text, options = {}) {
     if (!window.supabaseClient) return false;
     if (!canWriteSceneMapChat()) return false;
 
-    const ownPublicId = getOwnPublicChatId?.() || "";
     const cleanText = String(text || "").trim();
     if (!cleanText) return false;
 
-    const mirrorToBattle = options?.mirrorToBattle !== false && gameState === 'BATTLE';
+    const identity = typeof getObserveStaffChatIdentity === 'function'
+        ? getObserveStaffChatIdentity()
+        : {
+            isObserveStaff: false,
+            publicId: getOwnPublicChatId?.() || '',
+            nickname: getOwnChatLabel(),
+            staffRole: getOwnStaffRole?.() || 'player'
+        };
+
+    const mirrorToBattle = options?.mirrorToBattle !== false && (gameState === 'BATTLE' || gameState === 'OBSERVE');
 
     const scenePayload = {
         channel: "scene",
         room_id: getSceneChatRoomId(),
         player_id: getValidChatPlayerId(),
-        player_public_id: ownPublicId,
+        player_public_id: identity.publicId || null,
         recipient_public_id: null,
-        player_nickname: getOwnChatLabel(),
+        player_nickname: identity.nickname,
+        staff_role: identity.staffRole || 'player',
         message: cleanText
     };
 
@@ -373,6 +382,7 @@ async function sendSceneMapMessage(text, options = {}) {
             player_public_id: scenePayload.player_public_id,
             recipient_public_id: null,
             player_nickname: scenePayload.player_nickname,
+            staff_role: scenePayload.staff_role,
             message: cleanText
         });
     }
@@ -394,7 +404,7 @@ async function sendSceneMapMessage(text, options = {}) {
         created_at: nowIso,
         player_public_id: scenePayload.player_public_id,
         player_nickname: scenePayload.player_nickname,
-        staff_role: identity.staffRole,
+        staff_role: scenePayload.staff_role,
         message: scenePayload.message
     };
     pushChatToCache({ key: 'battle', channel: 'battle' }, { ...optimisticSceneMessage, channel: 'battle' });
@@ -4801,28 +4811,48 @@ async function syncLiveBattlePlayers(){
         ? String(authState.playerId)
         : (player?.id ? String(player.id) : null);
 
+    const activeIds = new Set();
     const visiblePlayers = [];
+
     livePlayers.forEach(entry => {
         const entryId = entry?.player_id ? String(entry.player_id) : '';
         const isMe = !!(entryId && myId && entryId === myId);
         const displayName = entry.nickname || `Pilot`;
-        visiblePlayers.push(displayName);
+        const shouldHideFromObserveScoreboard = gameState === 'OBSERVE' && isMe;
+
+        if(!shouldHideFromObserveScoreboard){
+            visiblePlayers.push(displayName);
+        }
+
         if(isMe) return;
+        if(!entryId) return;
+
+        activeIds.add(entryId);
         if(!remoteBattleShips.has(entryId)){
             remoteBattleShips.set(entryId, createRemoteBattleShipMesh(displayName, remoteBattleShips.size));
         }
     });
 
     Array.from(remoteBattleShips.keys()).forEach(entryId => {
-        if(!livePlayers.some(item => String(item?.player_id || '') === String(entryId))){
+        if(!activeIds.has(String(entryId))){
             const old = remoteBattleShips.get(entryId);
-            if(old?.mesh) scene.remove(old.mesh);
+            if(old?.mesh){
+                scene.remove(old.mesh);
+                old.mesh.traverse?.((child) => {
+                    if(child?.geometry) child.geometry.dispose?.();
+                    if(child?.material){
+                        if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+                        else child.material.dispose?.();
+                    }
+                });
+            }
             remoteBattleShips.delete(entryId);
         }
     });
 
     if(currentRoom){
-        currentRoom.currentPlayers = visiblePlayers.length ? visiblePlayers : [getDisplayPlayerTag()];
+        const fallbackPlayers = gameState === 'OBSERVE' ? [] : [getDisplayPlayerTag()];
+        currentRoom.currentPlayers = visiblePlayers.length ? visiblePlayers : fallbackPlayers;
         currentRoom.players = [...currentRoom.currentPlayers];
     }
     updateBattleScoreboard();
