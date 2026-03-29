@@ -3580,6 +3580,7 @@ function renderChatTabs() {
             const peerId = btn.dataset.close;
             if (!peerId) return;
 
+            await purgePrivateMessagesForPeer(peerId);
             delete privateChatTabs[peerId];
             delete chatCache.pm[peerId];
             delete chatUnread.pm[peerId];
@@ -3713,6 +3714,59 @@ function showSceneMapMessageInActiveScene(msg) {
     setTimeout(() => {
         item.remove();
     }, 9000);
+}
+
+async function purgePrivateMessagesForPeer(peerId){
+    if(!window.supabaseClient) return false;
+    const ownId = getOwnPublicChatId();
+    const safePeerId = String(peerId || '').trim();
+    if(!ownId || !safePeerId) return false;
+
+    const { error } = await window.supabaseClient
+        .from("chat_messages")
+        .delete()
+        .eq("channel", "pm")
+        .or(`and(player_public_id.eq.${ownId},recipient_public_id.eq.${safePeerId}),and(player_public_id.eq.${safePeerId},recipient_public_id.eq.${ownId})`);
+
+    if(error){
+        console.warn('Не удалось удалить историю ЛС для диалога:', safePeerId, error);
+        return false;
+    }
+
+    delete chatCache.pm[safePeerId];
+    delete chatUnread.pm[safePeerId];
+    if(privateChatTabs[safePeerId]){
+        privateChatTabs[safePeerId].preview = '';
+        privateChatTabs[safePeerId].updatedAt = Date.now();
+    }
+    saveChatUiState();
+    return true;
+}
+
+async function purgeAllPrivateMessages(){
+    if(!window.supabaseClient) return false;
+    const ownId = getOwnPublicChatId();
+    if(!ownId) return false;
+
+    const { error } = await window.supabaseClient
+        .from("chat_messages")
+        .delete()
+        .eq("channel", "pm")
+        .or(`player_public_id.eq.${ownId},recipient_public_id.eq.${ownId}`);
+
+    if(error){
+        console.warn('Не удалось очистить всю историю ЛС:', error);
+        return false;
+    }
+
+    Object.keys(chatCache.pm).forEach(key => delete chatCache.pm[key]);
+    Object.keys(chatUnread.pm).forEach(key => delete chatUnread.pm[key]);
+    Object.keys(privateChatTabs).forEach(key => {
+        privateChatTabs[key].preview = '';
+        privateChatTabs[key].updatedAt = Date.now();
+    });
+    saveChatUiState();
+    return true;
 }
 
 async function loadChatHistory(scopeName = currentChat) {
@@ -4046,6 +4100,9 @@ async function initRealtimeChat() {
     }
 
     restoreChatUiState();
+    if (canUsePrivateChat()) {
+        await purgeAllPrivateMessages();
+    }
     chatUnread.global = 0;
     chatUnread.clan = 0;
     chatUnread.battle = 0;
@@ -7330,12 +7387,27 @@ async function loadOnlinePlayersFromSupabase(){
 function refreshPmOnlineState(players = []){
     onlinePmPeers.clear();
     inGamePmPeers.clear();
+
     for(const p of players || []){
-        const targetId = p?.player_id ? String(p.player_id) : '';
+        const targetId = p?.player_id ? String(p.player_id).trim() : '';
         if(!targetId || !isAccountPublicId(targetId)) continue;
-        if (String(p.status || '').toLowerCase() === 'lobby') onlinePmPeers.add(targetId);
-        else inGamePmPeers.add(targetId);
+
+        const rawStatus = String(p?.status || '').trim().toLowerCase();
+        if(rawStatus === 'lobby' || rawStatus === 'online'){
+            onlinePmPeers.add(targetId);
+            continue;
+        }
+
+        if(rawStatus === 'in-game' || rawStatus === 'battle' || rawStatus === 'observe' || rawStatus === 'orbit' || rawStatus === 'combat'){
+            inGamePmPeers.add(targetId);
+            continue;
+        }
+
+        if(rawStatus && rawStatus !== 'offline'){
+            inGamePmPeers.add(targetId);
+        }
     }
+
     renderChatTabs();
 }
 
@@ -7419,7 +7491,13 @@ switchState = function(newState){
 
     previousSwitchStateOnline(newState);
     syncCurrentOnlinePresence();
-    setTimeout(renderOnlinePlayers, 300);
+    setTimeout(() => {
+        syncCurrentOnlinePresence();
+        renderOnlinePlayers();
+    }, 300);
+    setTimeout(() => {
+        renderOnlinePlayers();
+    }, 1200);
 };
 
 window.switchState = switchState;
