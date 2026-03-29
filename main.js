@@ -3066,6 +3066,10 @@ function getChatRoleBadgeHtmlByPublicId(publicId) {
     return getChatRoleBadgeHtmlByRole(getCachedStaffRole(publicId));
 }
 
+function shouldHideStaffIdentityInScene(publicId) {
+    return isStaffRole(getCachedStaffRole(publicId));
+}
+
 function applyPlayerIdentityRow(row = {}) {
     if (!row || typeof row !== "object") return;
     if (typeof row.staff_role !== "undefined") {
@@ -3252,6 +3256,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const recipientId = msg.recipient_public_id ? String(msg.recipient_public_id) : null;
     const ownId = getOwnPublicChatId();
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
@@ -3268,8 +3273,9 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
 
     return `
       <div class="chat-line${lineClass}" data-message-id="${msg.id}">
-        ${roleBadge}
+        ${prefix}${roleBadge}
         <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
+        <span class="chat-id">[${safePublicId}]</span>
         <span class="chat-time">[${time}]</span>
         <span class="chat-text">${text}</span>
       </div>
@@ -3285,6 +3291,11 @@ function buildBattleChatMessageHtml(msg) {
     const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
     const roleClass = getChatRoleCssClassByPublicId(publicId);
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
+
+    if (shouldHideStaffIdentityInScene(publicId)) {
+        return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    }
+
     return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span> <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
 }
 
@@ -3489,6 +3500,14 @@ function renderLobbyMessages() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+function updateLobbyChatComposerVisibility() {
+    const chatInputAreaEl = document.getElementById("chat-input-area");
+    if (!chatInputAreaEl) return;
+
+    const shouldHide = currentChat === "battle" && !canWriteBattleAnnouncementChat();
+    chatInputAreaEl.classList.toggle("chat-composer-hidden", shouldHide);
+}
+
 if (chatMessages && !chatMessages.dataset.playerActionsBound) {
     chatMessages.dataset.playerActionsBound = '1';
     chatMessages.addEventListener('click', async (e) => {
@@ -3530,7 +3549,9 @@ function showBattleAnnouncementInActiveScene(msg) {
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement${lineClass}`;
-    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    item.innerHTML = shouldHideStaffIdentityInScene(publicId)
+        ? `${roleBadge}<span class="chat-text">${text}</span>`
+        : `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
     feed.prepend(item);
 
@@ -3563,7 +3584,9 @@ function showSceneMapMessageInActiveScene(msg) {
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
-    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    item.innerHTML = shouldHideStaffIdentityInScene(publicId)
+        ? `${roleBadge}<span class="chat-text">${text}</span>`
+        : `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
     feed.prepend(item);
 
@@ -3799,6 +3822,7 @@ function openPrivateChat(peerId, label = null) {
     currentChat = getPrivateScopeKey(safePeerId);
     clearUnreadForCurrentScope();
     renderChatTabs();
+    updateLobbyChatComposerVisibility();
     loadChatHistory(currentChat).then(() => {
         syncPrivateTabFromScope(currentChat);
         renderLobbyMessages();
@@ -3837,6 +3861,7 @@ async function handleChatStateChange() {
         currentChat = "battle";
         clearUnreadForCurrentScope();
         renderChatTabs();
+        updateLobbyChatComposerVisibility();
         await loadChatHistory("battle");
         renderBattleMessages();
         return;
@@ -3845,6 +3870,7 @@ async function handleChatStateChange() {
     if (currentChat === "battle") currentChat = "global";
     clearUnreadForCurrentScope();
     renderChatTabs();
+    updateLobbyChatComposerVisibility();
     await loadChatHistory(currentChat);
     renderLobbyMessages();
 }
@@ -3858,6 +3884,7 @@ async function initRealtimeChat() {
     chatUnread.battle = 0;
     startRealtimeChat();
     renderChatTabs();
+    updateLobbyChatComposerVisibility();
     await loadChatHistory("global");
     renderLobbyMessages();
 }
