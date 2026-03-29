@@ -6538,7 +6538,7 @@ function limitBattleArea(){
 
     function getBattleMaps(){
         const liveRooms = Array.isArray(supabaseBattleRoomsCache)
-            ? supabaseBattleRoomsCache.filter(room => room && room.id && Array.isArray(room.currentPlayers) && room.currentPlayers.length > 0)
+            ? supabaseBattleRoomsCache.filter(room => room && room.id)
             : [];
 
         const sortedLiveRooms = liveRooms
@@ -7062,8 +7062,15 @@ function mergeUniquePlayers(primary = [], secondary = []){
 
 function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
   const meta = getRoomMetaFromMapName(room.map_name);
+  const joinedPlayers = Array.isArray(room.room_players)
+    ? room.room_players
+        .slice()
+        .sort((a, b) => new Date(a?.joined_at || 0) - new Date(b?.joined_at || 0))
+        .map(item => item?.nickname || item?.player_id)
+        .filter(Boolean)
+    : [];
   const livePlayers = getRoomOccupantsFromPresence(room.id, presenceRows);
-  const players = mergeUniquePlayers(livePlayers, []);
+  const players = mergeUniquePlayers(joinedPlayers, livePlayers);
 
   return {
     id: room.id,
@@ -7309,27 +7316,25 @@ async function loadRoomsFromSupabase() {
   }
 
   const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
-  const activeRoomIds = new Set(presenceRows.map(row => String(row.room_id || '')).filter(Boolean));
   const allRooms = Array.isArray(data) ? data : [];
-  const staleRooms = allRooms.filter(room => room?.id && !activeRoomIds.has(String(room.id)));
+  const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
 
-  if (staleRooms.length) {
-    const staleRoomIds = staleRooms.map(room => room.id).filter(Boolean);
+  if (emptyRooms.length) {
+    const emptyRoomIds = emptyRooms.map(room => room.id).filter(Boolean);
     try {
-      await window.supabaseClient.from('room_players').delete().in('room_id', staleRoomIds);
-      await window.supabaseClient.from('rooms').delete().in('id', staleRoomIds);
-      console.log('Удалены пустые/stale комнаты:', staleRoomIds);
+      await window.supabaseClient.from('room_players').delete().in('room_id', emptyRoomIds);
+      await window.supabaseClient.from('rooms').delete().in('id', emptyRoomIds);
+      console.log('Удалены пустые комнаты:', emptyRoomIds);
     } catch (cleanupError) {
-      console.warn('Не удалось удалить пустые/stale комнаты:', cleanupError);
+      console.warn('Не удалось удалить пустые комнаты:', cleanupError);
     }
   }
 
-  const activeRooms = allRooms.filter(room => room?.id && activeRoomIds.has(String(room.id)));
-  supabaseBattleRoomsCache = activeRooms
-    .map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows))
-    .filter(room => Array.isArray(room.currentPlayers) && room.currentPlayers.length > 0);
+  const visibleRooms = allRooms.filter(room => room?.id && Array.isArray(room.room_players) && room.room_players.length > 0);
+  supabaseBattleRoomsCache = visibleRooms
+    .map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows));
 
-  console.log('Комнаты из Supabase загружены:', activeRooms);
+  console.log('Комнаты из Supabase загружены:', visibleRooms);
   return supabaseBattleRoomsCache;
 }
 
