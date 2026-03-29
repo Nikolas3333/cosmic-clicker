@@ -4552,19 +4552,23 @@ function enterBattleMap(mapName){
     updateBattleScoreboard();
 }
 
-const remoteBattleShips = new Map();
+var remoteBattleShips = new Map();
 var liveBattleSyncTimer = null;
 
 function clearRemoteBattleShips(){
+    if(!(remoteBattleShips instanceof Map)){
+        remoteBattleShips = new Map();
+        return;
+    }
     remoteBattleShips.forEach(entry => {
         if(entry?.mesh) scene.remove(entry.mesh);
-        if(entry?.labelSprite) entry.mesh?.remove?.(entry.labelSprite);
+        if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
     });
     remoteBattleShips.clear();
 }
 
 function stopLiveBattleSync(){
-    if(liveBattleSyncTimer){
+    if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
         clearInterval(liveBattleSyncTimer);
         liveBattleSyncTimer = null;
     }
