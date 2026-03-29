@@ -3174,6 +3174,14 @@ function shouldHideStaffIdentityInScene(publicId, explicitRole = "") {
     return isStaffRole(getResolvedStaffRole(publicId, explicitRole));
 }
 
+function shouldHideStaffIdentityInObserve(publicId, explicitRole = "") {
+    return gameState === 'OBSERVE' && shouldHideStaffIdentityInScene(publicId, explicitRole);
+}
+
+function shouldShowSceneRoleBadgeInCurrentMode() {
+    return gameState !== 'BATTLE';
+}
+
 function getSceneRoleBadgeHtml(publicId, explicitRole = "") {
     const role = getResolvedStaffRole(publicId, explicitRole);
     const meta = getStaffRoleMeta(role);
@@ -3416,11 +3424,12 @@ function buildBattleChatMessageHtml(msg) {
     const time = formatChatTime(msg.created_at);
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
-    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
+    const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
 
-    if (shouldHideStaffIdentityInScene(publicId)) {
+    if (shouldHideStaffIdentityInObserve(publicId, msg.staff_role)) {
         return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
     }
 
@@ -3763,11 +3772,14 @@ function showSceneMapMessageInActiveScene(msg) {
     const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode();
+    const visibleRoleBadge = showRoleBadge ? roleBadge : '';
+
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
-    item.innerHTML = shouldHideStaffIdentityInScene(publicId, msg.staff_role)
-        ? `${roleBadge}<span class="chat-text">${text}</span>`
-        : `${roleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    item.innerHTML = shouldHideStaffIdentityInObserve(publicId, msg.staff_role)
+        ? `${visibleRoleBadge}<span class="chat-text">${text}</span>`
+        : `${visibleRoleBadge}<span class="chat-nick-static">${author}</span> <span class="chat-id">[${safePublicId}]</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
     feed.prepend(item);
 
@@ -7086,6 +7098,16 @@ function getRoomOccupantsFromPresence(roomId, presenceRows = []){
     .filter(Boolean);
 }
 
+function getRoomOccupantsFromRoomPlayers(room = null){
+  return Array.isArray(room?.room_players)
+    ? room.room_players
+        .slice()
+        .sort((a, b) => new Date(a?.joined_at || 0) - new Date(b?.joined_at || 0))
+        .map(item => item?.nickname || item?.player_id)
+        .filter(Boolean)
+    : [];
+}
+
 function mergeUniquePlayers(primary = [], secondary = []){
   const seen = new Set();
   const result = [];
@@ -7105,8 +7127,9 @@ function rebuildBattleMapOccupants(rooms = [], presenceRows = []){
   (rooms || []).forEach(room => {
     if(!isPublicBattleRoom(room)) return;
     const mapKey = normalizeBattleMapName(room?.map_name || room?.real || room?.map || 'earth');
+    const joinedPlayers = getRoomOccupantsFromRoomPlayers(room);
     const livePlayers = getRoomOccupantsFromPresence(room?.id, presenceRows);
-    const merged = mergeUniquePlayers(next.get(mapKey) || [], livePlayers);
+    const merged = mergeUniquePlayers(next.get(mapKey) || [], mergeUniquePlayers(joinedPlayers, livePlayers));
     next.set(mapKey, merged);
   });
   supabaseBattleMapOccupants = next;
@@ -7122,8 +7145,9 @@ function getBattleMapOccupants(mapName){
 
 function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
   const meta = getRoomMetaFromMapName(room.map_name);
+  const joinedPlayers = getRoomOccupantsFromRoomPlayers(room);
   const livePlayers = getRoomOccupantsFromPresence(room.id, presenceRows);
-  const players = mergeUniquePlayers(livePlayers, []);
+  const players = mergeUniquePlayers(joinedPlayers, livePlayers);
 
   return {
     id: room.id,
@@ -7372,16 +7396,31 @@ async function loadRoomsFromSupabase() {
     return [];
   }
 
-  const { data, error } = await window.supabaseClient
-    .from('rooms')
-    .select('*, room_players(player_id,nickname,joined_at)')
-    .order('created_at', { ascending: true });
+  const cutoffIso = getOnlineFreshCutoffIso();
+  const [roomsResponse, onlineResponse] = await Promise.all([
+    window.supabaseClient
+      .from('rooms')
+      .select('*, room_players(player_id,nickname,joined_at)')
+      .order('created_at', { ascending: true }),
+    window.supabaseClient
+      .from('online_players')
+      .select('player_id,nickname,room_id,status,updated_at')
+      .eq('status', 'in-game')
+      .gte('updated_at', cutoffIso)
+  ]);
+
+  const { data, error } = roomsResponse;
+  const { data: onlineData, error: onlineError } = onlineResponse;
 
   if (error) {
     console.error('Ошибка загрузки комнат:', error);
     return [];
   }
+  if (onlineError) {
+    console.warn('Не удалось загрузить active presence для комнат:', onlineError);
+  }
 
+  const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
   let allRooms = Array.isArray(data) ? data : [];
 
   const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
@@ -7398,10 +7437,10 @@ async function loadRoomsFromSupabase() {
     }
   }
 
-  rebuildBattleMapOccupants(allRooms);
+  rebuildBattleMapOccupants(allRooms, presenceRows);
 
   const visibleRooms = allRooms.filter(room => room?.id && Array.isArray(room.room_players) && room.room_players.length > 0);
-  supabaseBattleRoomsCache = visibleRooms.map(room => mapSupabaseRoomToLobbyEntry(room));
+  supabaseBattleRoomsCache = visibleRooms.map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows));
 
   const selectedId = String(selectedLobbyMap?.id || currentRoom?.id || '');
   if(selectedId){
