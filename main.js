@@ -6526,18 +6526,21 @@ function limitBattleArea(){
     }, { passive:false });
 
     function getBattleMaps(){
-        const baseMaps = (typeof LOBBY_MAP_DATA !== 'undefined' && Array.isArray(LOBBY_MAP_DATA) && LOBBY_MAP_DATA.length)
-            ? LOBBY_MAP_DATA
+        const liveRooms = Array.isArray(supabaseBattleRoomsCache)
+            ? supabaseBattleRoomsCache.filter(room => room && room.id)
             : [];
-        return baseMaps.map((entry) => ({
-            ...entry,
-            id: null,
-            players: [],
-            currentPlayers: [],
-            maxPlayers: 8,
-            minLevel: entry.minLevel || 1,
-            maxLevel: entry.maxLevel || 120
-        }));
+
+        if(liveRooms.length){
+            return liveRooms
+                .slice()
+                .sort((a, b) => {
+                    const aTime = new Date(a?.rawRoom?.created_at || 0).getTime();
+                    const bTime = new Date(b?.rawRoom?.created_at || 0).getTime();
+                    return bTime - aTime;
+                });
+        }
+
+        return [];
     }
 
     function getTournamentMaps(){
