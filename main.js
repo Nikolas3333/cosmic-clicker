@@ -6212,6 +6212,10 @@ function limitBattleArea(){
 
     function renderLobbyList(mode = 'battle'){
         lobbyMode = mode;
+        if(mode === 'battle' && typeof renderRoomsInLobby === 'function'){
+            renderRoomsInLobby(true);
+            return;
+        }
         const matchListEl = document.getElementById('match-list');
         const preview = document.getElementById('planet-preview');
         const playersBox = document.getElementById('map-players');
@@ -6305,9 +6309,13 @@ function limitBattleArea(){
 
         if(battleTab && !battleTab.dataset.v26Bound){
             battleTab.dataset.v26Bound = '1';
-            battleTab.onclick = () => {
+            battleTab.onclick = async () => {
                 if(gameState !== 'LOBBY') switchState('LOBBY');
-                renderLobbyList('battle');
+                if(typeof renderRoomsInLobby === 'function'){
+                    await renderRoomsInLobby(true);
+                }else{
+                    renderLobbyList('battle');
+                }
             };
         }
         if(soloTab && !soloTab.dataset.v26Bound){
@@ -6348,7 +6356,11 @@ function limitBattleArea(){
         if(newState === 'LOBBY'){
             bindTopNavModes();
             rebindLobbyButtons();
-            renderLobbyList(lobbyMode || 'battle');
+            if((lobbyMode || 'battle') === 'battle' && typeof renderRoomsInLobby === 'function'){
+                renderRoomsInLobby(true);
+            }else{
+                renderLobbyList(lobbyMode || 'battle');
+            }
         }
     };
     window.switchState = switchState;
@@ -6365,7 +6377,13 @@ function limitBattleArea(){
         bindTopNavModes();
         rebindLobbyButtons();
         ensureSunBackToOrbit();
-        if(gameState === 'LOBBY') renderLobbyList('battle');
+        if(gameState === 'LOBBY'){
+            if(typeof renderRoomsInLobby === 'function'){
+                renderRoomsInLobby(true);
+            }else{
+                renderLobbyList('battle');
+            }
+        }
     });
 })();
 
