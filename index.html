@@ -680,9 +680,9 @@ canvas {
 }
 
 .chat-tab.pm-tab{
-  max-width:220px;
-  min-width:170px;
-  padding-right:48px;
+  max-width:210px;
+  min-width:156px;
+  padding:6px 40px 6px 10px;
 }
 
 .pm-online-dot{
@@ -697,6 +697,11 @@ canvas {
 .chat-tab.pm-tab.online .pm-online-dot{
   background:#40ff88;
   box-shadow:0 0 10px rgba(64,255,136,0.55);
+}
+
+.chat-tab.pm-tab.in-game .pm-online-dot{
+  background:#ffd54a;
+  box-shadow:0 0 10px rgba(255,213,74,0.55);
 }
 
 .pm-tab-content{
@@ -2537,6 +2542,13 @@ body.state-observe #ui{ display:none !important; }
 }
 
 
+.clan-chat-note{
+  margin-top:12px;
+  color:#bfefff;
+  opacity:0.88;
+  font-size:13px;
+}
+
 /* === V23 BATTLE COMPOSER HIDE === */
 #chat-input-area.chat-composer-hidden{
   display:none !important;
@@ -2678,6 +2690,7 @@ body.state-observe #ui{ display:none !important; }
       <div id="chat-panel">
         <div id="chat-tabs">
           <button class="chat-tab active" data-scope="global" type="button">Global</button>
+          <button class="chat-tab" data-scope="clan" type="button">Clan</button>
           <button class="chat-tab" data-scope="battle" type="button">Battle</button>
         </div>
         <div id="chat-messages">
@@ -3010,6 +3023,7 @@ body.state-observe #ui{ display:none !important; }
   <div class="clans-content">
     <h2 class="window-title">Кланы</h2>
     <div id="clans-info"></div>
+    <div class="clan-chat-note">💬 Клановый чат теперь живёт во вкладке <b>Clan</b> в общем чате лобби.</div>
     <div class="clan-actions">
       <button id="close-clans" class="cosmic-btn">Закрыть</button>
     </div>
