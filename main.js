@@ -6538,7 +6538,7 @@ function limitBattleArea(){
 
     function getBattleMaps(){
         const liveRooms = Array.isArray(supabaseBattleRoomsCache)
-            ? supabaseBattleRoomsCache.filter(room => room && room.id)
+            ? supabaseBattleRoomsCache.filter(room => room && room.id && !isPublicBattleRoom(room.rawRoom || room))
             : [];
 
         const sortedLiveRooms = liveRooms
@@ -7050,6 +7050,11 @@ function getRoomMetaFromMapName(mapName){
     : null) || { title: String(mapName || 'Earth'), real: realKey, img: realKey, mode: 'DM' };
 }
 
+function isPublicBattleRoom(room){
+  const roomName = String(room?.room_name || room?.title || '').trim().toLowerCase();
+  return roomName.startsWith('public ');
+}
+
 function getCurrentPlayerIdentity(){
   const fallbackNickname = (typeof player !== 'undefined' && player?.nickname) ? player.nickname : 'Commander';
   const authPublicId = (typeof authState !== 'undefined' && authState?.mode === 'account' && authState?.playerId)
@@ -7371,8 +7376,7 @@ async function loadRoomsFromSupabase() {
     return [];
   }
 
-  const allRooms = Array.isArray(data) ? data : [];
-  rebuildBattleMapOccupants(allRooms);
+  let allRooms = Array.isArray(data) ? data : [];
 
   const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
   if (emptyRooms.length) {
@@ -7383,8 +7387,12 @@ async function loadRoomsFromSupabase() {
       .in('id', emptyRoomIds);
     if (emptyDeleteError) {
       console.warn('Не удалось удалить пустые комнаты:', emptyDeleteError);
+    } else {
+      allRooms = allRooms.filter(room => !emptyRoomIds.includes(room.id));
     }
   }
+
+  rebuildBattleMapOccupants(allRooms);
 
   const visibleRooms = allRooms.filter(room => room?.id && Array.isArray(room.room_players) && room.room_players.length > 0);
   supabaseBattleRoomsCache = visibleRooms.map(room => mapSupabaseRoomToLobbyEntry(room));
@@ -7474,15 +7482,47 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   }
 
   const normalizedMap = normalizeBattleMapName(mapName);
+  const safeRoomName = String(roomName || '').trim() || `Public ${String(normalizedMap || 'earth').toUpperCase()}`;
+  const isPublicRoom = /^public\s+/i.test(safeRoomName);
+
+  let existingQuery = window.supabaseClient
+    .from('rooms')
+    .select('*')
+    .eq('map_name', normalizedMap)
+    .limit(1);
+
+  if (isPublicRoom) {
+    existingQuery = existingQuery.eq('room_name', safeRoomName);
+  } else {
+    existingQuery = existingQuery.eq('room_name', safeRoomName).eq('host_name', hostName);
+  }
+
+  const { data: existingRows, error: existingError } = await existingQuery;
+  if (existingError) {
+    console.error('Ошибка проверки существующей комнаты:', existingError);
+    return null;
+  }
+
+  if (Array.isArray(existingRows) && existingRows.length > 0) {
+    const existingRoom = existingRows[0];
+    const joinedExisting = await joinRoomPlayers(existingRoom.id);
+    if (!joinedExisting) return null;
+    console.log('Используем существующую комнату:', existingRoom);
+    await loadRoomsFromSupabase();
+    if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
+      renderLobbyListV27('battle');
+    }
+    return existingRoom;
+  }
 
   const { data, error } = await window.supabaseClient
     .from('rooms')
     .insert([
       {
-        room_name: roomName,
+        room_name: safeRoomName,
         map_name: normalizedMap,
         max_players: maxPlayers,
-        host_name: hostName
+        host_name: isPublicRoom ? 'SYSTEM' : hostName
       }
     ])
     .select()
