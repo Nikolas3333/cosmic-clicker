@@ -316,7 +316,7 @@ function setBattleChatOpen(open){
     const box = document.getElementById('battle-chat-box');
     const input = document.getElementById('battle-chat-input');
 
-    const inputOnlyMode = gameState === 'BATTLE';
+    const inputOnlyMode = gameState === 'BATTLE' || gameState === 'OBSERVE';
 
     if(box){
         box.classList.toggle('hidden', !open);
@@ -337,13 +337,15 @@ function setBattleChatOpen(open){
     }
 }
 
-async function sendSceneMapMessage(text) {
+async function sendSceneMapMessage(text, options = {}) {
     if (!window.supabaseClient) return false;
     if (!canWriteSceneMapChat()) return false;
 
     const ownPublicId = getOwnPublicChatId?.() || "";
     const cleanText = String(text || "").trim();
     if (!cleanText) return false;
+
+    const mirrorToBattle = options?.mirrorToBattle !== false && gameState === 'BATTLE';
 
     const scenePayload = {
         channel: "scene",
@@ -355,22 +357,26 @@ async function sendSceneMapMessage(text) {
         message: cleanText
     };
 
-    const battlePayload = {
-        channel: "battle",
-        room_id: scenePayload.room_id,
-        player_id: scenePayload.player_id,
-        player_public_id: scenePayload.player_public_id,
-        recipient_public_id: null,
-        player_nickname: scenePayload.player_nickname,
-        message: cleanText
-    };
+    const payloads = [scenePayload];
+
+    if (mirrorToBattle) {
+        payloads.push({
+            channel: "battle",
+            room_id: scenePayload.room_id,
+            player_id: scenePayload.player_id,
+            player_public_id: scenePayload.player_public_id,
+            recipient_public_id: null,
+            player_nickname: scenePayload.player_nickname,
+            message: cleanText
+        });
+    }
 
     const { error } = await window.supabaseClient
         .from("chat_messages")
-        .insert([scenePayload, battlePayload]);
+        .insert(payloads);
 
     if (error) {
-        console.error("❌ Ошибка отправки scene/battle сообщения:", error);
+        console.error("❌ Ошибка отправки scene сообщения:", error);
         return false;
     }
 
@@ -386,11 +392,6 @@ function initBattleChat(){
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
         if(e.key === 'Enter'){
-            if(gameState === 'OBSERVE' && !canWriteBattleAnnouncementChat()){
-                e.preventDefault();
-                return;
-            }
-
             if(!battleChatOpen){
                 e.preventDefault();
                 setBattleChatOpen(true);
@@ -407,9 +408,9 @@ function initBattleChat(){
                 if(text){
                     let sent = false;
                     if(gameState === 'BATTLE'){
-                        sent = await sendSceneMapMessage(text);
-                    }else{
-                        sent = await sendMessage('battle', text);
+                        sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                    }else if(gameState === 'OBSERVE'){
+                        sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
                     }
                     if(sent) input.value = '';
                 }
@@ -717,11 +718,8 @@ if(gameState === "OBSERVE"){
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
+    const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = '';
     startLiveBattleSync();
-    setTimeout(() => {
-        loadChatHistory?.("battle");
-        renderBattleMessages?.();
-    }, 50);
 }
 
 if(gameState === "INVENTORY"){
@@ -3049,7 +3047,7 @@ function getSceneChatRoomId() {
 }
 
 function canWriteSceneMapChat() {
-    return gameState === "BATTLE";
+    return gameState === "BATTLE" || gameState === "OBSERVE";
 }
 
 function getPlayerClanChatId() {
@@ -3171,7 +3169,7 @@ function getChatRoleCssClassByPublicIdOrRole(publicId, explicitRole = "") {
 }
 
 function shouldHideStaffIdentityInScene(publicId, explicitRole = "") {
-    return isStaffRole(getResolvedStaffRole(publicId, explicitRole));
+    return gameState === 'OBSERVE' && isStaffRole(getResolvedStaffRole(publicId, explicitRole));
 }
 
 function shouldHideStaffIdentityInObserve(publicId, explicitRole = "") {
@@ -4663,6 +4661,33 @@ function createRemoteBattleShipMesh(name, slotIndex){
     return { mesh: shipGroup, labelSprite };
 }
 
+function getObservedRoomId(targetMap = ''){
+    const directRoomId = sanitizeOnlineRoomId(selectedLobbyMap?.id || selectedLobbyMap?.roomId || currentRoom?.id || currentRoom?.roomId || null);
+    if(directRoomId) return directRoomId;
+
+    const normalizedMap = normalizeBattleMapName(targetMap || selectedLobbyMap?.real || currentRoom?.map || 'earth');
+    const publicRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find((room) => {
+        const roomMap = normalizeBattleMapName(room?.real || room?.map || room?.rawRoom?.map_name || '');
+        return roomMap === normalizedMap && isPublicBattleRoom(room?.rawRoom || room);
+    });
+
+    return sanitizeOnlineRoomId(publicRoom?.id || publicRoom?.roomId || null);
+}
+
+function buildObserveRoomState(targetMap = ''){
+    const normalizedMap = normalizeBattleMapName(targetMap || selectedLobbyMap?.real || currentRoom?.map || 'earth');
+    const roomId = getObservedRoomId(normalizedMap);
+    return {
+        id: roomId || null,
+        roomId: roomId || null,
+        map: normalizedMap,
+        real: normalizedMap,
+        observer: true,
+        state: 'observe',
+        title: selectedLobbyMap?.title || currentRoom?.title || normalizedMap
+    };
+}
+
 async function fetchCurrentRoomLivePlayers(){
     if(!window.supabaseClient || !currentRoom?.id) return [];
     const roomId = String(currentRoom.id || currentRoom.roomId || '').trim();
@@ -5208,7 +5233,7 @@ window.addEventListener('load', () => {
         joinBtn.addEventListener('click', () => {
             selectedLobbyMap = getSelectedLobbyMapFromUI();
             currentRoom = { id: `local_${selectedLobbyMap.real}_${Date.now()}`, map: selectedLobbyMap.real, state: 'battle', players: [{name:'Commander'}] };
-            window.currentRoomId = currentRoom.id;
+            window.currentRoomId = currentRoom.id || null;
             switchState('BATTLE');
         });
     }
@@ -5491,48 +5516,17 @@ function setupObserverBattle(mapName){
     observerCameraPitch = -0.22;
     observerCameraDistance = 34;
     enterBattleMap(mapName);
-    observerBots = Array.from({length:6}, (_,i) => createObserverBot(i));
+    observerBots = [];
     const hud = document.getElementById('enemy-hud');
     if(hud) hud.style.display = 'none';
 }
 
 function updateObserverBattle(){
-    const aliveBots = observerBots.filter(bot => bot && bot.userData.alive);
-    for(const bot of observerBots){
-        if(!bot) continue;
-        const data = bot.userData;
-        if(!data.alive){
-            if(Date.now() >= data.respawnAt){
-                data.alive = true;
-                data.hp = data.maxHp;
-                bot.visible = true;
-                bot.position.set((Math.random()-0.5)*28, (Math.random()-0.5)*10, (Math.random()-0.5)*28);
-            }
-            continue;
-        }
-        const targets = aliveBots.filter(other => other !== bot);
-        if(!targets.length) continue;
-        let target = targets[0];
-        let minDist = bot.position.distanceTo(target.position);
-        for(const cand of targets.slice(1)){
-            const d = bot.position.distanceTo(cand.position);
-            if(d < minDist){ minDist = d; target = cand; }
-        }
-        data.strafePhase += 0.03;
-        const desiredForward = target.position.clone().sub(bot.position).normalize();
-        const side = new THREE.Vector3(0,1,0).cross(desiredForward).normalize();
-        const desiredPos = target.position.clone().add(desiredForward.clone().multiplyScalar(-13)).add(side.multiplyScalar(Math.sin(data.strafePhase)*6));
-        desiredPos.y += Math.cos(data.strafePhase*1.6) * 3;
-        bot.position.lerp(desiredPos, 0.028);
-        handleBattleCollisions(bot, data.velocity);
-        bot.lookAt(target.position);
-        bot.rotation.z += ((Math.sin(data.strafePhase)*0.48) - bot.rotation.z) * 0.08;
-        if(Date.now() >= data.nextShotAt){
-            data.nextShotAt = Date.now() + 500 + Math.random()*350;
-            fireObserverLaser(bot, target);
-        }
-    }
-    const focus = aliveBots[0];
+    const focusTargets = Array.from(remoteBattleShips.values())
+        .map(entry => entry?.mesh)
+        .filter(Boolean);
+
+    const focus = focusTargets[0] || battleMapPlanet;
     if(focus){
         observerCameraTarget.lerp(focus.position, 0.08);
         const offset = new THREE.Vector3(
@@ -5565,7 +5559,7 @@ function fireObserverLaser(shooter, target){
         btn.addEventListener('click', () => {
             const targetMap = selectedLobbyMap?.real || currentRoom?.map || 'earth';
             battleObserverMode = true;
-            currentRoom = { map: targetMap, observer: true, state:'observe' };
+            currentRoom = buildObserveRoomState(targetMap);
             switchState('OBSERVE');
         });
     }
@@ -6300,7 +6294,7 @@ function limitBattleArea(){
                 if(lobbyMode === 'solo') return;
                 const targetMap = selectedLobbyMap?.real || currentRoom?.map || 'earth';
                 battleObserverMode = true;
-                currentRoom = { map: targetMap, observer: true, state:'observe' };
+                currentRoom = buildObserveRoomState(targetMap);
                 switchState('OBSERVE');
                 const canvas = document.querySelector('canvas');
                 if(canvas){
@@ -6901,8 +6895,8 @@ function limitBattleArea(){
             observeBtn.addEventListener('click', () => {
                 if(lobbyModeV27 !== 'battle') return;
                 const targetMap = selectedLobbyMap?.real || currentRoom?.real || currentRoom?.map || 'earth';
-                currentRoom = { id: `observe_${targetMap}_${Date.now()}`, map: targetMap, observer:true, state:'observe' };
-                window.currentRoomId = currentRoom.id;
+                currentRoom = buildObserveRoomState(targetMap);
+                window.currentRoomId = currentRoom.id || null;
                 switchState('OBSERVE');
             });
         }
@@ -6954,7 +6948,7 @@ function limitBattleArea(){
                     state:'battle'
                 };
 
-                window.currentRoomId = currentRoom.id;
+                window.currentRoomId = currentRoom.id || null;
                 document.getElementById('create-match-window')?.classList.add('hidden');
                 const titleInput = document.getElementById('room-title');
                 if(titleInput) titleInput.value = '';
