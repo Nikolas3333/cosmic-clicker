@@ -7372,12 +7372,31 @@ async function renderOnlinePlayers(){
     }
 }
 
+function getOnlinePresenceStateForGameState(state = gameState){
+    const value = String(state || '').toUpperCase();
+    if(value === 'LOBBY') return 'lobby';
+    if(value === 'BATTLE' || value === 'OBSERVE' || value === 'ORBIT' || value === 'COMBAT') return 'in-game';
+    return 'offline';
+}
+
+function syncCurrentOnlinePresence(){
+    const status = getOnlinePresenceStateForGameState(gameState);
+    if(status === 'offline'){
+        removePlayerFromOnline();
+        return;
+    }
+
+    const roomId = status === 'in-game'
+        ? (currentRoom?.id || currentRoom?.roomId || currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || gameState)
+        : null;
+
+    setPlayerOnlineStatus(status, roomId ? String(roomId) : null);
+}
+
 function startOnlinePresenceHeartbeat(){
     if(onlineHeartbeatTimer) clearInterval(onlineHeartbeatTimer);
     onlineHeartbeatTimer = setInterval(() => {
-        if(gameState === 'LOBBY'){
-            setPlayerOnlineStatus('lobby', null);
-        }
+        syncCurrentOnlinePresence();
     }, ONLINE_HEARTBEAT_MS);
 }
 
@@ -7393,20 +7412,14 @@ switchState = function(newState){
     if(isGuestAccount() && (newState === 'ORBIT' || newState === 'INVENTORY' || newState === 'COMBAT')){
         showGuestOnlyPvpMessage();
         previousSwitchStateOnline('LOBBY');
-        setPlayerOnlineStatus('lobby', null);
+        syncCurrentOnlinePresence();
         setTimeout(renderOnlinePlayers, 300);
         return;
     }
 
     previousSwitchStateOnline(newState);
-
-    if(newState === 'LOBBY'){
-        setPlayerOnlineStatus('lobby', null);
-        setTimeout(renderOnlinePlayers, 300);
-        return;
-    }
-
-    removePlayerFromOnline();
+    syncCurrentOnlinePresence();
+    setTimeout(renderOnlinePlayers, 300);
 };
 
 window.switchState = switchState;
@@ -7421,22 +7434,21 @@ window.addEventListener('pagehide', () => {
 });
 
 document.addEventListener('visibilitychange', () => {
-    if(document.visibilityState === 'visible' && gameState === 'LOBBY'){
-        setPlayerOnlineStatus('lobby', null);
+    if(document.visibilityState === 'visible'){
+        syncCurrentOnlinePresence();
         setTimeout(renderOnlinePlayers, 250);
     }
 });
 
 window.addEventListener('focus', () => {
-    if(gameState === 'LOBBY'){
-        setPlayerOnlineStatus('lobby', null);
-        setTimeout(renderOnlinePlayers, 250);
-    }
+    syncCurrentOnlinePresence();
+    setTimeout(renderOnlinePlayers, 250);
 });
 
 startOnlinePresenceHeartbeat();
 startOnlineRenderLoop();
 cleanupStaleOnlinePlayers();
+syncCurrentOnlinePresence();
 renderOnlinePlayers();
 
 
