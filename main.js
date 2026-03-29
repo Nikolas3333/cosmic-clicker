@@ -585,9 +585,14 @@ function clearBattleScene(){
 }
 
 function switchState(newState){
+    const prevState = gameState;
 
     if(document.pointerLockElement){
         document.exitPointerLock();
+    }
+
+    if((prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE"){
+        cleanupBattleRoomSilently();
     }
 
     console.log("STATE:", newState);
@@ -7095,18 +7100,13 @@ function mergeUniquePlayers(primary = [], secondary = []){
   return result;
 }
 
-function rebuildBattleMapOccupants(rooms = []){
+function rebuildBattleMapOccupants(rooms = [], presenceRows = []){
   const next = new Map();
   (rooms || []).forEach(room => {
+    if(!isPublicBattleRoom(room)) return;
     const mapKey = normalizeBattleMapName(room?.map_name || room?.real || room?.map || 'earth');
-    const roomPlayers = Array.isArray(room?.room_players)
-      ? room.room_players
-          .slice()
-          .sort((a, b) => new Date(a?.joined_at || 0) - new Date(b?.joined_at || 0))
-          .map(item => item?.nickname || item?.player_id)
-          .filter(Boolean)
-      : [];
-    const merged = mergeUniquePlayers(next.get(mapKey) || [], roomPlayers);
+    const livePlayers = getRoomOccupantsFromPresence(room?.id, presenceRows);
+    const merged = mergeUniquePlayers(next.get(mapKey) || [], livePlayers);
     next.set(mapKey, merged);
   });
   supabaseBattleMapOccupants = next;
@@ -7122,15 +7122,8 @@ function getBattleMapOccupants(mapName){
 
 function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
   const meta = getRoomMetaFromMapName(room.map_name);
-  const joinedPlayers = Array.isArray(room.room_players)
-    ? room.room_players
-        .slice()
-        .sort((a, b) => new Date(a?.joined_at || 0) - new Date(b?.joined_at || 0))
-        .map(item => item?.nickname || item?.player_id)
-        .filter(Boolean)
-    : [];
   const livePlayers = getRoomOccupantsFromPresence(room.id, presenceRows);
-  const players = mergeUniquePlayers(joinedPlayers, livePlayers);
+  const players = mergeUniquePlayers(livePlayers, []);
 
   return {
     id: room.id,
@@ -7318,6 +7311,19 @@ async function cleanupCurrentBattleRoom() {
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function'){
     await loadRoomsFromSupabase();
     renderLobbyListV27(getLobbyModeSafe());
+  }
+}
+
+function cleanupBattleRoomSilently(){
+  const roomId = currentRoom?.id || currentRoom?.roomId || null;
+  const shouldLeave = !!(roomId && currentRoom?.state !== 'solo' && currentRoom?.observer !== true);
+  currentRoom = null;
+  window.currentRoomId = null;
+  selectedLobbyMap = null;
+  if(shouldLeave){
+    leaveRoomPlayers(roomId).catch(error => {
+      console.warn('cleanupBattleRoomSilently error:', error);
+    });
   }
 }
 
