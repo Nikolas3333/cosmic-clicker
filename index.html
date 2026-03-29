@@ -2,7 +2,3069 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<title>Galaxy Clicker</title><!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
 <title>Galaxy Clicker</title>
+
+
+
+<style>
+
+
+
+body {
+  margin:0;
+  overflow:hidden;
+  background:black;
+  font-family:Arial;
+  color:white;
+}
+
+#auth-screen{
+  position:fixed;
+  inset:0;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  justify-content:center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0,180,255,0.14), transparent 24%),
+    radial-gradient(circle at 80% 30%, rgba(180,120,255,0.14), transparent 28%),
+    linear-gradient(180deg, #02040d 0%, #050916 100%);
+  z-index:25000;
+}
+.auth-card{ width:min(980px,92vw); padding:28px; border-radius:22px; background:rgba(8,14,30,0.94); border:1px solid rgba(120,220,255,0.22); box-shadow:0 0 36px rgba(0,180,255,0.18); }
+.auth-card h1{ margin:0; text-align:center; color:#9fe8ff; }
+.auth-subtitle{ margin:8px 0 20px; text-align:center; color:#ccefff; opacity:0.8; }
+.auth-columns{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.auth-panel{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:12px; }
+.auth-panel h2{ margin:0 0 6px; color:#9fe8ff; }
+.auth-panel input{ padding:12px; border-radius:10px; border:1px solid rgba(130,220,255,0.22); background:#07101f; color:#fff; }
+.auth-btn{ padding:12px 14px; border-radius:10px; border:1px solid rgba(130,220,255,0.25); cursor:pointer; color:#fff; background:#0e1a32; }
+.auth-btn.primary{ background:linear-gradient(180deg,#113662,#0b2241); }
+.auth-btn.ghost{ background:rgba(255,255,255,0.05); }
+.auth-btn.guest{ background:linear-gradient(180deg,#28402a,#16281a); }
+.auth-check{ display:flex; gap:8px; align-items:center; font-size:14px; }
+.auth-divider{ text-align:center; opacity:0.7; }
+.auth-note,.auth-message{ font-size:14px; color:#ccefff; opacity:0.85; }
+.auth-message{ margin-top:16px; min-height:20px; text-align:center; }
+.premium-item{ display:inline-flex; align-items:center; gap:6px; }
+
+#premium-bar{
+  position:fixed;
+  top:16px;
+  right:20px;
+  display:none;
+  gap:14px;
+  align-items:center;
+  padding:10px 14px;
+  border-radius:12px;
+  background:rgba(8,18,35,0.88);
+  box-shadow:0 0 16px rgba(0,180,255,0.18);
+  border:1px solid rgba(120,220,255,0.18);
+  z-index:20010;
+}
+
+
+
+/* ===== V27 CENTER MODE TABS + TOURNAMENT ===== */
+#top-nav #battle-zone-tab,
+#top-nav #solo-tab{
+  display:none;
+}
+
+#lobby-mode-tabs{
+  display:flex;
+  gap:10px;
+  padding:10px 12px 0;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+
+.lobby-mode-tab{
+  flex:1;
+  text-align:center;
+  padding:10px 12px;
+  cursor:pointer;
+  border-radius:10px 10px 0 0;
+  background:rgba(255,255,255,0.04);
+  color:#bfefff;
+  transition:0.2s;
+  user-select:none;
+}
+
+.lobby-mode-tab:hover{
+  background:rgba(0,255,200,0.12);
+}
+
+.lobby-mode-tab.active{
+  background:rgba(0,255,200,0.22);
+  color:#00ffff;
+  box-shadow:0 0 14px rgba(0,255,255,0.18) inset;
+}
+
+#match-status-note{
+  min-height:24px;
+  text-align:center;
+  font-size:13px;
+  color:#9fe8ff;
+  padding:6px 10px 0;
+}
+
+#map-waiting-note{
+  text-align:center;
+  font-size:13px;
+  color:#ffd784;
+  min-height:20px;
+}
+
+.map-title,
+.map-real,
+.map-mode,
+.map-players,
+.map-level,
+.map-extra{
+  display:block;
+}
+
+.map-title{ font-weight:bold; color:#d7f7ff; }
+.map-real,.map-level,.map-extra{ font-size:12px; opacity:0.82; }
+.map-mode,.map-players{ font-size:12px; color:#7fe7ff; }
+
+#tournament-window{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.86);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:21010;
+}
+
+.tournament-box{
+  width:460px;
+  max-width:94vw;
+  background:#111;
+  padding:22px;
+  border-radius:14px;
+  border:1px solid #00ffff;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.tournament-box select,
+.tournament-box input{
+  padding:8px;
+  background:#000;
+  color:white;
+  border:1px solid #00ffff;
+}
+
+.tournament-note{
+  font-size:12px;
+  color:#cdefff;
+  opacity:0.85;
+}
+
+/* ===== CANVAS ===== */
+
+canvas {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== RESOURCE BAR (ТОЛЬКО ИКОНКИ) ===== */
+
+#resource-bar {
+  display:none;
+  position: fixed;
+  top: 15px;
+  left: 20px;
+  transform: none;
+
+  display: flex;
+  gap: 45px;
+
+  font-size: 22px;
+  font-weight: bold;
+
+  z-index: 1500;
+  pointer-events: none;
+}
+
+/* ===== INVENTORY BUTTON ===== */
+
+#inventory-button {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+
+  width: 60px;
+  height: 60px;
+
+  background: radial-gradient(circle at 30% 30%, #2a3b6e, #0a0f1f);
+  border: 2px solid #4da6ff;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 28px;
+  cursor: pointer;
+
+  box-shadow: 0 0 15px rgba(77,166,255,0.6);
+  transition: 0.2s;
+  z-index: 2000;
+}
+
+
+
+
+
+/* ===== INVENTORY WINDOW ===== */
+
+#inventory-window {
+  position: absolute;
+  bottom: 100px;
+  left: 20px;
+
+  width: 350px;
+  height: 300px;
+
+  background: rgba(10, 15, 30, 0.95);
+  border: 1px solid rgba(77,166,255,0.6);
+  border-radius: 12px;
+
+  padding: 10px;
+  box-sizing: border-box;
+
+  box-shadow: 0 0 20px rgba(77,166,255,0.5);
+  z-index: 2000;
+}
+
+.hidden {
+  display: none;
+}
+
+.inventory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+#close-inventory {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+#inventory {
+  height: 230px;
+  overflow-y: auto;
+}
+
+.inventory-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+.inventory-item span:first-child{
+  flex:1;
+  min-width:0;
+}
+
+
+/* ===== LEFT UI ===== */
+
+#ui {
+  display:none;
+  position:fixed;
+  top:90px;
+  left:10px;
+  z-index:5;
+
+  background:rgba(15,20,40,0.85);
+  padding:18px;
+  border-radius:16px;
+
+  box-shadow: 0 0 25px rgba(0,150,255,0.4);
+}
+
+#hpBarContainer {
+  width:200px;
+  height:20px;
+  background:#333;
+  margin-top:5px;
+}
+
+#hpBar {
+  height:100%;
+  width:100%;
+  background:red;
+}
+
+.resource-item{
+  margin-right:15px;
+  cursor:pointer;
+  font-size:18px;
+}
+
+.resource-item:hover{
+  transform:scale(1.1);
+}
+
+
+#resource-bar{
+  position:fixed;
+  top:15px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  flex-wrap:nowrap;
+  gap:12px;
+  padding:6px 10px;
+  background:rgba(0,0,0,0.7);
+  border-bottom:1px solid rgba(255,255,255,0.15);
+  overflow-x:auto;
+  white-space:nowrap;
+  font-family:Arial;
+  max-width:calc(100vw - 260px);
+  z-index:1500;
+}
+#resource-bar::-webkit-scrollbar{ height:6px; }
+
+#orbit-scene-note{
+  display:none;
+}
+
+/* orbit left info panel temporarily disabled */
+#ui{
+  display:none !important;
+}
+
+.planet-block{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:4px 8px;
+  background:rgba(255,255,255,0.05);
+  border-radius:6px;
+  min-width:90px;
+}
+
+.planet-title{
+  font-size:11px;
+  margin-bottom:4px;
+  opacity:0.7;
+}
+
+.resource-item{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:13px;
+  cursor:pointer;
+}
+
+.icon{
+  font-size:14px;
+}
+
+.amount{
+  min-width:18px;
+}
+
+.tooltip{
+  position:absolute;
+  bottom:130%;
+  left:50%;
+  transform:translateX(-50%);
+  background:black;
+  color:white;
+  padding:4px 6px;
+  font-size:11px;
+  border-radius:4px;
+  opacity:0;
+  pointer-events:none;
+  transition:0.2s;
+  white-space:nowrap;
+  z-index:100;
+}
+
+.resource-item:hover .tooltip{
+  opacity:1;
+}
+
+#lobby-screen{
+    position:fixed;
+    display:none;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+    background:#020308;
+    z-index:10000;
+}
+
+#lobby-bg{
+    position:absolute;
+    inset:-2%;
+    z-index:0;
+    overflow:hidden;
+    background-image:url("images/lobby_space_1.png");
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+    transform:translate3d(0,0,0) scale(1.05);
+    will-change:transform, background-image;
+    filter:brightness(0.72) saturate(1.05);
+}
+
+#lobby-bg::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(circle at center, rgba(255,255,255,0.06), transparent 38%),
+      linear-gradient(180deg, rgba(3,6,16,0.18) 0%, rgba(3,6,16,0.42) 55%, rgba(2,3,8,0.70) 100%);
+    pointer-events:none;
+}
+
+
+#lobby-fog{
+    position:absolute;
+    inset:-6%;
+    z-index:1;
+    pointer-events:none;
+    background:
+      radial-gradient(circle at 22% 28%, rgba(120,190,255,0.10), transparent 24%),
+      radial-gradient(circle at 72% 36%, rgba(180,120,255,0.09), transparent 26%),
+      radial-gradient(circle at 50% 78%, rgba(255,180,120,0.07), transparent 22%);
+    mix-blend-mode:screen;
+    opacity:0.9;
+}
+
+.lobby-box{
+    text-align:center;
+}
+
+.lobby-box h1{
+    color:#00ffff;
+    margin-bottom:30px;
+}
+
+.lobby-box button{
+    display:block;
+    margin:15px auto;
+    padding:15px 30px;
+    font-size:18px;
+    background:#111;
+    color:#00ffff;
+    border:1px solid #00ffff;
+    cursor:pointer;
+}
+
+
+#orbit-exit{
+    display:none;
+    position:fixed;
+    top:20px;
+    left:20px;
+    z-index:50000;
+    display:none;
+}
+
+#orbit-exit button{
+    padding:10px 20px;
+    background:#111;
+    color:#00ffff;
+    border:1px solid #00ffff;
+    cursor:pointer;
+    border-radius:8px;
+    box-shadow:0 0 10px rgba(0,255,255,0.35);
+}
+
+#orbit-exit button:hover{
+    background:#00ffff;
+    color:#000;
+}
+
+#lobby-background{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+
+  background:
+    radial-gradient(circle at 30% 30%, rgba(0,255,255,0.15), transparent 40%),
+    radial-gradient(circle at 70% 70%, rgba(0,100,255,0.15), transparent 40%),
+    radial-gradient(circle at center, #050510 0%, #000000 80%);
+
+  animation: spacePulse 8s infinite alternate;
+  z-index:0;
+}
+
+@keyframes spacePulse{
+  0%{
+    filter: brightness(1);
+  }
+  100%{
+    filter: brightness(1.2);
+  }
+}
+
+
+/* ===== TOP NAV ===== */
+
+#top-nav {
+  display:none;
+  position: fixed;
+  top: 15px;
+  left: 20px;
+  transform: none;
+
+  display: flex;
+  gap: 40px;
+  white-space: nowrap;
+  background: rgba(10,15,30,0.9);
+  padding: 10px 25px;
+  border-radius: 12px;
+
+  box-shadow: 0 0 20px rgba(0,200,255,0.4);
+  z-index: 20000;
+}
+
+.nav-tab {
+  cursor: pointer;
+  font-size: 16px;
+  padding: 6px 10px;
+  transition: 0.2s;
+}
+
+.nav-tab:hover {
+  color: #00ffff;
+  transform: scale(1.1);
+}
+
+/* ===== ONLINE PANEL ===== */
+
+#online-panel {
+  grid-column:2;
+  grid-row:1;
+
+  width:300px;       /* фиксированная ширина правой колонки */
+  height:380px;      /* совпадает с match-center */
+
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+
+  padding: 15px;
+  box-sizing: border-box;
+
+  box-shadow: 0 0 20px rgba(0,255,200,0.3);
+  display:flex;
+  flex-direction:column;
+}
+
+.online-header { display:none; }
+
+#online-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 330px;
+  overflow-y: auto;
+}
+
+.online-player {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.online-player:hover {
+  background: rgba(0,255,200,0.2);
+}
+
+
+
+
+
+/* ===== ONLINE SCROLL STYLE ===== */
+
+#online-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+#online-list::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+}
+
+#online-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(#00ffcc, #0088ff);
+  border-radius: 10px;
+}
+
+#online-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(#00ffff, #00aaff);
+}
+
+
+
+/* ===== CHAT PANEL ===== */
+
+#chat-panel {
+  width: 100%;
+  height: 250px;
+
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+
+  display: flex;
+  flex-direction: column;
+
+  box-shadow: 0 0 20px rgba(0,255,200,0.3);
+}
+
+/* ===== CHAT TABS ===== */
+
+#chat-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(0,255,200,0.2);
+}
+
+.chat-tab {
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  padding:8px 12px;
+  cursor:pointer;
+  font-size:14px;
+  color:#aaa;
+  background:transparent;
+  border:none;
+  text-align:left;
+}
+
+.chat-tab.active {
+  color:#00ffcc;
+  border-bottom:2px solid #00ffcc;
+}
+
+.chat-tab-title{
+  font-weight:700;
+}
+
+.chat-tab.pm-tab{
+  max-width:210px;
+  min-width:156px;
+  padding:6px 40px 6px 10px;
+}
+
+.pm-online-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.18);
+  box-shadow:none;
+  flex:0 0 auto;
+}
+
+.chat-tab.pm-tab.online .pm-online-dot{
+  background:#40ff88;
+  box-shadow:0 0 10px rgba(64,255,136,0.55);
+}
+
+.chat-tab.pm-tab.in-game .pm-online-dot{
+  background:#ffd54a;
+  box-shadow:0 0 10px rgba(255,213,74,0.55);
+}
+
+.pm-tab-content{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  flex:1;
+}
+
+.pm-tab-main{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+
+.pm-tab-label{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-weight:700;
+}
+
+.pm-tab-preview{
+  font-size:11px;
+  opacity:0.72;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.pin-state{
+  font-size:11px;
+}
+
+.chat-tab-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 6px;
+  border-radius:999px;
+  background:#ff3b3b;
+  color:#fff;
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+  box-shadow:0 0 8px rgba(255,59,59,0.6);
+  flex:0 0 auto;
+}
+
+.chat-tab .pin-tab,
+.chat-tab .close-tab{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:12px;
+  line-height:1;
+  cursor:pointer;
+  display:none;
+  user-select:none;
+}
+
+.chat-tab .pin-tab{
+  right:24px;
+  color:#ffd66b;
+}
+
+.chat-tab .close-tab{
+  right:6px;
+  color:#ff7a7a;
+}
+
+.chat-tab.pm-tab:hover .pin-tab,
+.chat-tab.pm-tab:hover .close-tab{
+  display:block;
+}
+
+.chat-tab .pin-tab:hover{
+  color:#fff0a3;
+}
+
+.chat-tab .close-tab:hover{
+  color:#ff3b3b;
+}
+
+.chat-tab.disabled{
+  opacity:0.45;
+  pointer-events:none;
+}
+
+#chat-messages {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 14px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.chat-message {
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+
+.chat-message.system {
+  color: #00ffcc;
+}
+
+#chat-input-area {
+  display: flex;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+#chat-input {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+}
+
+#chat-send {
+  width: 120px;
+  background: rgba(0,255,200,0.2);
+  border: none;
+  cursor: pointer;
+  color: white;
+  transition: 0.2s;
+}
+
+#chat-send:hover {
+  background: rgba(0,255,200,0.4);
+}
+
+
+
+/* ===== CHAT TIME ===== */
+
+.chat-time {
+  color: #888;
+  font-size: 11px;
+  margin-right: 6px;
+}
+
+.chat-author {
+  color: #00ffcc;
+  margin-right: 6px;
+}
+
+
+
+.chat-tab.notify {
+  position: relative;
+  color: #ffffff;
+  background: rgba(0,255,200,0.18);
+  box-shadow: 0 0 12px rgba(0,255,200,0.35);
+  animation: chatTabPulse 0.9s infinite alternate;
+}
+
+.chat-tab.notify::after {
+  content: "•";
+  position: absolute;
+  right: 4px;
+  top: 0;
+  color: #ff4444;
+  font-size: 18px;
+  animation: blink 0.8s infinite;
+}
+
+@keyframes chatTabPulse {
+  0% { box-shadow: 0 0 6px rgba(0,255,200,0.18); transform: translateY(0); }
+  100% { box-shadow: 0 0 18px rgba(0,255,200,0.55); transform: translateY(-1px); }
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.2; }
+  100% { opacity: 1; }
+}
+
+
+
+
+/* ===== MATCH CENTER PANEL ===== */
+
+#match-center{
+  grid-column:1;
+  grid-row:1;
+  height:380px;
+
+  background:rgba(0,0,0,0.52);
+  border-radius:16px;
+
+  border:2px solid #00f0ff;
+
+  box-shadow:
+    0 0 15px #00f0ff,
+    0 0 40px #00f0ff,
+    inset 0 0 20px rgba(0,240,255,0.3);
+
+  display:flex;
+  flex-direction:column;
+}
+
+/* ===== MATCH CONTENT ===== */
+
+#match-content{
+  flex:1;
+  padding:12px;
+  overflow-y:auto;
+}
+
+/* ===== MATCH LIST ===== */
+
+.match-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.match-item{
+  padding:6px 10px;
+  background:rgba(255,255,255,0.05);
+  border-radius:6px;
+  cursor:pointer;
+  transition:0.2s;
+  font-size:13px;
+  text-align:left;
+}
+
+.match-item:hover{
+  background:rgba(0,255,200,0.2);
+}
+
+
+
+
+/* ===== MATCH LAYOUT ===== */
+
+#match-layout{
+display:flex;
+gap:15px;
+height:100%;
+}
+
+/* список карт */
+
+.match-list{
+flex:1;
+display:flex;
+flex-direction:column;
+gap:6px;
+overflow-y:auto;
+}
+
+/* правая панель */
+
+#match-preview{
+width:240px;
+min-width:240px;
+display:flex;
+flex-direction:column;
+gap:10px;
+align-items:center;
+}
+
+
+
+/* мини карта */
+
+#map-mini-preview{
+width:220px;
+height:220px;
+background:#111;
+border:2px solid #00ffff;
+border-radius:50px;
+display:flex;
+align-items:center;
+justify-content:center;
+overflow:hidden;
+margin:0 auto;
+box-sizing:border-box;
+}
+
+/* игроки */
+
+#map-players{
+width:220px;
+display:flex;
+flex-direction:column;
+gap:5px;
+margin:0 auto;
+}
+
+.player-slot{
+background:rgba(255,255,255,0.05);
+padding:4px 6px;
+border-radius:6px;
+font-size:12px;
+}
+
+
+
+
+/* КНОПКА ВОЙТИ */
+
+.join-btn{
+  margin-left:10px;
+  padding:4px 10px;
+  background:#00ffff;
+  border:none;
+  cursor:pointer;
+  border-radius:4px;
+  font-size:12px;
+}
+
+.join-btn:hover{
+  background:#00cccc;
+}
+
+
+
+/* ===== MATCH BUTTONS ===== */
+
+#match-buttons{
+  display:flex;
+  gap:6px;
+  border-top:1px solid rgba(255,255,255,0.1);
+  padding:6px;
+}
+
+.match-btn{
+  flex:1;
+  padding:8px;
+  font-size:13px;
+  background:rgba(0,255,200,0.15);
+  border:none;
+  cursor:pointer;
+  color:white;
+  transition:0.2s;
+
+  position:relative;
+  z-index:2;
+  overflow:hidden;
+}
+
+.match-btn::before,
+.match-btn::after{
+  z-index:1;
+}
+
+.match-btn span,
+.match-btn{
+  z-index:2;
+}
+
+.match-btn:hover{
+  background:rgba(0,255,200,0.35);
+}
+
+
+
+
+
+
+/* ===== MATCH TABS ===== */
+
+#match-tabs{
+  display:flex;
+  border-bottom:1px solid rgba(255,255,255,0.1);
+}
+
+.match-tab{
+  flex:1;
+  text-align:center;
+  padding:10px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.match-tab:hover{
+  background:rgba(0,255,200,0.1);
+}
+
+.match-tab.active{
+  background:rgba(0,255,200,0.2);
+}
+
+/* ===== MATCH CONTENT ===== */
+
+#match-content{
+  flex:1;
+  padding:12px;
+  overflow-y:auto;
+}
+
+.match-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.match-item{
+  padding:8px 12px;
+  background:rgba(255,255,255,0.05);
+  border-radius:8px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.match-item:hover{
+  background:rgba(0,255,200,0.2);
+}
+
+.match-item.selected{
+  background:rgba(0,255,200,0.35);
+  border:1px solid #00ffff;
+}
+
+
+
+
+
+
+
+
+
+/* ===== PROFILE BUTTON ===== */
+
+#profile-button {
+  position: absolute;
+  bottom: 20px;
+  left: 80px; /* рядом с инвентарём */
+  padding: 10px 15px;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 5;
+}
+
+/* ===== PROFILE WINDOW ===== */
+
+#profile-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+.profile-content {
+  background: #111;
+  padding: 30px;
+  border: 2px solid white;
+  width: 300px;
+  text-align: center;
+}
+
+.hidden {
+  display: none !important;
+}
+
+
+/* ===== HANGAR WINDOW ===== */
+
+#hangar-window {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #111;
+  padding: 25px;
+  border-radius: 10px;
+  z-index: 1000;
+  width: 350px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.7);
+}
+
+.hangar-content h2 {
+  margin-top: 0;
+}
+
+.ship-card {
+  background: #1a1a1a;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+}
+
+.hidden {
+  display: none;
+}
+
+
+
+/* ===== SETTINGS WINDOW ===== */
+
+#settings-window{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.82);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:22000;
+}
+
+.settings-content{
+  width:420px;
+  max-width:92vw;
+  background:rgba(8,14,30,0.96);
+  border:1px solid rgba(0,255,255,0.45);
+  border-radius:16px;
+  padding:22px;
+  box-shadow:0 0 28px rgba(0,180,255,0.22);
+}
+
+.settings-content h2{
+  margin-top:0;
+  margin-bottom:18px;
+  color:#00ffff;
+  text-align:center;
+}
+
+.settings-group{
+  margin-bottom:16px;
+}
+
+.settings-label{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:8px;
+  font-size:14px;
+}
+
+.settings-value{
+  color:#8deaff;
+  min-width:56px;
+  text-align:right;
+}
+
+.settings-content input[type="range"]{
+  width:100%;
+}
+
+.settings-check{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+  font-size:14px;
+}
+
+.settings-actions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:18px;
+}
+
+
+
+#battle-screen{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:9500;
+    pointer-events:none;
+    background:transparent;
+}
+
+#battle-crosshair{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:34px;
+    height:34px;
+    transform:translate(-50%,-50%);
+    border:2px solid rgba(0,255,255,0.9);
+    border-radius:50%;
+    box-shadow:0 0 12px rgba(0,255,255,0.35);
+}
+
+#battle-crosshair::before,
+
+#battle-exit-btn{
+  position:fixed;
+  top:18px;
+  left:18px;
+  z-index:60020;
+  padding:10px 16px;
+  border:none;
+  border-radius:10px;
+  background:rgba(8,18,35,0.88);
+  color:#d9f3ff;
+  cursor:pointer;
+  box-shadow:0 0 16px rgba(0,180,255,0.22);
+}
+#battle-exit-btn:hover{
+  background:rgba(18,36,68,0.95);
+}
+#battle-scoreboard{
+  position:fixed;
+  top:18px;
+  right:18px;
+  width:560px;
+  z-index:60010;
+  background:rgba(16,28,48,0.82);
+  border:1px solid rgba(140,210,255,0.22);
+  box-shadow:0 0 16px rgba(0,0,0,0.25);
+  backdrop-filter:blur(2px);
+  color:#f4f7fb;
+  font-size:14px;
+}
+.battle-scoreboard-header,
+.battle-scoreboard-row{
+  display:grid;
+  grid-template-columns:72px 1.4fr 70px 76px 76px 72px;
+  align-items:center;
+}
+.battle-scoreboard-header{
+  background:rgba(255,255,255,0.12);
+  font-weight:bold;
+}
+.battle-scoreboard-header span,
+.battle-scoreboard-row span{
+  padding:6px 8px;
+  border-right:1px solid rgba(255,255,255,0.08);
+}
+.battle-scoreboard-row.enemy{
+  background:rgba(170,50,60,0.55);
+}
+.battle-scoreboard-row.player{
+  background:rgba(50,115,170,0.55);
+}
+
+#battle-crosshair::after{
+    content:"";
+    position:absolute;
+    background:rgba(0,255,255,0.95);
+}
+
+#battle-crosshair::before{
+    width:2px;
+    height:42px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+}
+
+#battle-crosshair::after{
+    width:42px;
+    height:2px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+}
+
+#enemy-hud{
+    position:absolute;
+    top:24px;
+    left:50%;
+    transform:translateX(-50%);
+    min-width:260px;
+    padding:10px 14px;
+    background:rgba(8,15,30,0.75);
+    border:1px solid rgba(255,90,90,0.65);
+    border-radius:12px;
+    box-shadow:0 0 18px rgba(255,80,80,0.18);
+    color:#fff;
+}
+
+#enemy-name{
+    font-weight:bold;
+    margin-bottom:8px;
+    color:#ff9d9d;
+    text-align:center;
+}
+
+#enemy-hp-bar-wrap{
+    width:100%;
+    height:12px;
+    background:rgba(255,255,255,0.12);
+    border-radius:999px;
+    overflow:hidden;
+}
+
+#enemy-hp-bar{
+    width:100%;
+    height:100%;
+    background:linear-gradient(90deg,#ff5a5a,#ffb347);
+}
+
+#enemy-hp-text{
+    margin-top:6px;
+    font-size:12px;
+    text-align:center;
+    color:#ffd6d6;
+}
+
+
+
+
+
+
+/* ===== CREATE MATCH WINDOW ===== */
+
+#create-match-window{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+
+  background:rgba(0,0,0,0.85);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:20000;
+}
+
+.create-match-box{
+  width:430px;
+  background:#111;
+  padding:20px;
+  border-radius:12px;
+  border:1px solid #00ffff;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.create-match-box select,
+.create-match-box input{
+  padding:6px;
+  background:#000;
+  color:white;
+  border:1px solid #00ffff;
+}
+
+
+/* ===== MAP SELECTOR (НОВАЯ ЧИСТАЯ ВЕРСИЯ) ===== */
+
+#map-selector{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-top:10px;
+}
+
+#map-preview{
+    width:100%;
+    height:150px;   /* было 180px — уменьшаем */
+    border:2px solid #00ffff;
+    border-radius:8px;
+    overflow:hidden;
+}
+
+#map-preview img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+/* НАЗВАНИЕ КАРТЫ */
+#map-name{
+    font-weight:bold;
+    text-align:center;
+}
+
+/* КНОПКА ВЫБОРА (как select игроков) */
+#map-selected{
+    background:#000;
+    border:1px solid #00ffff;
+    padding:8px;
+    cursor:pointer;
+}
+
+/* DROPDOWN */
+#map-dropdown{
+    background:#000;
+    border:1px solid #00ffff;
+    max-height:150px;
+    overflow-y:auto;
+}
+
+/* ОПЦИИ */
+.map-option{
+    padding:8px;
+    cursor:pointer;
+}
+
+.map-option:hover{
+    background:rgba(0,255,255,0.2);
+}
+
+
+/* ===== BUTTONS ===== */
+
+.create-buttons{
+  display:flex;
+  justify-content:space-between;
+  margin-top:15px;
+}
+
+
+
+#map-selected img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+}
+
+#map-dropdown {
+    position: relative;
+    margin-top: 5px;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #000;
+    border: 1px solid #444;
+    z-index: 1000;
+}
+
+.map-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    cursor: pointer;
+}
+
+.map-option:hover {
+    background: #222;
+}
+
+.map-option img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+}
+
+.hidden {
+    display: none;
+}
+
+
+
+#map-mini-preview{
+width:220px;
+height:220px;
+position:relative;
+overflow:hidden;
+display:flex;
+align-items:center;
+justify-content:center;
+filter: drop-shadow(0 0 20px rgba(255,255,255,0.3));
+}
+
+#planet-preview{
+width:100%;
+height:100%;
+background-size:cover;
+background-repeat:no-repeat;
+background-position:center;
+filter:none;
+}
+
+
+
+
+.match-item{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:8px 12px;
+cursor:pointer;
+font-size:14px;
+}
+
+.match-item span{
+flex:1;
+text-align:center;
+}
+
+.map-title{
+text-align:left;
+font-weight:bold;
+}
+
+.map-real{
+opacity:0.7;
+}
+
+.map-mode{
+font-weight:bold;
+}
+
+.map-players{
+color:#ddd;
+}
+
+.map-level{
+color:#ffd700;
+}
+
+
+
+
+
+/* ===== ГЛАВНАЯ СЕТКА ЛОББИ ===== */
+#lobby-wrapper {
+  width: 1400px;
+  height: 620px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: 380px 240px;
+  gap: 12px;
+  position:relative;
+  z-index:2;
+}
+
+/* MATCH CENTER */
+#match-center { grid-column:1; grid-row:1; }
+
+/* ONLINE PANEL */
+#online-panel {
+  grid-column:2; grid-row:1;
+  width: 300px;
+  height: 380px;
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+  padding: 15px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* CHAT WRAPPER */
+#chat-wrapper {
+  grid-column:1; grid-row:2;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0,0,0,0.52);
+  border-radius: 16px;
+  border: 2px solid #00f0ff;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* EMOJI PANEL */
+#emoji-panel {
+  grid-column:2; grid-row:2;
+  height: 240px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+  padding: 15px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+
+
+
+
+
+/* ===== COSMIC WINDOWS ===== */
+#profile-window,
+#hangar-window,
+#clans-window,
+#leaders-window{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.82);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:21000;
+}
+.profile-content,
+.hangar-content,
+.clans-content,
+.leaders-content{
+  width:min(760px,92vw);
+  max-height:84vh;
+  overflow:auto;
+  background:linear-gradient(180deg, rgba(8,14,30,0.97), rgba(11,20,40,0.97));
+  border:1px solid rgba(0,255,255,0.34);
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 0 30px rgba(0,180,255,0.18), inset 0 0 40px rgba(255,255,255,0.04);
+}
+.profile-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.stat-card,
+.ship-card,
+.clan-card,
+.leader-row{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(125,216,255,0.12);
+  border-radius:12px;
+  padding:12px 14px;
+}
+.profile-title,
+.window-title{
+  color:#9ee8ff;
+  text-shadow:0 0 10px rgba(0,255,255,0.22);
+  margin-top:0;
+}
+.leaders-table{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.leader-row{
+  display:grid;
+  grid-template-columns:56px 1.2fr 120px 120px 100px;
+  align-items:center;
+  gap:10px;
+}
+.leader-row.header{
+  background:rgba(0,255,255,0.10);
+  font-weight:bold;
+}
+.clan-actions,
+.window-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:16px;
+}
+.cosmic-btn{
+  padding:10px 14px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  color:#eaf8ff;
+  background:rgba(16,40,76,0.92);
+  box-shadow:0 0 14px rgba(0,180,255,0.18);
+}
+.cosmic-btn:hover{ background:rgba(24,58,108,0.96); }
+.cosmic-badge{ color:#8deaff; font-weight:bold; }
+
+/* ===== COSMIC SCOREBOARD ===== */
+#battle-scoreboard{
+  position:fixed;
+  top:18px;
+  right:18px;
+  width:620px;
+  z-index:60010;
+  background:linear-gradient(180deg, rgba(5,12,26,0.94), rgba(10,22,44,0.90));
+  border:1px solid rgba(98,223,255,0.30);
+  box-shadow:0 0 22px rgba(0,195,255,0.16), inset 0 0 30px rgba(255,255,255,0.03);
+  backdrop-filter:blur(5px);
+  color:#f4f7fb;
+  font-size:14px;
+  border-radius:14px;
+  overflow:hidden;
+}
+.battle-scoreboard-header,
+.battle-scoreboard-row{
+  display:grid;
+  grid-template-columns:80px 1.55fr 70px 76px 76px 72px;
+  align-items:center;
+}
+.battle-scoreboard-header{
+  background:linear-gradient(90deg, rgba(0,255,255,0.14), rgba(136,80,255,0.10));
+  font-weight:bold;
+  text-transform:uppercase;
+  letter-spacing:0.04em;
+}
+.battle-scoreboard-header span,
+.battle-scoreboard-row span{
+  padding:8px 10px;
+  border-right:1px solid rgba(255,255,255,0.06);
+}
+.battle-scoreboard-row.enemy{
+  background:linear-gradient(90deg, rgba(150,36,58,0.52), rgba(88,30,60,0.32));
+}
+.battle-scoreboard-row.player{
+  background:linear-gradient(90deg, rgba(26,88,150,0.54), rgba(24,58,120,0.28));
+}
+.battle-scoreboard-row:hover{ filter:brightness(1.08); }
+
+
+/* ===== V6 FIXES ===== */
+#create-match-window .big-map-preview{
+  width:100%;
+  height:150px;
+  object-fit:cover;
+  display:block;
+  border:2px solid #00ffff;
+  border-radius:8px;
+  background:#050914;
+}
+#min-level,#max-level,#player-count{
+  width:100%;
+  padding:8px;
+  background:#020712;
+  color:#dff8ff;
+  border:1px solid rgba(0,255,255,0.5);
+  border-radius:8px;
+}
+#hangar-window{
+  position:fixed !important;
+  inset:0 !important;
+  display:flex !important;
+  justify-content:center !important;
+  align-items:center !important;
+}
+#hangar-window.hidden{display:none !important;}
+
+
+/* ===== V8 FIXES ===== */
+#premium-bar{
+  position:fixed;
+  top:14px;
+  left:520px;
+  right:auto;
+  display:flex;
+  gap:14px;
+  align-items:center;
+  padding:8px 12px;
+  border-radius:12px;
+  background:rgba(8,18,35,0.88);
+  box-shadow:0 0 16px rgba(0,180,255,0.18);
+  border:1px solid rgba(120,220,255,0.18);
+  z-index:20000;
+}
+#kill-feed{
+  position:fixed;
+  top:18px;
+  left:18px;
+  width:380px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  z-index:60030;
+  pointer-events:none;
+}
+.kill-feed-item{
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(8,18,35,0.84);
+  border:1px solid rgba(108,219,255,0.18);
+  box-shadow:0 0 12px rgba(0,180,255,0.10);
+  color:#e9f7ff;
+  font-size:13px;
+  line-height:1.3;
+}
+.kill-feed-item.kill{ color:#ffd6d6; }
+.kill-feed-item.chat{ color:#dff8ff; }
+
+#battle-player-hud{ position:fixed; left:18px; bottom:18px; width:320px; padding:14px; border-radius:14px; background:rgba(8,18,35,0.88); border:1px solid rgba(120,220,255,0.2); box-shadow:0 0 16px rgba(0,180,255,0.14); color:#eef8ff; z-index:60015; display:none; }
+.battle-player-title{ font-weight:bold; margin-bottom:10px; color:#9fe8ff; }
+#battle-player-hp-wrap{ width:100%; height:12px; background:rgba(255,255,255,0.12); border-radius:999px; overflow:hidden; margin-bottom:8px; }
+#battle-player-hp-fill{ width:100%; height:100%; background:linear-gradient(90deg,#4ed0ff,#79ffb6); }
+#battle-player-hp-text,
+#battle-ammo-text,
+#battle-damage-text,
+#battle-reload-text{ font-size:13px; margin-top:6px; }
+#battle-screen{ pointer-events:none; }
+#battle-exit-btn,
+#battle-chat-box,
+#battle-chat-input{ pointer-events:auto; }
+
+#battle-exit-btn, #battle-scoreboard, #battle-chat-box, #battle-chat-input{ pointer-events:auto; }
+#battle-chat-box{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  width:340px;
+  max-height:220px;
+  z-index:60040;
+  background:linear-gradient(180deg, rgba(7,16,32,0.94), rgba(11,22,42,0.88));
+  border:1px solid rgba(98,223,255,0.28);
+  border-radius:14px;
+  box-shadow:0 0 18px rgba(0,180,255,0.12);
+  overflow:hidden;
+}
+#battle-chat-log{
+  padding:10px 12px;
+  max-height:140px;
+  overflow-y:auto;
+  font-size:13px;
+  color:#dff8ff;
+}
+#battle-chat-input{
+  width:100%;
+  box-sizing:border-box;
+  border:none;
+  outline:none;
+  padding:12px;
+  background:rgba(255,255,255,0.04);
+  color:#fff;
+  border-top:1px solid rgba(255,255,255,0.08);
+}
+#hangar-window{
+  position:fixed !important;
+  inset:0 !important;
+  top:0 !important;
+  left:0 !important;
+  width:100vw !important;
+  height:100vh !important;
+  display:none !important;
+  justify-content:center !important;
+  align-items:center !important;
+  z-index:21000 !important;
+  transform:none !important;
+  background:rgba(0,0,0,0.82) !important;
+}
+#hangar-window:not(.hidden){ display:flex !important; }
+.hangar-content{
+  width:min(760px,92vw);
+  max-height:84vh;
+  overflow:auto;
+  margin:auto;
+  background:linear-gradient(180deg, rgba(8,14,30,0.97), rgba(11,20,40,0.97));
+  border:1px solid rgba(0,255,255,0.34);
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 0 30px rgba(0,180,255,0.18), inset 0 0 40px rgba(255,255,255,0.04);
+}
+
+
+
+/* ===== V16 STATE FIXES ===== */
+#premium-bar{
+  top:18px !important;
+  right:18px !important;
+  left:auto !important;
+  bottom:auto !important;
+  display:none;
+  z-index:21010 !important;
+}
+body.state-auth #top-nav,
+body.state-auth #resource-bar,
+body.state-auth #ui,
+body.state-auth #premium-bar,
+body.state-auth #inventory-button,
+body.state-auth #orbit-exit{ display:none !important; }
+body.state-lobby #premium-bar{ display:flex !important; }
+body.state-lobby #resource-bar,
+body.state-lobby #ui{ display:none !important; }
+body.state-orbit #premium-bar,
+body.state-orbit #battle-player-hud{ display:none !important; }
+body.state-orbit #resource-bar{
+  left:50% !important;
+  right:auto !important;
+  transform:translateX(-50%) !important;
+  top:15px !important;
+  max-width:calc(100vw - 40px) !important;
+}
+body.state-orbit #ui{
+  display:none !important;
+}
+body.state-battle #resource-bar,
+body.state-battle #ui,
+body.state-observe #resource-bar,
+body.state-observe #ui{ display:none !important; }
+#battle-player-hud{
+  left:18px !important;
+  bottom:18px !important;
+  right:auto !important;
+  top:auto !important;
+}
+
+
+
+/* ===== AUTH + PREMIUM ACCOUNT PATCH ===== */
+#premium-bar{
+  display:none;
+  position:fixed;
+  top:16px;
+  right:20px;
+  align-items:center;
+  gap:12px;
+  padding:0 40px 0 0;
+  min-height:48px;
+  background:transparent;
+  box-shadow:none;
+  border:none;
+}
+#premium-account-info,
+#premium-currency-box{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color:#dff7ff;
+  font-size:14px;
+  white-space:nowrap;
+  padding:10px 14px;
+  border-radius:12px;
+  background:rgba(8,18,35,0.88);
+  box-shadow:0 0 16px rgba(0,180,255,0.18);
+  border:1px solid rgba(120,220,255,0.18);
+}
+#premium-currency-box{
+  gap:12px;
+}
+#premium-player-name{
+  color:#9fe8ff;
+  font-weight:bold;
+  max-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#premium-player-id{
+  opacity:0.8;
+}
+#premium-logout-btn{
+  position:absolute;
+  top:0;
+  right:0;
+  width:28px;
+  height:28px;
+  padding:0;
+  border:1px solid rgba(255,110,110,0.45);
+  border-radius:8px;
+  cursor:pointer;
+  color:#ff7d7d;
+  background:rgba(60,8,8,0.92);
+  box-shadow:0 0 12px rgba(255,70,70,0.25);
+  font-weight:bold;
+}
+#premium-logout-btn:hover{
+  background:rgba(110,12,12,0.96);
+  color:#ffd0d0;
+}
+#settings-window input[type="text"]{
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(130,220,255,0.22);
+  background:#07101f;
+  color:#fff;
+}
+#save-nickname-btn{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(130,220,255,0.25);
+  cursor:pointer;
+  color:#fff;
+  background:#0e1a32;
+}
+
+
+/* ===== REALTIME CHAT PATCH ===== */
+.chat-line{
+  padding:4px 8px;
+  background:rgba(255,255,255,0.05);
+  border-radius:6px;
+  margin-bottom:6px;
+  max-width:100%;
+  word-break:break-word;
+  line-height:1.35;
+}
+.chat-line.system{
+  color:#ffd166;
+  font-style:italic;
+}
+.chat-role-badge{
+  display:inline;
+  margin-right:4px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0;
+  text-transform:lowercase;
+}
+.chat-nick,
+.chat-nick-static{
+  display:inline;
+  padding:0;
+  border:none;
+  background:transparent;
+  color:#ffffff;
+  font-weight:700;
+  font-size:inherit;
+  font-family:inherit;
+  text-decoration:none;
+  cursor:pointer;
+  vertical-align:baseline;
+}
+.chat-nick:hover,
+.chat-nick-static:hover{
+  opacity:0.92;
+}
+.chat-id,
+.chat-time{
+  color:#d6d6d6;
+  font-size:inherit;
+  margin-left:2px;
+  margin-right:2px;
+}
+.chat-text{
+  color:#ffffff;
+  margin-left:4px;
+}
+.chat-line.chat-staff.role-mod,
+.chat-line.chat-staff.role-mod .chat-role-badge,
+.chat-line.chat-staff.role-mod .chat-nick,
+.chat-line.chat-staff.role-mod .chat-nick-static,
+.chat-line.chat-staff.role-mod .chat-id,
+.chat-line.chat-staff.role-mod .chat-time,
+.chat-line.chat-staff.role-mod .chat-text{
+  color:#ff2a2a;
+}
+.chat-line.chat-staff.role-adm,
+.chat-line.chat-staff.role-adm .chat-role-badge,
+.chat-line.chat-staff.role-adm .chat-nick,
+.chat-line.chat-staff.role-adm .chat-nick-static,
+.chat-line.chat-staff.role-adm .chat-id,
+.chat-line.chat-staff.role-adm .chat-time,
+.chat-line.chat-staff.role-adm .chat-text{
+  color:#ff8a1c;
+}
+.chat-line.chat-staff.role-owr,
+.chat-line.chat-staff.role-owr .chat-role-badge,
+.chat-line.chat-staff.role-owr .chat-nick,
+.chat-line.chat-staff.role-owr .chat-nick-static,
+.chat-line.chat-staff.role-owr .chat-id,
+.chat-line.chat-staff.role-owr .chat-time,
+.chat-line.chat-staff.role-owr .chat-text{
+  color:#ffd400;
+}
+.chat-tab.disabled{
+  opacity:0.45;
+}
+
+
+/* === FIX ROLE STYLE V10 === */
+#chat-panel{
+  overflow:hidden !important;
+}
+
+#chat-messages{
+  flex:1;
+  padding:12px;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  font-size:16px !important;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:flex-start;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+  white-space:normal !important;
+}
+
+.chat-line{
+  max-width:100%;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+  line-height:1.45;
+}
+
+.chat-message{
+  max-width:100%;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+.chat-role-badge{
+  display:inline-block;
+  margin-right:6px;
+  font-size:18px !important;
+  font-weight:900 !important;
+  letter-spacing:0;
+  text-transform:lowercase;
+  vertical-align:baseline;
+}
+
+.chat-nick,
+.chat-nick-static{
+  font-size:16px !important;
+  font-weight:700 !important;
+}
+
+.chat-time{
+  font-size:15px !important;
+}
+
+.chat-text{
+  font-size:16px !important;
+}
+
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+/* role darker than nick */
+.chat-line.chat-staff.role-mod .chat-role-badge{
+  color:#c61f1f !important;
+}
+.chat-line.chat-staff.role-adm .chat-role-badge{
+  color:#c96a14 !important;
+}
+.chat-line.chat-staff.role-owr .chat-role-badge{
+  color:#c39a00 !important;
+}
+
+/* nick and text remain brighter */
+.chat-line.chat-staff.role-mod .chat-nick,
+.chat-line.chat-staff.role-mod .chat-nick-static,
+.chat-line.chat-staff.role-mod .chat-time,
+.chat-line.chat-staff.role-mod .chat-text{
+  color:#ff2a2a !important;
+}
+.chat-line.chat-staff.role-adm .chat-nick,
+.chat-line.chat-staff.role-adm .chat-nick-static,
+.chat-line.chat-staff.role-adm .chat-time,
+.chat-line.chat-staff.role-adm .chat-text{
+  color:#ff8a1c !important;
+}
+.chat-line.chat-staff.role-owr .chat-nick,
+.chat-line.chat-staff.role-owr .chat-nick-static,
+.chat-line.chat-staff.role-owr .chat-time,
+.chat-line.chat-staff.role-owr .chat-text{
+  color:#ffd400 !important;
+}
+
+#chat-input-area{
+  overflow:hidden !important;
+}
+
+#chat-input{
+  min-width:0;
+}
+
+
+/* === V11 CHAT FIXES === */
+#chat-panel,
+#chat-tabs,
+#chat-messages,
+#chat-input-area{
+  overflow-x:hidden !important;
+  max-width:100% !important;
+}
+
+#chat-panel *{
+  box-sizing:border-box;
+}
+
+#chat-tabs{
+  flex-wrap:wrap;
+}
+
+#chat-messages{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  overscroll-behavior-x:none;
+}
+
+.chat-line,
+.chat-message{
+  width:100% !important;
+  max-width:100% !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+.chat-role-badge{
+  position:relative;
+  display:inline-block;
+  margin-right:6px;
+  font-size:18px !important;
+  font-weight:900 !important;
+  letter-spacing:0.4px;
+  line-height:1;
+  text-transform:lowercase;
+  -webkit-text-fill-color:transparent;
+  background-size:100% 240%;
+  background-position:0 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,0.55)) drop-shadow(0 0 5px rgba(255,255,255,0.10));
+  animation: roleSweepUp 2.1s linear infinite;
+}
+
+.chat-role-badge::after{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  pointer-events:none;
+  border-radius:4px;
+  opacity:.15;
+  mix-blend-mode:screen;
+  animation: rolePulseGlow 1.8s ease-in-out infinite;
+}
+
+.chat-line.chat-staff.role-mod .chat-role-badge{
+  background-image:linear-gradient(to top,#711111 0%,#b71a1a 22%,#ff8c8c 42%,#b71a1a 58%,#6c1010 100%) !important;
+}
+.chat-line.chat-staff.role-mod .chat-role-badge::after{
+  box-shadow:0 0 10px rgba(255,60,60,.32);
+}
+
+.chat-line.chat-staff.role-adm .chat-role-badge{
+  background-image:linear-gradient(to top,#73420c 0%,#b8660f 22%,#ffd08b 42%,#b8660f 58%,#653708 100%) !important;
+}
+.chat-line.chat-staff.role-adm .chat-role-badge::after{
+  box-shadow:0 0 10px rgba(255,153,51,.28);
+}
+
+.chat-line.chat-staff.role-owr .chat-role-badge{
+  background-image:linear-gradient(to top,#675200 0%,#b58d00 22%,#fff0a6 42%,#b58d00 58%,#5a4700 100%) !important;
+}
+.chat-line.chat-staff.role-owr .chat-role-badge::after{
+  box-shadow:0 0 11px rgba(255,214,64,.28);
+}
+
+@keyframes roleSweepUp{
+  0%{ background-position:0 130%; }
+  100%{ background-position:0 -80%; }
+}
+
+@keyframes rolePulseGlow{
+  0%,100%{ opacity:.10; transform:translateY(0); }
+  50%{ opacity:.24; transform:translateY(-1px); }
+}
+
+
+/* === V12 LOWER CHAT SCROLL FIX === */
+#chat-wrapper,
+#chat-panel,
+#chat-tabs,
+#chat-messages,
+#chat-input-area{
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  box-sizing:border-box !important;
+}
+
+#chat-panel{
+  min-width:0 !important;
+}
+
+#chat-tabs{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  row-gap:2px;
+}
+
+.chat-tab,
+.chat-tab.pm-tab,
+.pm-tab-content,
+.pm-tab-main,
+.pm-tab-label,
+.pm-tab-preview{
+  min-width:0 !important;
+  max-width:100% !important;
+}
+
+#chat-messages{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  white-space:normal !important;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+}
+
+.chat-line,
+.chat-message,
+.chat-text{
+  max-width:100% !important;
+  white-space:normal !important;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+}
+
+#chat-input{
+  min-width:0 !important;
+}
+
+
+/* === V14 OBSERVE/BATTLE CHAT === */
+#battle-chat-log{
+  max-width:100%;
+  overflow-x:hidden !important;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+#battle-chat-log > div{
+  max-width:100%;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
+
+/* === V15 TOP-LEFT BATTLE ANNOUNCEMENTS === */
+#kill-feed,
+#kill-feed .kill-feed-item{
+  max-width:420px;
+  white-space:normal !important;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
+
+/* === V16 GLOBAL BATTLE ANNOUNCEMENTS === */
+.kill-feed-item.chat-announcement{
+  max-width:420px;
+  white-space:normal !important;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  padding:4px 8px;
+  border-radius:8px;
+  background:rgba(5,10,22,0.72);
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:0 0 10px rgba(0,0,0,0.22);
+}
+
+.kill-feed-item.chat-announcement .chat-role-badge{
+  font-size:15px !important;
+  margin-right:5px;
+}
+
+.kill-feed-item.chat-announcement .chat-nick-static{
+  font-weight:700;
+}
+
+.kill-feed-item.chat-announcement .chat-sep{
+  margin:0 4px;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-mod .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-mod .chat-text{
+  color:#ff2a2a !important;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-adm .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-adm .chat-text{
+  color:#ff8a1c !important;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-owr .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-owr .chat-text{
+  color:#ffd400 !important;
+}
+
+
+/* === V17 MAP INPUT ONLY MODE === */
+#battle-chat-box.input-only{
+  display:block !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  padding:0 !important;
+}
+
+#battle-chat-box.input-only #battle-chat-log{
+  display:none !important;
+}
+
+#battle-chat-box.input-only #battle-chat-input{
+  width:320px;
+  max-width:45vw;
+}
+
+#battle-chat-box.input-only #battle-chat-input-area,
+#battle-chat-box.input-only .battle-chat-input-area{
+  background:rgba(5,10,22,0.72);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px;
+  padding:6px 8px;
+}
+
+
+/* === V18 SCENE->BATTLE MIRROR === */
+.chat-line.scene-mirrored,
+.chat-line[data-channel="scene"]{
+  max-width:100%;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
+
+/* === V21 CHAT ID VISIBLE === */
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  color:#c9d3df !important;
+  font-size:12px !important;
+  margin:0 6px 0 4px !important;
+}
+.kill-feed-item .chat-id{
+  color:#d6dde8 !important;
+}
+
+
+/* === V22 FORCE CHAT IDS === */
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  color:#c9d3df !important;
+  font-size:12px !important;
+  margin:0 6px 0 4px !important;
+}
+.kill-feed-item .chat-id{
+  color:#d6dde8 !important;
+}
+
+
+.clan-chat-note{
+  margin-top:12px;
+  color:#bfefff;
+  opacity:0.88;
+  font-size:13px;
+}
+
+/* === V23 BATTLE COMPOSER HIDE === */
+#chat-input-area.chat-composer-hidden{
+  display:none !important;
+}
+
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+
+/* === V24 MAP ROLE BADGE VISIBILITY === */
+.kill-feed-item.chat-announcement .chat-role-badge{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  margin-right:6px !important;
+  font-size:16px !important;
+  font-weight:900 !important;
+}
+
+
+/* === V25 VISIBLE ROLE IN MAP ANNOUNCEMENTS === */
+.scene-role-badge{
+  display:inline-block !important;
+  font-weight:900 !important;
+  font-size:16px !important;
+  margin-right:6px !important;
+  letter-spacing:0.2px;
+  color:inherit;
+  -webkit-text-fill-color:currentColor !important;
+  background:none !important;
+  -webkit-background-clip:border-box !important;
+  background-clip:border-box !important;
+  text-shadow:0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(255,255,255,0.08);
+}
+
+.kill-feed-item.chat-announcement .scene-role-badge.role-mod{
+  color:#ff2a2a !important;
+}
+.kill-feed-item.chat-announcement .scene-role-badge.role-adm{
+  color:#ff8a1c !important;
+}
+.kill-feed-item.chat-announcement .scene-role-badge.role-owr{
+  color:#ffd400 !important;
+}
+
+</style>
+</head>
+
+<body>
+<div id="kill-feed"></div>
+<div id='premium-bar'>
+  <div id="premium-account-info">
+    <span id="premium-player-name">Commander</span>
+    <span id="premium-player-id">ID: 0</span>
+  </div>
+  <div id="premium-currency-box">
+    <span class='premium-item' id="premium-crystals">💎 0</span>
+    <span class='premium-item' id="premium-coins">🪙 0</span>
+  </div>
+  <button id="premium-logout-btn" type="button" title="Сменить аккаунт / сервер">✕</button>
+</div>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1>Cosmic Clicker</h1>
+    <div class="auth-subtitle">Сначала зарегистрируйся или войди. Гость может играть без сохранения прогресса.</div>
+    <div class="auth-columns">
+      <div class="auth-panel">
+        <h2>Войти</h2>
+        <input id="login-email" type="email" placeholder="Email">
+        <input id="login-password" type="password" placeholder="Пароль">
+        <label class="auth-check"><input id="remember-password" type="checkbox"> <span>Запомнить пароль</span></label>
+        <button id="login-btn" class="auth-btn primary">Войти</button>
+        <button id="forgot-password-btn" class="auth-btn ghost">Забыли пароль?</button>
+        <div class="auth-note">После регистрации нужно отдельно выполнить вход.</div>
+      </div>
+      <div class="auth-panel">
+        <h2>Регистрация</h2>
+        <input id="register-email" type="email" placeholder="Email">
+        <input id="register-password" type="password" placeholder="Пароль">
+        <button id="register-btn" class="auth-btn primary">Зарегистрироваться</button>
+        <div class="auth-note">После регистрации выполни обычный вход через Email и пароль.</div>
+        <div class="auth-divider">или</div>
+        <button id="guest-login-btn" class="auth-btn guest">Войти как гость</button>
+        <div class="auth-note">У гостя прогресс не сохраняется.</div>
+      </div>
+    </div>
+    <div id="auth-message" class="auth-message"></div>
+  </div>
+</div>
+
+<div id="lobby-screen">
+  <div id="lobby-bg"></div>
+  <div id="lobby-fog"></div>
+
+  <div id="lobby-wrapper">
+
+    <!-- MATCH CENTER -->
+    <div id="match-center">
+      <div id="lobby-mode-tabs">
+        <div class="lobby-mode-tab active" id="lobby-battle-tab">⚔ Боевая зона</div>
+        <div class="lobby-mode-tab" id="lobby-solo-tab">🤖 Одиночная игра</div>
+        <div class="lobby-mode-tab" id="lobby-tournament-tab">🏆 Турнир</div>
+      </div>
+      <div id="match-status-note"></div>
+      <div id="match-content">
+        <div id="match-layout">
+          <div class="match-list" id="match-list"></div>
+
+          <div id="match-preview">
+            <div id="map-mini-preview">
+              <div id="planet-preview"></div>
+            </div>
+            <div id="map-players"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <div id="match-buttons">
+        <button class="match-btn" id="create-match-btn">Создать</button>
+        <button class="match-btn" id="observe-match-btn">Наблюдать</button>
+        <button class="match-btn" id="join-match-btn"><span>Войти</span></button>
+        <button class="match-btn" id="refresh-matches-btn">Обновить</button>
+      </div>
+    </div>
+
+    <!-- ONLINE PANEL -->
+    <div id="online-panel">
+      <div id="online-list"></div>
+    </div>
+
+    <!-- CHAT WRAPPER -->
+    <div id="chat-wrapper">
+      <div id="chat-panel">
+        <div id="chat-tabs">
+          <button class="chat-tab active" data-scope="global" type="button">Global</button>
+          <button class="chat-tab" data-scope="clan" type="button">Clan</button>
+          <button class="chat-tab" data-scope="battle" type="button">Battle</button>
+        </div>
+        <div id="chat-messages">
+          <div class="chat-message system">🚀 Добро пожаловать в галактику!</div>
+        </div>
+        <div id="chat-input-area">
+          <input type="text" id="chat-input" placeholder="Введите сообщение..." />
+          <button id="chat-send">Отправить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMOJI PANEL -->
+    <div id="emoji-panel">
+      <div class="emoji">😀</div>
+      <div class="emoji">🚀</div>
+      <div class="emoji">🔥</div>
+      <div class="emoji">😎</div>
+      <div class="emoji">💀</div>
+      <div class="emoji">🌌</div>
+      <div class="emoji">🛰</div>
+      <div class="emoji">⚔</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TOP NAVIGATION ===== -->
+<div id="top-nav">
+  <div id="hangar-tab" class="nav-tab">🚀 Ангар</div>
+  <div class="nav-tab" id="profile-tab">👤 Профиль</div>
+  <div class="nav-tab" id="clans-tab">👥 Кланы</div>
+  <div class="nav-tab" id="leaders-tab">🏆 Лидеры</div>
+  <div class="nav-tab" id="orbit-tab" onclick="switchState('ORBIT')">🌌 Выйти на орбиту</div>
+  <div class="nav-tab" id="battle-zone-tab">⚔ Боевая зона</div>
+  <div class="nav-tab" id="solo-tab">🤖 Одиночная игра</div>
+  <div class="nav-tab" id="shop-tab">🛒 Магазин</div>
+  <div class="nav-tab" id="settings-tab">⚙ Настройки</div>
+</div>
+
+<!-- РЕСУРСЫ -->
+<div id="resource-bar"></div>
+
+<!-- ЛЕВОЕ UI -->
+<div id="ui">
+  <div id="planetName"></div>
+  <div id="levelText"></div>
+  <div id="damageText"></div>
+  <div id="pointsText"></div>
+
+  <div id="hpBarContainer">
+    <div id="hpBar"></div>
+  </div>
+
+  <div id="hpText"></div>
+  <div id="structuresUI"></div>
+</div>
+
+<!-- ИНВЕНТАРЬ -->
+<div id="inventory-button">🛰</div>
+
+<div id="inventory-window" class="hidden">
+  <div class="inventory-header">
+    <span>INVENTORY</span>
+    <button id="close-inventory">✖</button>
+  </div>
+  <div id="inventory"></div>
+</div>
+
+<div id="orbit-exit">
+  <button onclick="switchState('LOBBY')">⬅ В лобби</button>
+</div>
+
+
+
+<!-- ===== PROFILE WINDOW ===== -->
+<div id="profile-window" class="hidden">
+  <div class="profile-content">
+    <h2>Профиль</h2>
+    <div id="profile-info"></div>
+    <div class="auth-note">Профиль, ID игрока и базовая статистика синхронизируются через Supabase.</div>
+    <br>
+    <button id="close-profile">Закрыть</button>
+  </div>
+</div>
+
+
+
+<!-- ===== CREATE MATCH WINDOW ===== -->
+<div id="create-match-window" class="hidden">
+
+
+  <div class="create-match-box">
+
+    <h2>Создать карту</h2>
+
+    <div id="map-selector">
+
+    <!-- БОЛЬШАЯ КАРТИНКА -->
+    <img id="map-preview" src="maps/mercury.jpg" class="big-map-preview">
+
+    <!-- НАЗВАНИЕ -->
+    <div id="map-selected-name">Выберите карту</div>
+
+    <!-- ВЫБОР КАРТЫ -->
+    <div id="map-selected">
+        Выбрать карту ▼
+    </div>
+
+    <div id="map-dropdown" class="hidden"></div>
+
+</div>
+
+
+
+    
+
+    <label>Название карты:</label>
+<input id="room-title" type="text" maxlength="32" placeholder="Например: Орбита Марса #1">
+
+<!-- Игроки -->
+<label>Игроков:</label>
+<select id="player-count">
+  <option value="2">2</option>
+  <option value="3">3</option>
+  <option value="4">4</option>
+  <option value="5">5</option>
+  <option value="6">6</option>
+  <option value="7">7</option>
+  <option value="8">8</option>
+</select>
+
+<!-- Минимальный уровень -->
+<label>Мин. уровень:</label>
+<select id="min-level"></select>
+
+<!-- Максимальный уровень -->
+<label>Макс. уровень:</label>
+<select id="max-level"></select>
+
+<div class="create-buttons">
+  <button id="confirm-create">Создать</button>
+  <button id="cancel-create">Отмена</button>
+</div>
+
+</div>
+</div>
+
+<div id="tournament-window" class="hidden">
+  <div class="tournament-box">
+    <h2>Создать турнир</h2>
+
+    <label>Название турнира:</label>
+    <input id="tournament-title" type="text" maxlength="40" placeholder="Например: Mars Cup">
+
+    <label>Карта:</label>
+    <select id="tournament-map"></select>
+
+    <label>Игроков:</label>
+    <select id="tournament-player-count">
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+    </select>
+
+    <label>Мин. уровень:</label>
+    <select id="tournament-min-level"></select>
+
+    <label>Макс. уровень:</label>
+    <select id="tournament-max-level"></select>
+
+    <label>Очки для победы:</label>
+    <select id="tournament-goal">
+      <option value="10">10 убийств</option>
+      <option value="20">20 убийств</option>
+    </select>
+
+    <label>Ставка монетами:</label>
+    <select id="tournament-stake-coins">
+      <option value="0">Без ставки монетами</option>
+      <option value="50">50 монет</option>
+      <option value="100">100 монет</option>
+      <option value="250">250 монет</option>
+      <option value="500">500 монет</option>
+    </select>
+
+    <label>Ставка кристаллами:</label>
+    <select id="tournament-stake-crystals">
+      <option value="0">Без ставки кристаллами</option>
+      <option value="1">1 кристалл</option>
+      <option value="2">2 кристалла</option>
+      <option value="5">5 кристаллов</option>
+      <option value="10">10 кристаллов</option>
+    </select>
+
+    <div class="tournament-note">Можно ставить только монеты, только кристаллы или обе ставки сразу. Максимум: 500 монет и 10 кристаллов. Победитель получает 80% общего банка.</div>
+
+    <div class="create-buttons">
+      <button id="confirm-tournament-create">Создать турнир</button>
+      <button id="cancel-tournament-create">Отмена</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="settings-window" class="hidden">
+  <div class="settings-content">
+    <h2>Настройки</h2>
+
+    <div class="settings-group">
+      <div class="settings-label">
+        <span>Чувствительность мыши</span>
+        <span class="settings-value" id="mouse-sensitivity-value">1.00x</span>
+      </div>
+      <input type="range" id="mouse-sensitivity" min="0.2" max="2.5" step="0.05" value="1">
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-check">
+        <input type="checkbox" id="invert-y">
+        <span>Инверсия по Y</span>
+      </label>
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-check">
+        <input type="checkbox" id="sound-enabled" checked>
+        <span>Включить звук</span>
+      </label>
+
+      <div class="settings-label">
+        <span>Громкость звуков</span>
+        <span class="settings-value" id="sound-volume-value">100%</span>
+      </div>
+      <input type="range" id="sound-volume" min="0" max="1" step="0.01" value="1">
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-check">
+        <input type="checkbox" id="music-enabled" checked>
+        <span>Включить музыку</span>
+      </label>
+
+      <div class="settings-label">
+        <span>Громкость музыки</span>
+        <span class="settings-value" id="music-volume-value">40%</span>
+      </div>
+      <input type="range" id="music-volume" min="0" max="1" step="0.01" value="0.4">
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-label">
+        <span>Ник пилота</span>
+        <span class="settings-value" id="nickname-status">текущий</span>
+      </div>
+      <input type="text" id="nickname-input" maxlength="20" placeholder="Новый ник">
+      <button id="save-nickname-btn" type="button">Сохранить ник</button>
+    </div>
+
+    <div class="settings-actions">
+      <button id="close-settings">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="battle-screen" style="display:none;">
+  <div id="battle-crosshair"></div>
+  <button id="battle-exit-btn" type="button">⟵ Выйти из карты</button>
+  <div id="enemy-hud">
+    <div id="enemy-name">BOT DRONE</div>
+    <div id="enemy-hp-bar-wrap"><div id="enemy-hp-bar"></div></div>
+    <div id="enemy-hp-text">0 / 0</div>
+  </div>
+  <div id="battle-player-hud">
+    <div class="battle-player-title">Корабль</div>
+    <div id="battle-player-hp-wrap"><div id="battle-player-hp-fill"></div></div>
+    <div id="battle-player-hp-text">HP: 100 / 100</div>
+    <div id="battle-ammo-text">Боеприпасы: 50 / 50 | запас ∞</div>
+    <div id="battle-damage-text">Урон: 12</div>
+    <div id="battle-reload-text">R — перезарядка</div>
+  </div>
+  <div id="battle-scoreboard" class="hidden">
+    <div class="battle-scoreboard-header">
+      <span>Clan</span>
+      <span>Ник</span>
+      <span>Фраги</span>
+      <span>Смерти</span>
+      <span>Уровень</span>
+      <span>ID</span>
+    </div>
+    <div id="battle-scoreboard-body">
+      <div class="battle-scoreboard-row enemy">
+        <span>[BOT]</span>
+        <span>Drone_x1</span>
+        <span>0</span>
+        <span>0</span>
+        <span>1</span>
+        <span>9001</span>
+      </div>
+      <div class="battle-scoreboard-row player">
+        <span>[YOU]</span>
+        <span>Commander</span>
+        <span>0</span>
+        <span>0</span>
+        <span>1</span>
+        <span>1001</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== HANGAR WINDOW ===== -->
+<div id="hangar-window" class="hidden">
+  <div class="hangar-content">
+    <h2>Ангар</h2>
+    <div id="hangar-list"></div>
+    <br>
+    <button id="close-hangar">Закрыть</button>
+  </div>
+</div>
+
+
+<div id="clans-window" class="hidden">
+  <div class="clans-content">
+    <h2 class="window-title">Кланы</h2>
+    <div id="clans-info"></div>
+    <div class="clan-chat-note">💬 Клановый чат теперь живёт во вкладке <b>Clan</b> в общем чате лобби.</div>
+    <div class="clan-actions">
+      <button id="close-clans" class="cosmic-btn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<div id="leaders-window" class="hidden">
+  <div class="leaders-content">
+    <h2 class="window-title">Лидеры</h2>
+    <div id="leaders-info"></div>
+    <div class="window-actions">
+      <button id="close-leaders" class="cosmic-btn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="battle-chat-box" class="hidden">
+  <div id="battle-chat-log"></div>
+  <input id="battle-chat-input" type="text" placeholder="Напишите сообщение и нажмите Enter...">
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://htflrhpqrbwqvlyxgbpu.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_SWbPj79rY6fTYjaoHODtDg_0KNOSRLb';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+window.supabaseClient = supabase;
+window.supabaseReady = true;
+
+console.log('🔥 Supabase подключен и готов к работе');
+</script>
+
+<script type="module" src="main.js"></script>
+
+
+</body>
+</html>
+
+
 
 
 
