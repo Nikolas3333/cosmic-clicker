@@ -361,6 +361,17 @@ async function sendSceneMapMessage(text) {
         player_nickname: payload.player_nickname,
         message: payload.message
     };
+
+    const battleMirrorScope = { key: "battle", channel: "battle" };
+    pushChatToCache(battleMirrorScope, {
+        ...optimisticMessage,
+        channel: "battle"
+    });
+
+    if (currentChat === "battle") {
+        renderLobbyMessages();
+    }
+
     showSceneMapMessageInActiveScene(optimisticMessage);
     return true;
 }
