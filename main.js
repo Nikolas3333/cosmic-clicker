@@ -37,7 +37,8 @@ let keys = {
     a: false,
     s: false,
     d: false,
-    space: false
+    space: false,
+    shift: false
 };
 let shipVelocity = new THREE.Vector3();
 let shipRotationVelocity = new THREE.Vector3();
@@ -183,6 +184,7 @@ function resetBattleInputState(){
     keys.s = false;
     keys.d = false;
     keys.space = false;
+    keys.shift = false;
     firing = false;
     mouseDeltaX = 0;
     mouseDeltaY = 0;
@@ -237,6 +239,8 @@ document.addEventListener("keydown", (e) => {
     if (e.code === "KeyA") keys.a = true;
     if (e.code === "KeyS") keys.s = true;
     if (e.code === "KeyD") keys.d = true;
+    if (e.code === "Space") keys.space = true;
+    if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.shift = true;
     if (e.code === "KeyR") startBattleReload();
 
     // Включить / выключить управление мышкой
@@ -261,6 +265,8 @@ document.addEventListener("keyup", (e) => {
     if (e.code === "KeyA") keys.a = false;
     if (e.code === "KeyS") keys.s = false;
     if (e.code === "KeyD") keys.d = false;
+    if (e.code === "Space") keys.space = false;
+    if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.shift = false;
 
 });
 
@@ -380,6 +386,23 @@ async function sendSceneMapMessage(text, options = {}) {
         return false;
     }
 
+    const nowIso = new Date().toISOString();
+    const optimisticSceneMessage = {
+        id: `scene-local-${Date.now()}`,
+        channel: 'scene',
+        room_id: scenePayload.room_id,
+        created_at: nowIso,
+        player_public_id: ownPublicId,
+        player_nickname: scenePayload.player_nickname,
+        staff_role: getOwnStaffRole(),
+        message: scenePayload.message
+    };
+    pushChatToCache({ key: 'battle', channel: 'battle' }, { ...optimisticSceneMessage, channel: 'battle' });
+    showSceneMapMessageInActiveScene(optimisticSceneMessage);
+    if (mirrorToBattle) {
+        showBattleAnnouncementInActiveScene({ ...optimisticSceneMessage, channel: 'battle' });
+    }
+    renderBattleMessages?.();
     return true;
 }
 
@@ -392,6 +415,7 @@ function initBattleChat(){
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
         if(e.key === 'Enter'){
+            if(e.repeat) return;
             if(!battleChatOpen){
                 e.preventDefault();
                 setBattleChatOpen(true);
@@ -3046,6 +3070,10 @@ function getSceneChatRoomId() {
     return String(fromCurrentRoom || `scene_${String(fallbackMap).toLowerCase()}`);
 }
 
+function getBattleChatRoomId() {
+    return getSceneChatRoomId();
+}
+
 function canWriteSceneMapChat() {
     return gameState === "BATTLE" || gameState === "OBSERVE";
 }
@@ -3710,7 +3738,12 @@ if (chatMessages && !chatMessages.dataset.playerActionsBound) {
 function renderBattleMessages() {
     const battleLog = document.getElementById("battle-chat-log");
     if (!battleLog) return;
-    battleLog.innerHTML = chatCache.battle.map(buildBattleChatMessageHtml).join("");
+    const activeRoomId = String(getBattleChatRoomId() || '');
+    const visibleMessages = chatCache.battle.filter(msg => {
+        if (!activeRoomId) return true;
+        return String(msg?.room_id || '') === activeRoomId;
+    });
+    battleLog.innerHTML = visibleMessages.map(buildBattleChatMessageHtml).join("");
     battleLog.scrollTop = battleLog.scrollHeight;
 }
 
@@ -3751,7 +3784,7 @@ function showBattleAnnouncementInActiveScene(msg) {
 
 function showSceneMapMessageInActiveScene(msg) {
     if (!msg) return;
-    if (gameState !== "BATTLE") return;
+    if (gameState !== "BATTLE" && gameState !== "OBSERVE") return;
     if (String(msg.room_id || "") !== String(getSceneChatRoomId() || "")) return;
 
     const feed = document.getElementById('kill-feed');
@@ -3804,6 +3837,13 @@ async function loadChatHistory(scopeName = currentChat) {
             return;
         }
         query = query.eq('room_id', scope.roomId);
+    }
+
+    if (scope.channel === "battle") {
+        const battleRoomId = getBattleChatRoomId();
+        if (battleRoomId) {
+            query = query.eq('room_id', battleRoomId);
+        }
     }
 
     if (scope.channel === "pm") {
@@ -3877,11 +3917,25 @@ async function handleIncomingRealtimeMessage(msg) {
     }
 
     if (msg.channel === "battle") {
+        const activeBattleRoomId = String(getBattleChatRoomId() || '');
+        if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) return;
         const scope = { key: "battle", channel: "battle" };
         if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
         if (currentChat === "battle") renderLobbyMessages();
         showBattleAnnouncementInActiveScene(msg);
+        renderChatTabs();
+        return;
+    }
+
+    if (msg.channel === "scene") {
+        const activeSceneRoomId = String(getSceneChatRoomId() || '');
+        if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
+        const scope = { key: "battle", channel: "battle" };
+        if (!pushChatToCache(scope, { ...msg, channel: 'battle' })) return;
+        if (currentChat !== "battle") incrementUnread("battle");
+        if (currentChat === "battle") renderLobbyMessages();
+        showSceneMapMessageInActiveScene(msg);
         renderChatTabs();
         return;
     }
@@ -3974,7 +4028,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
 
     const payload = {
         channel: scope.channel,
-        room_id: scope.channel === 'clan' ? getClanChatRoomId() : null,
+        room_id: scope.channel === 'clan' ? getClanChatRoomId() : (scope.channel === 'battle' ? getBattleChatRoomId() : null),
         player_id: getValidChatPlayerId(),
         player_public_id: ownPublicId,
         recipient_public_id: scope.channel === "pm" ? String(scope.peerId || "") : null,
@@ -4009,6 +4063,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         const optimisticMessage = {
             id: `local-${Date.now()}`,
             channel: "battle",
+            room_id: getBattleChatRoomId(),
             created_at: new Date().toISOString(),
             player_public_id: ownPublicId,
             player_nickname: getOwnChatLabel(),
@@ -4913,6 +4968,8 @@ document.addEventListener("keydown", (e) => {
     if (e.code === "KeyA") keys.a = true;
     if (e.code === "KeyS") keys.s = true;
     if (e.code === "KeyD") keys.d = true;
+    if (e.code === "Space") keys.space = true;
+    if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.shift = true;
     if (e.code === "KeyR") startBattleReload();
 
 });
@@ -4923,6 +4980,8 @@ document.addEventListener("keyup", (e) => {
     if (e.code === "KeyA") keys.a = false;
     if (e.code === "KeyS") keys.s = false;
     if (e.code === "KeyD") keys.d = false;
+    if (e.code === "Space") keys.space = false;
+    if (e.code === "ShiftLeft" || e.code === "ShiftRight") keys.shift = false;
 
 });
 
@@ -5260,7 +5319,7 @@ function initBattleUI(){
         document.addEventListener('keydown', (e) => {
             if(e.code === 'Tab'){
                 e.preventDefault();
-                if(scoreboard && gameState === 'BATTLE') scoreboard.classList.remove('hidden');
+                if(scoreboard && (gameState === 'BATTLE' || gameState === 'OBSERVE')) scoreboard.classList.remove('hidden');
             }
         });
         document.addEventListener('keyup', (e) => {
@@ -6518,13 +6577,23 @@ function limitBattleArea(){
 
     const prevUpdateObserverBattle = updateObserverBattle;
     updateObserverBattle = function(){
-        prevUpdateObserverBattle();
-        camera.position.lerp(observerFreeCameraPosition, 0.22);
         const lookDirection = new THREE.Vector3(
             Math.sin(observerCameraYaw) * Math.cos(observerCameraPitch),
             Math.sin(observerCameraPitch),
             -Math.cos(observerCameraYaw) * Math.cos(observerCameraPitch)
-        );
+        ).normalize();
+        const rightDirection = new THREE.Vector3().crossVectors(lookDirection, new THREE.Vector3(0, 1, 0)).normalize();
+        const moveForward = Number(!!keys.w) - Number(!!keys.s);
+        const moveRight = Number(!!keys.d) - Number(!!keys.a);
+        const moveUp = Number(!!keys.space) - Number(!!keys.shift);
+        const observerSpeed = 1.05;
+        if(moveForward || moveRight || moveUp){
+            observerFreeCameraPosition.add(lookDirection.clone().multiplyScalar(moveForward * observerSpeed));
+            observerFreeCameraPosition.add(rightDirection.clone().multiplyScalar(moveRight * observerSpeed));
+            observerFreeCameraPosition.y += moveUp * observerSpeed;
+        }
+        prevUpdateObserverBattle();
+        camera.position.lerp(observerFreeCameraPosition, 0.35);
         camera.lookAt(camera.position.clone().add(lookDirection));
     };
 
