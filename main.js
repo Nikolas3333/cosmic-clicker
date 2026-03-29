@@ -7027,26 +7027,16 @@ function getRoomMetaFromMapName(mapName){
     : null) || { title: String(mapName || 'Earth'), real: realKey, img: realKey, mode: 'DM' };
 }
 
-function generateUuidV4(){
-  if(globalThis.crypto?.randomUUID){
-    return globalThis.crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, ch => {
-    const r = Math.random() * 16 | 0;
-    const v = ch === 'x' ? r : ((r & 0x3) | 0x8);
-    return v.toString(16);
-  });
-}
-
 function getCurrentPlayerIdentity(){
   const fallbackNickname = (typeof player !== 'undefined' && player?.nickname) ? player.nickname : 'Commander';
-  const accountPublicId = authState?.mode === 'account' && authState?.playerId
-    ? String(authState.playerId)
+  const accountPublicId = Number(authState?.playerId || 0);
+  const authBasedId = (authState?.mode === 'account' && accountPublicId > 0)
+    ? String(accountPublicId)
     : '';
-  const localPlayerId = (typeof player !== 'undefined' && player?.id)
+  const playerBasedId = (typeof player !== 'undefined' && player?.id && String(player.id) !== 'local_player')
     ? String(player.id)
     : '';
-  const fallbackId = accountPublicId || localPlayerId || fallbackNickname;
+  const fallbackId = authBasedId || playerBasedId || fallbackNickname;
   return {
     playerId: fallbackId,
     nickname: fallbackNickname,
@@ -7166,24 +7156,20 @@ async function joinRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return false;
 
   const identity = getCurrentPlayerIdentity();
-  const safeRoomId = String(roomId || '').trim();
-  const safePlayerId = String(identity.playerId || '').trim();
-  const safeNickname = String(identity.displayName || identity.nickname || 'Commander').trim() || 'Commander';
-
-  if(!safeRoomId || !safePlayerId){
-    console.error('joinRoomPlayers: пустой roomId/playerId', { roomId: safeRoomId, playerId: safePlayerId });
+  if (!identity?.playerId || identity.playerId === 'local_player') {
+    console.error('joinRoomPlayers: некорректный playerId', identity);
     return false;
   }
 
   const { data: existingRows, error: existingError } = await window.supabaseClient
     .from('room_players')
     .select('id')
-    .eq('room_id', safeRoomId)
-    .eq('player_id', safePlayerId)
+    .eq('room_id', roomId)
+    .eq('player_id', identity.playerId)
     .limit(1);
 
   if (existingError) {
-    console.error('Ошибка проверки room_players:', existingError, { roomId: safeRoomId, playerId: safePlayerId });
+    console.error('Ошибка проверки room_players:', existingError);
     return false;
   }
 
@@ -7191,23 +7177,27 @@ async function joinRoomPlayers(roomId) {
     return true;
   }
 
-  const insertPayload = {
-    id: generateUuidV4(),
-    room_id: safeRoomId,
-    player_id: safePlayerId,
-    nickname: safeNickname
+  const payload = {
+    id: (globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(16).slice(2)}`),
+    room_id: roomId,
+    player_id: String(identity.playerId),
+    nickname: identity.displayName,
+    joined_at: new Date().toISOString()
   };
 
-  const { error } = await window.supabaseClient
+  const { data: insertedRow, error } = await window.supabaseClient
     .from('room_players')
-    .insert([insertPayload]);
+    .insert([payload])
+    .select('id,room_id,player_id,nickname,joined_at')
+    .single();
 
   if (error) {
-    console.error('Ошибка входа в room_players:', error, insertPayload);
+    console.error('Ошибка входа в room_players:', error, payload);
     return false;
   }
 
-  console.log('Игрок добавлен в room_players:', insertPayload);
+  console.log('room_players insert ok:', insertedRow);
+
   await loadRoomsFromSupabase();
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
@@ -7316,50 +7306,20 @@ async function loadRoomsFromSupabase() {
     return [];
   }
 
-  const cutoffIso = getOnlineFreshCutoffIso();
-
-  const [roomsResponse, onlineResponse] = await Promise.all([
-    window.supabaseClient
-      .from('rooms')
-      .select('*, room_players(player_id,nickname,joined_at)')
-      .order('created_at', { ascending: true }),
-    window.supabaseClient
-      .from('online_players')
-      .select('player_id,nickname,room_id,status,updated_at')
-      .eq('status', 'in-game')
-      .gte('updated_at', cutoffIso)
-  ]);
-
-  const { data, error } = roomsResponse;
-  const { data: onlineData, error: onlineError } = onlineResponse;
+  const { data, error } = await window.supabaseClient
+    .from('rooms')
+    .select('*, room_players(id,player_id,nickname,joined_at)')
+    .order('created_at', { ascending: true });
 
   if (error) {
     console.error('Ошибка загрузки комнат:', error);
     return [];
   }
 
-  if (onlineError) {
-    console.warn('Не удалось загрузить активных игроков по комнатам:', onlineError);
-  }
-
-  const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
   const allRooms = Array.isArray(data) ? data : [];
-  const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
-
-  if (emptyRooms.length) {
-    const emptyRoomIds = emptyRooms.map(room => room.id).filter(Boolean);
-    try {
-      await window.supabaseClient.from('room_players').delete().in('room_id', emptyRoomIds);
-      await window.supabaseClient.from('rooms').delete().in('id', emptyRoomIds);
-      console.log('Удалены пустые комнаты:', emptyRoomIds);
-    } catch (cleanupError) {
-      console.warn('Не удалось удалить пустые комнаты:', cleanupError);
-    }
-  }
-
   const visibleRooms = allRooms.filter(room => room?.id && Array.isArray(room.room_players) && room.room_players.length > 0);
-  supabaseBattleRoomsCache = visibleRooms
-    .map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows));
+
+  supabaseBattleRoomsCache = visibleRooms.map(room => mapSupabaseRoomToLobbyEntry(room, []));
 
   console.log('Комнаты из Supabase загружены:', visibleRooms);
   return supabaseBattleRoomsCache;
@@ -7453,9 +7413,20 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
 
   const joined = await joinRoomPlayers(data.id);
   if (!joined) {
+    console.error('Комната создана, но вход в room_players не удался:', data);
     await window.supabaseClient.from('rooms').delete().eq('id', data.id);
     return null;
   }
+
+  currentRoom = {
+    id: data.id,
+    roomId: data.id,
+    title: data.room_name || roomName,
+    map: normalizedMap,
+    real: normalizedMap,
+    state: 'battle'
+  };
+  window.currentRoomId = data.id;
 
   console.log('Комната создана:', data);
   await loadRoomsFromSupabase();
