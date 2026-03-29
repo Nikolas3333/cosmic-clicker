@@ -678,6 +678,7 @@ if(gameState === "BATTLE"){
         spawnPlayer();
         createEnemyBot();
         updateEnemyHud();
+        updateBattleScoreboard();
     }
 }
 
@@ -4541,38 +4542,6 @@ function createEnemyBot(){
         scene.remove(enemyBot);
         enemyBot = null;
     }
-
-    const botGroup = new THREE.Group();
-    botGroup.rotation.order = 'YXZ';
-
-    const body = new THREE.Mesh(
-        new THREE.ConeGeometry(1.15, 4.0, 8),
-        new THREE.MeshStandardMaterial({ color:0xc93a45, emissive:0x28060a, roughness:0.45, metalness:0.55 })
-    );
-    body.rotation.x = -Math.PI / 2;
-    botGroup.add(body);
-
-    const wingMat = new THREE.MeshStandardMaterial({ color:0x8f1e28, roughness:0.5, metalness:0.35 });
-    const leftWing = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.12, 1.0), wingMat);
-    leftWing.position.set(-1.6, 0, -0.1);
-    botGroup.add(leftWing);
-    const rightWing = leftWing.clone();
-    rightWing.position.x = 1.6;
-    botGroup.add(rightWing);
-
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), new THREE.MeshBasicMaterial({ color:0xffc7cf }));
-    core.position.set(0, 0.18, -1.1);
-    botGroup.add(core);
-
-    const engineGlow = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.9), new THREE.MeshBasicMaterial({ color:0xff7755 }));
-    engineGlow.position.set(0, 0, 1.9);
-    botGroup.add(engineGlow);
-
-    botGroup.position.copy(spawnPointB);
-    botGroup.lookAt(spawnPointA);
-    botGroup.userData = { hp: 160, maxHp: 160, id: 9001, name:'Drone_x1', yaw:botGroup.rotation.y, pitch:0, roll:0, strafePhase:0 };
-    enemyBot = botGroup;
-    scene.add(enemyBot);
     updateEnemyHud();
     updateBattleScoreboard();
 }
@@ -4622,25 +4591,26 @@ function fireBotLaser(){
 function updateBattleScoreboard(){
     const body = document.getElementById('battle-scoreboard-body');
     if(!body) return;
-    const botName = enemyBot?.userData?.name || 'Drone_x1';
-    const playerName = player?.nickname || 'Commander';
-    body.innerHTML = `
-      <div class="battle-scoreboard-row enemy">
-        <span>[BOT]</span>
-        <span>${botName}</span>
-        <span>${battleStats.botKills}</span>
-        <span>${battleStats.botDeaths}</span>
-        <span>1</span>
-        <span>9001</span>
-      </div>
-      <div class="battle-scoreboard-row player">
-        <span>[YOU]</span>
-        <span>${playerName}</span>
-        <span>${battleStats.playerKills}</span>
-        <span>${battleStats.playerDeaths}</span>
+
+    const roomPlayers = Array.isArray(currentRoom?.currentPlayers) && currentRoom.currentPlayers.length
+        ? currentRoom.currentPlayers
+        : (Array.isArray(currentRoom?.players) ? currentRoom.players : []);
+
+    const normalizedPlayers = roomPlayers.length ? roomPlayers : [player?.nickname || 'Commander'];
+
+    body.innerHTML = normalizedPlayers.map((name, index) => {
+      const safeName = String(name?.name || name || `Pilot ${index + 1}`);
+      const isYou = safeName === (player?.nickname || 'Commander') || safeName === (typeof getDisplayPlayerTag === 'function' ? getDisplayPlayerTag() : 'Commander');
+      return `
+      <div class="battle-scoreboard-row ${isYou ? 'player' : 'enemy'}">
+        <span>${isYou ? '[YOU]' : '[PLY]'}</span>
+        <span>${safeName}</span>
+        <span>${isYou ? battleStats.playerKills : 0}</span>
+        <span>${isYou ? battleStats.playerDeaths : 0}</span>
         <span>${player?.level || 1}</span>
-        <span>${player?.id || '1001'}</span>
+        <span>${isYou ? (player?.id || '1001') : 'LIVE'}</span>
       </div>`;
+    }).join('');
 }
 
 // ================= SPAWN PLAYER =================
@@ -6810,6 +6780,7 @@ function limitBattleArea(){
 /* ================= SUPABASE ROOMS SYSTEM ================= */
 
 let supabaseBattleRoomsCache = [];
+let battleRoomsRenderTimer = null;
 
 const DEFAULT_SUPABASE_BATTLE_ROOMS = [];
 
@@ -6830,15 +6801,40 @@ function getCurrentPlayerIdentity(){
   };
 }
 
-function mapSupabaseRoomToLobbyEntry(room){
+function getRoomOccupantsFromPresence(roomId, presenceRows = []){
+  if(!roomId) return [];
+  return (presenceRows || [])
+    .filter(row => String(row?.room_id || '') === String(roomId))
+    .sort((a, b) => new Date(a.updated_at || 0) - new Date(b.updated_at || 0))
+    .map(row => row.nickname || row.player_id)
+    .filter(Boolean);
+}
+
+function mergeUniquePlayers(primary = [], secondary = []){
+  const seen = new Set();
+  const result = [];
+  [ ...(primary || []), ...(secondary || []) ].forEach(name => {
+    const value = String(name || '').trim();
+    if(!value) return;
+    const key = value.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    result.push(value);
+  });
+  return result;
+}
+
+function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
   const meta = getRoomMetaFromMapName(room.map_name);
-  const players = Array.isArray(room.room_players)
+  const roomPlayers = Array.isArray(room.room_players)
     ? room.room_players
         .slice()
         .sort((a, b) => new Date(a.joined_at || 0) - new Date(b.joined_at || 0))
         .map(item => item.nickname || item.player_id)
         .filter(Boolean)
     : [];
+  const livePlayers = getRoomOccupantsFromPresence(room.id, presenceRows);
+  const players = mergeUniquePlayers(roomPlayers, livePlayers);
 
   return {
     id: room.id,
@@ -7010,17 +7006,35 @@ async function loadRoomsFromSupabase() {
     return [];
   }
 
-  const { data, error } = await window.supabaseClient
-    .from('rooms')
-    .select('*, room_players(player_id,nickname,joined_at)')
-    .order('created_at', { ascending: true });
+  const cutoffIso = getOnlineFreshCutoffIso();
+
+  const [roomsResponse, onlineResponse] = await Promise.all([
+    window.supabaseClient
+      .from('rooms')
+      .select('*, room_players(player_id,nickname,joined_at)')
+      .order('created_at', { ascending: true }),
+    window.supabaseClient
+      .from('online_players')
+      .select('player_id,nickname,room_id,status,updated_at')
+      .eq('status', 'in-game')
+      .gte('updated_at', cutoffIso)
+  ]);
+
+  const { data, error } = roomsResponse;
+  const { data: onlineData, error: onlineError } = onlineResponse;
 
   if (error) {
     console.error('Ошибка загрузки комнат:', error);
     return [];
   }
 
-  supabaseBattleRoomsCache = (data || []).map(mapSupabaseRoomToLobbyEntry);
+  if (onlineError) {
+    console.warn('Не удалось загрузить активных игроков по комнатам:', onlineError);
+  }
+
+  const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
+
+  supabaseBattleRoomsCache = (data || []).map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows));
   console.log('Комнаты из Supabase загружены:', data);
   return supabaseBattleRoomsCache;
 }
@@ -7392,7 +7406,20 @@ async function renderOnlinePlayers(){
     refreshPmOnlineState(players);
     list.innerHTML = '';
 
-    for(const p of players.filter(item => String(item?.status || '').toLowerCase() === 'lobby')){
+    const lobbyPlayers = players.filter(item => String(item?.status || '').toLowerCase() === 'lobby');
+    const inGamePlayers = players.filter(item => String(item?.status || '').toLowerCase() === 'in-game');
+
+    const appendSectionTitle = (text) => {
+        const title = document.createElement('div');
+        title.className = 'online-header';
+        title.style.margin = '6px 0 4px';
+        title.style.fontSize = '12px';
+        title.style.opacity = '0.82';
+        title.textContent = text;
+        list.appendChild(title);
+    };
+
+    const appendPlayerRow = (p, suffix = '') => {
         const row = document.createElement('div');
         row.className = 'online-player';
 
@@ -7400,7 +7427,7 @@ async function renderOnlinePlayers(){
         const canPmTarget = isAccountPublicId(targetId);
         const isMe = !!(targetId && myId && targetId === myId);
 
-        row.textContent = p.nickname + (!canPmTarget ? ' (guest)' : '');
+        row.textContent = `${p.nickname || 'Player'}${suffix}${!canPmTarget ? ' (guest)' : ''}`;
         row.title = isMe ? 'Это вы' : 'Нажмите, чтобы открыть профиль';
         row.dataset.playerId = targetId || '';
         row.dataset.nickname = p.nickname || '';
@@ -7413,6 +7440,28 @@ async function renderOnlinePlayers(){
                 await openPlayerProfile(targetId, p.nickname || `ID ${targetId}`);
             });
         }
+    };
+
+    if(lobbyPlayers.length){
+        appendSectionTitle('Лобби');
+        lobbyPlayers.forEach(p => appendPlayerRow(p));
+    }
+
+    if(inGamePlayers.length){
+        appendSectionTitle('На картах');
+        inGamePlayers.forEach(p => {
+            const room = supabaseBattleRoomsCache.find(item => String(item.id) === String(p.room_id));
+            const mapLabel = room?.title || room?.real || 'Карта';
+            appendPlayerRow(p, ` — ${mapLabel}`);
+        });
+    }
+
+    if(!lobbyPlayers.length && !inGamePlayers.length){
+        const empty = document.createElement('div');
+        empty.className = 'online-player';
+        empty.style.opacity = '0.7';
+        empty.textContent = 'Игроков онлайн пока нет';
+        list.appendChild(empty);
     }
 }
 
@@ -7451,6 +7500,16 @@ function startOnlineRenderLoop(){
     }, 5000);
 }
 
+function startBattleRoomsRenderLoop(){
+    if(battleRoomsRenderTimer) clearInterval(battleRoomsRenderTimer);
+    battleRoomsRenderTimer = setInterval(async () => {
+        if(gameState !== 'LOBBY') return;
+        if(typeof renderRoomsInLobby === 'function'){
+            await renderRoomsInLobby(true);
+        }
+    }, 4000);
+}
+
 const previousSwitchStateOnline = window.switchState || switchState;
 switchState = function(newState){
     if(newState === 'AUTH'){
@@ -7469,6 +7528,9 @@ switchState = function(newState){
     previousSwitchStateOnline(newState);
     syncCurrentOnlinePresence();
     setTimeout(renderOnlinePlayers, 300);
+    if(newState === 'LOBBY' && typeof renderRoomsInLobby === 'function'){
+        setTimeout(() => { renderRoomsInLobby(true); }, 180);
+    }
 };
 
 window.switchState = switchState;
@@ -7498,6 +7560,7 @@ window.addEventListener('focus', () => {
 
 startOnlinePresenceHeartbeat();
 startOnlineRenderLoop();
+startBattleRoomsRenderLoop();
 cleanupStaleOnlinePlayers();
 syncCurrentOnlinePresence();
 renderOnlinePlayers();
