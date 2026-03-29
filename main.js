@@ -3461,15 +3461,31 @@ function showBattleAnnouncementInActiveScene(msg) {
     if (!msg) return;
     if (gameState !== "BATTLE" && gameState !== "OBSERVE") return;
 
-    const author = msg.player_nickname || msg.nickname || "Unknown";
-    const text = msg.message || "";
-    const line = `${author}: ${text}`;
+    const feed = document.getElementById('kill-feed');
+    if (!feed) return;
 
-    pushKillFeed(line, 'chat');
+    const author = escapeChatHtml(msg.player_nickname || msg.nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
+    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
-    if (gameState === "BATTLE" || gameState === "OBSERVE") {
-        renderBattleMessages?.();
+    const item = document.createElement('div');
+    item.className = `kill-feed-item chat-announcement${lineClass}`;
+    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+
+    feed.prepend(item);
+
+    while (feed.children.length > 8) {
+        feed.removeChild(feed.lastChild);
     }
+
+    setTimeout(() => {
+        item.remove();
+    }, 9000);
+
+    renderBattleMessages?.();
 }
 
 async function loadChatHistory(scopeName = currentChat) {
