@@ -304,7 +304,14 @@ function setBattleChatOpen(open){
     battleChatOpen = open;
     const box = document.getElementById('battle-chat-box');
     const input = document.getElementById('battle-chat-input');
-    if(box) box.classList.toggle('hidden', !open);
+
+    const inputOnlyMode = gameState === 'BATTLE' && !canWriteBattleAnnouncementChat();
+
+    if(box){
+        box.classList.toggle('hidden', !open);
+        box.classList.toggle('input-only', !!open && inputOnlyMode);
+    }
+
     if(open){
         resetBattleInputState();
         if(document.pointerLockElement) document.exitPointerLock();
@@ -319,6 +326,45 @@ function setBattleChatOpen(open){
     }
 }
 
+async function sendSceneMapMessage(text) {
+    if (!window.supabaseClient) return false;
+    if (!canWriteSceneMapChat()) return false;
+
+    const ownPublicId = getOwnPublicChatId?.() || "";
+    const payload = {
+        channel: "scene",
+        room_id: getSceneChatRoomId(),
+        player_id: getValidChatPlayerId(),
+        player_public_id: ownPublicId,
+        recipient_public_id: null,
+        player_nickname: getOwnChatLabel(),
+        message: String(text || "").trim()
+    };
+
+    if (!payload.message) return false;
+
+    const { error } = await window.supabaseClient
+        .from("chat_messages")
+        .insert(payload);
+
+    if (error) {
+        console.error("❌ Ошибка отправки scene-сообщения:", error);
+        return false;
+    }
+
+    const optimisticMessage = {
+        id: `scene-local-${Date.now()}`,
+        channel: "scene",
+        room_id: payload.room_id,
+        created_at: new Date().toISOString(),
+        player_public_id: ownPublicId,
+        player_nickname: payload.player_nickname,
+        message: payload.message
+    };
+    showSceneMapMessageInActiveScene(optimisticMessage);
+    return true;
+}
+
 function initBattleChat(){
     const input = document.getElementById('battle-chat-input');
     if(!input || input.dataset.bound) return;
@@ -328,16 +374,9 @@ function initBattleChat(){
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
         if(e.key === 'Enter'){
-            if(battleObserverMode){
-                if(!canWriteInObserverChat()){
-                    e.preventDefault();
-                    return;
-                }
-            } else {
-                if(!canWriteBattleAnnouncementChat()){
-                    e.preventDefault();
-                    return;
-                }
+            if(gameState === 'OBSERVE' && !canWriteBattleAnnouncementChat()){
+                e.preventDefault();
+                return;
             }
 
             if(!battleChatOpen){
@@ -354,7 +393,12 @@ function initBattleChat(){
                 }
 
                 if(text){
-                    const sent = await sendMessage('battle', text);
+                    let sent = false;
+                    if(gameState === 'BATTLE' && !canWriteBattleAnnouncementChat()){
+                        sent = await sendSceneMapMessage(text);
+                    }else{
+                        sent = await sendMessage('battle', text);
+                    }
                     if(sent) input.value = '';
                 }
                 setBattleChatOpen(false);
@@ -2970,6 +3014,16 @@ function canWriteBattleAnnouncementChat() {
     return role === "adm" || role === "owr";
 }
 
+function getSceneChatRoomId() {
+    const fromCurrentRoom = currentRoom?.id || currentRoom?.roomId || null;
+    const fallbackMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "scene";
+    return String(fromCurrentRoom || `scene_${String(fallbackMap).toLowerCase()}`);
+}
+
+function canWriteSceneMapChat() {
+    return gameState === "BATTLE";
+}
+
 const chatRateLimitState = {
     lastSentAt: 0,
     cooldownMs: 1800
@@ -3486,6 +3540,36 @@ function showBattleAnnouncementInActiveScene(msg) {
     }, 9000);
 
     renderBattleMessages?.();
+}
+
+function showSceneMapMessageInActiveScene(msg) {
+    if (!msg) return;
+    if (gameState !== "BATTLE") return;
+    if (String(msg.room_id || "") !== String(getSceneChatRoomId() || "")) return;
+
+    const feed = document.getElementById('kill-feed');
+    if (!feed) return;
+
+    const author = escapeChatHtml(msg.player_nickname || msg.nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const roleBadge = getChatRoleBadgeHtmlByPublicId(publicId);
+    const roleClass = getChatRoleCssClassByPublicId(publicId);
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
+
+    const item = document.createElement('div');
+    item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
+    item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span><span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+
+    feed.prepend(item);
+
+    while (feed.children.length > 8) {
+        feed.removeChild(feed.lastChild);
+    }
+
+    setTimeout(() => {
+        item.remove();
+    }, 9000);
 }
 
 async function loadChatHistory(scopeName = currentChat) {
