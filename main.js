@@ -412,7 +412,7 @@ async function sendSceneMapMessage(text, options = {}) {
     }
 
     const effectiveBattleRow = insertedBattle || (
-        insertedScene && mirrorToBattle && gameState === 'BATTLE'
+        insertedScene && mirrorToBattle
             ? {
                 ...insertedScene,
                 id: `battle-mirror:${insertedScene.id}`,
@@ -427,13 +427,16 @@ async function sendSceneMapMessage(text, options = {}) {
         markLocalHandledChatMessage(insertedBattle.id);
     }
 
-    if (effectiveBattleRow && currentChat !== 'battle') {
-        incrementUnread('battle');
+    if (effectiveBattleRow) {
+        const battleScope = { key: 'battle', channel: 'battle', roomId };
+        pushChatToCache(battleScope, effectiveBattleRow);
+        if (currentChat !== 'battle') incrementUnread('battle');
+        if (currentChat === 'battle') renderLobbyMessages();
+        if (gameState === 'BATTLE' || gameState === 'OBSERVE' || currentChat === 'battle') {
+            renderBattleMessages();
+        }
+        renderChatTabs();
     }
-
-    try {
-        await refreshBattleFeedFromDb();
-    } catch (_) { }
 
     return true;
 }
@@ -4108,8 +4111,14 @@ async function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "battle") {
         const activeBattleRoomId = String(getBattleChatRoomId() || '');
         if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) return;
+        const scope = { key: 'battle', channel: 'battle', roomId: activeBattleRoomId || String(msg.room_id || '') };
+        if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
-        scheduleBattleFeedRefresh();
+        if (currentChat === 'battle') renderLobbyMessages();
+        if (gameState === 'BATTLE' || gameState === 'OBSERVE' || currentChat === 'battle') {
+            renderBattleMessages();
+        }
+        renderChatTabs();
         return;
     }
 
@@ -4117,13 +4126,10 @@ async function handleIncomingRealtimeMessage(msg) {
         const activeSceneRoomId = String(getSceneChatRoomId() || '');
         if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
 
-        if (currentChat !== "battle") incrementUnread("battle");
-
         if (!wasLocalHandledChatMessage(msg.id)) {
             showSceneMapMessageInActiveScene(msg);
         }
 
-        scheduleBattleFeedRefresh();
         return;
     }
 
