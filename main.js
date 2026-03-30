@@ -409,10 +409,25 @@ async function sendSceneMapMessage(text, options = {}) {
         showSceneMapMessageInActiveScene(insertedScene);
     }
 
+    const effectiveBattleRow = insertedBattle || (
+        insertedScene && mirrorToBattle && gameState === 'BATTLE'
+            ? {
+                ...insertedScene,
+                id: `battle-mirror:${insertedScene.id}`,
+                channel: 'battle',
+                __localMirror: true,
+                source_scene_id: insertedScene.id
+            }
+            : null
+    );
+
     if (insertedBattle) {
         markLocalHandledChatMessage(insertedBattle.id);
+    }
+
+    if (effectiveBattleRow) {
         const scope = { key: 'battle', channel: 'battle' };
-        if (pushChatToCache(scope, insertedBattle)) {
+        if (pushChatToCache(scope, effectiveBattleRow)) {
             if (currentChat !== 'battle') incrementUnread('battle');
             renderBattleMessages?.();
             renderChatTabs?.();
@@ -3474,6 +3489,31 @@ function wasLocalHandledChatMessage(id) {
 function pushChatToCache(scope, msg) {
     const list = getChatCacheList(scope);
     if (list.some(item => String(item.id) === String(msg.id))) return false;
+
+    if (scope?.channel === 'battle') {
+        const sourceSceneId = String(msg?.source_scene_id || '').trim();
+        if (sourceSceneId && list.some(item => String(item?.source_scene_id || '') === sourceSceneId || String(item?.id || '') === sourceSceneId)) {
+            return false;
+        }
+
+        const msgText = String(msg?.message || '').trim();
+        const msgRoom = String(msg?.room_id || '').trim();
+        const msgAuthor = String(msg?.player_public_id || msg?.player_id || '').trim();
+        const msgTime = new Date(msg?.created_at || 0).getTime();
+
+        if (msgText && msgRoom && msgAuthor && Number.isFinite(msgTime)) {
+            const nearDuplicate = list.some(item => {
+                const itemText = String(item?.message || '').trim();
+                const itemRoom = String(item?.room_id || '').trim();
+                const itemAuthor = String(item?.player_public_id || item?.player_id || '').trim();
+                const itemTime = new Date(item?.created_at || 0).getTime();
+                if (!Number.isFinite(itemTime)) return false;
+                return itemText === msgText && itemRoom === msgRoom && itemAuthor === msgAuthor && Math.abs(itemTime - msgTime) < 2500;
+            });
+            if (nearDuplicate) return false;
+        }
+    }
+
     list.push(msg);
     list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
