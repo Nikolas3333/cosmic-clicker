@@ -4049,9 +4049,23 @@ async function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "scene") {
         const activeSceneRoomId = String(getSceneChatRoomId() || '');
         if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
+
+        const battleScope = { key: "battle", channel: "battle" };
+        const mirroredBattleMsg = { ...msg, channel: "battle", source_scene_id: msg.id };
+
+        pushChatToCache(battleScope, mirroredBattleMsg);
+
+        if (currentChat !== "battle") incrementUnread("battle");
+
         if (!wasLocalHandledChatMessage(msg.id)) {
             showSceneMapMessageInActiveScene(msg);
         }
+
+        if (currentChat === "battle") {
+            renderLobbyMessages();
+        }
+
+        renderBattleMessages();
         renderChatTabs();
         return;
     }
