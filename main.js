@@ -390,30 +390,33 @@ async function sendSceneMapMessage(text, options = {}) {
         });
     }
 
-    const { error } = await window.supabaseClient
+    const { data, error } = await window.supabaseClient
         .from("chat_messages")
-        .insert(payloads);
+        .insert(payloads)
+        .select('*');
 
     if (error) {
         console.error("❌ Ошибка отправки scene сообщения:", error);
         return false;
     }
 
-    if (gameState === 'BATTLE' && mirrorToBattle) {
-        const optimisticBattleMessage = {
-            id: `battle-local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            channel: 'battle',
-            room_id: scenePayload.room_id,
-            created_at: new Date().toISOString(),
-            player_public_id: scenePayload.player_public_id,
-            player_nickname: scenePayload.player_nickname,
-            staff_role: scenePayload.staff_role,
-            message: cleanText
-        };
-        pushChatToCache({ key: 'battle', channel: 'battle' }, optimisticBattleMessage);
-        if (currentChat !== 'battle') incrementUnread('battle');
-        renderBattleMessages?.();
-        renderChatTabs?.();
+    const insertedRows = Array.isArray(data) ? data : [];
+    const insertedScene = insertedRows.find(row => row?.channel === 'scene');
+    const insertedBattle = insertedRows.find(row => row?.channel === 'battle');
+
+    if (insertedScene) {
+        markLocalHandledChatMessage(insertedScene.id);
+        showSceneMapMessageInActiveScene(insertedScene);
+    }
+
+    if (insertedBattle) {
+        markLocalHandledChatMessage(insertedBattle.id);
+        const scope = { key: 'battle', channel: 'battle' };
+        if (pushChatToCache(scope, insertedBattle)) {
+            if (currentChat !== 'battle') incrementUnread('battle');
+            renderBattleMessages?.();
+            renderChatTabs?.();
+        }
     }
 
     return true;
@@ -3050,6 +3053,7 @@ const chatUnread = {
 const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
 const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
+const localHandledChatMessageIds = new Set();
 
 const playerStaffRoleCache = {};
 const STAFF_ROLE_META = {
@@ -3451,25 +3455,25 @@ function syncPrivateTabFromScope(scopeName) {
     }
 }
 
-function isSameChatMessageFingerprint(a, b) {
-    if (!a || !b) return false;
-    const sameChannel = String(a.channel || '') === String(b.channel || '');
-    const sameRoom = String(a.room_id || '') === String(b.room_id || '');
-    const sameAuthor = String(a.player_public_id || '') === String(b.player_public_id || '');
-    const sameNickname = String(a.player_nickname || '') === String(b.player_nickname || '');
-    const sameRole = String(a.staff_role || '') === String(b.staff_role || '');
-    const sameMessage = String(a.message || '') === String(b.message || '');
-    if (!(sameChannel && sameRoom && sameAuthor && sameNickname && sameRole && sameMessage)) return false;
-    const aTime = new Date(a.created_at || 0).getTime();
-    const bTime = new Date(b.created_at || 0).getTime();
-    if (!Number.isFinite(aTime) || !Number.isFinite(bTime)) return false;
-    return Math.abs(aTime - bTime) <= 5000;
+
+function markLocalHandledChatMessage(id) {
+    const key = String(id || '').trim();
+    if (!key) return;
+    localHandledChatMessageIds.add(key);
+    setTimeout(() => localHandledChatMessageIds.delete(key), 15000);
+}
+
+function wasLocalHandledChatMessage(id) {
+    const key = String(id || '').trim();
+    if (!key) return false;
+    if (!localHandledChatMessageIds.has(key)) return false;
+    localHandledChatMessageIds.delete(key);
+    return true;
 }
 
 function pushChatToCache(scope, msg) {
     const list = getChatCacheList(scope);
     if (list.some(item => String(item.id) === String(msg.id))) return false;
-    if (list.some(item => isSameChatMessageFingerprint(item, msg))) return false;
     list.push(msg);
     list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
@@ -4005,13 +4009,9 @@ async function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "scene") {
         const activeSceneRoomId = String(getSceneChatRoomId() || '');
         if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
-        const scope = { key: "battle", channel: "battle" };
-        const mirroredMsg = { ...msg, channel: 'battle' };
-        if (!pushChatToCache(scope, mirroredMsg)) return;
-        if (currentChat !== "battle") incrementUnread("battle");
-        if (currentChat === "battle") renderLobbyMessages();
-        renderBattleMessages();
-        showSceneMapMessageInActiveScene(msg);
+        if (!wasLocalHandledChatMessage(msg.id)) {
+            showSceneMapMessageInActiveScene(msg);
+        }
         renderChatTabs();
         return;
     }
