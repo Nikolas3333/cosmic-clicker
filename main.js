@@ -436,11 +436,23 @@ function initBattleChat(){
                     let sent = false;
                     if(gameState === 'BATTLE'){
                         sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                        if(sent){
+                            try{
+                                await loadChatHistory('battle');
+                                renderBattleMessages();
+                            }catch(_){ }
+                        }
                     }else if(gameState === 'OBSERVE'){
                         if(!canWriteInObserverChat()) {
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                         } else {
                             sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                            if(sent){
+                                try{
+                                    await loadChatHistory('battle');
+                                    renderBattleMessages();
+                                }catch(_){ }
+                            }
                         }
                     }
                     if(sent) input.value = '';
