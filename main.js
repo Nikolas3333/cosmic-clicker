@@ -415,6 +415,11 @@ function initBattleChat(){
         if(e.key === 'Enter'){
             if(e.repeat) return;
             if(!battleChatOpen){
+                if(gameState === 'OBSERVE' && !canWriteInObserverChat()) {
+                    e.preventDefault();
+                    pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
+                    return;
+                }
                 e.preventDefault();
                 setBattleChatOpen(true);
             }else{
@@ -432,7 +437,11 @@ function initBattleChat(){
                     if(gameState === 'BATTLE'){
                         sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
                     }else if(gameState === 'OBSERVE'){
-                        sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                        if(!canWriteInObserverChat()) {
+                            pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
+                        } else {
+                            sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                        }
                     }
                     if(sent) input.value = '';
                 }
@@ -3075,7 +3084,9 @@ function getBattleChatRoomId() {
 }
 
 function canWriteSceneMapChat() {
-    return gameState === "BATTLE" || gameState === "OBSERVE";
+    if (gameState === "BATTLE") return true;
+    if (gameState === "OBSERVE") return canWriteInObserverChat();
+    return false;
 }
 
 function getPlayerClanChatId() {
