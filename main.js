@@ -3096,19 +3096,68 @@ function canWriteBattleAnnouncementChat() {
     return role === "adm" || role === "owr";
 }
 
+function getSharedBattleChatRoomId() {
+    const mapName = String(
+        currentRoom?.real ||
+        currentRoom?.map ||
+        currentRoom?.rawRoom?.map_name ||
+        selectedLobbyMap?.real ||
+        selectedLobbyMap?.map ||
+        selectedLobbyMap?.name ||
+        ''
+    ).trim().toLowerCase();
+    if (!mapName) return '';
+
+    const roomName = String(
+        currentRoom?.title ||
+        currentRoom?.room_name ||
+        currentRoom?.rawRoom?.room_name ||
+        selectedLobbyMap?.title ||
+        selectedLobbyMap?.room_name ||
+        ''
+    ).trim();
+    const hostName = String(
+        currentRoom?.host ||
+        currentRoom?.host_name ||
+        currentRoom?.rawRoom?.host_name ||
+        selectedLobbyMap?.host ||
+        selectedLobbyMap?.host_name ||
+        ''
+    ).trim().toUpperCase();
+
+    const isPublicRoom = hostName === 'SYSTEM' || /^public\s+/i.test(roomName);
+    if (!isPublicRoom) return '';
+
+    return `public_${mapName}`;
+}
+
 function getSceneChatRoomId() {
+    const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
+    if (sharedBattleRoomId) {
+        activeBattleChatRoomId = sharedBattleRoomId;
+        return sharedBattleRoomId;
+    }
+
     const fromCurrentRoom = currentRoom?.id || currentRoom?.roomId || null;
     if (fromCurrentRoom) {
         activeBattleChatRoomId = String(fromCurrentRoom);
         return String(fromCurrentRoom);
     }
+
     const rememberedRoomId = String(activeBattleChatRoomId || window.currentRoomId || '').trim();
     if (rememberedRoomId) return rememberedRoomId;
-    const fallbackMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "scene";
+
+    const fallbackMap = currentRoom?.map || currentRoom?.real || selectedLobbyMap?.real || selectedLobbyMap?.name || "scene";
     return String(`scene_${String(fallbackMap).toLowerCase()}`);
 }
 
 function getBattleChatRoomId() {
+    const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
+    if (sharedBattleRoomId) {
+        activeBattleChatRoomId = sharedBattleRoomId;
+        return sharedBattleRoomId;
+    }
+
     const sceneRoomId = String(getSceneChatRoomId() || '').trim();
     if (sceneRoomId) {
         activeBattleChatRoomId = sceneRoomId;
@@ -3474,13 +3523,29 @@ function wasLocalHandledChatMessage(id) {
 
 function pushChatToCache(scope, msg) {
     const list = getChatCacheList(scope);
-    const msgId = String(msg?.id || '').trim();
-    if (msgId && list.some(item => String(item?.id || '').trim() === msgId)) return false;
+    if (list.some(item => String(item.id) === String(msg.id))) return false;
 
     if (scope?.channel === 'battle') {
         const sourceSceneId = String(msg?.source_scene_id || '').trim();
-        if (sourceSceneId && list.some(item => String(item?.source_scene_id || '').trim() === sourceSceneId)) {
+        if (sourceSceneId && list.some(item => String(item?.source_scene_id || '') === sourceSceneId || String(item?.id || '') === sourceSceneId)) {
             return false;
+        }
+
+        const msgText = String(msg?.message || '').trim();
+        const msgRoom = String(msg?.room_id || '').trim();
+        const msgAuthor = String(msg?.player_public_id || msg?.player_id || '').trim();
+        const msgTime = new Date(msg?.created_at || 0).getTime();
+
+        if (msgText && msgRoom && msgAuthor && Number.isFinite(msgTime)) {
+            const nearDuplicate = list.some(item => {
+                const itemText = String(item?.message || '').trim();
+                const itemRoom = String(item?.room_id || '').trim();
+                const itemAuthor = String(item?.player_public_id || item?.player_id || '').trim();
+                const itemTime = new Date(item?.created_at || 0).getTime();
+                if (!Number.isFinite(itemTime)) return false;
+                return itemText === msgText && itemRoom === msgRoom && itemAuthor === msgAuthor && Math.abs(itemTime - msgTime) < 2500;
+            });
+            if (nearDuplicate) return false;
         }
     }
 
