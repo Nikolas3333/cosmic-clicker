@@ -425,14 +425,13 @@ async function sendSceneMapMessage(text, options = {}) {
         markLocalHandledChatMessage(insertedBattle.id);
     }
 
-    if (effectiveBattleRow) {
-        const scope = { key: 'battle', channel: 'battle' };
-        if (pushChatToCache(scope, effectiveBattleRow)) {
-            if (currentChat !== 'battle') incrementUnread('battle');
-            renderBattleMessages?.();
-            renderChatTabs?.();
-        }
+    if (effectiveBattleRow && currentChat !== 'battle') {
+        incrementUnread('battle');
     }
+
+    try {
+        await refreshBattleFeedFromDb();
+    } catch (_) { }
 
     return true;
 }
@@ -3991,7 +3990,18 @@ async function loadChatHistory(scopeName = currentChat) {
 
     const list = getChatCacheList(scope);
     list.length = 0;
-    (data || []).slice().reverse().forEach(msg => list.push(msg));
+    if (scope.channel === "battle") {
+        const seen = new Set();
+        (data || []).slice().reverse().forEach(msg => {
+            if (!msg) return;
+            const key = String(msg.id || '');
+            if (key && seen.has(key)) return;
+            if (key) seen.add(key);
+            list.push(msg.channel === 'scene' ? { ...msg, channel: 'battle', source_scene_id: msg.id } : msg);
+        });
+    } else {
+        (data || []).slice().reverse().forEach(msg => list.push(msg));
+    }
 
     if (scope.channel === "pm") {
         const peerId = scope.peerId;
@@ -4009,6 +4019,45 @@ async function loadChatHistory(scopeName = currentChat) {
     if (scope.channel === "battle" && (gameState === "BATTLE" || gameState === "OBSERVE" || currentChat === "battle")) {
         renderBattleMessages();
     }
+}
+
+
+async function refreshBattleFeedFromDb() {
+    if (!window.supabaseClient) return;
+    const roomId = String(getBattleChatRoomId() || '').trim();
+    if (!roomId) return;
+
+    const { data, error } = await window.supabaseClient
+        .from("chat_messages")
+        .select("*")
+        .in("channel", ["battle", "scene"])
+        .eq("room_id", roomId)
+        .order("created_at", { ascending: true })
+        .limit(CHAT_MESSAGE_LIMIT);
+
+    if (error) {
+        console.error('❌ Ошибка обновления battle потока:', error);
+        return;
+    }
+
+    await hydrateStaffRolesForMessages(data || []);
+
+    const normalized = [];
+    const seen = new Set();
+    for (const raw of (data || [])) {
+        if (!raw) continue;
+        const key = String(raw.id || '');
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        normalized.push(raw.channel === 'scene' ? { ...raw, channel: 'battle', source_scene_id: raw.id } : raw);
+    }
+
+    chatCache.battle.length = 0;
+    normalized.forEach(msg => chatCache.battle.push(msg));
+
+    renderBattleMessages();
+    if (currentChat === 'battle') renderLobbyMessages();
+    renderChatTabs();
 }
 
 async function handleIncomingRealtimeMessage(msg) {
@@ -4042,12 +4091,8 @@ async function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "battle") {
         const activeBattleRoomId = String(getBattleChatRoomId() || '');
         if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) return;
-        const scope = { key: "battle", channel: "battle" };
-        if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
-        if (currentChat === "battle") renderLobbyMessages();
-        renderBattleMessages();
-        renderChatTabs();
+        await refreshBattleFeedFromDb();
         return;
     }
 
@@ -4055,23 +4100,13 @@ async function handleIncomingRealtimeMessage(msg) {
         const activeSceneRoomId = String(getSceneChatRoomId() || '');
         if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
 
-        const battleScope = { key: "battle", channel: "battle" };
-        const mirroredBattleMsg = { ...msg, channel: "battle", source_scene_id: msg.id };
-
-        pushChatToCache(battleScope, mirroredBattleMsg);
-
         if (currentChat !== "battle") incrementUnread("battle");
 
         if (!wasLocalHandledChatMessage(msg.id)) {
             showSceneMapMessageInActiveScene(msg);
         }
 
-        if (currentChat === "battle") {
-            renderLobbyMessages();
-        }
-
-        renderBattleMessages();
-        renderChatTabs();
+        await refreshBattleFeedFromDb();
         return;
     }
 
