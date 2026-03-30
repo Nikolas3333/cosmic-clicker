@@ -399,6 +399,23 @@ async function sendSceneMapMessage(text, options = {}) {
         return false;
     }
 
+    if (gameState === 'BATTLE' && mirrorToBattle) {
+        const optimisticBattleMessage = {
+            id: `battle-local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            channel: 'battle',
+            room_id: scenePayload.room_id,
+            created_at: new Date().toISOString(),
+            player_public_id: scenePayload.player_public_id,
+            player_nickname: scenePayload.player_nickname,
+            staff_role: scenePayload.staff_role,
+            message: cleanText
+        };
+        pushChatToCache({ key: 'battle', channel: 'battle' }, optimisticBattleMessage);
+        if (currentChat !== 'battle') incrementUnread('battle');
+        renderBattleMessages?.();
+        renderChatTabs?.();
+    }
+
     return true;
 }
 
@@ -3434,9 +3451,25 @@ function syncPrivateTabFromScope(scopeName) {
     }
 }
 
+function isSameChatMessageFingerprint(a, b) {
+    if (!a || !b) return false;
+    const sameChannel = String(a.channel || '') === String(b.channel || '');
+    const sameRoom = String(a.room_id || '') === String(b.room_id || '');
+    const sameAuthor = String(a.player_public_id || '') === String(b.player_public_id || '');
+    const sameNickname = String(a.player_nickname || '') === String(b.player_nickname || '');
+    const sameRole = String(a.staff_role || '') === String(b.staff_role || '');
+    const sameMessage = String(a.message || '') === String(b.message || '');
+    if (!(sameChannel && sameRoom && sameAuthor && sameNickname && sameRole && sameMessage)) return false;
+    const aTime = new Date(a.created_at || 0).getTime();
+    const bTime = new Date(b.created_at || 0).getTime();
+    if (!Number.isFinite(aTime) || !Number.isFinite(bTime)) return false;
+    return Math.abs(aTime - bTime) <= 5000;
+}
+
 function pushChatToCache(scope, msg) {
     const list = getChatCacheList(scope);
     if (list.some(item => String(item.id) === String(msg.id))) return false;
+    if (list.some(item => isSameChatMessageFingerprint(item, msg))) return false;
     list.push(msg);
     list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
