@@ -4035,6 +4035,20 @@ async function refreshBattleFeedFromDb() {
 
 async function handleIncomingRealtimeMessage(msg) {
     if (!msg || !msg.channel) return;
+    console.log('📥 RECEIVE MESSAGE:', {
+        id: msg.id || null,
+        channel: msg.channel || null,
+        room_id: msg.room_id || null,
+        player_id: msg.player_id || null,
+        player_public_id: msg.player_public_id || null,
+        nickname: msg.player_nickname || null,
+        currentChat,
+        gameState,
+        battleRoomId: getBattleChatRoomId ? getBattleChatRoomId() : null,
+        sceneRoomId: getSceneChatRoomId ? getSceneChatRoomId() : null,
+        observerMode: !!battleObserverMode,
+        text: msg.message || ''
+    });
     await hydrateStaffRolesForMessages([msg]);
 
     if (msg.channel === "global") {
@@ -4063,9 +4077,24 @@ async function handleIncomingRealtimeMessage(msg) {
 
     if (msg.channel === "battle") {
         const activeBattleRoomId = String(getBattleChatRoomId() || '');
-        if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) return;
+        if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) {
+            console.log('⛔ BATTLE FILTER SKIP:', {
+                incomingRoomId: String(msg.room_id || ''),
+                activeBattleRoomId,
+                id: msg.id || null,
+                text: msg.message || ''
+            });
+            return;
+        }
         const scope = { key: 'battle', channel: 'battle' };
-        if (!pushChatToCache(scope, msg)) return;
+        if (!pushChatToCache(scope, msg)) {
+            console.log('♻️ BATTLE DUPLICATE SKIP:', {
+                id: msg.id || null,
+                room_id: msg.room_id || null,
+                text: msg.message || ''
+            });
+            return;
+        }
         if (currentChat !== "battle") incrementUnread("battle");
         renderBattleMessages();
         if (currentChat === 'battle') renderLobbyMessages();
@@ -4179,6 +4208,21 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         player_nickname: getOwnChatLabel(),
         message: text
     };
+
+    console.log('📤 SEND MESSAGE:', {
+        scopeName,
+        channel: payload.channel,
+        room_id: payload.room_id,
+        player_id: payload.player_id,
+        player_public_id: payload.player_public_id,
+        nickname: payload.player_nickname,
+        currentChat,
+        gameState,
+        battleRoomId: getBattleChatRoomId ? getBattleChatRoomId() : null,
+        sceneRoomId: getSceneChatRoomId ? getSceneChatRoomId() : null,
+        observerMode: !!battleObserverMode,
+        text
+    });
 
     if (scope.channel === 'clan' && !payload.room_id) {
         addSystemLobbyChatMessage('⚠ Не найден room_id клана для отправки сообщения.');
