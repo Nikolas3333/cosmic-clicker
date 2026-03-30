@@ -31,6 +31,7 @@ player.ships.push({
 
 let gameState = "AUTH";
 let currentRoom = null;
+let activeBattleChatRoomId = null;
 let playerShip = null;
 let keys = {
     w: false,
@@ -361,6 +362,7 @@ async function sendSceneMapMessage(text, options = {}) {
 
     const roomId = String(getSceneChatRoomId() || '').trim();
     if (!roomId) return false;
+    activeBattleChatRoomId = roomId;
 
     const mirrorToBattle = options?.mirrorToBattle !== false && (gameState === 'BATTLE' || gameState === 'OBSERVE');
 
@@ -3122,12 +3124,23 @@ function canWriteBattleAnnouncementChat() {
 
 function getSceneChatRoomId() {
     const fromCurrentRoom = currentRoom?.id || currentRoom?.roomId || null;
+    if (fromCurrentRoom) {
+        activeBattleChatRoomId = String(fromCurrentRoom);
+        return String(fromCurrentRoom);
+    }
+    const rememberedRoomId = String(activeBattleChatRoomId || window.currentRoomId || '').trim();
+    if (rememberedRoomId) return rememberedRoomId;
     const fallbackMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "scene";
-    return String(fromCurrentRoom || `scene_${String(fallbackMap).toLowerCase()}`);
+    return String(`scene_${String(fallbackMap).toLowerCase()}`);
 }
 
 function getBattleChatRoomId() {
-    return getSceneChatRoomId();
+    const sceneRoomId = String(getSceneChatRoomId() || '').trim();
+    if (sceneRoomId) {
+        activeBattleChatRoomId = sceneRoomId;
+        return sceneRoomId;
+    }
+    return String(activeBattleChatRoomId || '').trim();
 }
 
 function canWriteSceneMapChat() {
