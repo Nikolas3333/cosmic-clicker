@@ -412,7 +412,7 @@ async function sendSceneMapMessage(text, options = {}) {
     }
 
     const effectiveBattleRow = insertedBattle || (
-        insertedScene && mirrorToBattle
+        insertedScene && mirrorToBattle && gameState === 'BATTLE'
             ? {
                 ...insertedScene,
                 id: `battle-mirror:${insertedScene.id}`,
@@ -427,16 +427,13 @@ async function sendSceneMapMessage(text, options = {}) {
         markLocalHandledChatMessage(insertedBattle.id);
     }
 
-    if (effectiveBattleRow) {
-        const battleScope = { key: 'battle', channel: 'battle', roomId };
-        pushChatToCache(battleScope, effectiveBattleRow);
-        if (currentChat !== 'battle') incrementUnread('battle');
-        if (currentChat === 'battle') renderLobbyMessages();
-        if (gameState === 'BATTLE' || gameState === 'OBSERVE' || currentChat === 'battle') {
-            renderBattleMessages();
-        }
-        renderChatTabs();
+    if (effectiveBattleRow && currentChat !== 'battle') {
+        incrementUnread('battle');
     }
+
+    try {
+        await refreshBattleFeedFromDb();
+    } catch (_) { }
 
     return true;
 }
@@ -3073,9 +3070,6 @@ const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
 const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
 const localHandledChatMessageIds = new Set();
-let lastBattleCacheRoomId = '';
-let battleFeedRefreshTimer = null;
-let battleFeedRefreshInFlight = null;
 
 const playerStaffRoleCache = {};
 const STAFF_ROLE_META = {
@@ -3536,28 +3530,6 @@ function pushChatToCache(scope, msg) {
     list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
     return true;
-}
-
-function replaceOrMergeChatCache(scope, messages, options = {}) {
-    const list = getChatCacheList(scope);
-    const replace = !!options.replace;
-    if (replace) list.length = 0;
-    (messages || []).forEach(msg => pushChatToCache(scope, msg));
-    list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
-    return list;
-}
-
-function scheduleBattleFeedRefresh(delay = 120) {
-    if (battleFeedRefreshTimer) clearTimeout(battleFeedRefreshTimer);
-    battleFeedRefreshTimer = setTimeout(async () => {
-        battleFeedRefreshTimer = null;
-        if (battleFeedRefreshInFlight) return;
-        battleFeedRefreshInFlight = refreshBattleFeedFromDb().finally(() => {
-            battleFeedRefreshInFlight = null;
-        });
-        await battleFeedRefreshInFlight;
-    }, delay);
 }
 
 function formatChatTime(dateStr) {
@@ -4026,11 +3998,8 @@ async function loadChatHistory(scopeName = currentChat) {
     await hydrateStaffRolesForMessages(data || []);
 
     const list = getChatCacheList(scope);
-    const shouldReplaceBattle = scope.channel !== 'battle' || String(scope.roomId || getBattleChatRoomId() || '') !== String(lastBattleCacheRoomId || '');
-    if (scope.channel === 'battle') {
-        lastBattleCacheRoomId = String(scope.roomId || getBattleChatRoomId() || '').trim();
-    }
-    replaceOrMergeChatCache(scope, (data || []).slice().reverse(), { replace: shouldReplaceBattle || scope.channel !== 'battle' });
+    list.length = 0;
+    (data || []).slice().reverse().forEach(msg => list.push(msg));
 
     if (scope.channel === "pm") {
         const peerId = scope.peerId;
@@ -4071,9 +4040,23 @@ async function refreshBattleFeedFromDb() {
 
     await hydrateStaffRolesForMessages(data || []);
 
-    const replace = String(lastBattleCacheRoomId || '') !== roomId;
-    lastBattleCacheRoomId = roomId;
-    replaceOrMergeChatCache({ key: 'battle', channel: 'battle', roomId }, data || [], { replace });
+    const otherRooms = chatCache.battle.filter(msg => String(msg?.room_id || '') !== roomId);
+    const mergedRoomMessages = chatCache.battle.filter(msg => String(msg?.room_id || '') === roomId);
+
+    (data || []).forEach(msg => {
+        if (!mergedRoomMessages.some(item => String(item?.id || '') === String(msg?.id || ''))) {
+            mergedRoomMessages.push(msg);
+        }
+    });
+
+    mergedRoomMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    while (mergedRoomMessages.length > CHAT_MESSAGE_LIMIT) mergedRoomMessages.shift();
+
+    chatCache.battle.length = 0;
+    otherRooms.forEach(msg => chatCache.battle.push(msg));
+    mergedRoomMessages.forEach(msg => chatCache.battle.push(msg));
+    chatCache.battle.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    while (chatCache.battle.length > CHAT_MESSAGE_LIMIT * 2) chatCache.battle.shift();
 
     renderBattleMessages();
     if (currentChat === 'battle') renderLobbyMessages();
@@ -4111,14 +4094,8 @@ async function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "battle") {
         const activeBattleRoomId = String(getBattleChatRoomId() || '');
         if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) return;
-        const scope = { key: 'battle', channel: 'battle', roomId: activeBattleRoomId || String(msg.room_id || '') };
-        if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
-        if (currentChat === 'battle') renderLobbyMessages();
-        if (gameState === 'BATTLE' || gameState === 'OBSERVE' || currentChat === 'battle') {
-            renderBattleMessages();
-        }
-        renderChatTabs();
+        await refreshBattleFeedFromDb();
         return;
     }
 
@@ -4126,10 +4103,13 @@ async function handleIncomingRealtimeMessage(msg) {
         const activeSceneRoomId = String(getSceneChatRoomId() || '');
         if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
 
+        if (currentChat !== "battle") incrementUnread("battle");
+
         if (!wasLocalHandledChatMessage(msg.id)) {
             showSceneMapMessageInActiveScene(msg);
         }
 
+        await refreshBattleFeedFromDb();
         return;
     }
 
