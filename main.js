@@ -411,29 +411,15 @@ async function sendSceneMapMessage(text, options = {}) {
         showSceneMapMessageInActiveScene(insertedScene);
     }
 
-    const effectiveBattleRow = insertedBattle || (
-        insertedScene && mirrorToBattle && gameState === 'BATTLE'
-            ? {
-                ...insertedScene,
-                id: `battle-mirror:${insertedScene.id}`,
-                channel: 'battle',
-                __localMirror: true,
-                source_scene_id: insertedScene.id
-            }
-            : null
-    );
-
     if (insertedBattle) {
         markLocalHandledChatMessage(insertedBattle.id);
+        const battleScope = { key: 'battle', channel: 'battle' };
+        pushChatToCache(battleScope, insertedBattle);
+        if (currentChat !== 'battle') incrementUnread('battle');
+        renderBattleMessages();
+        if (currentChat === 'battle') renderLobbyMessages();
+        renderChatTabs();
     }
-
-    if (effectiveBattleRow && currentChat !== 'battle') {
-        incrementUnread('battle');
-    }
-
-    try {
-        await refreshBattleFeedFromDb();
-    } catch (_) { }
 
     return true;
 }
@@ -472,23 +458,11 @@ function initBattleChat(){
                     let sent = false;
                     if(gameState === 'BATTLE'){
                         sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
-                        if(sent){
-                            try{
-                                await loadChatHistory('battle');
-                                renderBattleMessages();
-                            }catch(_){ }
-                        }
                     }else if(gameState === 'OBSERVE'){
                         if(!canWriteInObserverChat()) {
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                         } else {
                             sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
-                            if(sent){
-                                try{
-                                    await loadChatHistory('battle');
-                                    renderBattleMessages();
-                                }catch(_){ }
-                            }
                         }
                     }
                     if(sent) input.value = '';
@@ -4040,23 +4014,19 @@ async function refreshBattleFeedFromDb() {
 
     await hydrateStaffRolesForMessages(data || []);
 
-    const otherRooms = chatCache.battle.filter(msg => String(msg?.room_id || '') !== roomId);
-    const mergedRoomMessages = chatCache.battle.filter(msg => String(msg?.room_id || '') === roomId);
-
+    const scope = { key: 'battle', channel: 'battle' };
+    const roomList = [];
     (data || []).forEach(msg => {
-        if (!mergedRoomMessages.some(item => String(item?.id || '') === String(msg?.id || ''))) {
-            mergedRoomMessages.push(msg);
+        if (!roomList.some(item => String(item?.id || '') === String(msg?.id || ''))) {
+            roomList.push(msg);
         }
     });
+    roomList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-    mergedRoomMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    while (mergedRoomMessages.length > CHAT_MESSAGE_LIMIT) mergedRoomMessages.shift();
-
+    const otherRooms = chatCache.battle.filter(msg => String(msg?.room_id || '') !== roomId);
     chatCache.battle.length = 0;
     otherRooms.forEach(msg => chatCache.battle.push(msg));
-    mergedRoomMessages.forEach(msg => chatCache.battle.push(msg));
-    chatCache.battle.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    while (chatCache.battle.length > CHAT_MESSAGE_LIMIT * 2) chatCache.battle.shift();
+    roomList.forEach(msg => pushChatToCache(scope, msg));
 
     renderBattleMessages();
     if (currentChat === 'battle') renderLobbyMessages();
@@ -4094,8 +4064,12 @@ async function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "battle") {
         const activeBattleRoomId = String(getBattleChatRoomId() || '');
         if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) return;
+        const scope = { key: 'battle', channel: 'battle' };
+        if (!pushChatToCache(scope, msg)) return;
         if (currentChat !== "battle") incrementUnread("battle");
-        await refreshBattleFeedFromDb();
+        renderBattleMessages();
+        if (currentChat === 'battle') renderLobbyMessages();
+        renderChatTabs();
         return;
     }
 
@@ -4103,13 +4077,10 @@ async function handleIncomingRealtimeMessage(msg) {
         const activeSceneRoomId = String(getSceneChatRoomId() || '');
         if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
 
-        if (currentChat !== "battle") incrementUnread("battle");
-
         if (!wasLocalHandledChatMessage(msg.id)) {
             showSceneMapMessageInActiveScene(msg);
         }
 
-        await refreshBattleFeedFromDb();
         return;
     }
 
