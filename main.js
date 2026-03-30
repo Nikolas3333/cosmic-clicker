@@ -32,6 +32,24 @@ player.ships.push({
 let gameState = "AUTH";
 let currentRoom = null;
 let activeBattleChatRoomId = null;
+
+function persistBattleChatRoomId(roomId) {
+    const safeRoomId = String(roomId || '').trim();
+    if (!safeRoomId) return;
+    activeBattleChatRoomId = safeRoomId;
+    window.currentRoomId = safeRoomId;
+    try { localStorage.setItem('cosmicLastBattleChatRoomId', safeRoomId); } catch (_) {}
+}
+
+function getPersistedBattleChatRoomId() {
+    const direct = String(activeBattleChatRoomId || window.currentRoomId || '').trim();
+    if (direct) return direct;
+    try {
+        const saved = localStorage.getItem('cosmicLastBattleChatRoomId');
+        if (saved && String(saved).trim()) return String(saved).trim();
+    } catch (_) {}
+    return '';
+}
 let playerShip = null;
 let keys = {
     w: false,
@@ -362,7 +380,7 @@ async function sendSceneMapMessage(text, options = {}) {
 
     const roomId = String(getSceneChatRoomId() || '').trim();
     if (!roomId) return false;
-    activeBattleChatRoomId = roomId;
+    persistBattleChatRoomId(roomId);
 
     const mirrorToBattle = options?.mirrorToBattle !== false && (gameState === 'BATTLE' || gameState === 'OBSERVE');
 
@@ -3134,36 +3152,39 @@ function getSharedBattleChatRoomId() {
 function getSceneChatRoomId() {
     const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
     if (sharedBattleRoomId) {
-        activeBattleChatRoomId = sharedBattleRoomId;
+        persistBattleChatRoomId(sharedBattleRoomId);
         return sharedBattleRoomId;
     }
 
     const fromCurrentRoom = currentRoom?.id || currentRoom?.roomId || null;
     if (fromCurrentRoom) {
-        activeBattleChatRoomId = String(fromCurrentRoom);
-        return String(fromCurrentRoom);
+        const currentRoomId = String(fromCurrentRoom).trim();
+        persistBattleChatRoomId(currentRoomId);
+        return currentRoomId;
     }
 
-    const rememberedRoomId = String(activeBattleChatRoomId || window.currentRoomId || '').trim();
+    const rememberedRoomId = getPersistedBattleChatRoomId();
     if (rememberedRoomId) return rememberedRoomId;
 
     const fallbackMap = currentRoom?.map || currentRoom?.real || selectedLobbyMap?.real || selectedLobbyMap?.name || "scene";
-    return String(`scene_${String(fallbackMap).toLowerCase()}`);
+    const fallbackRoomId = String(`scene_${String(fallbackMap).toLowerCase()}`);
+    persistBattleChatRoomId(fallbackRoomId);
+    return fallbackRoomId;
 }
 
 function getBattleChatRoomId() {
     const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
     if (sharedBattleRoomId) {
-        activeBattleChatRoomId = sharedBattleRoomId;
+        persistBattleChatRoomId(sharedBattleRoomId);
         return sharedBattleRoomId;
     }
 
     const sceneRoomId = String(getSceneChatRoomId() || '').trim();
     if (sceneRoomId) {
-        activeBattleChatRoomId = sceneRoomId;
+        persistBattleChatRoomId(sceneRoomId);
         return sceneRoomId;
     }
-    return String(activeBattleChatRoomId || '').trim();
+    return getPersistedBattleChatRoomId();
 }
 
 function canWriteSceneMapChat() {
