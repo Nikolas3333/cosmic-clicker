@@ -3958,11 +3958,7 @@ async function loadChatHistory(scopeName = currentChat) {
         .order("created_at", { ascending: false })
         .limit(CHAT_MESSAGE_LIMIT);
 
-    if (scope.channel === "battle") {
-        query = query.in("channel", ["battle", "scene"]);
-    } else {
-        query = query.eq("channel", scope.channel);
-    }
+    query = query.eq("channel", scope.channel);
 
     if (scope.channel === "clan") {
         if (!scope.roomId) {
@@ -4003,18 +3999,7 @@ async function loadChatHistory(scopeName = currentChat) {
 
     const list = getChatCacheList(scope);
     list.length = 0;
-    if (scope.channel === "battle") {
-        const seen = new Set();
-        (data || []).slice().reverse().forEach(msg => {
-            if (!msg) return;
-            const key = String(msg.id || '');
-            if (key && seen.has(key)) return;
-            if (key) seen.add(key);
-            list.push(msg.channel === 'scene' ? { ...msg, channel: 'battle', source_scene_id: msg.id } : msg);
-        });
-    } else {
-        (data || []).slice().reverse().forEach(msg => list.push(msg));
-    }
+    (data || []).slice().reverse().forEach(msg => list.push(msg));
 
     if (scope.channel === "pm") {
         const peerId = scope.peerId;
@@ -4043,7 +4028,7 @@ async function refreshBattleFeedFromDb() {
     const { data, error } = await window.supabaseClient
         .from("chat_messages")
         .select("*")
-        .in("channel", ["battle", "scene"])
+        .eq("channel", "battle")
         .eq("room_id", roomId)
         .order("created_at", { ascending: true })
         .limit(CHAT_MESSAGE_LIMIT);
@@ -4055,18 +4040,8 @@ async function refreshBattleFeedFromDb() {
 
     await hydrateStaffRolesForMessages(data || []);
 
-    const normalized = [];
-    const seen = new Set();
-    for (const raw of (data || [])) {
-        if (!raw) continue;
-        const key = String(raw.id || '');
-        if (key && seen.has(key)) continue;
-        if (key) seen.add(key);
-        normalized.push(raw.channel === 'scene' ? { ...raw, channel: 'battle', source_scene_id: raw.id } : raw);
-    }
-
     chatCache.battle.length = 0;
-    normalized.forEach(msg => chatCache.battle.push(msg));
+    (data || []).forEach(msg => chatCache.battle.push(msg));
 
     renderBattleMessages();
     if (currentChat === 'battle') renderLobbyMessages();
