@@ -3943,9 +3943,14 @@ async function loadChatHistory(scopeName = currentChat) {
     let query = window.supabaseClient
         .from("chat_messages")
         .select("*")
-        .eq("channel", scope.channel)
         .order("created_at", { ascending: false })
         .limit(CHAT_MESSAGE_LIMIT);
+
+    if (scope.channel === "battle") {
+        query = query.in("channel", ["battle", "scene"]);
+    } else {
+        query = query.eq("channel", scope.channel);
+    }
 
     if (scope.channel === "clan") {
         if (!scope.roomId) {
