@@ -530,16 +530,16 @@ canvas {
 #top-nav {
   display:none;
   position: fixed;
-  top: 50px;
+  top: 8px;
   left: 20px;
   transform: none;
   display: flex;
-  gap: 14px;
+  gap: 12px;
   white-space: nowrap;
   background: rgba(10,15,30,0.92);
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 12px;
-  max-width: calc(100vw - 420px);
+  max-width: calc(100vw - 520px);
   overflow-x: auto;
   overflow-y: hidden;
   box-shadow: 0 0 18px rgba(0,200,255,0.28);
@@ -1993,25 +1993,26 @@ body.state-observe #ui{ display:none !important; }
 #premium-bar{
   display:none;
   position:fixed;
-  top:16px;
-  right:20px;
+  top:8px;
+  right:18px;
   align-items:center;
-  gap:12px;
-  padding:0 40px 0 0;
-  min-height:48px;
+  gap:10px;
+  padding:0 34px 0 0;
+  min-height:38px;
   background:transparent;
   box-shadow:none;
   border:none;
+  z-index:20005;
 }
 #premium-account-info,
 #premium-currency-box{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:8px;
   color:#dff7ff;
-  font-size:14px;
+  font-size:13px;
   white-space:nowrap;
-  padding:10px 14px;
+  padding:7px 12px;
   border-radius:12px;
   background:rgba(8,18,35,0.88);
   box-shadow:0 0 16px rgba(0,180,255,0.18);
@@ -2023,7 +2024,7 @@ body.state-observe #ui{ display:none !important; }
 #premium-player-name{
   color:#9fe8ff;
   font-weight:bold;
-  max-width:180px;
+  max-width:110px;
   overflow:hidden;
   text-overflow:ellipsis;
 }
@@ -2800,7 +2801,43 @@ body.state-observe #ui{ display:none !important; }
 .shop-side-subtitle{
   display:none;
 }
-.shop-main-switch,
+.shop-main-switch{
+  display:flex !important;
+  gap:8px;
+  padding:0 12px 10px;
+}
+.shop-switch-btn{
+  flex:1;
+  border:none;
+  cursor:pointer;
+  text-align:center;
+  color:#dfeeff;
+  background:linear-gradient(180deg, rgba(14,26,58,0.92), rgba(9,16,38,0.96));
+  border:1px solid rgba(108,188,255,0.10);
+  border-radius:10px;
+  padding:9px 10px;
+  font-size:12px;
+  font-weight:800;
+  transition:0.18s ease;
+}
+.shop-switch-btn:hover{
+  background:linear-gradient(180deg, rgba(16,34,74,0.96), rgba(10,20,46,0.98));
+  border-color:rgba(112,236,255,0.22);
+}
+.shop-switch-btn.active{
+  background:linear-gradient(180deg, rgba(20,64,130,0.98), rgba(13,30,76,0.98));
+  color:#f4fbff;
+  border-color:rgba(128,240,255,0.38);
+  box-shadow:0 0 14px rgba(0,170,255,0.14), inset 0 0 0 1px rgba(132,255,247,0.24);
+}
+#shop-screen.shop-ships-only #shop-module-type-label,
+#shop-screen.shop-ships-only #shop-module-type-tabs{
+  display:none !important;
+}
+#shop-screen.shop-modules-only #shop-type-label,
+#shop-screen.shop-modules-only #shop-type-tabs{
+  display:none !important;
+}
 #shop-ships-label,
 #shop-ships-list,
 #shop-modules-label,
