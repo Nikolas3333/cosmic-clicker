@@ -914,14 +914,19 @@ canvas {
 flex:1;
 padding:12px;
 overflow:hidden;
+min-height:0;
 }
 
 /* ===== MATCH LIST ===== */
 
 .match-list{
-  display:flex;
-  flex-direction:column;
-  gap:8px;
+flex:1 1 auto;
+min-height:0;
+display:flex;
+flex-direction:column;
+gap:6px;
+overflow-y:auto;
+overflow-x:hidden;
 }
 
 .match-item{
@@ -948,6 +953,8 @@ display:flex;
 gap:15px;
 height:100%;
 align-items:flex-start;
+min-height:0;
+overflow:hidden;
 }
 
 /* список карт */
@@ -968,13 +975,14 @@ min-width:240px;
 height:100%;
 display:grid;
 grid-template-columns:1fr;
-grid-template-rows:120px 1fr;
-justify-items:start;
+grid-template-rows:150px minmax(0,1fr);
+justify-items:center;
 align-items:start;
 padding-top:0;
 padding-left:0;
 row-gap:8px;
 overflow:hidden;
+min-height:0;
 }
 
 
@@ -982,14 +990,14 @@ overflow:hidden;
 /* мини карта */
 
 #map-mini-preview{
-width:120px;
-height:120px;
-border-radius:20px;
+width:140px;
+height:140px;
+border-radius:22px;
 border:2px solid #00ffff;
 overflow:hidden;
 margin:0;
-justify-self:start;
-align-self:start;
+justify-self:center;
+align-self:center;
 }
 
 
