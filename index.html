@@ -2797,11 +2797,7 @@ body.state-observe #ui{ display:none !important; }
   letter-spacing:0.5px;
 }
 .shop-side-subtitle{
-  font-size:10px;
-  color:#d8ecff;
-  opacity:0.78;
-  margin-top:4px;
-  line-height:1.25;
+  display:none;
 }
 .shop-main-switch,
 #shop-ships-label,
@@ -2830,6 +2826,17 @@ body.state-observe #ui{ display:none !important; }
   flex-direction:column;
   gap:6px;
   padding:0 8px;
+}
+
+.shop-module-tabs{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:0 8px;
+  margin-top:2px;
+}
+.shop-section-label.modules{
+  margin-top:8px;
 }
 .shop-type-tab,
 .shop-item-btn{
@@ -2890,8 +2897,8 @@ body.state-observe #ui{ display:none !important; }
   border-radius:12px;
   box-shadow:0 0 18px rgba(0,120,255,0.10), inset 0 0 16px rgba(255,255,255,0.02);
 }
-.shop-main-head{
-  padding:10px 12px;
+shop-main-head{
+  padding:8px 12px;
   border-bottom:1px solid rgba(98,223,255,0.12);
   background:
     radial-gradient(circle at 20% 20%, rgba(98,223,255,0.12), transparent 24%),
@@ -2905,10 +2912,7 @@ body.state-observe #ui{ display:none !important; }
   letter-spacing:0.5px;
 }
 .shop-main-subtitle{
-  font-size:10px;
-  color:#d7e8ff;
-  margin-top:3px;
-  opacity:0.88;
+  display:none;
 }
 .shop-catalog{
   flex:1;
@@ -3082,12 +3086,13 @@ body.state-observe #ui{ display:none !important; }
           <div class="shop-sidebar">
             <div class="shop-side-header">
               <div class="shop-side-title">Магазин</div>
-              <div class="shop-side-subtitle">Слева только классы. Выбранный класс открывает 5 кораблей ветки.</div>
-            </div>
+                          </div>
             <div class="shop-main-switch" id="shop-main-switch"></div>
             <div class="shop-sidebar-scroll">
               <div class="shop-section-label" id="shop-type-label">Классы кораблей</div>
               <div class="shop-type-tabs" id="shop-type-tabs"></div>
+              <div class="shop-section-label modules" id="shop-module-type-label">Классы модулей</div>
+              <div class="shop-module-tabs" id="shop-module-type-tabs"></div>
               <div class="shop-section-label" id="shop-ships-label">Модели ветки</div>
               <div class="shop-list" id="shop-ships-list"></div>
               <div class="shop-section-label" id="shop-modules-label">Модули</div>
@@ -3097,7 +3102,7 @@ body.state-observe #ui{ display:none !important; }
           <div class="shop-content">
             <div class="shop-main-head">
               <div class="shop-main-title" id="shop-main-title">ИСТРЕБИТЕЛИ</div>
-              <div class="shop-main-subtitle" id="shop-main-subtitle">Ветка откроет 5 моделей: от старого корпуса до топовой версии.</div>
+              <div class="shop-main-subtitle" id="shop-main-subtitle"></div>
             </div>
             <div class="shop-catalog" id="shop-catalog-list"></div>
           </div>
