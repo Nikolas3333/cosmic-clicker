@@ -6859,9 +6859,13 @@ function limitBattleArea(){
             battleTab.style.color = '#00ffff';
             battleTab.style.textShadow = '0 0 10px rgba(0,255,255,0.4)';
         }
-        if(soloTab && lobbyMode === 'solo'){
+        if(soloTab && lobbyMode === 'solo' && !shopState?.open){
             soloTab.style.color = '#00ffff';
             soloTab.style.textShadow = '0 0 10px rgba(0,255,255,0.4)';
+        }
+        if(shopTab && shopState?.open){
+            shopTab.style.color = '#00ffff';
+            shopTab.style.textShadow = '0 0 10px rgba(0,255,255,0.4)';
         }
     }
 
@@ -7117,42 +7121,18 @@ function buildShopModelSvg(item){
 function renderShopMainSwitch(){
     const wrap = document.getElementById('shop-main-switch');
     if(!wrap) return;
-    wrap.innerHTML = `
-      <button type="button" class="shop-main-tab ${shopState.view === 'ships' ? 'active' : ''}" data-shop-main="ships">Корабли</button>
-      <button type="button" class="shop-main-tab ${shopState.view === 'modules' ? 'active' : ''}" data-shop-main="modules">Модули</button>
-    `;
-    wrap.querySelectorAll('.shop-main-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const nextView = btn.dataset.shopMain || 'ships';
-            shopState.view = nextView;
-            if(nextView === 'ships'){
-                const list = getCurrentShopShips();
-                shopState.selectedId = list[0]?.id || '';
-            }else{
-                shopState.selectedId = SHOP_DATA.modules[0]?.id || '';
-            }
-            renderShopScreen();
-        });
-    });
+    wrap.innerHTML = '';
+    shopState.view = 'ships';
 }
+
 
 function renderShopTypeTabs(){
     const wrap = document.getElementById('shop-type-tabs');
     const typeLabel = document.getElementById('shop-type-label');
     if(!wrap) return;
 
-    if(shopState.view === 'modules'){
-        wrap.innerHTML = `
-          <button type="button" class="shop-type-tab active" data-shop-modules="all">
-            <span class="shop-type-name">Все модули</span>
-            <span class="shop-type-sub">Улучшения скорости, защиты, реактора и оружия</span>
-          </button>
-        `;
-        if(typeLabel) typeLabel.textContent = 'Раздел модулей';
-        return;
-    }
-
-    if(typeLabel) typeLabel.textContent = 'Ветки кораблей';
+    shopState.view = 'ships';
+    if(typeLabel) typeLabel.textContent = 'Классы кораблей';
     wrap.innerHTML = SHOP_DATA.types.map(type => `
         <button type="button" class="shop-type-tab ${shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
             <span class="shop-type-name">${type.name}</span>
@@ -7171,44 +7151,19 @@ function renderShopTypeTabs(){
     });
 }
 
+
 function renderShopLists(){
     const shipsList = document.getElementById('shop-ships-list');
     const modulesList = document.getElementById('shop-modules-list');
     const shipsLabel = document.getElementById('shop-ships-label');
     const modulesLabel = document.getElementById('shop-modules-label');
-    if(!shipsList || !modulesList) return;
-
-    const ships = getCurrentShopShips();
-
-    shipsList.innerHTML = ships.map(item => `
-        <button type="button" class="shop-item-btn ${shopState.view === 'ships' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-view="ships" data-shop-id="${item.id}">
-            <span class="shop-item-name">${item.name}</span>
-            <span class="shop-item-sub">${item.subtitle}</span>
-            <span class="shop-item-tier">${item.tier}</span>
-        </button>
-    `).join('');
-
-    modulesList.innerHTML = SHOP_DATA.modules.map(item => `
-        <button type="button" class="shop-item-btn ${shopState.view === 'modules' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-view="modules" data-shop-id="${item.id}">
-            <span class="shop-item-name">${item.name}</span>
-            <span class="shop-item-sub">${item.subtitle}</span>
-            <span class="shop-item-tier">${item.tier}</span>
-        </button>
-    `).join('');
-
-    if(shipsLabel) shipsLabel.style.display = shopState.view === 'ships' ? 'block' : 'none';
-    if(shipsList) shipsList.style.display = shopState.view === 'ships' ? 'flex' : 'none';
-    if(modulesLabel) modulesLabel.style.display = 'block';
-    if(modulesList) modulesList.style.display = 'flex';
-
-    document.querySelectorAll('.shop-item-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            shopState.view = btn.dataset.shopView || 'ships';
-            shopState.selectedId = btn.dataset.shopId || '';
-            renderShopScreen();
-        });
-    });
+    if(shipsLabel) shipsLabel.style.display = 'none';
+    if(shipsList) shipsList.style.display = 'none';
+    if(modulesLabel) modulesLabel.style.display = 'none';
+    if(modulesList) modulesList.style.display = 'none';
+    shopState.view = 'ships';
 }
+
 
 function splitItemStats(item){
     const stats = Array.isArray(item?.stats) ? item.stats : [];
@@ -7227,14 +7182,14 @@ function splitItemStats(item){
 function getShopCurrentTitle(){
     if(shopState.view === 'modules'){
         return {
-            title:'МОДУЛИ УЛУЧШЕНИЯ',
-            subtitle:'В центре показываются все доступные модули. Они парят и крутятся без подиума.'
+            title:'КОРАБЛИ',
+            subtitle:'Слева выбирается класс, а по центру показываются 5 кораблей этой ветки.'
         };
     }
     const activeType = SHOP_DATA.types.find(type => type.id === shopState.shipType) || SHOP_DATA.types[0];
     return {
         title:(activeType?.name || 'КОРАБЛИ').toUpperCase(),
-        subtitle:`${activeType?.subtitle || 'Боевая ветка'}. По центру показаны 5 моделей — от старого корпуса до новой топовой версии.`
+        subtitle:`${activeType?.subtitle || 'Космическая ветка'}. По центру показаны 5 кораблей класса: от старой модели до новой топовой версии.`
     };
 }
 
@@ -7333,6 +7288,8 @@ function setShopMode(open){
     if(note) note.style.display = open ? 'none' : 'block';
     content.style.display = open ? 'none' : 'block';
     buttons.style.display = open ? 'none' : 'flex';
+    shopState.view = 'ships';
+    try{ updateLobbyTabStyles?.(); }catch(_){ }
     if(open) renderShopScreen();
 }
 
