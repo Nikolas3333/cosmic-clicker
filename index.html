@@ -2592,6 +2592,84 @@ body.state-observe #ui{ display:none !important; }
   color:#ffd400 !important;
 }
 
+
+
+/* === V76 BATTLE HISTORY SEARCH === */
+#battle-history-search-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:8px 12px 0;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+#battle-history-search-wrap.hidden{
+  display:none !important;
+}
+.battle-history-search-bar{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.battle-history-search-title{
+  color:#9fe8ff;
+  font-size:13px;
+  font-weight:700;
+}
+#battle-history-player-id{
+  flex:0 1 150px;
+  min-width:120px;
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid rgba(120,220,255,0.22);
+  background:#07101f;
+  color:#fff;
+}
+#battle-history-search-btn,
+#battle-history-search-close{
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid rgba(120,220,255,0.22);
+  background:#0e1a32;
+  color:#fff;
+  cursor:pointer;
+}
+#battle-history-search-btn:disabled{
+  opacity:0.6;
+  cursor:default;
+}
+.battle-history-search-panel{
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(0,255,200,0.18);
+  border-radius:10px;
+  padding:8px;
+  max-height:190px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.battle-history-search-panel.hidden{
+  display:none !important;
+}
+.battle-history-search-panel-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+#battle-history-search-caption{
+  color:#dff8ff;
+  font-size:12px;
+  font-weight:700;
+}
+.battle-history-search-results{
+  overflow-y:auto;
+  max-height:130px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
 </style>
 </head>
 
