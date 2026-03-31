@@ -6268,7 +6268,7 @@ function updatePremiumAccountInfo(){
     if(levelEl) levelEl.textContent = `⭐ ${player?.level || 1}`;
     const currentExp = Number(player?.experience || 0);
     const nextExp = Math.max(100, (Number(player?.level || 1) * 600));
-    if(expEl) expEl.textContent = `EXP ${currentExp} / ${nextExp}`;
+    if(expEl) expEl.textContent = `EXP ${currentExp}/${nextExp}`;
     if(crystalEl) crystalEl.textContent = `💎 ${playerResources?.crystals || 0}`;
     if(coinsEl) coinsEl.textContent = `🪙 ${playerResources?.coins || 0}`;
 }
@@ -6861,7 +6861,7 @@ function limitBattleArea(){
             tab.style.color = '';
             tab.style.textShadow = '';
         });
-        if(battleTab && lobbyMode === 'battle'){
+        if(battleTab && lobbyMode === 'battle' && !shopState?.open){
             battleTab.style.color = '#00ffff';
             battleTab.style.textShadow = '0 0 10px rgba(0,255,255,0.4)';
         }
