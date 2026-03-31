@@ -927,6 +927,8 @@ flex-direction:column;
 gap:6px;
 overflow-y:auto;
 overflow-x:hidden;
+padding-right:4px;
+box-sizing:border-box;
 }
 
 .match-item{
@@ -970,17 +972,17 @@ overflow-y:auto;
 /* правая панель */
 
 #match-preview{
-width:240px;
-min-width:240px;
+width:260px;
+min-width:260px;
 height:100%;
 display:grid;
 grid-template-columns:1fr;
-grid-template-rows:150px minmax(0,1fr);
-justify-items:center;
+grid-template-rows:170px minmax(0,1fr);
+justify-items:stretch;
 align-items:start;
 padding-top:0;
 padding-left:0;
-row-gap:8px;
+row-gap:10px;
 overflow:hidden;
 min-height:0;
 }
@@ -990,14 +992,15 @@ min-height:0;
 /* мини карта */
 
 #map-mini-preview{
-width:140px;
-height:140px;
+width:150px;
+height:150px;
 border-radius:22px;
 border:2px solid #00ffff;
 overflow:hidden;
-margin:0;
+margin:0 auto;
 justify-self:center;
 align-self:center;
+box-sizing:border-box;
 }
 
 
@@ -1015,7 +1018,7 @@ overflow-x:hidden;
 display:flex;
 flex-direction:column;
 gap:4px;
-padding-right:4px;
+padding:0 4px 0 0;
 box-sizing:border-box;
 margin:0;
 }
@@ -3638,3 +3641,23 @@ console.log('🔥 Supabase подключен и готов к работе');
 </body>
 </html>
 
+
+
+.match-list::-webkit-scrollbar,
+#map-players::-webkit-scrollbar{
+  width:8px;
+}
+.match-list::-webkit-scrollbar-track,
+#map-players::-webkit-scrollbar-track{
+  background:rgba(255,255,255,0.05);
+  border-radius:10px;
+}
+.match-list::-webkit-scrollbar-thumb,
+#map-players::-webkit-scrollbar-thumb{
+  background:linear-gradient(#00ffcc,#0088ff);
+  border-radius:10px;
+}
+.match-list::-webkit-scrollbar-thumb:hover,
+#map-players::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(#00ffff,#00aaff);
+}
