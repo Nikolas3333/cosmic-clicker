@@ -2594,13 +2594,15 @@ body.state-observe #ui{ display:none !important; }
 
 
 
-/* === V76 BATTLE HISTORY SEARCH === */
+/* === V77 BATTLE HISTORY SEARCH CENTER WINDOW === */
 #battle-history-search-wrap{
+  position:absolute;
+  top:10px;
+  right:12px;
+  z-index:5;
   display:flex;
-  flex-direction:column;
-  gap:8px;
-  padding:8px 12px 0;
-  border-bottom:1px solid rgba(255,255,255,0.08);
+  align-items:center;
+  justify-content:flex-end;
 }
 #battle-history-search-wrap.hidden{
   display:none !important;
@@ -2609,17 +2611,10 @@ body.state-observe #ui{ display:none !important; }
   display:flex;
   align-items:center;
   gap:8px;
-  flex-wrap:wrap;
-}
-.battle-history-search-title{
-  color:#9fe8ff;
-  font-size:13px;
-  font-weight:700;
 }
 #battle-history-player-id{
-  flex:0 1 150px;
-  min-width:120px;
-  padding:8px 10px;
+  width:120px;
+  padding:7px 10px;
   border-radius:8px;
   border:1px solid rgba(120,220,255,0.22);
   background:#07101f;
@@ -2627,47 +2622,76 @@ body.state-observe #ui{ display:none !important; }
 }
 #battle-history-search-btn,
 #battle-history-search-close{
-  padding:8px 10px;
+  width:40px;
+  height:36px;
+  padding:0;
   border-radius:8px;
   border:1px solid rgba(120,220,255,0.22);
   background:#0e1a32;
   color:#fff;
   cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
 }
 #battle-history-search-btn:disabled{
   opacity:0.6;
   cursor:default;
 }
-.battle-history-search-panel{
-  background:rgba(255,255,255,0.04);
-  border:1px solid rgba(0,255,200,0.18);
-  border-radius:10px;
-  padding:8px;
-  max-height:190px;
+#battle-history-search-modal{
+  position:absolute;
+  inset:0;
+  z-index:25050;
+}
+#battle-history-search-modal.hidden{
+  display:none !important;
+}
+.battle-history-search-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.58);
+}
+.battle-history-search-window{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:min(780px,82vw);
+  max-height:68vh;
+  background:linear-gradient(180deg, rgba(7,16,32,0.97), rgba(10,22,44,0.96));
+  border:1px solid rgba(0,255,200,0.32);
+  border-radius:16px;
+  box-shadow:0 0 30px rgba(0,180,255,0.22);
   display:flex;
   flex-direction:column;
-  gap:8px;
-}
-.battle-history-search-panel.hidden{
-  display:none !important;
+  overflow:hidden;
 }
 .battle-history-search-panel-head{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:8px;
+  padding:14px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
 }
 #battle-history-search-caption{
   color:#dff8ff;
-  font-size:12px;
+  font-size:16px;
   font-weight:700;
 }
 .battle-history-search-results{
   overflow-y:auto;
-  max-height:130px;
+  max-height:calc(68vh - 68px);
   display:flex;
   flex-direction:column;
-  gap:6px;
+  gap:8px;
+  padding:14px 16px 16px;
+}
+.battle-history-line{
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(255,255,255,0.04);
 }
 
 </style>
