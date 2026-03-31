@@ -6907,12 +6907,13 @@ function limitBattleArea(){
                     if(mode === 'solo'){
                         // В одиночной игре под квадратом ничего не показываем
                     }else{
-                        for(let i=0;i<8;i++){
+                        const players = Array.isArray(entry.currentPlayers) ? entry.currentPlayers : (Array.isArray(entry.players) ? entry.players : []);
+                        players.filter(Boolean).forEach((playerName) => {
                             const slot = document.createElement('div');
                             slot.className = 'player-slot';
-                            slot.textContent = '—';
+                            slot.textContent = playerName;
                             playersBox.appendChild(slot);
-                        }
+                        });
                     }
                 }
             });
@@ -7364,6 +7365,7 @@ function openShopView(){
     shopState.view = 'ships';
     setTimeout(() => {
         setShopMode(true);
+        try{ updateLobbyTabStyles?.(); }catch(_){}
     }, gameState === 'LOBBY' ? 0 : 80);
 }
 
@@ -7704,14 +7706,14 @@ function closeShopView(){
             if(lobbyModeV27 === 'solo'){
                 // В одиночной игре под квадратом ничего не показываем
             } else if(lobbyModeV27 === 'tournament'){
-                const players = entry.currentPlayers || [];
+                const players = Array.isArray(entry.currentPlayers) ? entry.currentPlayers.filter(Boolean) : [];
                 const maxPlayers = Number(entry.maxPlayers || 2);
-                for(let i=0;i<maxPlayers;i++){
+                players.forEach((playerName) => {
                     const slot = document.createElement('div');
                     slot.className = 'player-slot';
-                    slot.textContent = players[i] || '—';
+                    slot.textContent = playerName;
                     playersBox.appendChild(slot);
-                }
+                });
                 const need = Math.max(0, maxPlayers - players.length);
                 if(waitNote) waitNote.textContent = need > 0 ? `Ожидание ${need} игроков до начала` : '';
                 const coinsText = Number(entry.stakeCoins || 0) > 0 ? `${entry.stakeCoins} монет` : '';
