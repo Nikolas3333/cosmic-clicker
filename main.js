@@ -6261,8 +6261,14 @@ function updatePremiumAccountInfo(){
     const idEl = document.getElementById('premium-player-id');
     if(nameEl) nameEl.textContent = player?.nickname || 'Commander';
     if(idEl) idEl.textContent = `ID: ${authState.playerId || 0}`;
+    const levelEl = document.getElementById('premium-player-level');
+    const expEl = document.getElementById('premium-player-exp');
     const crystalEl = document.getElementById('premium-crystals');
     const coinsEl = document.getElementById('premium-coins');
+    if(levelEl) levelEl.textContent = `⭐ ${player?.level || 1}`;
+    const currentExp = Number(player?.experience || 0);
+    const nextExp = Math.max(100, (Number(player?.level || 1) * 600));
+    if(expEl) expEl.textContent = `EXP ${currentExp} / ${nextExp}`;
     if(crystalEl) crystalEl.textContent = `💎 ${playerResources?.crystals || 0}`;
     if(coinsEl) coinsEl.textContent = `🪙 ${playerResources?.coins || 0}`;
 }
@@ -6904,7 +6910,7 @@ function limitBattleArea(){
                         for(let i=0;i<8;i++){
                             const slot = document.createElement('div');
                             slot.className = 'player-slot';
-                            slot.textContent = i === 0 ? 'Свободная карта' : 'Ожидание игрока';
+                            slot.textContent = '—';
                             playersBox.appendChild(slot);
                         }
                     }
@@ -7142,20 +7148,15 @@ function buildShopModelSvg(item){
 
 function renderShopMainSwitch(){
     const wrap = document.getElementById('shop-main-switch');
+    const shop = document.getElementById('shop-screen');
     if(!wrap) return;
     wrap.innerHTML = `
-        <button type="button" class="shop-type-tab ${shopState.view === 'ships' ? 'active' : ''}" data-shop-main-view="ships">
-            <span class="shop-type-name">Корабли</span>
-            <span class="shop-type-sub">Боевые ветки</span>
-        </button>
-        <button type="button" class="shop-type-tab ${shopState.view === 'modules' ? 'active' : ''}" data-shop-main-view="modules">
-            <span class="shop-type-name">Модули</span>
-            <span class="shop-type-sub">Улучшения и слоты</span>
-        </button>
+        <button type="button" class="shop-switch-btn ${shopState.view === 'modules' ? '' : 'active'}" data-shop-view="ships">Корабли</button>
+        <button type="button" class="shop-switch-btn ${shopState.view === 'modules' ? 'active' : ''}" data-shop-view="modules">Модули</button>
     `;
-    wrap.querySelectorAll('[data-shop-main-view]').forEach(btn => {
+    wrap.querySelectorAll('[data-shop-view]').forEach(btn => {
         btn.addEventListener('click', () => {
-            const nextView = btn.dataset.shopMainView || 'ships';
+            const nextView = btn.dataset.shopView === 'modules' ? 'modules' : 'ships';
             if(shopState.view === nextView) return;
             shopState.view = nextView;
             const nextList = nextView === 'modules' ? getCurrentShopModules() : getCurrentShopShips();
@@ -7163,6 +7164,10 @@ function renderShopMainSwitch(){
             renderShopScreen();
         });
     });
+    if(shop){
+        shop.classList.toggle('shop-ships-only', shopState.view !== 'modules');
+        shop.classList.toggle('shop-modules-only', shopState.view === 'modules');
+    }
 }
 
 
@@ -7173,28 +7178,18 @@ function renderShopTypeTabs(){
     const moduleLabel = document.getElementById('shop-module-type-label');
     if(!wrap) return;
 
-    const shipsMode = shopState.view !== 'modules';
-
-    if(typeLabel){
-        typeLabel.textContent = 'Классы кораблей';
-        typeLabel.style.display = shipsMode ? 'block' : 'none';
-    }
-    wrap.style.display = shipsMode ? 'flex' : 'none';
+    if(typeLabel) typeLabel.textContent = 'Классы кораблей';
     wrap.innerHTML = SHOP_DATA.types.map(type => `
-        <button type="button" class="shop-type-tab ${shipsMode && shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
+        <button type="button" class="shop-type-tab ${shopState.view === 'ships' && shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
             <span class="shop-type-name">${type.name}</span>
             <span class="shop-type-sub">${type.subtitle}</span>
         </button>
     `).join('');
 
-    if(moduleLabel){
-        moduleLabel.textContent = 'Классы модулей';
-        moduleLabel.style.display = shipsMode ? 'none' : 'block';
-    }
+    if(moduleLabel) moduleLabel.textContent = 'Классы модулей';
     if(moduleWrap){
-        moduleWrap.style.display = shipsMode ? 'none' : 'flex';
         moduleWrap.innerHTML = SHOP_DATA.moduleTypes.map(type => `
-            <button type="button" class="shop-type-tab ${!shipsMode && shopState.moduleType === type.id ? 'active' : ''}" data-shop-module-type="${type.id}">
+            <button type="button" class="shop-type-tab ${shopState.view === 'modules' && shopState.moduleType === type.id ? 'active' : ''}" data-shop-module-type="${type.id}">
                 <span class="shop-type-name">${type.name}</span>
                 <span class="shop-type-sub">${type.subtitle}</span>
             </button>
@@ -7359,13 +7354,14 @@ function setShopMode(open){
     if(note) note.style.display = open ? 'none' : 'block';
     content.style.display = open ? 'none' : 'block';
     buttons.style.display = open ? 'none' : 'flex';
-    shopState.view = 'ships';
+    if(!open){ shopState.view = 'ships'; }
     try{ updateLobbyTabStyles?.(); }catch(_){ }
     if(open) renderShopScreen();
 }
 
 function openShopView(){
     if(gameState !== 'LOBBY') switchState('LOBBY');
+    shopState.view = 'ships';
     setTimeout(() => {
         setShopMode(true);
     }, gameState === 'LOBBY' ? 0 : 80);
@@ -7713,7 +7709,7 @@ function closeShopView(){
                 for(let i=0;i<maxPlayers;i++){
                     const slot = document.createElement('div');
                     slot.className = 'player-slot';
-                    slot.textContent = players[i] || `Ожидание игрока ${i+1}`;
+                    slot.textContent = players[i] || '—';
                     playersBox.appendChild(slot);
                 }
                 const need = Math.max(0, maxPlayers - players.length);
@@ -7740,7 +7736,7 @@ function closeShopView(){
             if(lobbyModeV27 === 'solo'){
                 statusNote.textContent = entry.mission || 'Миссия против ботов';
             } else {
-                statusNote.textContent = entry.title || 'Свободная карта';
+                statusNote.textContent = entry.title || '';
             }
         }
     }
@@ -8597,7 +8593,7 @@ async function renderRoomsInLobby(forceBattleMode = false) {
       const waitNote = document.getElementById('map-waiting-note');
       if (waitNote) waitNote.textContent = '';
       const statusNote = document.getElementById('match-status-note');
-      if (statusNote) statusNote.textContent = entry.title || 'Свободная карта';
+      if (statusNote) statusNote.textContent = entry.title || '';
     });
     matchList.appendChild(el);
   });
