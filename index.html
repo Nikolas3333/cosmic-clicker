@@ -975,18 +975,7 @@ canvas {
 
 /* правая панель */
 
-#match-preview{
-  width:240px;
-  min-width:240px;
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  justify-content:flex-start;
-  gap:0;
-  overflow:hidden;
-  min-height:0;
-}
+
 
 
 
@@ -1001,9 +990,7 @@ canvas {
 
 
 
-#map-players{
-  display:none !important;
-}
+
 
 
 
@@ -1011,19 +998,7 @@ canvas {
 
 /* игроки */
 
-#map-players{
-  width:220px;
-  flex:1 1 auto;
-  min-height:0;
-  overflow-y:auto;
-  overflow-x:hidden;
-  display:flex;
-  flex-direction:column;
-  gap:5px;
-  margin:0 auto;
-  padding-right:4px;
-  box-sizing:border-box;
-}
+
 
 
 
@@ -2069,18 +2044,7 @@ body.state-observe #ui{ display:none !important; }
   right:18px !important;
   left:auto !important;
 }
-#match-preview{
-  width:240px;
-  min-width:240px;
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
-  gap:10px;
-  overflow:hidden;
-  min-height:0;
-}
+
 
 #premium-account-info,
 #premium-currency-box{
@@ -3160,8 +3124,35 @@ shop-main-head{
 #map-players::-webkit-scrollbar-thumb:hover{
   background:linear-gradient(#00ffff,#00aaff);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+/* ===== FINAL PLANET PREVIEW + NICKS ===== */
+
+#match-preview{
+  width:240px;
+  min-width:240px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  gap:0;
+  overflow:hidden;
+  min-height:0;
+}
+
 #map-mini-preview{
-  position:relative !important;
+  position:relative;
   width:100%;
   height:100%;
   min-height:0;
@@ -3174,6 +3165,7 @@ shop-main-head{
   box-sizing:border-box;
   flex:1 1 auto;
 }
+
 #planet-preview{
   position:absolute;
   inset:0;
@@ -3182,6 +3174,7 @@ shop-main-head{
   background-repeat:no-repeat;
   filter:brightness(0.98) saturate(1.04);
 }
+
 #map-player-overlay{
   position:absolute;
   top:10px;
@@ -3190,81 +3183,43 @@ shop-main-head{
   bottom:10px;
   display:flex;
   flex-direction:column;
-  gap:4px;
-  z-index:3;
-  pointer-events:none;
-  position:absolute;
-  inset:8px;
-  display:grid;
-  grid-template-columns:1fr;
-  grid-template-rows:repeat(8, minmax(0, 1fr));
-  gap:4px;
-  z-index:3;
+  gap:3px;
+  z-index:5;
   pointer-events:none;
 }
+
 .map-player-chip{
   display:flex;
   align-items:center;
-  gap:6px;
+  gap:5px;
   padding:0;
   border:none;
   background:none;
   color:#ffffff;
-  font-size:11px;
+  font-size:10px;
   font-weight:700;
+  line-height:1;
   text-shadow:
     0 0 4px rgba(0,0,0,1),
     0 0 8px rgba(0,0,0,1);
   pointer-events:auto;
   cursor:pointer;
   min-width:0;
-  display:flex;
-  align-items:center;
-  justify-content:flex-start;
-  gap:4px;
-  padding:1px 6px;
-  border-radius:8px;
-  background:rgba(2,8,20,0.48);
-  border:1px solid rgba(140,240,255,0.18);
-  color:#ffffff;
-  font-size:10px;
-  font-weight:800;
-  line-height:1;
-  letter-spacing:0.1px;
-  text-shadow:0 1px 2px rgba(0,0,0,0.98), 0 0 6px rgba(0,0,0,0.98);
-  box-shadow:0 0 10px rgba(0,0,0,0.22);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  cursor:pointer;
-  pointer-events:auto;
-  user-select:none;
-  transition:transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
-.map-player-chip:hover{
-  background:rgba(0,180,255,0.28);
-  border-color:rgba(120,250,255,0.56);
-  transform:scale(1.01);
-}
-.map-player-chip.empty{
-  opacity:0.12;
-  cursor:default;
-}
-.map-player-chip.empty:hover{
-  transform:none;
-  background:rgba(2,8,20,0.48);
-  border-color:rgba(140,240,255,0.18);
-}
+
 .map-player-name{
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
+  white-space:nowrap;
 }
+
 .map-player-owner{
   color:#ffd85a;
   flex:0 0 auto;
   text-shadow:0 0 6px rgba(0,0,0,0.98);
 }
+
 #map-players{
   display:none !important;
 }
