@@ -962,12 +962,13 @@ overflow-y:auto;
 /* правая панель */
 
 #match-preview{
-width:240px;
-min-width:240px;
+width:260px;
+min-width:260px;
 display:flex;
 flex-direction:column;
 gap:10px;
 align-items:center;
+justify-content:flex-start;
 }
 
 
@@ -975,34 +976,56 @@ align-items:center;
 /* мини карта */
 
 #map-mini-preview{
-width:220px;
-height:220px;
+width:170px;
+height:170px;
 background:#111;
 border:2px solid #00ffff;
-border-radius:50px;
+border-radius:36px;
 display:flex;
 align-items:center;
 justify-content:center;
 overflow:hidden;
 margin:0 auto;
 box-sizing:border-box;
+flex:0 0 auto;
 }
 
 /* игроки */
 
 #map-players{
-width:220px;
+width:100%;
+max-height:150px;
 display:flex;
 flex-direction:column;
 gap:5px;
 margin:0 auto;
+overflow-y:auto;
+padding-right:6px;
+box-sizing:border-box;
+}
+
+#map-players::-webkit-scrollbar{
+  width:8px;
+}
+
+#map-players::-webkit-scrollbar-track{
+  background:rgba(255,255,255,0.05);
+  border-radius:10px;
+}
+
+#map-players::-webkit-scrollbar-thumb{
+  background:linear-gradient(#00ffcc, #0088ff);
+  border-radius:10px;
 }
 
 .player-slot{
-background:rgba(255,255,255,0.05);
-padding:4px 6px;
-border-radius:6px;
+background:rgba(255,255,255,0.07);
+padding:6px 8px;
+border-radius:8px;
 font-size:12px;
+min-height:28px;
+display:flex;
+align-items:center;
 }
 
 
@@ -1560,14 +1583,14 @@ font-size:12px;
 
 
 #map-mini-preview{
-width:220px;
-height:220px;
+width:170px;
+height:170px;
 position:relative;
 overflow:hidden;
 display:flex;
 align-items:center;
 justify-content:center;
-filter: drop-shadow(0 0 20px rgba(255,255,255,0.3));
+filter: drop-shadow(0 0 16px rgba(255,255,255,0.24));
 }
 
 #planet-preview{
@@ -1577,6 +1600,7 @@ background-size:cover;
 background-repeat:no-repeat;
 background-position:center;
 filter:none;
+border-radius:32px;
 }
 
 
@@ -2004,6 +2028,20 @@ body.state-observe #ui{ display:none !important; }
   border:none;
   z-index:20005;
 }
+
+/* ===== V93 RIGHT PANEL + TOP ROW FIX ===== */
+#top-nav{
+  top:8px !important;
+}
+#premium-bar{
+  top:8px !important;
+  right:18px !important;
+  left:auto !important;
+}
+#match-preview{
+  padding-top:6px;
+}
+
 #premium-account-info,
 #premium-currency-box{
   display:flex;
