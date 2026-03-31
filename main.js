@@ -7143,8 +7143,26 @@ function buildShopModelSvg(item){
 function renderShopMainSwitch(){
     const wrap = document.getElementById('shop-main-switch');
     if(!wrap) return;
-    wrap.innerHTML = '';
-    shopState.view = 'ships';
+    wrap.innerHTML = `
+        <button type="button" class="shop-type-tab ${shopState.view === 'ships' ? 'active' : ''}" data-shop-main-view="ships">
+            <span class="shop-type-name">Корабли</span>
+            <span class="shop-type-sub">Боевые ветки</span>
+        </button>
+        <button type="button" class="shop-type-tab ${shopState.view === 'modules' ? 'active' : ''}" data-shop-main-view="modules">
+            <span class="shop-type-name">Модули</span>
+            <span class="shop-type-sub">Улучшения и слоты</span>
+        </button>
+    `;
+    wrap.querySelectorAll('[data-shop-main-view]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const nextView = btn.dataset.shopMainView || 'ships';
+            if(shopState.view === nextView) return;
+            shopState.view = nextView;
+            const nextList = nextView === 'modules' ? getCurrentShopModules() : getCurrentShopShips();
+            shopState.selectedId = nextList[0]?.id || '';
+            renderShopScreen();
+        });
+    });
 }
 
 
@@ -7155,18 +7173,28 @@ function renderShopTypeTabs(){
     const moduleLabel = document.getElementById('shop-module-type-label');
     if(!wrap) return;
 
-    if(typeLabel) typeLabel.textContent = 'Классы кораблей';
+    const shipsMode = shopState.view !== 'modules';
+
+    if(typeLabel){
+        typeLabel.textContent = 'Классы кораблей';
+        typeLabel.style.display = shipsMode ? 'block' : 'none';
+    }
+    wrap.style.display = shipsMode ? 'flex' : 'none';
     wrap.innerHTML = SHOP_DATA.types.map(type => `
-        <button type="button" class="shop-type-tab ${shopState.view === 'ships' && shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
+        <button type="button" class="shop-type-tab ${shipsMode && shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
             <span class="shop-type-name">${type.name}</span>
             <span class="shop-type-sub">${type.subtitle}</span>
         </button>
     `).join('');
 
-    if(moduleLabel) moduleLabel.textContent = 'Классы модулей';
+    if(moduleLabel){
+        moduleLabel.textContent = 'Классы модулей';
+        moduleLabel.style.display = shipsMode ? 'none' : 'block';
+    }
     if(moduleWrap){
+        moduleWrap.style.display = shipsMode ? 'none' : 'flex';
         moduleWrap.innerHTML = SHOP_DATA.moduleTypes.map(type => `
-            <button type="button" class="shop-type-tab ${shopState.view === 'modules' && shopState.moduleType === type.id ? 'active' : ''}" data-shop-module-type="${type.id}">
+            <button type="button" class="shop-type-tab ${!shipsMode && shopState.moduleType === type.id ? 'active' : ''}" data-shop-module-type="${type.id}">
                 <span class="shop-type-name">${type.name}</span>
                 <span class="shop-type-sub">${type.subtitle}</span>
             </button>
@@ -7204,7 +7232,6 @@ function renderShopLists(){
     if(shipsList) shipsList.style.display = 'none';
     if(modulesLabel) modulesLabel.style.display = 'none';
     if(modulesList) modulesList.style.display = 'none';
-    shopState.view = 'ships';
 }
 
 
