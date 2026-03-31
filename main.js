@@ -6955,192 +6955,194 @@ function limitBattleArea(){
 
 
 
-/* ===== V81 SHOP ===== */
+
+/* ===== V82 SHOP CLASSES ===== */
 const SHOP_DATA = {
-    ships: [
-        {
-            id:'falcon_x1',
-            type:'ship',
-            name:'Falcon X1',
-            subtitle:'Лёгкий перехватчик',
-            badge:'Истребитель',
-            price:1200,
-            description:'Лёгкий фронтовой истребитель для быстрых вылетов и дуэлей. Хорош для агрессивного старта и ухода из-под огня.',
-            stats:[['Скорость','9.4'],['Броня','3.1'],['Урон','5.8'],['Энергия','6.0']],
-            art:'falcon'
-        },
-        {
-            id:'viper_mk2',
-            type:'ship',
-            name:'Viper MK-II',
-            subtitle:'Штурмовой клинок',
-            badge:'Истребитель',
-            price:1850,
-            description:'Средний штурмовик с усиленным носом и ракетными пилонами. Держит удар лучше лёгких моделей.',
-            stats:[['Скорость','7.6'],['Броня','6.9'],['Урон','7.4'],['Энергия','5.3']],
-            art:'viper'
-        },
-        {
-            id:'nova_spear',
-            type:'ship',
-            name:'Nova Spear',
-            subtitle:'Снайперский истребитель',
-            badge:'Истребитель',
-            price:2400,
-            description:'Дальнобойная модель с удлинённым корпусом и стабилизаторами. Любит точный огонь и контроль дистанции.',
-            stats:[['Скорость','6.8'],['Броня','5.0'],['Урон','9.1'],['Энергия','7.6']],
-            art:'nova'
-        },
-        {
-            id:'aegis_hammer',
-            type:'ship',
-            name:'Aegis Hammer',
-            subtitle:'Тяжёлый лобовой боец',
-            badge:'Истребитель',
-            price:3150,
-            description:'Тяжёлый корпус с массивными щитовыми секциями. Медленнее, но отлично подходит для продавливания фронта.',
-            stats:[['Скорость','5.2'],['Броня','9.3'],['Урон','8.6'],['Энергия','6.1']],
-            art:'aegis'
-        },
-        {
-            id:'phantom_razor',
-            type:'ship',
-            name:'Phantom Razor',
-            subtitle:'Скрытный охотник',
-            badge:'Истребитель',
-            price:4100,
-            description:'Премиальный истребитель с тонким силуэтом и высоким темпом манёвра. Идеален для опытных пилотов.',
-            stats:[['Скорость','9.8'],['Броня','4.7'],['Урон','8.2'],['Энергия','8.8']],
-            art:'phantom'
-        }
+    types: [
+        { id:'fighters', name:'Истребители', subtitle:'Скорость и перехват', badge:'Истребитель' },
+        { id:'tanks', name:'Танки', subtitle:'Броня и давление', badge:'Тяжёлый корпус' },
+        { id:'assault', name:'Штурмовики', subtitle:'Ракеты и тяжёлый урон', badge:'Штурмовик' },
+        { id:'technology', name:'Технологии', subtitle:'Энергия и спецэффекты', badge:'Технологический класс' },
+        { id:'universal', name:'Универсалы', subtitle:'Баланс всех систем', badge:'Универсал' }
     ],
+    shipsByType: {
+        fighters: [
+            { id:'scout_1', type:'ship', classId:'fighters', tier:'Старый корпус', name:'Скаут-1', subtitle:'Старый перехватчик', badge:'Истребители', price:900, description:'Базовый старый корпус для быстрых вылетов. Узкий силуэт, простая броня, яркие носовые неоны и лёгкие лазерные пушки.', stats:[['Скорость','9.2'],['Броня','3.2'],['Урон','4.8'],['Энергия','5.4'],['Оружие','Лазеры']], art:'arrow', neon:'#76f7ff', engine:'#59c7ff', weapon:'laser', accent:'#7a8cff' },
+            { id:'scout_2', type:'ship', classId:'fighters', tier:'Усиленный корпус', name:'Скаут-2', subtitle:'Форсажная версия', badge:'Истребители', price:1350, description:'Обновлённая версия старой платформы: ярче контуры, мощнее сопла, лучше стабилизация и более чистый лазерный след.', stats:[['Скорость','9.6'],['Броня','3.8'],['Урон','5.5'],['Энергия','5.9'],['Оружие','Импульсный лазер']], art:'dart', neon:'#86fff2', engine:'#65d2ff', weapon:'laser', accent:'#57a8ff' },
+            { id:'stinger', type:'ship', classId:'fighters', tier:'Новая серия', name:'Стингер', subtitle:'Клинок перехвата', badge:'Истребители', price:1880, description:'Уже современный и более острый корпус. Пара боковых пушек даёт плотный импульсный огонь, а неоновые жилы подчёркивают скорость.', stats:[['Скорость','9.8'],['Броня','4.2'],['Урон','6.3'],['Энергия','6.4'],['Оружие','Двойной импульс']], art:'stinger', neon:'#7efcff', engine:'#4ab8ff', weapon:'pulse', accent:'#ffd86a' },
+            { id:'phantom', type:'ship', classId:'fighters', tier:'Современный stealth', name:'Фантом', subtitle:'Стелс-перехватчик', badge:'Истребители', price:2640, description:'Тонкий скрытный корпус с фиолетово-голубыми неонами. Задние двигатели горят коротким резким факелом, вооружение — тонкие лучевые лазеры.', stats:[['Скорость','10.0'],['Броня','4.7'],['Урон','7.3'],['Энергия','7.4'],['Оружие','Лучевой лазер']], art:'phantom', neon:'#95f1ff', engine:'#8b6cff', weapon:'beam', accent:'#9f6bff' },
+            { id:'phantom_x', type:'ship', classId:'fighters', tier:'Топ версия', name:'Фантом-X', subtitle:'Пиковая модель ветки', badge:'Истребители', price:3520, description:'Новая элитная модификация с яркими неоновыми линиями по всему корпусу, усиленными двигателями и плазменным лучом высокой плотности.', stats:[['Скорость','10.4'],['Броня','5.1'],['Урон','8.2'],['Энергия','8.6'],['Оружие','Плазменный луч']], art:'razor', neon:'#7cfbff', engine:'#a36cff', weapon:'plasma', accent:'#ffe07d' }
+        ],
+        tanks: [
+            { id:'bastion_0', type:'ship', classId:'tanks', tier:'Старый корпус', name:'Бастион-0', subtitle:'Старый тяжёлый щит', badge:'Танки', price:980, description:'Старая тяжёлая платформа с широким корпусом и медленными, но мощными двигателями. Лобовые пушки стреляют плотным синим лазером.', stats:[['Скорость','4.2'],['Броня','8.4'],['Урон','5.6'],['Энергия','5.0'],['Оружие','Тяжёлый лазер']], art:'bulwark', neon:'#7fe7ff', engine:'#4aa8ff', weapon:'laser', accent:'#56c9ff' },
+            { id:'bastion_1', type:'ship', classId:'tanks', tier:'Усиленный корпус', name:'Бастион-1', subtitle:'Лобовой подавитель', badge:'Танки', price:1480, description:'Усиленная версия с более яркой защитной подсветкой и массивным центральным орудием. Хорошо держит фронт и постоянно светится по краям.', stats:[['Скорость','4.6'],['Броня','9.0'],['Урон','6.3'],['Энергия','5.5'],['Оружие','Осадный лазер']], art:'bulwark', neon:'#85f2ff', engine:'#5cb6ff', weapon:'beam', accent:'#7aa7ff' },
+            { id:'goliath', type:'ship', classId:'tanks', tier:'Новая серия', name:'Голиаф', subtitle:'Тяжёлый молот', badge:'Танки', price:2280, description:'Новая тяжёлая рама с боковыми бронеплитами, угловыми неонами и плазменным залпом из центральной башни.', stats:[['Скорость','4.8'],['Броня','9.6'],['Урон','7.1'],['Энергия','6.1'],['Оружие','Плазменный залп']], art:'fortress', neon:'#8bf9ff', engine:'#4fc0ff', weapon:'plasma', accent:'#ffd06c' },
+            { id:'titan', type:'ship', classId:'tanks', tier:'Современный тяжёлый', name:'Титан', subtitle:'Фронтовой бастион', badge:'Танки', price:3180, description:'Плотный корпус с яркими броневыми рёбрами, крупными реакторами и медленным тяжёлым лучевым выстрелом.', stats:[['Скорость','5.1'],['Броня','10.0'],['Урон','7.8'],['Энергия','6.6'],['Оружие','Тяжёлый луч']], art:'fortress', neon:'#9dfcff', engine:'#7ab6ff', weapon:'beam', accent:'#7ad7ff' },
+            { id:'titan_mk2', type:'ship', classId:'tanks', tier:'Топ версия', name:'Титан-МК2', subtitle:'Броневой доминатор', badge:'Танки', price:4180, description:'Топовая версия ветки: насыщенные неоны, тройной задний выхлоп и тяжёлое фазовое орудие для продавливания линии боя.', stats:[['Скорость','5.4'],['Броня','10.6'],['Урон','8.7'],['Энергия','7.2'],['Оружие','Фазовый заряд']], art:'citadel', neon:'#8ff8ff', engine:'#95c0ff', weapon:'phase', accent:'#9c83ff' }
+        ],
+        assault: [
+            { id:'raider', type:'ship', classId:'assault', tier:'Старый корпус', name:'Рейдер', subtitle:'Старый штурмовой клинок', badge:'Штурмовики', price:950, description:'Старый штурмовой корпус с агрессивным носом и яркими оранжево-голубыми прожилками. Вооружён коротким лазерным залпом.', stats:[['Скорость','7.0'],['Броня','5.4'],['Урон','6.8'],['Энергия','5.2'],['Оружие','Штурмовой лазер']], art:'lancer', neon:'#76f2ff', engine:'#4bc4ff', weapon:'laser', accent:'#ffba63' },
+            { id:'raider_mk2', type:'ship', classId:'assault', tier:'Усиленный корпус', name:'Рейдер-МК2', subtitle:'Ракетная версия', badge:'Штурмовики', price:1460, description:'Новая секция под ракетные пилоны и мощнее сопла. Неоны идут по крыльям, а нос несёт импульсно-ракетный пакет.', stats:[['Скорость','7.3'],['Броня','5.9'],['Урон','7.6'],['Энергия','5.7'],['Оружие','Ракеты + импульс']], art:'lancer', neon:'#82fdff', engine:'#63d1ff', weapon:'missile', accent:'#ffd76a' },
+            { id:'blitz', type:'ship', classId:'assault', tier:'Новая серия', name:'Блиц', subtitle:'Быстрый штурм', badge:'Штурмовики', price:2140, description:'Скоростной штурмовик со стреловидным корпусом, красочными боковыми неонами и парой плазменных ускорителей.', stats:[['Скорость','7.9'],['Броня','6.3'],['Урон','8.2'],['Энергия','6.4'],['Оружие','Плазменные болты']], art:'stinger', neon:'#7efbff', engine:'#5ed6ff', weapon:'plasma', accent:'#ff9e61' },
+            { id:'destroyer', type:'ship', classId:'assault', tier:'Современный штурм', name:'Разрушитель', subtitle:'Тяжёлый атакующий корпус', badge:'Штурмовики', price:3020, description:'Корпус с широкой носовой частью и двойным задним факелом. Пушки стреляют плотными ракетно-плазменными залпами.', stats:[['Скорость','7.2'],['Броня','7.2'],['Урон','9.0'],['Энергия','6.9'],['Оружие','Ракеты + плазма']], art:'destroyer', neon:'#89f9ff', engine:'#ff9e66', weapon:'missile', accent:'#ff7f66' },
+            { id:'destroyer_x', type:'ship', classId:'assault', tier:'Топ версия', name:'Разрушитель-X', subtitle:'Топовый дамагер', badge:'Штурмовики', price:3950, description:'Элитный штурмовик с мерцающими неонами по крыльям, перегретыми кормовыми двигателями и тяжёлым алым плазменным выбросом.', stats:[['Скорость','7.5'],['Броня','7.7'],['Урон','9.8'],['Энергия','7.5'],['Оружие','Алый плазмо-залп']], art:'destroyer', neon:'#9ffbff', engine:'#ff8b63', weapon:'plasma', accent:'#ff6a6a' }
+        ],
+        technology: [
+            { id:'echo', type:'ship', classId:'technology', tier:'Старый корпус', name:'Эхо', subtitle:'Старый энергокорабль', badge:'Технологии', price:1020, description:'Старый исследовательский корпус с мягкими бирюзовыми неонами и кольцевой энергетикой вокруг центрального ядра.', stats:[['Скорость','6.0'],['Броня','4.8'],['Урон','5.7'],['Энергия','8.1'],['Оружие','Энерголучи']], art:'halo', neon:'#81fdff', engine:'#6fd8ff', weapon:'beam', accent:'#84a6ff' },
+            { id:'echo_2', type:'ship', classId:'technology', tier:'Усиленный корпус', name:'Эхо-2', subtitle:'Улучшенное ядро', badge:'Технологии', price:1580, description:'Модернизированная старая платформа с более ярким центральным ядром и фазовым свечением на крыльях.', stats:[['Скорость','6.3'],['Броня','5.0'],['Урон','6.2'],['Энергия','8.8'],['Оружие','Фазовый луч']], art:'halo', neon:'#95ffff', engine:'#6bc4ff', weapon:'phase', accent:'#9d7cff' },
+            { id:'nova', type:'ship', classId:'technology', tier:'Новая серия', name:'Нова', subtitle:'Энергетический фрегат', badge:'Технологии', price:2360, description:'Новый корпус с энергетическими арками, яркими неоновыми кольцами и чистым дальним лучом.', stats:[['Скорость','6.8'],['Броня','5.4'],['Урон','7.1'],['Энергия','9.4'],['Оружие','Квантовый луч']], art:'halo', neon:'#8efbff', engine:'#7dc6ff', weapon:'beam', accent:'#fff184' },
+            { id:'helios', type:'ship', classId:'technology', tier:'Современный tech', name:'Гелиос', subtitle:'Солнечная батарея боя', badge:'Технологии', price:3280, description:'Светящийся современный корпус с золотыми прожилками, реактором в центре и стабилизированным плазменным импульсом.', stats:[['Скорость','7.0'],['Броня','5.9'],['Урон','7.8'],['Энергия','10.0'],['Оружие','Солнечная плазма']], art:'helios', neon:'#92ffff', engine:'#8bc8ff', weapon:'plasma', accent:'#ffd96d' },
+            { id:'helios_prime', type:'ship', classId:'technology', tier:'Топ версия', name:'Гелиос-Прайм', subtitle:'Пиковая энергомодель', badge:'Технологии', price:4320, description:'Топовый технологический корабль с самыми яркими неонами, пульсирующими орбитальными кольцами и фазовым орудием высокой плотности.', stats:[['Скорость','7.4'],['Броня','6.2'],['Урон','8.5'],['Энергия','10.8'],['Оружие','Фазовая арка']], art:'helios', neon:'#a6ffff', engine:'#93d2ff', weapon:'phase', accent:'#ffd86b' }
+        ],
+        universal: [
+            { id:'pioneer', type:'ship', classId:'universal', tier:'Старый корпус', name:'Пионер', subtitle:'Старый универсал', badge:'Универсалы', price:880, description:'Классический корпус ранней серии: аккуратные синие неоны, пара компактных двигателей и простой лазерный комплект.', stats:[['Скорость','7.0'],['Броня','5.8'],['Урон','5.9'],['Энергия','6.2'],['Оружие','Лазеры']], art:'classic', neon:'#79f4ff', engine:'#62c8ff', weapon:'laser', accent:'#6ba4ff' },
+            { id:'pioneer_2', type:'ship', classId:'universal', tier:'Усиленный корпус', name:'Пионер-2', subtitle:'Сбалансированный апгрейд', badge:'Универсалы', price:1320, description:'Улучшенная версия старой платформы с ярче светящимися линиями и более уверенным импульсным вооружением.', stats:[['Скорость','7.3'],['Броня','6.2'],['Урон','6.4'],['Энергия','6.8'],['Оружие','Импульсные пушки']], art:'classic', neon:'#88fbff', engine:'#6ed3ff', weapon:'pulse', accent:'#7ad7ff' },
+            { id:'vector', type:'ship', classId:'universal', tier:'Новая серия', name:'Вектор', subtitle:'Баланс во всём', badge:'Универсалы', price:1980, description:'Современный сбалансированный корпус с равномерным неоновым контуром и точным центральным лучом.', stats:[['Скорость','7.8'],['Броня','6.8'],['Урон','7.0'],['Энергия','7.2'],['Оружие','Точный луч']], art:'vector', neon:'#86ffff', engine:'#74d6ff', weapon:'beam', accent:'#8a8fff' },
+            { id:'vector_plus', type:'ship', classId:'universal', tier:'Современный плюс', name:'Вектор-Плюс', subtitle:'Усиленная баланс-модель', badge:'Универсалы', price:2780, description:'Прокачанная версия с более густым свечением крыльев, улучшенными соплами и плазменным импульсом средней дальности.', stats:[['Скорость','8.1'],['Броня','7.1'],['Урон','7.6'],['Энергия','7.8'],['Оружие','Плазменный импульс']], art:'vector', neon:'#92ffff', engine:'#82d9ff', weapon:'plasma', accent:'#ffd470' },
+            { id:'vector_elite', type:'ship', classId:'universal', tier:'Топ версия', name:'Вектор-Элит', subtitle:'Элитный баланс-класс', badge:'Универсалы', price:3660, description:'Топовый универсал с яркими голубыми неонами, насыщенным свечением двигателей и фазовым многоцелевым орудием.', stats:[['Скорость','8.5'],['Броня','7.5'],['Урон','8.1'],['Энергия','8.5'],['Оружие','Фазовый импульс']], art:'vector', neon:'#9dfdff', engine:'#8edfff', weapon:'phase', accent:'#9b7cff' }
+        ]
+    },
     modules: [
-        {
-            id:'speed_core',
-            type:'module',
-            name:'Модуль скорости',
-            subtitle:'Ускорители маршевых двигателей',
-            badge:'Модуль',
-            price:350,
-            description:'Увеличивает максимальную скорость и разгон корабля. Полезен для лёгких и средних истребителей.',
-            stats:[['Бонус','+12% скорость'],['Слот','Двигатель'],['Редкость','Редкий'],['Вес','Лёгкий']],
-            art:'speed'
-        },
-        {
-            id:'shield_lattice',
-            type:'module',
-            name:'Модуль защиты',
-            subtitle:'Щитовая решётка',
-            badge:'Модуль',
-            price:420,
-            description:'Усиливает лобовую и боковую защиту корпуса, снижая урон от прямых попаданий.',
-            stats:[['Бонус','+18% броня'],['Слот','Защита'],['Редкость','Редкий'],['Вес','Средний']],
-            art:'shield'
-        },
-        {
-            id:'reactor_overdrive',
-            type:'module',
-            name:'Реактор Overdrive',
-            subtitle:'Пиковая энергия',
-            badge:'Модуль',
-            price:560,
-            description:'Ускоряет перезарядку энергии оружия и даёт кораблю стабильность в затяжной дуэли.',
-            stats:[['Бонус','+20% энергия'],['Слот','Реактор'],['Редкость','Эпический'],['Вес','Средний']],
-            art:'reactor'
-        },
-        {
-            id:'target_matrix',
-            type:'module',
-            name:'Прицельная матрица',
-            subtitle:'Контроль огня',
-            badge:'Модуль',
-            price:610,
-            description:'Стабилизирует вооружение, повышает точность и уменьшает разброс лазерных батарей.',
-            stats:[['Бонус','+16% точность'],['Слот','Наведение'],['Редкость','Эпический'],['Вес','Лёгкий']],
-            art:'matrix'
-        },
-        {
-            id:'plasma_capacitor',
-            type:'module',
-            name:'Плазменный конденсатор',
-            subtitle:'Усилитель урона',
-            badge:'Модуль',
-            price:740,
-            description:'Даёт более мощный импульс орудиям. Рекомендуется для штурмовых и снайперских конфигураций.',
-            stats:[['Бонус','+14% урон'],['Слот','Оружие'],['Редкость','Эпический'],['Вес','Средний']],
-            art:'plasma'
-        },
-        {
-            id:'phase_nullifier',
-            type:'module',
-            name:'Фазовый стабилизатор',
-            subtitle:'Контроль манёвра',
-            badge:'Модуль',
-            price:860,
-            description:'Снижает инерцию корабля, делая развороты резче и безопаснее на высокой скорости.',
-            stats:[['Бонус','+15% манёвр'],['Слот','Навигация'],['Редкость','Легендарный'],['Вес','Лёгкий']],
-            art:'phase'
-        }
+        { id:'speed_core', type:'module', tier:'Редкий', name:'Модуль скорости', subtitle:'Ускорители маршевых двигателей', badge:'Модуль', price:350, description:'Увеличивает максимальную скорость и разгон корабля. Полезен для лёгких и средних истребителей.', stats:[['Бонус','+12% скорость'],['Слот','Двигатель'],['Редкость','Редкий'],['Вес','Лёгкий']], art:'speed' },
+        { id:'shield_lattice', type:'module', tier:'Редкий', name:'Модуль защиты', subtitle:'Щитовая решётка', badge:'Модуль', price:420, description:'Усиливает лобовую и боковую защиту корпуса, снижая урон от прямых попаданий.', stats:[['Бонус','+18% броня'],['Слот','Защита'],['Редкость','Редкий'],['Вес','Средний']], art:'shield' },
+        { id:'reactor_overdrive', type:'module', tier:'Эпический', name:'Реактор Overdrive', subtitle:'Пиковая энергия', badge:'Модуль', price:560, description:'Ускоряет перезарядку энергии оружия и даёт кораблю стабильность в затяжной дуэли.', stats:[['Бонус','+20% энергия'],['Слот','Реактор'],['Редкость','Эпический'],['Вес','Средний']], art:'reactor' },
+        { id:'target_matrix', type:'module', tier:'Эпический', name:'Прицельная матрица', subtitle:'Контроль огня', badge:'Модуль', price:610, description:'Стабилизирует вооружение, повышает точность и уменьшает разброс лазерных батарей.', stats:[['Бонус','+16% точность'],['Слот','Наведение'],['Редкость','Эпический'],['Вес','Лёгкий']], art:'matrix' },
+        { id:'plasma_capacitor', type:'module', tier:'Эпический', name:'Плазменный конденсатор', subtitle:'Усилитель урона', badge:'Модуль', price:740, description:'Даёт более мощный импульс орудиям. Рекомендуется для штурмовых и снайперских конфигураций.', stats:[['Бонус','+14% урон'],['Слот','Оружие'],['Редкость','Эпический'],['Вес','Средний']], art:'plasma' },
+        { id:'phase_nullifier', type:'module', tier:'Легендарный', name:'Фазовый стабилизатор', subtitle:'Контроль манёвра', badge:'Модуль', price:860, description:'Снижает инерцию корабля, делая развороты резче и безопаснее на высокой скорости.', stats:[['Бонус','+15% манёвр'],['Слот','Навигация'],['Редкость','Легендарный'],['Вес','Лёгкий']], art:'phase' }
     ]
 };
 
 const shopState = {
     open:false,
-    category:'ships',
-    selectedId:'falcon_x1'
+    view:'ships',
+    shipType:'fighters',
+    selectedId:'scout_1'
 };
 
+function getCurrentShopShips(){
+    return SHOP_DATA.shipsByType[shopState.shipType] || [];
+}
+
 function getShopSelectedItem(){
-    const list = shopState.category === 'ships' ? SHOP_DATA.ships : SHOP_DATA.modules;
+    const list = shopState.view === 'modules' ? SHOP_DATA.modules : getCurrentShopShips();
     return list.find(item => item.id === shopState.selectedId) || list[0] || null;
 }
 
 function buildShopModelSvg(item){
-    const common = 'viewBox="0 0 240 240" class="shop-model-svg" xmlns="http://www.w3.org/2000/svg"';
-    const glow = '<defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0%" stop-color="#74f0ff"/><stop offset="100%" stop-color="#4f78ff"/></linearGradient><linearGradient id="g2" x1="0" x2="1"><stop offset="0%" stop-color="#ffd76b"/><stop offset="100%" stop-color="#ff8b42"/></linearGradient></defs>';
-    const art = item?.art || 'falcon';
+    const common = 'viewBox="0 0 280 280" class="shop-model-svg" xmlns="http://www.w3.org/2000/svg"';
+    const neon = item?.neon || '#7efcff';
+    const engine = item?.engine || '#63d1ff';
+    const accent = item?.accent || '#7a8cff';
+    const art = item?.art || 'classic';
+    const weapon = item?.weapon || 'laser';
+    const defs = `
+      <defs>
+        <linearGradient id="shipHullA" x1="0" x2="1"><stop offset="0%" stop-color="#d8f6ff"/><stop offset="100%" stop-color="${accent}"/></linearGradient>
+        <linearGradient id="shipHullB" x1="0" x2="1"><stop offset="0%" stop-color="${neon}"/><stop offset="100%" stop-color="#1a2f56"/></linearGradient>
+        <linearGradient id="engineGlow" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#fff7bf"/><stop offset="55%" stop-color="${engine}"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></linearGradient>
+        <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="55%" stop-color="${neon}" stop-opacity="0.85"/><stop offset="100%" stop-color="${neon}" stop-opacity="0"/></radialGradient>
+      </defs>`;
     if(item?.type === 'module'){
         const moduleMap = {
-            speed: '<circle cx="120" cy="120" r="54" fill="rgba(35,70,120,0.45)" stroke="url(#g1)" stroke-width="4"/><circle cx="120" cy="120" r="26" fill="#7ef9ff" opacity="0.9"/><path d="M120 52 L134 94 L184 94 L144 120 L160 182 L120 144 L80 182 L96 120 L56 94 L106 94 Z" fill="url(#g2)" opacity="0.94"/>',
-            shield: '<circle cx="120" cy="120" r="58" fill="rgba(35,70,120,0.32)" stroke="#74f0ff" stroke-width="4"/><path d="M120 52 L176 78 L166 144 Q155 182 120 196 Q85 182 74 144 L64 78 Z" fill="url(#g1)" opacity="0.94"/><path d="M120 78 L152 94 L146 134 Q140 156 120 168 Q100 156 94 134 L88 94 Z" fill="#dffbff" opacity="0.46"/>',
-            reactor: '<circle cx="120" cy="120" r="62" fill="rgba(14,28,58,0.64)" stroke="#6cf6ff" stroke-width="3"/><circle cx="120" cy="120" r="22" fill="#fff2a3"/><circle cx="120" cy="120" r="40" fill="none" stroke="#ffbf4d" stroke-width="8" stroke-dasharray="18 10" opacity="0.86"/><circle cx="120" cy="120" r="58" fill="none" stroke="#74f0ff" stroke-width="2" opacity="0.5"/>',
-            matrix: '<rect x="72" y="72" width="96" height="96" rx="14" fill="rgba(18,32,64,0.76)" stroke="#74f0ff" stroke-width="4"/><path d="M88 120 H152 M120 88 V152" stroke="#ffd76b" stroke-width="8" stroke-linecap="round"/><circle cx="120" cy="120" r="18" fill="none" stroke="#dffbff" stroke-width="4"/>',
-            plasma: '<circle cx="120" cy="120" r="28" fill="#fff6b2"/><path d="M120 52 C154 74 178 88 188 120 C176 154 156 172 120 188 C84 172 64 154 52 120 C64 88 90 74 120 52 Z" fill="none" stroke="#ff8b42" stroke-width="10" opacity="0.9"/><path d="M120 72 L138 112 L176 120 L138 128 L120 168 L102 128 L64 120 L102 112 Z" fill="#74f0ff" opacity="0.92"/>',
-            phase: '<circle cx="120" cy="120" r="56" fill="rgba(16,24,48,0.58)" stroke="#7ef9ff" stroke-width="3"/><ellipse cx="120" cy="120" rx="68" ry="24" fill="none" stroke="#6c8cff" stroke-width="6" opacity="0.82" transform="rotate(-24 120 120)"/><ellipse cx="120" cy="120" rx="68" ry="24" fill="none" stroke="#74f0ff" stroke-width="4" opacity="0.58" transform="rotate(28 120 120)"/><circle cx="120" cy="120" r="18" fill="#dffbff"/>'
+            speed: `<circle cx="140" cy="140" r="58" fill="rgba(35,70,120,0.45)" stroke="${neon}" stroke-width="4"/><circle cx="140" cy="140" r="26" fill="url(#coreGlow)" class="shop-neon-dot"/><path d="M140 68 L156 110 L212 110 L166 140 L184 206 L140 164 L96 206 L114 140 L68 110 L124 110 Z" fill="${accent}" opacity="0.94" class="shop-neon-line"/>`,
+            shield: `<circle cx="140" cy="140" r="62" fill="rgba(35,70,120,0.32)" stroke="${neon}" stroke-width="4"/><path d="M140 70 L198 96 L186 168 Q174 206 140 220 Q106 206 94 168 L82 96 Z" fill="url(#shipHullB)" opacity="0.95"/><path d="M140 100 L170 114 L164 158 Q156 182 140 192 Q124 182 116 158 L110 114 Z" fill="#dffbff" opacity="0.42"/>`,
+            reactor: `<circle cx="140" cy="140" r="66" fill="rgba(14,28,58,0.64)" stroke="${neon}" stroke-width="3"/><circle cx="140" cy="140" r="24" fill="#fff2a3" class="shop-neon-dot"/><circle cx="140" cy="140" r="42" fill="none" stroke="${accent}" stroke-width="8" stroke-dasharray="18 10" opacity="0.86" class="shop-neon-line"/><circle cx="140" cy="140" r="58" fill="none" stroke="${neon}" stroke-width="2" opacity="0.5"/>`,
+            matrix: `<rect x="92" y="92" width="96" height="96" rx="14" fill="rgba(18,32,64,0.76)" stroke="${neon}" stroke-width="4"/><path d="M108 140 H172 M140 108 V172" stroke="${accent}" stroke-width="8" stroke-linecap="round" class="shop-neon-line"/><circle cx="140" cy="140" r="18" fill="none" stroke="#dffbff" stroke-width="4"/>`,
+            plasma: `<circle cx="140" cy="140" r="28" fill="#fff6b2" class="shop-neon-dot"/><path d="M140 72 C174 94 198 108 208 140 C196 174 176 192 140 208 C104 192 84 174 72 140 C84 108 110 94 140 72 Z" fill="none" stroke="${accent}" stroke-width="10" opacity="0.9" class="shop-neon-line"/><path d="M140 92 L158 132 L196 140 L158 148 L140 188 L122 148 L84 140 L122 132 Z" fill="${neon}" opacity="0.92"/>`,
+            phase: `<circle cx="140" cy="140" r="58" fill="rgba(16,24,48,0.58)" stroke="${neon}" stroke-width="3"/><ellipse cx="140" cy="140" rx="70" ry="24" fill="none" stroke="${accent}" stroke-width="6" opacity="0.82" transform="rotate(-24 140 140)" class="shop-neon-line"/><ellipse cx="140" cy="140" rx="70" ry="24" fill="none" stroke="${neon}" stroke-width="4" opacity="0.58" transform="rotate(28 140 140)" class="shop-neon-line"/><circle cx="140" cy="140" r="18" fill="#dffbff"/>`
         };
-        return `<svg ${common}>${glow}${moduleMap[art] || moduleMap['speed']}</svg>`;
+        return `<svg ${common}>${defs}${moduleMap[art] || moduleMap['speed']}</svg>`;
     }
-    const shipMap = {
-        falcon: '<path d="M120 30 L146 92 L208 118 L146 144 L120 210 L94 144 L32 118 L94 92 Z" fill="url(#g1)" opacity="0.95"/><path d="M120 58 L136 104 L176 118 L136 132 L120 180 L104 132 L64 118 L104 104 Z" fill="#dffbff" opacity="0.55"/><path d="M58 120 H182" stroke="#ffcf6e" stroke-width="8" opacity="0.8"/>',
-        viper: '<path d="M120 24 L154 86 L214 110 L170 126 L150 200 L120 166 L90 200 L70 126 L26 110 L86 86 Z" fill="url(#g2)" opacity="0.96"/><path d="M120 48 L140 106 L176 116 L140 126 L120 172 L100 126 L64 116 L100 106 Z" fill="#74f0ff" opacity="0.72"/><circle cx="120" cy="114" r="12" fill="#dffbff"/>',
-        nova: '<path d="M120 20 L142 104 L210 118 L142 132 L120 220 L98 132 L30 118 L98 104 Z" fill="url(#g1)" opacity="0.95"/><path d="M120 44 L132 110 L120 192 L108 110 Z" fill="#fff5b3" opacity="0.78"/><path d="M62 120 H178" stroke="#74f0ff" stroke-width="6" opacity="0.6"/>',
-        aegis: '<path d="M120 22 L174 86 L216 118 L184 138 L166 208 L120 182 L74 208 L56 138 L24 118 L66 86 Z" fill="#6e9aff" opacity="0.96"/><path d="M120 58 L148 108 L174 120 L148 132 L120 174 L92 132 L66 120 L92 108 Z" fill="#dffbff" opacity="0.64"/><rect x="92" y="102" width="56" height="36" rx="12" fill="#ffcf6e" opacity="0.8"/>',
-        phantom: '<path d="M120 18 L152 88 L210 120 L152 150 L120 222 L88 150 L30 120 L88 88 Z" fill="#74f0ff" opacity="0.92"/><path d="M120 44 L140 102 L186 120 L140 138 L120 192 L100 138 L54 120 L100 102 Z" fill="#ffffff" opacity="0.45"/><path d="M74 120 C92 92 148 92 166 120 C148 148 92 148 74 120 Z" fill="#7d69ff" opacity="0.72"/>'
+
+    const frameMap = {
+        arrow: '<path class="shop-hull-main" d="M140 24 L174 92 L244 118 L174 144 L140 232 L106 144 L36 118 L106 92 Z" fill="url(#shipHullA)" opacity="0.95"/><path d="M140 60 L158 112 L202 124 L158 136 L140 190 L122 136 L78 124 L122 112 Z" fill="rgba(223,251,255,0.56)"/><path d="M92 168 L124 144 L156 144 L188 168" fill="none" stroke="${neon}" stroke-width="5" class="shop-neon-line"/>',
+        dart: '<path class="shop-hull-main" d="M140 28 L182 90 L242 116 L192 132 L166 214 L140 184 L114 214 L88 132 L38 116 L98 90 Z" fill="url(#shipHullB)" opacity="0.97"/><path d="M140 54 L162 118 L204 126 L162 134 L140 188 L118 134 L76 126 L118 118 Z" fill="rgba(223,251,255,0.62)"/><path d="M112 84 L140 66 L168 84" fill="none" stroke="${neon}" stroke-width="4" class="shop-neon-line"/>',
+        stinger: '<path class="shop-hull-main" d="M140 24 L170 98 L232 118 L178 140 L140 226 L102 140 L48 118 L110 98 Z" fill="url(#shipHullA)" opacity="0.96"/><path d="M140 56 L158 118 L188 124 L158 134 L140 192 L122 134 L92 124 L122 118 Z" fill="rgba(223,251,255,0.58)"/><path d="M74 118 H206" stroke="${accent}" stroke-width="7" opacity="0.84" class="shop-weapon-glow"/>',
+        razor: '<path class="shop-hull-main" d="M140 18 L180 92 L246 120 L180 150 L140 238 L100 150 L34 120 L100 92 Z" fill="url(#shipHullA)" opacity="0.94"/><path d="M140 44 L164 108 L210 120 L164 132 L140 198 L116 132 L70 120 L116 108 Z" fill="rgba(255,255,255,0.46)"/><path d="M94 120 C114 88 166 88 186 120 C166 152 114 152 94 120 Z" fill="${accent}" opacity="0.72" class="shop-neon-line"/>',
+        bulwark: '<path class="shop-hull-main" d="M140 26 L194 86 L244 118 L198 146 L178 222 L140 204 L102 222 L82 146 L36 118 L86 86 Z" fill="url(#shipHullB)" opacity="0.96"/><rect x="104" y="106" width="72" height="42" rx="16" fill="rgba(223,251,255,0.38)"/><path d="M88 94 H192" stroke="${neon}" stroke-width="6" class="shop-neon-line"/>',
+        fortress: '<path class="shop-hull-main" d="M140 22 L206 86 L248 118 L218 146 L194 230 L140 212 L86 230 L62 146 L32 118 L74 86 Z" fill="url(#shipHullA)" opacity="0.97"/><path d="M140 60 L176 110 L210 122 L176 134 L140 184 L104 134 L70 122 L104 110 Z" fill="rgba(223,251,255,0.54)"/><path d="M74 118 H206" stroke="${accent}" stroke-width="10" opacity="0.78" class="shop-weapon-glow"/>',
+        citadel: '<path class="shop-hull-main" d="M140 16 L208 88 L248 120 L214 148 L196 238 L140 220 L84 238 L66 148 L32 120 L72 88 Z" fill="url(#shipHullB)" opacity="0.98"/><rect x="100" y="102" width="80" height="48" rx="18" fill="rgba(223,251,255,0.36)"/><path d="M94 84 H186" stroke="${neon}" stroke-width="5" class="shop-neon-line"/><circle cx="140" cy="126" r="16" fill="${accent}" opacity="0.85" class="shop-neon-dot"/>',
+        lancer: '<path class="shop-hull-main" d="M140 26 L170 90 L238 118 L176 142 L140 224 L104 142 L42 118 L110 90 Z" fill="url(#shipHullB)" opacity="0.96"/><path d="M140 56 L158 110 L196 120 L158 130 L140 186 L122 130 L84 120 L122 110 Z" fill="rgba(223,251,255,0.54)"/><path d="M82 104 L66 128 L82 150" fill="none" stroke="${accent}" stroke-width="7" class="shop-weapon-glow"/><path d="M198 104 L214 128 L198 150" fill="none" stroke="${accent}" stroke-width="7" class="shop-weapon-glow"/>',
+        destroyer: '<path class="shop-hull-main" d="M140 20 L188 82 L246 118 L196 144 L170 232 L140 214 L110 232 L84 144 L34 118 L92 82 Z" fill="url(#shipHullA)" opacity="0.97"/><path d="M140 52 L164 108 L206 120 L164 132 L140 190 L116 132 L74 120 L116 108 Z" fill="rgba(223,251,255,0.56)"/><path d="M76 118 H204" stroke="${accent}" stroke-width="9" class="shop-weapon-glow"/>',
+        halo: '<path class="shop-hull-main" d="M140 30 L170 98 L224 118 L170 138 L140 212 L110 138 L56 118 L110 98 Z" fill="url(#shipHullA)" opacity="0.95"/><circle cx="140" cy="120" r="24" fill="url(#coreGlow)" class="shop-neon-dot"/><ellipse cx="140" cy="120" rx="74" ry="26" fill="none" stroke="${accent}" stroke-width="6" transform="rotate(-24 140 120)" class="shop-neon-line"/>',
+        helios: '<path class="shop-hull-main" d="M140 26 L172 96 L228 118 L172 140 L140 222 L108 140 L52 118 L108 96 Z" fill="url(#shipHullB)" opacity="0.97"/><circle cx="140" cy="120" r="20" fill="#fff0a8" class="shop-neon-dot"/><path d="M140 70 L160 118 L140 168 L120 118 Z" fill="${accent}" opacity="0.84" class="shop-neon-line"/>',
+        classic: '<path class="shop-hull-main" d="M140 34 L172 98 L230 118 L172 138 L140 214 L108 138 L50 118 L108 98 Z" fill="url(#shipHullA)" opacity="0.95"/><path d="M140 62 L156 114 L140 176 L124 114 Z" fill="rgba(223,251,255,0.56)"/><path d="M88 120 H192" stroke="${neon}" stroke-width="5" class="shop-neon-line"/>',
+        vector: '<path class="shop-hull-main" d="M140 24 L176 94 L236 118 L176 142 L140 224 L104 142 L44 118 L104 94 Z" fill="url(#shipHullB)" opacity="0.97"/><path d="M140 54 L160 112 L194 120 L160 128 L140 186 L120 128 L86 120 L120 112 Z" fill="rgba(223,251,255,0.58)"/><path d="M98 92 L140 72 L182 92" fill="none" stroke="${accent}" stroke-width="4" class="shop-neon-line"/>'
     };
-    return `<svg ${common}>${glow}${shipMap[art] || shipMap['falcon']}</svg>`;
+
+    const weaponMap = {
+        laser: '<path d="M88 118 H56" stroke="${neon}" stroke-width="6" class="shop-weapon-glow"/><path d="M192 118 H224" stroke="${neon}" stroke-width="6" class="shop-weapon-glow"/>',
+        pulse: '<circle cx="60" cy="118" r="8" fill="${accent}" class="shop-weapon-glow"/><circle cx="220" cy="118" r="8" fill="${accent}" class="shop-weapon-glow"/>',
+        beam: '<path d="M82 118 H40" stroke="${accent}" stroke-width="8" stroke-linecap="round" class="shop-weapon-glow"/><path d="M198 118 H240" stroke="${accent}" stroke-width="8" stroke-linecap="round" class="shop-weapon-glow"/>',
+        plasma: '<path d="M86 118 H50" stroke="${accent}" stroke-width="10" stroke-linecap="round" class="shop-weapon-glow"/><path d="M194 118 H230" stroke="${accent}" stroke-width="10" stroke-linecap="round" class="shop-weapon-glow"/><circle cx="140" cy="118" r="10" fill="${neon}" class="shop-neon-dot"/>',
+        missile: '<path d="M72 98 L48 118 L72 138" fill="none" stroke="${accent}" stroke-width="7" stroke-linecap="round" class="shop-weapon-glow"/><path d="M208 98 L232 118 L208 138" fill="none" stroke="${accent}" stroke-width="7" stroke-linecap="round" class="shop-weapon-glow"/>',
+        phase: '<ellipse cx="60" cy="118" rx="16" ry="8" fill="none" stroke="${accent}" stroke-width="5" class="shop-weapon-glow"/><ellipse cx="220" cy="118" rx="16" ry="8" fill="none" stroke="${accent}" stroke-width="5" class="shop-weapon-glow"/>'
+    };
+
+    const engineSvg = `
+      <ellipse cx="120" cy="234" rx="12" ry="30" fill="url(#engineGlow)" class="shop-engine-flame"/>
+      <ellipse cx="160" cy="234" rx="12" ry="30" fill="url(#engineGlow)" class="shop-engine-flame-alt"/>
+      <circle cx="120" cy="206" r="8" fill="${engine}" class="shop-neon-dot"/>
+      <circle cx="160" cy="206" r="8" fill="${engine}" class="shop-neon-dot"/>`;
+
+    const frame = (frameMap[art] || frameMap['classic'])
+        .replaceAll('${accent}', accent)
+        .replaceAll('${neon}', neon);
+    const weapons = (weaponMap[weapon] || weaponMap['laser']).replaceAll('${accent}', accent).replaceAll('${neon}', neon);
+    return `<svg ${common}>${defs}${frame}${weapons}${engineSvg}</svg>`;
+}
+
+function renderShopTypeTabs(){
+    const wrap = document.getElementById('shop-type-tabs');
+    if(!wrap) return;
+    wrap.innerHTML = SHOP_DATA.types.map(type => `
+        <button type="button" class="shop-type-tab ${shopState.shipType === type.id && shopState.view === 'ships' ? 'active' : ''}" data-shop-type="${type.id}">
+            <span class="shop-type-name">${type.name}</span>
+            <span class="shop-type-sub">${type.subtitle}</span>
+        </button>
+    `).join('');
+    wrap.querySelectorAll('.shop-type-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            shopState.view = 'ships';
+            shopState.shipType = btn.dataset.shopType || 'fighters';
+            const nextList = getCurrentShopShips();
+            shopState.selectedId = nextList[0]?.id || '';
+            renderShopScreen();
+        });
+    });
 }
 
 function renderShopLists(){
     const shipsList = document.getElementById('shop-ships-list');
     const modulesList = document.getElementById('shop-modules-list');
     if(!shipsList || !modulesList) return;
-    shipsList.innerHTML = SHOP_DATA.ships.map(item => `
-        <button type="button" class="shop-item-btn ${shopState.category === 'ships' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-category="ships" data-shop-id="${item.id}">
-            <span class="shop-item-name">${item.name}</span>
+
+    const ships = getCurrentShopShips();
+    shipsList.innerHTML = ships.map(item => `
+        <button type="button" class="shop-item-btn ${shopState.view === 'ships' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-view="ships" data-shop-id="${item.id}">
+            <div class="shop-item-top">
+              <span class="shop-item-name">${item.name}</span>
+              <span class="shop-item-tier">${item.tier}</span>
+            </div>
             <span class="shop-item-sub">${item.subtitle}</span>
         </button>
     `).join('');
+
     modulesList.innerHTML = SHOP_DATA.modules.map(item => `
-        <button type="button" class="shop-item-btn ${shopState.category === 'modules' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-category="modules" data-shop-id="${item.id}">
-            <span class="shop-item-name">${item.name}</span>
+        <button type="button" class="shop-item-btn ${shopState.view === 'modules' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-view="modules" data-shop-id="${item.id}">
+            <div class="shop-item-top">
+              <span class="shop-item-name">${item.name}</span>
+              <span class="shop-item-tier">${item.tier}</span>
+            </div>
             <span class="shop-item-sub">${item.subtitle}</span>
         </button>
     `).join('');
+
     document.querySelectorAll('.shop-item-btn').forEach(btn => {
         if(btn.dataset.boundShop) return;
         btn.dataset.boundShop = '1';
         btn.addEventListener('click', () => {
-            shopState.category = btn.dataset.shopCategory || 'ships';
+            shopState.view = btn.dataset.shopView || 'ships';
             shopState.selectedId = btn.dataset.shopId || '';
             renderShopScreen();
         });
@@ -7158,23 +7160,30 @@ function renderShopPreview(){
     const stats = document.getElementById('shop-stats');
     const hint = document.getElementById('shop-item-hint');
     if(!item || !orbit || !badge || !title || !desc || !price || !stats) return;
+
     orbit.className = `shop-model-orbit ${item.type === 'ship' ? 'ship' : 'module'}`;
     orbit.innerHTML = buildShopModelSvg(item);
     if(pedestal) pedestal.style.display = item.type === 'ship' ? 'block' : 'none';
+
     badge.textContent = item.badge;
     title.textContent = item.name;
     desc.textContent = item.description;
     price.textContent = `Цена: ${item.price} 🪙`;
     stats.innerHTML = (item.stats || []).map(([k,v]) => `<div class="shop-stat"><strong>${k}:</strong> ${v}</div>`).join('');
-    if(hint) hint.textContent = item.type === 'ship'
-        ? 'На подиуме корабль вращается на платформе. Выбери другую модель слева, чтобы сравнить характеристики.'
-        : 'Модуль парит без подиума и крутится в воздухе. Выбери другой модуль слева для сравнения бонусов.';
+
+    if(hint){
+        hint.textContent = item.type === 'ship'
+            ? `На подиуме крутится ${item.name}. Неоны мерцают, двигатели работают, а вооружение отображает тип: ${item.stats?.find(([k]) => k === 'Оружие')?.[1] || 'боевой комплект'}.`
+            : 'Модуль парит без подиума и крутится в воздухе. Выбери другой модуль слева для сравнения бонусов.';
+    }
 }
 
 function renderShopScreen(){
+    renderShopTypeTabs();
     renderShopLists();
     renderShopPreview();
 }
+
 
 function setShopMode(open){
     const shop = document.getElementById('shop-screen');
