@@ -530,26 +530,28 @@ canvas {
 #top-nav {
   display:none;
   position: fixed;
-  top: 15px;
+  top: 50px;
   left: 20px;
   transform: none;
-
   display: flex;
-  gap: 40px;
+  gap: 14px;
   white-space: nowrap;
-  background: rgba(10,15,30,0.9);
-  padding: 10px 25px;
+  background: rgba(10,15,30,0.92);
+  padding: 6px 12px;
   border-radius: 12px;
-
-  box-shadow: 0 0 20px rgba(0,200,255,0.4);
+  max-width: calc(100vw - 420px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-shadow: 0 0 18px rgba(0,200,255,0.28);
   z-index: 20000;
 }
 
 .nav-tab {
   cursor: pointer;
-  font-size: 16px;
-  padding: 6px 10px;
+  font-size: 13px;
+  padding: 4px 6px;
   transition: 0.2s;
+  flex: 0 0 auto;
 }
 
 .nav-tab:hover {
@@ -3013,10 +3015,10 @@ shop-main-head{
   <div id="premium-account-info">
     <span id="premium-player-name">Commander</span>
     <span id="premium-player-id">ID: 0</span>
-  </div>
-  <div id="premium-currency-box">
-    <span class='premium-item' id="premium-crystals">💎 0</span>
+    <span id="premium-player-level">⭐ 1</span>
+    <span id="premium-player-exp">EXP 0 / 100</span>
     <span class='premium-item' id="premium-coins">🪙 0</span>
+    <span class='premium-item' id="premium-crystals">💎 0</span>
   </div>
   <button id="premium-logout-btn" type="button" title="Сменить аккаунт / сервер">✕</button>
 </div>
@@ -3059,7 +3061,7 @@ shop-main-head{
     <!-- MATCH CENTER -->
     <div id="match-center">
       <div id="lobby-mode-tabs">
-        <div class="lobby-mode-tab active" id="lobby-battle-tab">🚪 Комнаты</div>
+        <div class="lobby-mode-tab active" id="lobby-battle-tab">🗂 Комнаты</div>
         <div class="lobby-mode-tab" id="lobby-solo-tab">🤖 Одиночная игра</div>
         <div class="lobby-mode-tab" id="lobby-tournament-tab">🏆 Турнир</div>
       </div>
@@ -3092,9 +3094,7 @@ shop-main-head{
               <div class="shop-type-tabs" id="shop-type-tabs"></div>
               <div class="shop-section-label modules" id="shop-module-type-label">Классы модулей</div>
               <div class="shop-module-tabs" id="shop-module-type-tabs"></div>
-              <div class="shop-section-label" id="shop-ships-label">Модели ветки</div>
               <div class="shop-list" id="shop-ships-list"></div>
-              <div class="shop-section-label" id="shop-modules-label">Модули</div>
               <div class="shop-list" id="shop-modules-list"></div>
             </div>
           </div>
@@ -3156,13 +3156,12 @@ shop-main-head{
 
 <!-- ===== TOP NAVIGATION ===== -->
 <div id="top-nav">
+  <div class="nav-tab" id="battle-zone-tab">⚔ Боевая зона</div>
   <div id="hangar-tab" class="nav-tab">🚀 Ангар</div>
   <div class="nav-tab" id="profile-tab">👤 Профиль</div>
   <div class="nav-tab" id="clans-tab">👥 Кланы</div>
   <div class="nav-tab" id="leaders-tab">🏆 Лидеры</div>
   <div class="nav-tab" id="orbit-tab" onclick="switchState('ORBIT')">🌌 Выйти на орбиту</div>
-  <div class="nav-tab" id="battle-zone-tab">⚔ Боевая зона</div>
-  <div class="nav-tab" id="solo-tab">🤖 Одиночная игра</div>
   <div class="nav-tab" id="shop-tab">🛒 Магазин</div>
   <div class="nav-tab" id="settings-tab">⚙ Настройки</div>
 </div>
