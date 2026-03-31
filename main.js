@@ -3786,7 +3786,8 @@ function buildBattleHistoryMessageHtml(msg) {
 
 function ensureBattleHistorySearchUi() {
     const panel = document.getElementById('chat-panel');
-    if (!panel) return null;
+    const tabs = document.getElementById('chat-tabs');
+    if (!panel || !tabs) return null;
 
     let wrap = document.getElementById('battle-history-search-wrap');
     if (!wrap) {
@@ -3799,7 +3800,7 @@ function ensureBattleHistorySearchUi() {
                 <button id="battle-history-search-btn" type="button" title="Поиск истории battle">🔎</button>
             </div>
         `;
-        panel.appendChild(wrap);
+        tabs.appendChild(wrap);
 
         let modal = document.getElementById('battle-history-search-modal');
         if (!modal) {
@@ -3890,8 +3891,17 @@ function renderBattleHistorySearchUi() {
         return;
     }
 
+    const previousTop = results.scrollTop;
+    const shouldStickToBottom = (results.scrollHeight - results.scrollTop - results.clientHeight) <= 28;
+    const wasEmpty = !results.children.length;
     results.innerHTML = battleHistorySearchState.messages.map(msg => buildBattleHistoryMessageHtml(msg)).join('');
-    results.scrollTop = results.scrollHeight;
+    if (wasEmpty) {
+        results.scrollTop = 0;
+    } else if (shouldStickToBottom) {
+        results.scrollTop = results.scrollHeight;
+    } else {
+        results.scrollTop = previousTop;
+    }
 }
 
 async function runBattleHistorySearch(forcedPlayerId = null) {
@@ -4123,8 +4133,15 @@ function renderBattleMessages() {
         if (!activeRoomId) return true;
         return String(msg?.room_id || '') === activeRoomId;
     });
+    const distanceFromBottom = battleLog.scrollHeight - battleLog.scrollTop - battleLog.clientHeight;
+    const shouldStickToBottom = distanceFromBottom <= 28;
+    const prevScrollTop = battleLog.scrollTop;
     battleLog.innerHTML = visibleMessages.map(buildBattleChatMessageHtml).join("");
-    battleLog.scrollTop = battleLog.scrollHeight;
+    if (shouldStickToBottom) {
+        battleLog.scrollTop = battleLog.scrollHeight;
+    } else {
+        battleLog.scrollTop = prevScrollTop;
+    }
 }
 
 function showBattleAnnouncementInActiveScene(msg) {
