@@ -6953,6 +6953,257 @@ function limitBattleArea(){
         }
     }
 
+
+
+/* ===== V81 SHOP ===== */
+const SHOP_DATA = {
+    ships: [
+        {
+            id:'falcon_x1',
+            type:'ship',
+            name:'Falcon X1',
+            subtitle:'Лёгкий перехватчик',
+            badge:'Истребитель',
+            price:1200,
+            description:'Лёгкий фронтовой истребитель для быстрых вылетов и дуэлей. Хорош для агрессивного старта и ухода из-под огня.',
+            stats:[['Скорость','9.4'],['Броня','3.1'],['Урон','5.8'],['Энергия','6.0']],
+            art:'falcon'
+        },
+        {
+            id:'viper_mk2',
+            type:'ship',
+            name:'Viper MK-II',
+            subtitle:'Штурмовой клинок',
+            badge:'Истребитель',
+            price:1850,
+            description:'Средний штурмовик с усиленным носом и ракетными пилонами. Держит удар лучше лёгких моделей.',
+            stats:[['Скорость','7.6'],['Броня','6.9'],['Урон','7.4'],['Энергия','5.3']],
+            art:'viper'
+        },
+        {
+            id:'nova_spear',
+            type:'ship',
+            name:'Nova Spear',
+            subtitle:'Снайперский истребитель',
+            badge:'Истребитель',
+            price:2400,
+            description:'Дальнобойная модель с удлинённым корпусом и стабилизаторами. Любит точный огонь и контроль дистанции.',
+            stats:[['Скорость','6.8'],['Броня','5.0'],['Урон','9.1'],['Энергия','7.6']],
+            art:'nova'
+        },
+        {
+            id:'aegis_hammer',
+            type:'ship',
+            name:'Aegis Hammer',
+            subtitle:'Тяжёлый лобовой боец',
+            badge:'Истребитель',
+            price:3150,
+            description:'Тяжёлый корпус с массивными щитовыми секциями. Медленнее, но отлично подходит для продавливания фронта.',
+            stats:[['Скорость','5.2'],['Броня','9.3'],['Урон','8.6'],['Энергия','6.1']],
+            art:'aegis'
+        },
+        {
+            id:'phantom_razor',
+            type:'ship',
+            name:'Phantom Razor',
+            subtitle:'Скрытный охотник',
+            badge:'Истребитель',
+            price:4100,
+            description:'Премиальный истребитель с тонким силуэтом и высоким темпом манёвра. Идеален для опытных пилотов.',
+            stats:[['Скорость','9.8'],['Броня','4.7'],['Урон','8.2'],['Энергия','8.8']],
+            art:'phantom'
+        }
+    ],
+    modules: [
+        {
+            id:'speed_core',
+            type:'module',
+            name:'Модуль скорости',
+            subtitle:'Ускорители маршевых двигателей',
+            badge:'Модуль',
+            price:350,
+            description:'Увеличивает максимальную скорость и разгон корабля. Полезен для лёгких и средних истребителей.',
+            stats:[['Бонус','+12% скорость'],['Слот','Двигатель'],['Редкость','Редкий'],['Вес','Лёгкий']],
+            art:'speed'
+        },
+        {
+            id:'shield_lattice',
+            type:'module',
+            name:'Модуль защиты',
+            subtitle:'Щитовая решётка',
+            badge:'Модуль',
+            price:420,
+            description:'Усиливает лобовую и боковую защиту корпуса, снижая урон от прямых попаданий.',
+            stats:[['Бонус','+18% броня'],['Слот','Защита'],['Редкость','Редкий'],['Вес','Средний']],
+            art:'shield'
+        },
+        {
+            id:'reactor_overdrive',
+            type:'module',
+            name:'Реактор Overdrive',
+            subtitle:'Пиковая энергия',
+            badge:'Модуль',
+            price:560,
+            description:'Ускоряет перезарядку энергии оружия и даёт кораблю стабильность в затяжной дуэли.',
+            stats:[['Бонус','+20% энергия'],['Слот','Реактор'],['Редкость','Эпический'],['Вес','Средний']],
+            art:'reactor'
+        },
+        {
+            id:'target_matrix',
+            type:'module',
+            name:'Прицельная матрица',
+            subtitle:'Контроль огня',
+            badge:'Модуль',
+            price:610,
+            description:'Стабилизирует вооружение, повышает точность и уменьшает разброс лазерных батарей.',
+            stats:[['Бонус','+16% точность'],['Слот','Наведение'],['Редкость','Эпический'],['Вес','Лёгкий']],
+            art:'matrix'
+        },
+        {
+            id:'plasma_capacitor',
+            type:'module',
+            name:'Плазменный конденсатор',
+            subtitle:'Усилитель урона',
+            badge:'Модуль',
+            price:740,
+            description:'Даёт более мощный импульс орудиям. Рекомендуется для штурмовых и снайперских конфигураций.',
+            stats:[['Бонус','+14% урон'],['Слот','Оружие'],['Редкость','Эпический'],['Вес','Средний']],
+            art:'plasma'
+        },
+        {
+            id:'phase_nullifier',
+            type:'module',
+            name:'Фазовый стабилизатор',
+            subtitle:'Контроль манёвра',
+            badge:'Модуль',
+            price:860,
+            description:'Снижает инерцию корабля, делая развороты резче и безопаснее на высокой скорости.',
+            stats:[['Бонус','+15% манёвр'],['Слот','Навигация'],['Редкость','Легендарный'],['Вес','Лёгкий']],
+            art:'phase'
+        }
+    ]
+};
+
+const shopState = {
+    open:false,
+    category:'ships',
+    selectedId:'falcon_x1'
+};
+
+function getShopSelectedItem(){
+    const list = shopState.category === 'ships' ? SHOP_DATA.ships : SHOP_DATA.modules;
+    return list.find(item => item.id === shopState.selectedId) || list[0] || null;
+}
+
+function buildShopModelSvg(item){
+    const common = 'viewBox="0 0 240 240" class="shop-model-svg" xmlns="http://www.w3.org/2000/svg"';
+    const glow = '<defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0%" stop-color="#74f0ff"/><stop offset="100%" stop-color="#4f78ff"/></linearGradient><linearGradient id="g2" x1="0" x2="1"><stop offset="0%" stop-color="#ffd76b"/><stop offset="100%" stop-color="#ff8b42"/></linearGradient></defs>';
+    const art = item?.art || 'falcon';
+    if(item?.type === 'module'){
+        const moduleMap = {
+            speed: '<circle cx="120" cy="120" r="54" fill="rgba(35,70,120,0.45)" stroke="url(#g1)" stroke-width="4"/><circle cx="120" cy="120" r="26" fill="#7ef9ff" opacity="0.9"/><path d="M120 52 L134 94 L184 94 L144 120 L160 182 L120 144 L80 182 L96 120 L56 94 L106 94 Z" fill="url(#g2)" opacity="0.94"/>',
+            shield: '<circle cx="120" cy="120" r="58" fill="rgba(35,70,120,0.32)" stroke="#74f0ff" stroke-width="4"/><path d="M120 52 L176 78 L166 144 Q155 182 120 196 Q85 182 74 144 L64 78 Z" fill="url(#g1)" opacity="0.94"/><path d="M120 78 L152 94 L146 134 Q140 156 120 168 Q100 156 94 134 L88 94 Z" fill="#dffbff" opacity="0.46"/>',
+            reactor: '<circle cx="120" cy="120" r="62" fill="rgba(14,28,58,0.64)" stroke="#6cf6ff" stroke-width="3"/><circle cx="120" cy="120" r="22" fill="#fff2a3"/><circle cx="120" cy="120" r="40" fill="none" stroke="#ffbf4d" stroke-width="8" stroke-dasharray="18 10" opacity="0.86"/><circle cx="120" cy="120" r="58" fill="none" stroke="#74f0ff" stroke-width="2" opacity="0.5"/>',
+            matrix: '<rect x="72" y="72" width="96" height="96" rx="14" fill="rgba(18,32,64,0.76)" stroke="#74f0ff" stroke-width="4"/><path d="M88 120 H152 M120 88 V152" stroke="#ffd76b" stroke-width="8" stroke-linecap="round"/><circle cx="120" cy="120" r="18" fill="none" stroke="#dffbff" stroke-width="4"/>',
+            plasma: '<circle cx="120" cy="120" r="28" fill="#fff6b2"/><path d="M120 52 C154 74 178 88 188 120 C176 154 156 172 120 188 C84 172 64 154 52 120 C64 88 90 74 120 52 Z" fill="none" stroke="#ff8b42" stroke-width="10" opacity="0.9"/><path d="M120 72 L138 112 L176 120 L138 128 L120 168 L102 128 L64 120 L102 112 Z" fill="#74f0ff" opacity="0.92"/>',
+            phase: '<circle cx="120" cy="120" r="56" fill="rgba(16,24,48,0.58)" stroke="#7ef9ff" stroke-width="3"/><ellipse cx="120" cy="120" rx="68" ry="24" fill="none" stroke="#6c8cff" stroke-width="6" opacity="0.82" transform="rotate(-24 120 120)"/><ellipse cx="120" cy="120" rx="68" ry="24" fill="none" stroke="#74f0ff" stroke-width="4" opacity="0.58" transform="rotate(28 120 120)"/><circle cx="120" cy="120" r="18" fill="#dffbff"/>'
+        };
+        return `<svg ${common}>${glow}${moduleMap[art] || moduleMap['speed']}</svg>`;
+    }
+    const shipMap = {
+        falcon: '<path d="M120 30 L146 92 L208 118 L146 144 L120 210 L94 144 L32 118 L94 92 Z" fill="url(#g1)" opacity="0.95"/><path d="M120 58 L136 104 L176 118 L136 132 L120 180 L104 132 L64 118 L104 104 Z" fill="#dffbff" opacity="0.55"/><path d="M58 120 H182" stroke="#ffcf6e" stroke-width="8" opacity="0.8"/>',
+        viper: '<path d="M120 24 L154 86 L214 110 L170 126 L150 200 L120 166 L90 200 L70 126 L26 110 L86 86 Z" fill="url(#g2)" opacity="0.96"/><path d="M120 48 L140 106 L176 116 L140 126 L120 172 L100 126 L64 116 L100 106 Z" fill="#74f0ff" opacity="0.72"/><circle cx="120" cy="114" r="12" fill="#dffbff"/>',
+        nova: '<path d="M120 20 L142 104 L210 118 L142 132 L120 220 L98 132 L30 118 L98 104 Z" fill="url(#g1)" opacity="0.95"/><path d="M120 44 L132 110 L120 192 L108 110 Z" fill="#fff5b3" opacity="0.78"/><path d="M62 120 H178" stroke="#74f0ff" stroke-width="6" opacity="0.6"/>',
+        aegis: '<path d="M120 22 L174 86 L216 118 L184 138 L166 208 L120 182 L74 208 L56 138 L24 118 L66 86 Z" fill="#6e9aff" opacity="0.96"/><path d="M120 58 L148 108 L174 120 L148 132 L120 174 L92 132 L66 120 L92 108 Z" fill="#dffbff" opacity="0.64"/><rect x="92" y="102" width="56" height="36" rx="12" fill="#ffcf6e" opacity="0.8"/>',
+        phantom: '<path d="M120 18 L152 88 L210 120 L152 150 L120 222 L88 150 L30 120 L88 88 Z" fill="#74f0ff" opacity="0.92"/><path d="M120 44 L140 102 L186 120 L140 138 L120 192 L100 138 L54 120 L100 102 Z" fill="#ffffff" opacity="0.45"/><path d="M74 120 C92 92 148 92 166 120 C148 148 92 148 74 120 Z" fill="#7d69ff" opacity="0.72"/>'
+    };
+    return `<svg ${common}>${glow}${shipMap[art] || shipMap['falcon']}</svg>`;
+}
+
+function renderShopLists(){
+    const shipsList = document.getElementById('shop-ships-list');
+    const modulesList = document.getElementById('shop-modules-list');
+    if(!shipsList || !modulesList) return;
+    shipsList.innerHTML = SHOP_DATA.ships.map(item => `
+        <button type="button" class="shop-item-btn ${shopState.category === 'ships' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-category="ships" data-shop-id="${item.id}">
+            <span class="shop-item-name">${item.name}</span>
+            <span class="shop-item-sub">${item.subtitle}</span>
+        </button>
+    `).join('');
+    modulesList.innerHTML = SHOP_DATA.modules.map(item => `
+        <button type="button" class="shop-item-btn ${shopState.category === 'modules' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-category="modules" data-shop-id="${item.id}">
+            <span class="shop-item-name">${item.name}</span>
+            <span class="shop-item-sub">${item.subtitle}</span>
+        </button>
+    `).join('');
+    document.querySelectorAll('.shop-item-btn').forEach(btn => {
+        if(btn.dataset.boundShop) return;
+        btn.dataset.boundShop = '1';
+        btn.addEventListener('click', () => {
+            shopState.category = btn.dataset.shopCategory || 'ships';
+            shopState.selectedId = btn.dataset.shopId || '';
+            renderShopScreen();
+        });
+    });
+}
+
+function renderShopPreview(){
+    const item = getShopSelectedItem();
+    const orbit = document.getElementById('shop-model-orbit');
+    const pedestal = document.getElementById('shop-pedestal');
+    const badge = document.getElementById('shop-kind-badge');
+    const title = document.getElementById('shop-item-title');
+    const desc = document.getElementById('shop-item-desc');
+    const price = document.getElementById('shop-item-price');
+    const stats = document.getElementById('shop-stats');
+    const hint = document.getElementById('shop-item-hint');
+    if(!item || !orbit || !badge || !title || !desc || !price || !stats) return;
+    orbit.className = `shop-model-orbit ${item.type === 'ship' ? 'ship' : 'module'}`;
+    orbit.innerHTML = buildShopModelSvg(item);
+    if(pedestal) pedestal.style.display = item.type === 'ship' ? 'block' : 'none';
+    badge.textContent = item.badge;
+    title.textContent = item.name;
+    desc.textContent = item.description;
+    price.textContent = `Цена: ${item.price} 🪙`;
+    stats.innerHTML = (item.stats || []).map(([k,v]) => `<div class="shop-stat"><strong>${k}:</strong> ${v}</div>`).join('');
+    if(hint) hint.textContent = item.type === 'ship'
+        ? 'На подиуме корабль вращается на платформе. Выбери другую модель слева, чтобы сравнить характеристики.'
+        : 'Модуль парит без подиума и крутится в воздухе. Выбери другой модуль слева для сравнения бонусов.';
+}
+
+function renderShopScreen(){
+    renderShopLists();
+    renderShopPreview();
+}
+
+function setShopMode(open){
+    const shop = document.getElementById('shop-screen');
+    const tabs = document.getElementById('lobby-mode-tabs');
+    const note = document.getElementById('match-status-note');
+    const content = document.getElementById('match-content');
+    const buttons = document.getElementById('match-buttons');
+    if(!shop || !content || !buttons) return;
+    shopState.open = !!open;
+    shop.classList.toggle('active', !!open);
+    if(tabs) tabs.style.display = open ? 'none' : 'flex';
+    if(note) note.style.display = open ? 'none' : 'block';
+    content.style.display = open ? 'none' : 'block';
+    buttons.style.display = open ? 'none' : 'flex';
+    if(open) renderShopScreen();
+}
+
+function openShopView(){
+    if(gameState !== 'LOBBY') switchState('LOBBY');
+    setTimeout(() => {
+        setShopMode(true);
+    }, gameState === 'LOBBY' ? 0 : 80);
+}
+
+function closeShopView(){
+    if(!shopState.open) return;
+    setShopMode(false);
+}
+
     function bindTopNavModes(){
         const battleTab = document.getElementById('battle-zone-tab');
         const soloTab = document.getElementById('solo-tab');
@@ -6961,6 +7212,7 @@ function limitBattleArea(){
         if(battleTab && !battleTab.dataset.v26Bound){
             battleTab.dataset.v26Bound = '1';
             battleTab.onclick = () => {
+                closeShopView();
                 if(gameState !== 'LOBBY') switchState('LOBBY');
                 renderLobbyList('battle');
             };
@@ -6972,6 +7224,7 @@ function limitBattleArea(){
                     showGuestOnlyPvpMessage();
                     return;
                 }
+                closeShopView();
                 if(gameState !== 'LOBBY') switchState('LOBBY');
                 renderLobbyList('solo');
             };
@@ -6979,7 +7232,7 @@ function limitBattleArea(){
         if(shopTab && !shopTab.dataset.v26Bound){
             shopTab.dataset.v26Bound = '1';
             shopTab.onclick = () => {
-                alert('🛒 Магазин скоро появится');
+                openShopView();
             };
         }
     }
@@ -6987,6 +7240,9 @@ function limitBattleArea(){
     const prevSwitchState = switchState;
     switchState = function(newState){
         prevSwitchState(newState);
+        if(newState === 'LOBBY'){
+            closeShopView();
+        }
         if(newState === 'ORBIT'){
             ensureSunBackToOrbit();
             if(typeof orbitNebulaGroup !== 'undefined' && orbitNebulaGroup) orbitNebulaGroup.visible = true;
@@ -7682,6 +7938,9 @@ function limitBattleArea(){
                     try{ safeRequestPointerLock(canvas); }catch(_){ }
                 }, 30);
             }
+        }
+        if(newState === 'LOBBY'){
+            closeShopView();
         }
         if(newState === 'ORBIT'){
             ensureSunStable();
