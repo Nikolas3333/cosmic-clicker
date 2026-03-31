@@ -6904,17 +6904,12 @@ function limitBattleArea(){
                 }
                 if(playersBox){
                     playersBox.innerHTML = '';
-                    if(mode === 'solo'){
-                        // В одиночной игре под квадратом ничего не показываем
-                    }else{
-                        const players = Array.isArray(entry.currentPlayers) ? entry.currentPlayers : (Array.isArray(entry.players) ? entry.players : []);
-                        players.filter(Boolean).forEach((playerName) => {
-                            const slot = document.createElement('div');
-                            slot.className = 'player-slot';
-                            slot.textContent = playerName;
-                            playersBox.appendChild(slot);
-                        });
-                    }
+                }
+                if(mode === 'solo'){
+                    renderPlayersOnPlanet({ players: [] });
+                }else{
+                    const players = Array.isArray(entry.currentPlayers) ? entry.currentPlayers : (Array.isArray(entry.players) ? entry.players : []);
+                    renderPlayersOnPlanet({ ...entry, currentPlayers: players, players: players });
                 }
             });
             matchListEl.appendChild(item);
@@ -7687,6 +7682,80 @@ function closeShopView(){
         if(active) active.classList.add('active');
     }
 
+
+function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
+    const ownerId = String(entry?.owner_id || entry?.host_id || entry?.creator_id || entry?.player_id || '').trim();
+    const ownerName = String(entry?.owner || entry?.host || entry?.host_name || entry?.creator || '').trim().toLowerCase();
+
+    let id = '';
+    let nickname = '';
+    if(typeof rawPlayer === 'string'){
+        nickname = rawPlayer.trim();
+    }else if(rawPlayer && typeof rawPlayer === 'object'){
+        id = String(rawPlayer.public_id || rawPlayer.player_id || rawPlayer.id || rawPlayer.user_id || '').trim();
+        nickname = String(rawPlayer.nickname || rawPlayer.name || rawPlayer.player_nickname || rawPlayer.display_name || '').trim();
+    }
+
+    if(!nickname){
+        nickname = `Игрок ${index + 1}`;
+    }
+
+    const isOwner = !!(
+        (ownerId && id && ownerId === id) ||
+        (ownerName && nickname.toLowerCase() === ownerName) ||
+        (!ownerId && !ownerName && index === 0)
+    );
+
+    return { id, nickname, isOwner };
+}
+
+function renderPlayersOnPlanet(entry = {}){
+    const overlay = document.getElementById('map-player-overlay');
+    if(!overlay) return;
+
+    overlay.innerHTML = '';
+
+    const rawPlayers = Array.isArray(entry?.currentPlayers) && entry.currentPlayers.length
+        ? entry.currentPlayers
+        : (Array.isArray(entry?.players) ? entry.players : []);
+
+    const normalizedPlayers = rawPlayers.slice(0, 8).map((p, index) => normalizePreviewPlayerEntry(p, entry, index));
+
+    for(let i = 0; i < 8; i++){
+        const playerMeta = normalizedPlayers[i];
+        const chip = document.createElement('div');
+        chip.className = 'map-player-chip';
+
+        if(!playerMeta){
+            chip.classList.add('empty');
+            chip.textContent = '—';
+            overlay.appendChild(chip);
+            continue;
+        }
+
+        if(playerMeta.isOwner){
+            const crown = document.createElement('span');
+            crown.className = 'map-player-owner';
+            crown.textContent = '👑';
+            chip.appendChild(crown);
+        }
+
+        const name = document.createElement('span');
+        name.className = 'map-player-name';
+        name.textContent = playerMeta.nickname;
+        chip.appendChild(name);
+
+        chip.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            if(typeof openPlayerProfile === 'function'){
+                await openPlayerProfile(playerMeta.id || '', playerMeta.nickname);
+            }
+        });
+
+        overlay.appendChild(chip);
+    }
+}
+
     function syncPreview(entry){
         const preview = document.getElementById('planet-preview');
         const playersBox = document.getElementById('map-players');
@@ -7703,35 +7772,25 @@ function closeShopView(){
         }
         if(playersBox){
             playersBox.innerHTML = '';
-            if(lobbyModeV27 === 'solo'){
-                // В одиночной игре под квадратом ничего не показываем
-            } else if(lobbyModeV27 === 'tournament'){
-                const players = Array.isArray(entry.currentPlayers) ? entry.currentPlayers.filter(Boolean) : [];
-                const maxPlayers = Number(entry.maxPlayers || 2);
-                players.forEach((playerName) => {
-                    const slot = document.createElement('div');
-                    slot.className = 'player-slot';
-                    slot.textContent = playerName;
-                    playersBox.appendChild(slot);
-                });
-                const need = Math.max(0, maxPlayers - players.length);
-                if(waitNote) waitNote.textContent = need > 0 ? `Ожидание ${need} игроков до начала` : '';
-                const coinsText = Number(entry.stakeCoins || 0) > 0 ? `${entry.stakeCoins} монет` : '';
-                const crystalsText = Number(entry.stakeCrystals || 0) > 0 ? `${entry.stakeCrystals} кристаллов` : '';
-                const feeText = [coinsText, crystalsText].filter(Boolean).join(' + ') || 'Без ставки';
-                if(statusNote) statusNote.textContent = `${entry.title} • Ставка: ${feeText} • Победитель получает 80% банка`;
-                return;
-            } else {
-                const players = entry.isBaseMap
-                    ? getBattleMapOccupants(entry.real || entry.map || entry.name)
-                    : (entry.currentPlayers || entry.players || []);
-                players.forEach((playerName) => {
-                    const slot = document.createElement('div');
-                    slot.className = 'player-slot';
-                    slot.textContent = playerName;
-                    playersBox.appendChild(slot);
-                });
-            }
+        }
+        if(lobbyModeV27 === 'solo'){
+            renderPlayersOnPlanet({ players: [] });
+        } else if(lobbyModeV27 === 'tournament'){
+            const players = Array.isArray(entry.currentPlayers) ? entry.currentPlayers.filter(Boolean) : [];
+            const maxPlayers = Number(entry.maxPlayers || 2);
+            renderPlayersOnPlanet({ ...entry, currentPlayers: players, players: players });
+            const need = Math.max(0, maxPlayers - players.length);
+            if(waitNote) waitNote.textContent = need > 0 ? `Ожидание ${need} игроков до начала` : '';
+            const coinsText = Number(entry.stakeCoins || 0) > 0 ? `${entry.stakeCoins} монет` : '';
+            const crystalsText = Number(entry.stakeCrystals || 0) > 0 ? `${entry.stakeCrystals} кристаллов` : '';
+            const feeText = [coinsText, crystalsText].filter(Boolean).join(' + ') || 'Без ставки';
+            if(statusNote) statusNote.textContent = `${entry.title} • Ставка: ${feeText} • Победитель получает 80% банка`;
+            return;
+        } else {
+            const players = entry.isBaseMap
+                ? getBattleMapOccupants(entry.real || entry.map || entry.name)
+                : (entry.currentPlayers || entry.players || []);
+            renderPlayersOnPlanet({ ...entry, currentPlayers: players, players: players });
         }
         if(waitNote) waitNote.textContent = '';
         if(statusNote){
@@ -7761,6 +7820,7 @@ function closeShopView(){
             list.appendChild(empty);
             selectedLobbyMap = null;
             syncPreview({ img:'earth', title:'Ожидание', mission:'', players:[] });
+            renderPlayersOnPlanet({ players: [] });
         } else {
             dataset.forEach((entry, index) => {
                 const item = document.createElement('div');
@@ -8592,6 +8652,7 @@ async function renderRoomsInLobby(forceBattleMode = false) {
       }
       const playersBox = document.getElementById('map-players');
       if (playersBox) playersBox.innerHTML = '';
+      renderPlayersOnPlanet({ ...selectedLobbyMap, currentPlayers: occupants, players: occupants });
       const waitNote = document.getElementById('map-waiting-note');
       if (waitNote) waitNote.textContent = '';
       const statusNote = document.getElementById('match-status-note');
