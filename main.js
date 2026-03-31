@@ -3756,6 +3756,34 @@ function getPeerLabelFromPmMessage(msg, peerId) {
 }
 
 
+function formatBattleHistoryDateTime(dateStr) {
+    const d = new Date(dateStr || Date.now());
+    const date = d.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `${date} ${time}`;
+}
+
+function buildBattleHistoryMessageHtml(msg) {
+    const author = escapeChatHtml(msg.player_nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const dateTime = formatBattleHistoryDateTime(msg.created_at);
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
+    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
+    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
+    const idHtml = publicId ? `<span class="chat-id">[${safePublicId}]</span>` : '';
+    return `
+      <div class="chat-line battle-history-line${lineClass}" data-message-id="${msg.id}">
+        ${roleBadge}
+        <span class="chat-nick-static">${author}</span>
+        ${idHtml}
+        <span class="chat-time">[${escapeChatHtml(dateTime)}]</span>
+        <span class="chat-text">${text}</span>
+      </div>
+    `;
+}
+
 function ensureBattleHistorySearchUi() {
     const panel = document.getElementById('chat-panel');
     if (!panel) return null;
@@ -3767,21 +3795,32 @@ function ensureBattleHistorySearchUi() {
         wrap.className = 'battle-history-search-wrap hidden';
         wrap.innerHTML = `
             <div class="battle-history-search-bar">
-                <span class="battle-history-search-title">🔎 Battle history</span>
                 <input id="battle-history-player-id" type="text" inputmode="numeric" placeholder="ID игрока">
-                <button id="battle-history-search-btn" type="button">Найти</button>
-            </div>
-            <div id="battle-history-search-panel" class="battle-history-search-panel hidden">
-                <div class="battle-history-search-panel-head">
-                    <span id="battle-history-search-caption">История battle</span>
-                    <button id="battle-history-search-close" type="button">×</button>
-                </div>
-                <div id="battle-history-search-results" class="battle-history-search-results"></div>
+                <button id="battle-history-search-btn" type="button" title="Поиск истории battle">🔎</button>
             </div>
         `;
-        const chatMessagesEl = document.getElementById('chat-messages');
-        if (chatMessagesEl) panel.insertBefore(wrap, chatMessagesEl);
-        else panel.appendChild(wrap);
+        panel.appendChild(wrap);
+
+        let modal = document.getElementById('battle-history-search-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'battle-history-search-modal';
+            modal.className = 'battle-history-search-modal hidden';
+            modal.innerHTML = `
+                <div class="battle-history-search-backdrop" data-role="history-close"></div>
+                <div class="battle-history-search-window">
+                    <div class="battle-history-search-panel-head">
+                        <span id="battle-history-search-caption">История battle</span>
+                        <button id="battle-history-search-close" type="button">×</button>
+                    </div>
+                    <div id="battle-history-search-results" class="battle-history-search-results"></div>
+                </div>
+            `;
+            const lobbyScreen = document.getElementById('lobby-screen') || document.body;
+            lobbyScreen.appendChild(modal);
+            modal.querySelector('[data-role="history-close"]')?.addEventListener('click', closeBattleHistorySearchModal);
+            modal.querySelector('#battle-history-search-close')?.addEventListener('click', closeBattleHistorySearchModal);
+        }
 
         wrap.querySelector('#battle-history-search-btn')?.addEventListener('click', () => {
             runBattleHistorySearch();
@@ -3792,14 +3831,16 @@ function ensureBattleHistorySearchUi() {
                 runBattleHistorySearch();
             }
         });
-        wrap.querySelector('#battle-history-search-close')?.addEventListener('click', () => {
-            battleHistorySearchState.messages = [];
-            battleHistorySearchState.error = '';
-            battleHistorySearchState.playerLabel = '';
-            renderBattleHistorySearchUi();
-        });
     }
     return wrap;
+}
+
+function closeBattleHistorySearchModal() {
+    battleHistorySearchState.messages = [];
+    battleHistorySearchState.error = '';
+    battleHistorySearchState.playerLabel = '';
+    battleHistorySearchState.loading = false;
+    renderBattleHistorySearchUi();
 }
 
 function renderBattleHistorySearchUi() {
@@ -3808,25 +3849,24 @@ function renderBattleHistorySearchUi() {
 
     const shouldShowToolbar = currentChat === 'battle';
     wrap.classList.toggle('hidden', !shouldShowToolbar);
-    if (!shouldShowToolbar) return;
 
     const input = document.getElementById('battle-history-player-id');
     const searchBtn = document.getElementById('battle-history-search-btn');
-    const panel = document.getElementById('battle-history-search-panel');
+    const modal = document.getElementById('battle-history-search-modal');
     const caption = document.getElementById('battle-history-search-caption');
     const results = document.getElementById('battle-history-search-results');
-    if (!input || !searchBtn || !panel || !caption || !results) return;
+    if (!input || !searchBtn || !modal || !caption || !results) return;
 
     if (document.activeElement !== input) {
         input.value = battleHistorySearchState.playerId || '';
     }
     searchBtn.disabled = !!battleHistorySearchState.loading;
-    searchBtn.textContent = battleHistorySearchState.loading ? 'Поиск...' : 'Найти';
+    searchBtn.textContent = battleHistorySearchState.loading ? '…' : '🔎';
 
     const hasVisiblePanel = !!battleHistorySearchState.loading || !!battleHistorySearchState.error || battleHistorySearchState.messages.length > 0;
-    panel.classList.toggle('hidden', !hasVisiblePanel);
+    modal.classList.toggle('hidden', !hasVisiblePanel || !shouldShowToolbar);
 
-    if (!hasVisiblePanel) {
+    if (!hasVisiblePanel || !shouldShowToolbar) {
         results.innerHTML = '';
         return;
     }
@@ -3850,8 +3890,7 @@ function renderBattleHistorySearchUi() {
         return;
     }
 
-    const scope = parseChatScope('battle');
-    results.innerHTML = battleHistorySearchState.messages.map(msg => buildLobbyChatMessageHtml(msg, scope)).join('');
+    results.innerHTML = battleHistorySearchState.messages.map(msg => buildBattleHistoryMessageHtml(msg)).join('');
     results.scrollTop = results.scrollHeight;
 }
 
