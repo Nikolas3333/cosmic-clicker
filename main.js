@@ -3068,7 +3068,9 @@ const battleHistorySearchState = {
     loading: false,
     error: '',
     messages: [],
-    playerLabel: ''
+    playerLabel: '',
+    dateQuery: '',
+    keywordQuery: ''
 };
 
 const playerStaffRoleCache = {};
@@ -3812,7 +3814,11 @@ function ensureBattleHistorySearchUi() {
                 <div class="battle-history-search-window">
                     <div class="battle-history-search-panel-head">
                         <span id="battle-history-search-caption">История battle</span>
-                        <button id="battle-history-search-close" type="button">×</button>
+                        <div class="battle-history-search-panel-tools">
+                            <input id="battle-history-date-filter" type="text" placeholder="Дата: 30.03.2026">
+                            <input id="battle-history-keyword-filter" type="text" placeholder="Ключевые слова">
+                            <button id="battle-history-search-close" type="button">×</button>
+                        </div>
                     </div>
                     <div id="battle-history-search-results" class="battle-history-search-results"></div>
                 </div>
@@ -3821,6 +3827,14 @@ function ensureBattleHistorySearchUi() {
             lobbyScreen.appendChild(modal);
             modal.querySelector('[data-role="history-close"]')?.addEventListener('click', closeBattleHistorySearchModal);
             modal.querySelector('#battle-history-search-close')?.addEventListener('click', closeBattleHistorySearchModal);
+            modal.querySelector('#battle-history-date-filter')?.addEventListener('input', (e) => {
+                battleHistorySearchState.dateQuery = String(e.target?.value || '').trim();
+                renderBattleHistorySearchUi();
+            });
+            modal.querySelector('#battle-history-keyword-filter')?.addEventListener('input', (e) => {
+                battleHistorySearchState.keywordQuery = String(e.target?.value || '').trim();
+                renderBattleHistorySearchUi();
+            });
         }
 
         wrap.querySelector('#battle-history-search-btn')?.addEventListener('click', () => {
@@ -3841,7 +3855,35 @@ function closeBattleHistorySearchModal() {
     battleHistorySearchState.error = '';
     battleHistorySearchState.playerLabel = '';
     battleHistorySearchState.loading = false;
+    battleHistorySearchState.dateQuery = '';
+    battleHistorySearchState.keywordQuery = '';
     renderBattleHistorySearchUi();
+}
+
+function normalizeBattleHistoryDateStrings(createdAt) {
+    if (!createdAt) return [];
+    const date = new Date(createdAt);
+    if (Number.isNaN(date.getTime())) return [];
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(date.getFullYear());
+    return [
+        `${dd}.${mm}.${yyyy}`,
+        `${yyyy}-${mm}-${dd}`,
+        `${dd}/${mm}/${yyyy}`
+    ];
+}
+
+function getFilteredBattleHistoryMessages() {
+    const dateQuery = String(battleHistorySearchState.dateQuery || '').trim().toLowerCase();
+    const keywordQuery = String(battleHistorySearchState.keywordQuery || '').trim().toLowerCase();
+    return (battleHistorySearchState.messages || []).filter(msg => {
+        const msgText = String(msg?.message || '').toLowerCase();
+        const matchesKeyword = !keywordQuery || msgText.includes(keywordQuery);
+        const dateStrings = normalizeBattleHistoryDateStrings(msg?.created_at).map(v => v.toLowerCase());
+        const matchesDate = !dateQuery || dateStrings.some(v => v.includes(dateQuery));
+        return matchesKeyword && matchesDate;
+    });
 }
 
 function renderBattleHistorySearchUi() {
@@ -3856,14 +3898,24 @@ function renderBattleHistorySearchUi() {
     const modal = document.getElementById('battle-history-search-modal');
     const caption = document.getElementById('battle-history-search-caption');
     const results = document.getElementById('battle-history-search-results');
-    if (!input || !searchBtn || !modal || !caption || !results) return;
+    const dateFilterInput = document.getElementById('battle-history-date-filter');
+    const keywordFilterInput = document.getElementById('battle-history-keyword-filter');
+    if (!input || !searchBtn || !modal || !caption || !results || !dateFilterInput || !keywordFilterInput) return;
 
     if (document.activeElement !== input) {
         input.value = battleHistorySearchState.playerId || '';
     }
+    if (document.activeElement !== dateFilterInput) {
+        dateFilterInput.value = battleHistorySearchState.dateQuery || '';
+    }
+    if (document.activeElement !== keywordFilterInput) {
+        keywordFilterInput.value = battleHistorySearchState.keywordQuery || '';
+    }
+
     searchBtn.disabled = !!battleHistorySearchState.loading;
     searchBtn.textContent = battleHistorySearchState.loading ? '…' : '🔎';
 
+    const filteredMessages = getFilteredBattleHistoryMessages();
     const hasVisiblePanel = !!battleHistorySearchState.loading || !!battleHistorySearchState.error || battleHistorySearchState.messages.length > 0;
     modal.classList.toggle('hidden', !hasVisiblePanel || !shouldShowToolbar);
 
@@ -3891,10 +3943,15 @@ function renderBattleHistorySearchUi() {
         return;
     }
 
+    if (!filteredMessages.length) {
+        results.innerHTML = '<div class="chat-line system">По выбранным фильтрам ничего не найдено.</div>';
+        return;
+    }
+
     const previousTop = results.scrollTop;
     const shouldStickToBottom = (results.scrollHeight - results.scrollTop - results.clientHeight) <= 28;
     const wasEmpty = !results.children.length;
-    results.innerHTML = battleHistorySearchState.messages.map(msg => buildBattleHistoryMessageHtml(msg)).join('');
+    results.innerHTML = filteredMessages.map(msg => buildBattleHistoryMessageHtml(msg)).join('');
     if (wasEmpty) {
         results.scrollTop = 0;
     } else if (shouldStickToBottom) {
