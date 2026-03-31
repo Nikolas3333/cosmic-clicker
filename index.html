@@ -2594,15 +2594,16 @@ body.state-observe #ui{ display:none !important; }
 
 
 
-/* === V77 BATTLE HISTORY SEARCH CENTER WINDOW === */
+/* === V78 BATTLE HISTORY SEARCH CENTER WINDOW + SCROLL FIX === */
+#chat-tabs{
+  position:relative;
+}
 #battle-history-search-wrap{
-  position:absolute;
-  top:10px;
-  right:12px;
-  z-index:5;
+  margin-left:auto;
   display:flex;
   align-items:center;
   justify-content:flex-end;
+  padding-right:8px;
 }
 #battle-history-search-wrap.hidden{
   display:none !important;
@@ -2610,22 +2611,24 @@ body.state-observe #ui{ display:none !important; }
 .battle-history-search-bar{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:6px;
 }
 #battle-history-player-id{
-  width:120px;
-  padding:7px 10px;
-  border-radius:8px;
+  width:88px;
+  height:30px;
+  padding:4px 8px;
+  border-radius:7px;
   border:1px solid rgba(120,220,255,0.22);
   background:#07101f;
   color:#fff;
+  font-size:13px;
 }
 #battle-history-search-btn,
 #battle-history-search-close{
-  width:40px;
-  height:36px;
+  width:32px;
+  height:30px;
   padding:0;
-  border-radius:8px;
+  border-radius:7px;
   border:1px solid rgba(120,220,255,0.22);
   background:#0e1a32;
   color:#fff;
@@ -2633,7 +2636,7 @@ body.state-observe #ui{ display:none !important; }
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  font-size:18px;
+  font-size:16px;
 }
 #battle-history-search-btn:disabled{
   opacity:0.6;
