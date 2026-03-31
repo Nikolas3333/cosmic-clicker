@@ -962,14 +962,14 @@ overflow-y:auto;
 /* правая панель */
 
 #match-preview{
-width:260px;
-min-width:260px;
+width:240px;
+min-width:240px;
 display:flex;
 flex-direction:column;
 align-items:center;
 justify-content:flex-start;
-gap:8px;
-padding-top:5px;
+gap:4px;
+padding-top:2px;
 }
 
 
@@ -977,30 +977,34 @@ padding-top:5px;
 /* мини карта */
 
 #map-mini-preview{
-width:140px;
-height:140px;
+width:118px;
+height:118px;
 background:#111;
 border:2px solid #00ffff;
-border-radius:28px;
+border-radius:24px;
 display:flex;
 align-items:center;
 justify-content:center;
 overflow:hidden;
 box-sizing:border-box;
 flex:0 0 auto;
+margin-top:2px;
 }
 
 /* игроки */
 
 #map-players{
 width:100%;
-flex:1;
+height:148px;
+min-height:148px;
 display:flex;
 flex-direction:column;
-gap:6px;
+gap:4px;
 overflow-y:auto;
-padding-right:6px;
+padding-right:4px;
+padding-top:2px;
 box-sizing:border-box;
+align-items:stretch;
 }
 
 #map-players::-webkit-scrollbar{
@@ -2056,6 +2060,7 @@ body.state-observe #ui{ display:none !important; }
   background:rgba(8,18,35,0.88);
   box-shadow:0 0 16px rgba(0,180,255,0.18);
   border:1px solid rgba(120,220,255,0.18);
+  line-height:1;
 }
 #premium-currency-box{
   gap:12px;
@@ -2069,6 +2074,21 @@ body.state-observe #ui{ display:none !important; }
 }
 #premium-player-id{
   opacity:0.8;
+}
+#premium-account-info > span,
+#premium-currency-box > span{
+  display:inline-flex;
+  align-items:center;
+  line-height:1;
+}
+#premium-player-exp,
+#premium-player-level,
+#premium-player-id,
+#premium-player-name,
+#premium-coins,
+#premium-crystals{
+  position:relative;
+  top:0;
 }
 #premium-logout-btn{
   position:absolute;
