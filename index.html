@@ -2674,18 +2674,42 @@ body.state-observe #ui{ display:none !important; }
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:8px;
+  gap:12px;
   padding:14px 16px;
   border-bottom:1px solid rgba(255,255,255,0.08);
+  flex-wrap:wrap;
 }
 #battle-history-search-caption{
   color:#dff8ff;
   font-size:16px;
   font-weight:700;
 }
+.battle-history-search-panel-tools{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-left:auto;
+}
+#battle-history-date-filter,
+#battle-history-keyword-filter{
+  height:32px;
+  padding:4px 10px;
+  border-radius:8px;
+  border:1px solid rgba(120,220,255,0.22);
+  background:#07101f;
+  color:#fff;
+  font-size:13px;
+}
+#battle-history-date-filter{
+  width:180px;
+}
+#battle-history-keyword-filter{
+  width:150px;
+}
 .battle-history-search-results{
   overflow-y:auto;
-  max-height:calc(68vh - 68px);
+  max-height:calc(68vh - 84px);
   display:flex;
   flex-direction:column;
   gap:8px;
@@ -2695,6 +2719,17 @@ body.state-observe #ui{ display:none !important; }
   padding:8px 10px;
   border-radius:10px;
   background:rgba(255,255,255,0.04);
+}
+@media (max-width: 980px){
+  .battle-history-search-panel-tools{
+    width:100%;
+    margin-left:0;
+  }
+  #battle-history-date-filter,
+  #battle-history-keyword-filter{
+    flex:1 1 180px;
+    width:auto;
+  }
 }
 
 </style>
