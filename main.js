@@ -232,8 +232,8 @@ window.renderPlayersOnPlanet = function(entry = {}){
     }
 };
 
-function window.renderPlayersOnPlanet(entry = {}){
-    return window.window.renderPlayersOnPlanet(entry);
+function renderPlayersOnPlanet(entry = {}){
+    return window.renderPlayersOnPlanet(entry);
 }
 
 
@@ -7806,7 +7806,7 @@ function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
     return { id, nickname, isOwner };
 }
 
-function window.renderPlayersOnPlanet(entry = {}){
+window.renderPlayersOnPlanet = function(entry = {}){
     const overlay = document.getElementById('map-player-overlay');
     if(!overlay) return;
 
@@ -8700,13 +8700,6 @@ async function loadRoomsFromSupabase() {
 
   console.log('Комнаты из Supabase загружены:', visibleRooms);
   return supabaseBattleRoomsCache;
-}
-
-function getLobbyModeSafe(){
-  if (typeof window.getLobbyModeV27 === 'function') {
-    return window.getLobbyModeV27() || 'battle';
-  }
-  return 'battle';
 }
 
 async function renderRoomsInLobby(forceBattleMode = false) {
