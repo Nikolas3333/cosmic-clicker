@@ -3682,6 +3682,16 @@ console.log('🔥 Supabase подключен и готов к работе');
 }
 #map-player-overlay{
   position:absolute;
+  top:10px;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  z-index:3;
+  pointer-events:none;
+  position:absolute;
   inset:8px;
   display:grid;
   grid-template-columns:1fr;
@@ -3691,6 +3701,20 @@ console.log('🔥 Supabase подключен и готов к работе');
   pointer-events:none;
 }
 .map-player-chip{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:0;
+  border:none;
+  background:none;
+  color:#ffffff;
+  font-size:11px;
+  font-weight:700;
+  text-shadow:
+    0 0 4px rgba(0,0,0,1),
+    0 0 8px rgba(0,0,0,1);
+  pointer-events:auto;
+  cursor:pointer;
   min-width:0;
   display:flex;
   align-items:center;
