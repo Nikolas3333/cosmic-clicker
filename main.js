@@ -7037,24 +7037,38 @@ function buildShopModelSvg(item){
     const weapon = item?.weapon || 'laser';
     const defs = `
       <defs>
-        <linearGradient id="shipHullA" x1="0" x2="1"><stop offset="0%" stop-color="#d8f6ff"/><stop offset="100%" stop-color="${accent}"/></linearGradient>
-        <linearGradient id="shipHullB" x1="0" x2="1"><stop offset="0%" stop-color="${neon}"/><stop offset="100%" stop-color="#1a2f56"/></linearGradient>
-        <linearGradient id="engineGlow" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#fff7bf"/><stop offset="55%" stop-color="${engine}"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></linearGradient>
-        <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/><stop offset="55%" stop-color="${neon}" stop-opacity="0.85"/><stop offset="100%" stop-color="${neon}" stop-opacity="0"/></radialGradient>
+        <linearGradient id="shipHullA" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#edf7ff"/>
+          <stop offset="45%" stop-color="#7a9dc7"/>
+          <stop offset="100%" stop-color="#22324a"/>
+        </linearGradient>
+        <linearGradient id="shipHullB" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#fef4d2"/>
+          <stop offset="42%" stop-color="#9cb6da"/>
+          <stop offset="100%" stop-color="#243248"/>
+        </linearGradient>
+        <linearGradient id="engineGlow" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fff2c8"/>
+          <stop offset="55%" stop-color="${engine}"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+        </linearGradient>
+        <radialGradient id="coreGlow" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="38%" stop-color="${neon}"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+        </radialGradient>
       </defs>`;
-    if(item?.type === 'module'){
-        const moduleMap = {
-            speed: `<circle cx="140" cy="140" r="58" fill="rgba(35,70,120,0.45)" stroke="${neon}" stroke-width="4"/><circle cx="140" cy="140" r="26" fill="url(#coreGlow)" class="shop-neon-dot"/><path d="M140 68 L156 110 L212 110 L166 140 L184 206 L140 164 L96 206 L114 140 L68 110 L124 110 Z" fill="${accent}" opacity="0.94" class="shop-neon-line"/>`,
-            shield: `<circle cx="140" cy="140" r="62" fill="rgba(35,70,120,0.32)" stroke="${neon}" stroke-width="4"/><path d="M140 70 L198 96 L186 168 Q174 206 140 220 Q106 206 94 168 L82 96 Z" fill="url(#shipHullB)" opacity="0.95"/><path d="M140 100 L170 114 L164 158 Q156 182 140 192 Q124 182 116 158 L110 114 Z" fill="#dffbff" opacity="0.42"/>`,
-            reactor: `<circle cx="140" cy="140" r="66" fill="rgba(14,28,58,0.64)" stroke="${neon}" stroke-width="3"/><circle cx="140" cy="140" r="24" fill="#fff2a3" class="shop-neon-dot"/><circle cx="140" cy="140" r="42" fill="none" stroke="${accent}" stroke-width="8" stroke-dasharray="18 10" opacity="0.86" class="shop-neon-line"/><circle cx="140" cy="140" r="58" fill="none" stroke="${neon}" stroke-width="2" opacity="0.5"/>`,
-            matrix: `<rect x="92" y="92" width="96" height="96" rx="14" fill="rgba(18,32,64,0.76)" stroke="${neon}" stroke-width="4"/><path d="M108 140 H172 M140 108 V172" stroke="${accent}" stroke-width="8" stroke-linecap="round" class="shop-neon-line"/><circle cx="140" cy="140" r="18" fill="none" stroke="#dffbff" stroke-width="4"/>`,
-            plasma: `<circle cx="140" cy="140" r="28" fill="#fff6b2" class="shop-neon-dot"/><path d="M140 72 C174 94 198 108 208 140 C196 174 176 192 140 208 C104 192 84 174 72 140 C84 108 110 94 140 72 Z" fill="none" stroke="${accent}" stroke-width="10" opacity="0.9" class="shop-neon-line"/><path d="M140 92 L158 132 L196 140 L158 148 L140 188 L122 148 L84 140 L122 132 Z" fill="${neon}" opacity="0.92"/>`,
-            phase: `<circle cx="140" cy="140" r="58" fill="rgba(16,24,48,0.58)" stroke="${neon}" stroke-width="3"/><ellipse cx="140" cy="140" rx="70" ry="24" fill="none" stroke="${accent}" stroke-width="6" opacity="0.82" transform="rotate(-24 140 140)" class="shop-neon-line"/><ellipse cx="140" cy="140" rx="70" ry="24" fill="none" stroke="${neon}" stroke-width="4" opacity="0.58" transform="rotate(28 140 140)" class="shop-neon-line"/><circle cx="140" cy="140" r="18" fill="#dffbff"/>`
-        };
-        return `<svg ${common}>${defs}${moduleMap[art] || moduleMap['speed']}</svg>`;
-    }
 
-    const frameMap = {
+    const moduleMap = {
+        speed: `<circle cx="140" cy="140" r="58" fill="rgba(35,70,120,0.45)" stroke="${neon}" stroke-width="4"/><circle cx="140" cy="140" r="26" fill="url(#coreGlow)" class="shop-neon-dot"/><path d="M140 68 L156 110 L212 110 L166 140 L184 206 L140 164 L96 206 L114 140 L68 110 L124 110 Z" fill="${accent}" opacity="0.94" class="shop-neon-line"/>`,
+        shield: `<path d="M140 58 L206 96 V146 C206 182 178 210 140 226 C102 210 74 182 74 146 V96 Z" fill="rgba(32,62,110,0.44)" stroke="${neon}" stroke-width="4"/><path d="M140 84 L178 108 V142 C178 164 162 184 140 194 C118 184 102 164 102 142 V108 Z" fill="rgba(255,255,255,0.14)" stroke="${accent}" stroke-width="3" class="shop-neon-line"/>`,
+        reactor: `<circle cx="140" cy="140" r="66" fill="rgba(14,28,58,0.64)" stroke="${neon}" stroke-width="3"/><circle cx="140" cy="140" r="24" fill="#fff2a3" class="shop-neon-dot"/><circle cx="140" cy="140" r="42" fill="none" stroke="${accent}" stroke-width="8" stroke-dasharray="18 10" opacity="0.86" class="shop-neon-line"/><circle cx="140" cy="140" r="58" fill="none" stroke="${neon}" stroke-width="2" opacity="0.5"/>`,
+        matrix: `<rect x="92" y="92" width="96" height="96" rx="14" fill="rgba(18,32,64,0.76)" stroke="${neon}" stroke-width="4"/><path d="M108 140 H172 M140 108 V172" stroke="${accent}" stroke-width="8" stroke-linecap="round" class="shop-neon-line"/><circle cx="140" cy="140" r="18" fill="none" stroke="#dffbff" stroke-width="4"/>`,
+        plasma: `<circle cx="140" cy="140" r="28" fill="#fff6b2" class="shop-neon-dot"/><path d="M140 72 C174 94 198 108 208 140 C196 174 176 192 140 208 C104 192 84 174 72 140 C84 108 110 94 140 72 Z" fill="none" stroke="${accent}" stroke-width="10" opacity="0.9" class="shop-neon-line"/><path d="M140 92 L158 132 L196 140 L158 148 L140 188 L122 148 L84 140 L122 132 Z" fill="${neon}" opacity="0.92"/>`,
+        phase: `<circle cx="140" cy="140" r="58" fill="rgba(16,24,48,0.58)" stroke="${neon}" stroke-width="3"/><ellipse cx="140" cy="140" rx="70" ry="24" fill="none" stroke="${accent}" stroke-width="6" opacity="0.82" transform="rotate(-24 140 140)" class="shop-neon-line"/><ellipse cx="140" cy="140" rx="70" ry="24" fill="none" stroke="${neon}" stroke-width="4" opacity="0.58" transform="rotate(28 140 140)" class="shop-neon-line"/><circle cx="140" cy="140" r="18" fill="#dffbff"/>`
+    };
+
+    const shipMap = {
         arrow: '<path class="shop-hull-main" d="M140 24 L174 92 L244 118 L174 144 L140 232 L106 144 L36 118 L106 92 Z" fill="url(#shipHullA)" opacity="0.95"/><path d="M140 60 L158 112 L202 124 L158 136 L140 190 L122 136 L78 124 L122 112 Z" fill="rgba(223,251,255,0.56)"/><path d="M92 168 L124 144 L156 144 L188 168" fill="none" stroke="${neon}" stroke-width="5" class="shop-neon-line"/>',
         dart: '<path class="shop-hull-main" d="M140 28 L182 90 L242 116 L192 132 L166 214 L140 184 L114 214 L88 132 L38 116 L98 90 Z" fill="url(#shipHullB)" opacity="0.97"/><path d="M140 54 L162 118 L204 126 L162 134 L140 188 L118 134 L76 126 L118 118 Z" fill="rgba(223,251,255,0.62)"/><path d="M112 84 L140 66 L168 84" fill="none" stroke="${neon}" stroke-width="4" class="shop-neon-line"/>',
         stinger: '<path class="shop-hull-main" d="M140 24 L170 98 L232 118 L178 140 L140 226 L102 140 L48 118 L110 98 Z" fill="url(#shipHullA)" opacity="0.96"/><path d="M140 56 L158 118 L188 124 L158 134 L140 192 L122 134 L92 124 L122 118 Z" fill="rgba(223,251,255,0.58)"/><path d="M74 118 H206" stroke="${accent}" stroke-width="7" opacity="0.84" class="shop-weapon-glow"/>',
@@ -7079,28 +7093,73 @@ function buildShopModelSvg(item){
         phase: '<ellipse cx="60" cy="118" rx="16" ry="8" fill="none" stroke="${accent}" stroke-width="5" class="shop-weapon-glow"/><ellipse cx="220" cy="118" rx="16" ry="8" fill="none" stroke="${accent}" stroke-width="5" class="shop-weapon-glow"/>'
     };
 
+    if(item?.type === 'module'){
+        return `<svg ${common}>${defs}${(moduleMap[art] || moduleMap.speed).replaceAll('${accent}', accent).replaceAll('${neon}', neon)}</svg>`;
+    }
+
+    const frame = (shipMap[art] || shipMap.classic)
+        .replaceAll('${accent}', accent)
+        .replaceAll('${neon}', neon);
+
+    const weapons = (weaponMap[weapon] || weaponMap.laser)
+        .replaceAll('${accent}', accent)
+        .replaceAll('${neon}', neon);
+
     const engineSvg = `
       <ellipse cx="120" cy="234" rx="12" ry="30" fill="url(#engineGlow)" class="shop-engine-flame"/>
       <ellipse cx="160" cy="234" rx="12" ry="30" fill="url(#engineGlow)" class="shop-engine-flame-alt"/>
       <circle cx="120" cy="206" r="8" fill="${engine}" class="shop-neon-dot"/>
       <circle cx="160" cy="206" r="8" fill="${engine}" class="shop-neon-dot"/>`;
 
-    const frame = (frameMap[art] || frameMap['classic'])
-        .replaceAll('${accent}', accent)
-        .replaceAll('${neon}', neon);
-    const weapons = (weaponMap[weapon] || weaponMap['laser']).replaceAll('${accent}', accent).replaceAll('${neon}', neon);
     return `<svg ${common}>${defs}${frame}${weapons}${engineSvg}</svg>`;
+}
+
+function renderShopMainSwitch(){
+    const wrap = document.getElementById('shop-main-switch');
+    if(!wrap) return;
+    wrap.innerHTML = `
+      <button type="button" class="shop-main-tab ${shopState.view === 'ships' ? 'active' : ''}" data-shop-main="ships">Корабли</button>
+      <button type="button" class="shop-main-tab ${shopState.view === 'modules' ? 'active' : ''}" data-shop-main="modules">Модули</button>
+    `;
+    wrap.querySelectorAll('.shop-main-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const nextView = btn.dataset.shopMain || 'ships';
+            shopState.view = nextView;
+            if(nextView === 'ships'){
+                const list = getCurrentShopShips();
+                shopState.selectedId = list[0]?.id || '';
+            }else{
+                shopState.selectedId = SHOP_DATA.modules[0]?.id || '';
+            }
+            renderShopScreen();
+        });
+    });
 }
 
 function renderShopTypeTabs(){
     const wrap = document.getElementById('shop-type-tabs');
+    const typeLabel = document.getElementById('shop-type-label');
     if(!wrap) return;
+
+    if(shopState.view === 'modules'){
+        wrap.innerHTML = `
+          <button type="button" class="shop-type-tab active" data-shop-modules="all">
+            <span class="shop-type-name">Все модули</span>
+            <span class="shop-type-sub">Улучшения скорости, защиты, реактора и оружия</span>
+          </button>
+        `;
+        if(typeLabel) typeLabel.textContent = 'Раздел модулей';
+        return;
+    }
+
+    if(typeLabel) typeLabel.textContent = 'Ветки кораблей';
     wrap.innerHTML = SHOP_DATA.types.map(type => `
-        <button type="button" class="shop-type-tab ${shopState.shipType === type.id && shopState.view === 'ships' ? 'active' : ''}" data-shop-type="${type.id}">
+        <button type="button" class="shop-type-tab ${shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
             <span class="shop-type-name">${type.name}</span>
             <span class="shop-type-sub">${type.subtitle}</span>
         </button>
     `).join('');
+
     wrap.querySelectorAll('.shop-type-tab').forEach(btn => {
         btn.addEventListener('click', () => {
             shopState.view = 'ships';
@@ -7115,32 +7174,34 @@ function renderShopTypeTabs(){
 function renderShopLists(){
     const shipsList = document.getElementById('shop-ships-list');
     const modulesList = document.getElementById('shop-modules-list');
+    const shipsLabel = document.getElementById('shop-ships-label');
+    const modulesLabel = document.getElementById('shop-modules-label');
     if(!shipsList || !modulesList) return;
 
     const ships = getCurrentShopShips();
+
     shipsList.innerHTML = ships.map(item => `
         <button type="button" class="shop-item-btn ${shopState.view === 'ships' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-view="ships" data-shop-id="${item.id}">
-            <div class="shop-item-top">
-              <span class="shop-item-name">${item.name}</span>
-              <span class="shop-item-tier">${item.tier}</span>
-            </div>
+            <span class="shop-item-name">${item.name}</span>
             <span class="shop-item-sub">${item.subtitle}</span>
+            <span class="shop-item-tier">${item.tier}</span>
         </button>
     `).join('');
 
     modulesList.innerHTML = SHOP_DATA.modules.map(item => `
         <button type="button" class="shop-item-btn ${shopState.view === 'modules' && shopState.selectedId === item.id ? 'active' : ''}" data-shop-view="modules" data-shop-id="${item.id}">
-            <div class="shop-item-top">
-              <span class="shop-item-name">${item.name}</span>
-              <span class="shop-item-tier">${item.tier}</span>
-            </div>
+            <span class="shop-item-name">${item.name}</span>
             <span class="shop-item-sub">${item.subtitle}</span>
+            <span class="shop-item-tier">${item.tier}</span>
         </button>
     `).join('');
 
+    if(shipsLabel) shipsLabel.style.display = shopState.view === 'ships' ? 'block' : 'none';
+    if(shipsList) shipsList.style.display = shopState.view === 'ships' ? 'flex' : 'none';
+    if(modulesLabel) modulesLabel.style.display = 'block';
+    if(modulesList) modulesList.style.display = 'flex';
+
     document.querySelectorAll('.shop-item-btn').forEach(btn => {
-        if(btn.dataset.boundShop) return;
-        btn.dataset.boundShop = '1';
         btn.addEventListener('click', () => {
             shopState.view = btn.dataset.shopView || 'ships';
             shopState.selectedId = btn.dataset.shopId || '';
@@ -7149,39 +7210,113 @@ function renderShopLists(){
     });
 }
 
-function renderShopPreview(){
-    const item = getShopSelectedItem();
-    const orbit = document.getElementById('shop-model-orbit');
-    const pedestal = document.getElementById('shop-pedestal');
-    const badge = document.getElementById('shop-kind-badge');
-    const title = document.getElementById('shop-item-title');
-    const desc = document.getElementById('shop-item-desc');
-    const price = document.getElementById('shop-item-price');
-    const stats = document.getElementById('shop-stats');
-    const hint = document.getElementById('shop-item-hint');
-    if(!item || !orbit || !badge || !title || !desc || !price || !stats) return;
-
-    orbit.className = `shop-model-orbit ${item.type === 'ship' ? 'ship' : 'module'}`;
-    orbit.innerHTML = buildShopModelSvg(item);
-    if(pedestal) pedestal.style.display = item.type === 'ship' ? 'block' : 'none';
-
-    badge.textContent = item.badge;
-    title.textContent = item.name;
-    desc.textContent = item.description;
-    price.textContent = `Цена: ${item.price} 🪙`;
-    stats.innerHTML = (item.stats || []).map(([k,v]) => `<div class="shop-stat"><strong>${k}:</strong> ${v}</div>`).join('');
-
-    if(hint){
-        hint.textContent = item.type === 'ship'
-            ? `На подиуме крутится ${item.name}. Неоны мерцают, двигатели работают, а вооружение отображает тип: ${item.stats?.find(([k]) => k === 'Оружие')?.[1] || 'боевой комплект'}.`
-            : 'Модуль парит без подиума и крутится в воздухе. Выбери другой модуль слева для сравнения бонусов.';
+function splitItemStats(item){
+    const stats = Array.isArray(item?.stats) ? item.stats : [];
+    if(item?.type === 'module'){
+        return {
+            left: stats.slice(0, 2),
+            right: stats.slice(2)
+        };
     }
+    return {
+        left: stats.slice(0, 4),
+        right: stats.slice(4)
+    };
+}
+
+function getShopCurrentTitle(){
+    if(shopState.view === 'modules'){
+        return {
+            title:'МОДУЛИ УЛУЧШЕНИЯ',
+            subtitle:'В центре показываются все доступные модули. Они парят и крутятся без подиума.'
+        };
+    }
+    const activeType = SHOP_DATA.types.find(type => type.id === shopState.shipType) || SHOP_DATA.types[0];
+    return {
+        title:(activeType?.name || 'КОРАБЛИ').toUpperCase(),
+        subtitle:`${activeType?.subtitle || 'Боевая ветка'}. По центру показаны 5 моделей — от старого корпуса до новой топовой версии.`
+    };
+}
+
+function renderShopCatalog(){
+    const wrap = document.getElementById('shop-catalog-list');
+    const title = document.getElementById('shop-main-title');
+    const subtitle = document.getElementById('shop-main-subtitle');
+    if(!wrap) return;
+
+    const head = getShopCurrentTitle();
+    if(title) title.textContent = head.title;
+    if(subtitle) subtitle.textContent = head.subtitle;
+
+    const list = shopState.view === 'modules' ? SHOP_DATA.modules : getCurrentShopShips();
+
+    if(!list.length){
+        wrap.innerHTML = '<div class="shop-empty">Тут пока пусто.</div>';
+        return;
+    }
+
+    wrap.innerHTML = list.map((item, index) => {
+        const selected = shopState.selectedId === item.id;
+        const cols = splitItemStats(item);
+        const valueLine = item.price ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${item.price}</span></div>` : '';
+        const buyText = item.type === 'module' ? 'Установить' : 'Купить';
+        const rowNote = item.type === 'module'
+            ? 'Модуль парит и вращается без площадки'
+            : `Стрельба: ${(item.stats || []).find(([k]) => k === 'Оружие')?.[1] || 'боевой комплект'}`;
+
+        return `
+          <div class="shop-row ${selected ? 'selected' : ''} ${item.type}" data-shop-row="${item.id}">
+            <div class="shop-row-level">
+              <span class="shop-row-cross"></span>
+              <span>${44 + index * 4}</span>
+            </div>
+            <div class="shop-row-preview">
+              ${item.type === 'ship' ? '<div class="shop-row-pedestal"></div>' : ''}
+              <div class="shop-row-orbit">${buildShopModelSvg(item)}</div>
+            </div>
+            <div class="shop-row-info">
+              <div class="shop-row-name">${item.name}</div>
+              <div class="shop-row-subtitle">${item.subtitle}</div>
+              <div class="shop-row-desc">${item.description}</div>
+              ${valueLine}
+            </div>
+            <div class="shop-stats-col">
+              <div class="shop-col-title">${item.type === 'ship' ? 'Характеристики' : 'Параметры'}</div>
+              ${(cols.left || []).map(([k,v]) => `<div class="shop-stat"><strong>${k}:</strong> ${v}</div>`).join('')}
+            </div>
+            <div class="shop-stats-col">
+              <div class="shop-col-title">${item.type === 'ship' ? 'Системы и оружие' : 'Слоты и класс'}</div>
+              ${(cols.right || []).map(([k,v]) => `<div class="shop-stat"><strong>${k}:</strong> ${v}</div>`).join('')}
+            </div>
+            <div class="shop-buy-wrap">
+              <div class="shop-type-badge">${item.tier}</div>
+              <button type="button" class="shop-buy-btn">${buyText}</button>
+              <div class="shop-buy-note">${rowNote}</div>
+            </div>
+          </div>
+        `;
+    }).join('');
+
+    wrap.querySelectorAll('[data-shop-row]').forEach(row => {
+        row.addEventListener('click', (event) => {
+            if(event.target.closest('.shop-buy-btn')) return;
+            shopState.selectedId = row.dataset.shopRow || '';
+            renderShopScreen();
+        });
+    });
+
+    wrap.querySelectorAll('.shop-buy-btn').forEach(btn => {
+        btn.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+    });
 }
 
 function renderShopScreen(){
+    renderShopMainSwitch();
     renderShopTypeTabs();
     renderShopLists();
-    renderShopPreview();
+    renderShopCatalog();
 }
 
 
