@@ -197,17 +197,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
 
     const normalizedPlayers = rawPlayers.slice(0, 8).map((p, index) => normalizePreviewPlayerEntry(p, entry, index));
 
-    for(let i = 0; i < 8; i++){
+    for(let i = 0; i < normalizedPlayers.length; i++){
         const playerMeta = normalizedPlayers[i];
         const chip = document.createElement('div');
         chip.className = 'map-player-chip';
 
-        if(!playerMeta){
-            chip.classList.add('empty');
-            chip.textContent = '—';
-            overlay.appendChild(chip);
-            continue;
-        }
+        
 
         if(playerMeta.isOwner){
             const crown = document.createElement('span');
@@ -7818,17 +7813,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
 
     const normalizedPlayers = rawPlayers.slice(0, 8).map((p, index) => normalizePreviewPlayerEntry(p, entry, index));
 
-    for(let i = 0; i < 8; i++){
+    for(let i = 0; i < normalizedPlayers.length; i++){
         const playerMeta = normalizedPlayers[i];
         const chip = document.createElement('div');
         chip.className = 'map-player-chip';
 
-        if(!playerMeta){
-            chip.classList.add('empty');
-            chip.textContent = '—';
-            overlay.appendChild(chip);
-            continue;
-        }
+        
 
         if(playerMeta.isOwner){
             const crown = document.createElement('span');
