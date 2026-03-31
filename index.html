@@ -911,9 +911,9 @@ canvas {
 /* ===== MATCH CONTENT ===== */
 
 #match-content{
-  flex:1;
-  padding:12px;
-  overflow:hidden;
+flex:1;
+padding:12px;
+overflow:hidden;
 }
 
 /* ===== MATCH LIST ===== */
@@ -966,12 +966,11 @@ overflow-y:auto;
 width:240px;
 min-width:240px;
 height:100%;
-display:grid;
-grid-template-rows:120px minmax(0,1fr);
-row-gap:8px;
-align-content:start;
-justify-items:center;
-padding-top:0;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:flex-start;
+gap:6px;
 overflow:hidden;
 }
 
@@ -982,17 +981,12 @@ overflow:hidden;
 #map-mini-preview{
 width:120px;
 height:120px;
-background:#111;
+border-radius:20px;
 border:2px solid #00ffff;
-border-radius:24px;
-display:flex;
-align-items:center;
-justify-content:center;
 overflow:hidden;
-box-sizing:border-box;
-margin:-10px 0 0 0;
-align-self:start;
-justify-self:center;
+margin-top:-8px;
+margin-bottom:6px;
+flex:0 0 auto;
 }
 
 
@@ -1007,17 +1001,13 @@ justify-self:center;
 
 #map-players{
 width:100%;
-min-height:0;
-height:100%;
+height:180px;
 overflow-y:auto;
 overflow-x:hidden;
 display:flex;
 flex-direction:column;
 gap:4px;
 padding-right:4px;
-box-sizing:border-box;
-align-items:stretch;
-margin:0;
 }
 
 
@@ -1055,11 +1045,11 @@ margin:0;
 }
 
 .player-slot{
-background:rgba(255,255,255,0.07);
+background:rgba(255,255,255,0.08);
 padding:4px 8px;
 border-radius:8px;
 font-size:12px;
-min-height:26px;
+min-height:24px;
 display:flex;
 align-items:center;
 }
@@ -1154,9 +1144,9 @@ align-items:center;
 /* ===== MATCH CONTENT ===== */
 
 #match-content{
-  flex:1;
-  padding:12px;
-  overflow-y:auto;
+flex:1;
+padding:12px;
+overflow:hidden;
 }
 
 .match-list{
@@ -1619,14 +1609,14 @@ align-items:center;
 
 
 #map-mini-preview{
-width:170px;
-height:170px;
-position:relative;
+width:120px;
+height:120px;
+border-radius:20px;
+border:2px solid #00ffff;
 overflow:hidden;
-display:flex;
-align-items:center;
-justify-content:center;
-filter: drop-shadow(0 0 16px rgba(255,255,255,0.24));
+margin-top:-8px;
+margin-bottom:6px;
+flex:0 0 auto;
 }
 
 #planet-preview{
@@ -2075,7 +2065,15 @@ body.state-observe #ui{ display:none !important; }
   left:auto !important;
 }
 #match-preview{
-  padding-top:6px;
+width:240px;
+min-width:240px;
+height:100%;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:flex-start;
+gap:6px;
+overflow:hidden;
 }
 
 #premium-account-info,
