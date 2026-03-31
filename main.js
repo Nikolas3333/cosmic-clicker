@@ -7006,20 +7006,38 @@ const SHOP_DATA = {
             { id:'vector_elite', type:'ship', classId:'universal', tier:'Топ версия', name:'Вектор-Элит', subtitle:'Элитный баланс-класс', badge:'Универсалы', price:3660, description:'Топовый универсал с яркими голубыми неонами, насыщенным свечением двигателей и фазовым многоцелевым орудием.', stats:[['Скорость','8.5'],['Броня','7.5'],['Урон','8.1'],['Энергия','8.5'],['Оружие','Фазовый импульс']], art:'vector', neon:'#9dfdff', engine:'#8edfff', weapon:'phase', accent:'#9b7cff' }
         ]
     },
-    modules: [
-        { id:'speed_core', type:'module', tier:'Редкий', name:'Модуль скорости', subtitle:'Ускорители маршевых двигателей', badge:'Модуль', price:350, description:'Увеличивает максимальную скорость и разгон корабля. Полезен для лёгких и средних истребителей.', stats:[['Бонус','+12% скорость'],['Слот','Двигатель'],['Редкость','Редкий'],['Вес','Лёгкий']], art:'speed' },
-        { id:'shield_lattice', type:'module', tier:'Редкий', name:'Модуль защиты', subtitle:'Щитовая решётка', badge:'Модуль', price:420, description:'Усиливает лобовую и боковую защиту корпуса, снижая урон от прямых попаданий.', stats:[['Бонус','+18% броня'],['Слот','Защита'],['Редкость','Редкий'],['Вес','Средний']], art:'shield' },
-        { id:'reactor_overdrive', type:'module', tier:'Эпический', name:'Реактор Overdrive', subtitle:'Пиковая энергия', badge:'Модуль', price:560, description:'Ускоряет перезарядку энергии оружия и даёт кораблю стабильность в затяжной дуэли.', stats:[['Бонус','+20% энергия'],['Слот','Реактор'],['Редкость','Эпический'],['Вес','Средний']], art:'reactor' },
-        { id:'target_matrix', type:'module', tier:'Эпический', name:'Прицельная матрица', subtitle:'Контроль огня', badge:'Модуль', price:610, description:'Стабилизирует вооружение, повышает точность и уменьшает разброс лазерных батарей.', stats:[['Бонус','+16% точность'],['Слот','Наведение'],['Редкость','Эпический'],['Вес','Лёгкий']], art:'matrix' },
-        { id:'plasma_capacitor', type:'module', tier:'Эпический', name:'Плазменный конденсатор', subtitle:'Усилитель урона', badge:'Модуль', price:740, description:'Даёт более мощный импульс орудиям. Рекомендуется для штурмовых и снайперских конфигураций.', stats:[['Бонус','+14% урон'],['Слот','Оружие'],['Редкость','Эпический'],['Вес','Средний']], art:'plasma' },
-        { id:'phase_nullifier', type:'module', tier:'Легендарный', name:'Фазовый стабилизатор', subtitle:'Контроль манёвра', badge:'Модуль', price:860, description:'Снижает инерцию корабля, делая развороты резче и безопаснее на высокой скорости.', stats:[['Бонус','+15% манёвр'],['Слот','Навигация'],['Редкость','Легендарный'],['Вес','Лёгкий']], art:'phase' }
-    ]
+
+    moduleTypes: [
+        { id:'engine', name:'Двигатели', subtitle:'Скорость и манёвр' },
+        { id:'defense', name:'Защита', subtitle:'Броня и щиты' },
+        { id:'reactor', name:'Реакторы', subtitle:'Энергия и перегрузка' },
+        { id:'targeting', name:'Наведение', subtitle:'Точность и контроль' },
+        { id:'weapon', name:'Оружейные', subtitle:'Усиление урона' }
+    ],
+    modulesByType: {
+        engine: [
+            { id:'speed_core', type:'module', classId:'engine', tier:'Редкий', name:'Модуль скорости', subtitle:'Ускорители маршевых двигателей', badge:'Двигатели', price:350, description:'Увеличивает максимальную скорость и разгон корабля. Полезен для лёгких и средних истребителей.', stats:[['Бонус','+12% скорость'],['Слот','Двигатель'],['Редкость','Редкий'],['Вес','Лёгкий']], art:'speed' }
+        ],
+        defense: [
+            { id:'shield_lattice', type:'module', classId:'defense', tier:'Редкий', name:'Модуль защиты', subtitle:'Щитовая решётка', badge:'Защита', price:420, description:'Усиливает лобовую и боковую защиту корпуса, снижая урон от прямых попаданий.', stats:[['Бонус','+18% броня'],['Слот','Защита'],['Редкость','Редкий'],['Вес','Средний']], art:'shield' }
+        ],
+        reactor: [
+            { id:'reactor_overdrive', type:'module', classId:'reactor', tier:'Эпический', name:'Реактор Overdrive', subtitle:'Пиковая энергия', badge:'Реакторы', price:560, description:'Ускоряет перезарядку энергии оружия и даёт кораблю стабильность в затяжной дуэли.', stats:[['Бонус','+20% энергия'],['Слот','Реактор'],['Редкость','Эпический'],['Вес','Средний']], art:'reactor' }
+        ],
+        targeting: [
+            { id:'target_matrix', type:'module', classId:'targeting', tier:'Эпический', name:'Прицельная матрица', subtitle:'Контроль огня', badge:'Наведение', price:610, description:'Стабилизирует вооружение, повышает точность и уменьшает разброс лазерных батарей.', stats:[['Бонус','+16% точность'],['Слот','Наведение'],['Редкость','Эпический'],['Вес','Лёгкий']], art:'matrix' }
+        ],
+        weapon: [
+            { id:'plasma_capacitor', type:'module', classId:'weapon', tier:'Эпический', name:'Плазменный конденсатор', subtitle:'Усилитель урона', badge:'Оружие', price:740, description:'Даёт более мощный импульс орудиям. Рекомендуется для штурмовых и снайперских конфигураций.', stats:[['Бонус','+14% урон'],['Слот','Оружие'],['Редкость','Эпический'],['Вес','Средний']], art:'plasma' }
+        ]
+    }
 };
 
 const shopState = {
     open:false,
     view:'ships',
     shipType:'fighters',
+    moduleType:'engine',
     selectedId:'scout_1'
 };
 
@@ -7027,8 +7045,12 @@ function getCurrentShopShips(){
     return SHOP_DATA.shipsByType[shopState.shipType] || [];
 }
 
+function getCurrentShopModules(){
+    return SHOP_DATA.modulesByType?.[shopState.moduleType] || [];
+}
+
 function getShopSelectedItem(){
-    const list = shopState.view === 'modules' ? SHOP_DATA.modules : getCurrentShopShips();
+    const list = shopState.view === 'modules' ? getCurrentShopModules() : getCurrentShopShips();
     return list.find(item => item.id === shopState.selectedId) || list[0] || null;
 }
 
@@ -7129,22 +7151,43 @@ function renderShopMainSwitch(){
 function renderShopTypeTabs(){
     const wrap = document.getElementById('shop-type-tabs');
     const typeLabel = document.getElementById('shop-type-label');
+    const moduleWrap = document.getElementById('shop-module-type-tabs');
+    const moduleLabel = document.getElementById('shop-module-type-label');
     if(!wrap) return;
 
-    shopState.view = 'ships';
     if(typeLabel) typeLabel.textContent = 'Классы кораблей';
     wrap.innerHTML = SHOP_DATA.types.map(type => `
-        <button type="button" class="shop-type-tab ${shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
+        <button type="button" class="shop-type-tab ${shopState.view === 'ships' && shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
             <span class="shop-type-name">${type.name}</span>
             <span class="shop-type-sub">${type.subtitle}</span>
         </button>
     `).join('');
+
+    if(moduleLabel) moduleLabel.textContent = 'Классы модулей';
+    if(moduleWrap){
+        moduleWrap.innerHTML = SHOP_DATA.moduleTypes.map(type => `
+            <button type="button" class="shop-type-tab ${shopState.view === 'modules' && shopState.moduleType === type.id ? 'active' : ''}" data-shop-module-type="${type.id}">
+                <span class="shop-type-name">${type.name}</span>
+                <span class="shop-type-sub">${type.subtitle}</span>
+            </button>
+        `).join('');
+    }
 
     wrap.querySelectorAll('.shop-type-tab').forEach(btn => {
         btn.addEventListener('click', () => {
             shopState.view = 'ships';
             shopState.shipType = btn.dataset.shopType || 'fighters';
             const nextList = getCurrentShopShips();
+            shopState.selectedId = nextList[0]?.id || '';
+            renderShopScreen();
+        });
+    });
+
+    moduleWrap?.querySelectorAll('.shop-type-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            shopState.view = 'modules';
+            shopState.moduleType = btn.dataset.shopModuleType || 'engine';
+            const nextList = getCurrentShopModules();
             shopState.selectedId = nextList[0]?.id || '';
             renderShopScreen();
         });
@@ -7181,15 +7224,16 @@ function splitItemStats(item){
 
 function getShopCurrentTitle(){
     if(shopState.view === 'modules'){
+        const activeModuleType = SHOP_DATA.moduleTypes.find(type => type.id === shopState.moduleType) || SHOP_DATA.moduleTypes[0];
         return {
-            title:'КОРАБЛИ',
-            subtitle:'Слева выбирается класс, по центру — 5 кораблей ветки.'
+            title:(activeModuleType?.name || 'МОДУЛИ').toUpperCase(),
+            subtitle:''
         };
     }
     const activeType = SHOP_DATA.types.find(type => type.id === shopState.shipType) || SHOP_DATA.types[0];
     return {
         title:(activeType?.name || 'КОРАБЛИ').toUpperCase(),
-        subtitle:`${activeType?.subtitle || 'Космическая ветка'}. По центру 5 кораблей класса: от старой модели до топовой версии.`
+        subtitle:''
     };
 }
 
@@ -7203,7 +7247,7 @@ function renderShopCatalog(){
     if(title) title.textContent = head.title;
     if(subtitle) subtitle.textContent = head.subtitle;
 
-    const list = shopState.view === 'modules' ? SHOP_DATA.modules : getCurrentShopShips();
+    const list = shopState.view === 'modules' ? getCurrentShopModules() : getCurrentShopShips();
 
     if(!list.length){
         wrap.innerHTML = '<div class="shop-empty">Тут пока пусто.</div>';
