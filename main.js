@@ -7183,13 +7183,13 @@ function getShopCurrentTitle(){
     if(shopState.view === 'modules'){
         return {
             title:'КОРАБЛИ',
-            subtitle:'Слева выбирается класс, а по центру показываются 5 кораблей этой ветки.'
+            subtitle:'Слева выбирается класс, по центру — 5 кораблей ветки.'
         };
     }
     const activeType = SHOP_DATA.types.find(type => type.id === shopState.shipType) || SHOP_DATA.types[0];
     return {
         title:(activeType?.name || 'КОРАБЛИ').toUpperCase(),
-        subtitle:`${activeType?.subtitle || 'Космическая ветка'}. По центру показаны 5 кораблей класса: от старой модели до новой топовой версии.`
+        subtitle:`${activeType?.subtitle || 'Космическая ветка'}. По центру 5 кораблей класса: от старой модели до топовой версии.`
     };
 }
 
