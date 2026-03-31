@@ -3062,6 +3062,14 @@ const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
 const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
 const localHandledChatMessageIds = new Set();
+const BATTLE_HISTORY_SEARCH_LIMIT = 80;
+const battleHistorySearchState = {
+    playerId: '',
+    loading: false,
+    error: '',
+    messages: [],
+    playerLabel: ''
+};
 
 const playerStaffRoleCache = {};
 const STAFF_ROLE_META = {
@@ -3747,6 +3755,165 @@ function getPeerLabelFromPmMessage(msg, peerId) {
     return privateChatTabs[String(peerId)]?.label || `ID ${peerId}`;
 }
 
+
+function ensureBattleHistorySearchUi() {
+    const panel = document.getElementById('chat-panel');
+    if (!panel) return null;
+
+    let wrap = document.getElementById('battle-history-search-wrap');
+    if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.id = 'battle-history-search-wrap';
+        wrap.className = 'battle-history-search-wrap hidden';
+        wrap.innerHTML = `
+            <div class="battle-history-search-bar">
+                <span class="battle-history-search-title">🔎 Battle history</span>
+                <input id="battle-history-player-id" type="text" inputmode="numeric" placeholder="ID игрока">
+                <button id="battle-history-search-btn" type="button">Найти</button>
+            </div>
+            <div id="battle-history-search-panel" class="battle-history-search-panel hidden">
+                <div class="battle-history-search-panel-head">
+                    <span id="battle-history-search-caption">История battle</span>
+                    <button id="battle-history-search-close" type="button">×</button>
+                </div>
+                <div id="battle-history-search-results" class="battle-history-search-results"></div>
+            </div>
+        `;
+        const chatMessagesEl = document.getElementById('chat-messages');
+        if (chatMessagesEl) panel.insertBefore(wrap, chatMessagesEl);
+        else panel.appendChild(wrap);
+
+        wrap.querySelector('#battle-history-search-btn')?.addEventListener('click', () => {
+            runBattleHistorySearch();
+        });
+        wrap.querySelector('#battle-history-player-id')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                runBattleHistorySearch();
+            }
+        });
+        wrap.querySelector('#battle-history-search-close')?.addEventListener('click', () => {
+            battleHistorySearchState.messages = [];
+            battleHistorySearchState.error = '';
+            battleHistorySearchState.playerLabel = '';
+            renderBattleHistorySearchUi();
+        });
+    }
+    return wrap;
+}
+
+function renderBattleHistorySearchUi() {
+    const wrap = ensureBattleHistorySearchUi();
+    if (!wrap) return;
+
+    const shouldShowToolbar = currentChat === 'battle';
+    wrap.classList.toggle('hidden', !shouldShowToolbar);
+    if (!shouldShowToolbar) return;
+
+    const input = document.getElementById('battle-history-player-id');
+    const searchBtn = document.getElementById('battle-history-search-btn');
+    const panel = document.getElementById('battle-history-search-panel');
+    const caption = document.getElementById('battle-history-search-caption');
+    const results = document.getElementById('battle-history-search-results');
+    if (!input || !searchBtn || !panel || !caption || !results) return;
+
+    if (document.activeElement !== input) {
+        input.value = battleHistorySearchState.playerId || '';
+    }
+    searchBtn.disabled = !!battleHistorySearchState.loading;
+    searchBtn.textContent = battleHistorySearchState.loading ? 'Поиск...' : 'Найти';
+
+    const hasVisiblePanel = !!battleHistorySearchState.loading || !!battleHistorySearchState.error || battleHistorySearchState.messages.length > 0;
+    panel.classList.toggle('hidden', !hasVisiblePanel);
+
+    if (!hasVisiblePanel) {
+        results.innerHTML = '';
+        return;
+    }
+
+    const safePlayerId = escapeChatHtml(battleHistorySearchState.playerId || '');
+    const safeLabel = escapeChatHtml(battleHistorySearchState.playerLabel || '');
+    caption.textContent = safeLabel ? `История Battle: ${safeLabel}` : `История Battle ID ${safePlayerId || '?'}`;
+
+    if (battleHistorySearchState.loading) {
+        results.innerHTML = '<div class="chat-line system">Загрузка истории battle...</div>';
+        return;
+    }
+
+    if (battleHistorySearchState.error) {
+        results.innerHTML = `<div class="chat-line system">${escapeChatHtml(battleHistorySearchState.error)}</div>`;
+        return;
+    }
+
+    if (!battleHistorySearchState.messages.length) {
+        results.innerHTML = '<div class="chat-line system">Сообщения battle для этого ID не найдены.</div>';
+        return;
+    }
+
+    const scope = parseChatScope('battle');
+    results.innerHTML = battleHistorySearchState.messages.map(msg => buildLobbyChatMessageHtml(msg, scope)).join('');
+    results.scrollTop = results.scrollHeight;
+}
+
+async function runBattleHistorySearch(forcedPlayerId = null) {
+    if (!window.supabaseClient) {
+        battleHistorySearchState.error = 'Supabase ещё не готов.';
+        battleHistorySearchState.messages = [];
+        renderBattleHistorySearchUi();
+        return;
+    }
+
+    const input = document.getElementById('battle-history-player-id');
+    const safePlayerId = String(forcedPlayerId ?? input?.value ?? battleHistorySearchState.playerId ?? '').trim();
+    if (!/^\d+$/.test(safePlayerId)) {
+        battleHistorySearchState.playerId = safePlayerId;
+        battleHistorySearchState.error = 'Введите числовой ID игрока.';
+        battleHistorySearchState.messages = [];
+        battleHistorySearchState.playerLabel = '';
+        renderBattleHistorySearchUi();
+        return;
+    }
+
+    battleHistorySearchState.playerId = safePlayerId;
+    battleHistorySearchState.loading = true;
+    battleHistorySearchState.error = '';
+    battleHistorySearchState.messages = [];
+    battleHistorySearchState.playerLabel = '';
+    renderBattleHistorySearchUi();
+
+    const { data, error } = await window.supabaseClient
+        .from('chat_messages')
+        .select('*')
+        .eq('channel', 'battle')
+        .eq('player_public_id', safePlayerId)
+        .order('created_at', { ascending: false })
+        .limit(BATTLE_HISTORY_SEARCH_LIMIT);
+
+    battleHistorySearchState.loading = false;
+
+    if (error) {
+        console.error('❌ Ошибка поиска history battle:', error);
+        battleHistorySearchState.error = 'Ошибка поиска истории battle.';
+        battleHistorySearchState.messages = [];
+        renderBattleHistorySearchUi();
+        return;
+    }
+
+    const messages = (data || []).slice().reverse();
+    await hydrateStaffRolesForMessages(messages);
+
+    battleHistorySearchState.messages = messages;
+    battleHistorySearchState.error = '';
+    const latest = messages[messages.length - 1] || data?.[0] || null;
+    if (latest) {
+        const nick = String(latest.player_nickname || '').trim();
+        battleHistorySearchState.playerLabel = nick ? `${nick} [${safePlayerId}]` : `ID ${safePlayerId}`;
+    } else {
+        battleHistorySearchState.playerLabel = `ID ${safePlayerId}`;
+    }
+    renderBattleHistorySearchUi();
+}
+
 function renderChatTabs() {
     if (!chatTabsWrap) return;
 
@@ -3866,6 +4033,7 @@ function renderChatTabs() {
     });
 
     saveChatUiState();
+    renderBattleHistorySearchUi();
     console.log("CHAT_NOTIFY_STATE", JSON.stringify(chatUnread), "current=", currentChat);
 }
 
@@ -3880,6 +4048,7 @@ function renderLobbyMessages() {
     const list = getChatCacheList(scope);
     chatMessages.innerHTML = list.map(msg => buildLobbyChatMessageHtml(msg, scope)).join("");
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    renderBattleHistorySearchUi();
 }
 
 function updateLobbyChatComposerVisibility() {
