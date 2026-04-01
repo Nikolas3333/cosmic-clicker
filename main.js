@@ -3231,27 +3231,8 @@ function getSharedBattleChatRoomId() {
         selectedLobbyMap?.name ||
         ''
     ).trim().toLowerCase();
+
     if (!mapName) return '';
-
-    const roomName = String(
-        currentRoom?.title ||
-        currentRoom?.room_name ||
-        currentRoom?.rawRoom?.room_name ||
-        selectedLobbyMap?.title ||
-        selectedLobbyMap?.room_name ||
-        ''
-    ).trim();
-    const hostName = String(
-        currentRoom?.host ||
-        currentRoom?.host_name ||
-        currentRoom?.rawRoom?.host_name ||
-        selectedLobbyMap?.host ||
-        selectedLobbyMap?.host_name ||
-        ''
-    ).trim().toUpperCase();
-
-    const isPublicRoom = hostName === 'SYSTEM' || /^public\s+/i.test(roomName);
-    if (!isPublicRoom) return '';
 
     return `public_${mapName}`;
 }
