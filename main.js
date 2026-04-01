@@ -571,15 +571,19 @@ function initBattleChat(){
 
                 if(text){
                     let sent = false;
-                    if(gameState === 'BATTLE'){
+
+                    if (canWriteBattleAnnouncementChat()) {
+                        sent = await sendMessage('battle', text);
+                    } else if (gameState === 'BATTLE') {
                         sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
-                    }else if(gameState === 'OBSERVE'){
+                    } else if (gameState === 'OBSERVE') {
                         if(!canWriteInObserverChat()) {
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                         } else {
                             sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
                         }
                     }
+
                     if(sent) input.value = '';
                 }
                 setBattleChatOpen(false);
@@ -4277,22 +4281,20 @@ if (chatMessages && !chatMessages.dataset.playerActionsBound) {
 function renderBattleMessages() {
     const battleLog = document.getElementById("battle-chat-log");
     if (!battleLog) return;
-    const activeRoomId = String(getBattleChatRoomId() || '');
-    const visibleMessages = chatCache.battle.filter(msg => {
-        if (!activeRoomId) 
-try {
-    renderBattleMessages && renderBattleMessages();
-    renderLobbyMessages && renderLobbyMessages();
-    renderChatTabs && renderChatTabs();
-} catch(e){}
 
-return true;
-        return String(msg?.room_id || '') === activeRoomId;
+    const activeRoomId = String(getBattleChatRoomId() || '').trim();
+    const visibleMessages = chatCache.battle.filter(msg => {
+        const incomingRoomId = String(msg?.room_id || '').trim();
+        if (!activeRoomId) return true;
+        return incomingRoomId === activeRoomId || incomingRoomId === '__all__';
     });
+
     const distanceFromBottom = battleLog.scrollHeight - battleLog.scrollTop - battleLog.clientHeight;
     const shouldStickToBottom = distanceFromBottom <= 28;
     const prevScrollTop = battleLog.scrollTop;
+
     battleLog.innerHTML = visibleMessages.map(buildBattleChatMessageHtml).join("");
+
     if (shouldStickToBottom) {
         battleLog.scrollTop = battleLog.scrollHeight;
     } else {
@@ -4396,9 +4398,11 @@ async function loadChatHistory(scopeName = currentChat) {
     }
 
     if (scope.channel === "battle") {
-        const battleRoomId = getBattleChatRoomId();
+        const battleRoomId = String(getBattleChatRoomId() || '').trim();
         if (battleRoomId) {
-            query = query.eq('room_id', battleRoomId);
+            query = query.or(`room_id.eq.${battleRoomId},room_id.eq.__all__`);
+        } else {
+            query = query.eq('room_id', '__all__');
         }
     }
 
@@ -4527,10 +4531,11 @@ async function handleIncomingRealtimeMessage(msg) {
     }
 
     if (msg.channel === "battle") {
-        const activeBattleRoomId = String(getBattleChatRoomId() || '');
-        if (activeBattleRoomId && String(msg.room_id || '') !== activeBattleRoomId) {
+        const activeBattleRoomId = String(getBattleChatRoomId() || '').trim();
+        const incomingRoomId = String(msg.room_id || '').trim();
+        if (activeBattleRoomId && incomingRoomId !== activeBattleRoomId && incomingRoomId !== '__all__') {
             console.log('⛔ BATTLE FILTER SKIP:', {
-                incomingRoomId: String(msg.room_id || ''),
+                incomingRoomId,
                 activeBattleRoomId,
                 id: msg.id || null,
                 text: msg.message || ''
@@ -4652,7 +4657,11 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
 
     const payload = {
         channel: scope.channel,
-        room_id: scope.channel === 'clan' ? getClanChatRoomId() : (scope.channel === 'battle' ? getBattleChatRoomId() : null),
+        room_id: scope.channel === 'clan'
+            ? getClanChatRoomId()
+            : (scope.channel === 'battle'
+                ? (canWriteBattleAnnouncementChat() ? '__all__' : getBattleChatRoomId())
+                : null),
         player_id: getValidChatPlayerId(),
         player_public_id: ownPublicId,
         recipient_public_id: scope.channel === "pm" ? String(scope.peerId || "") : null,
