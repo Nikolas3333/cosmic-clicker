@@ -572,11 +572,15 @@ function initBattleChat(){
                 if(text){
                     let sent = false;
 
-                    if (canWriteBattleAnnouncementChat()) {
-                        sent = await sendMessage('battle', text);
-                    } else if (gameState === 'BATTLE') {
+                    if(gameState === 'BATTLE'){
                         sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
-                    } else if (gameState === 'OBSERVE') {
+
+                        if(sent && canWriteBattleAnnouncementChat()){
+                            try{
+                                await sendMessage('battle', text);
+                            }catch(_){}
+                        }
+                    }else if(gameState === 'OBSERVE'){
                         if(!canWriteInObserverChat()) {
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                         } else {
@@ -4650,9 +4654,6 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         if (battleObserverMode && !canWriteInObserverChat()) {
             return false;
         }
-        if (!battleObserverMode && !canWriteBattleAnnouncementChat()) {
-            return false;
-        }
     }
 
     const payload = {
@@ -4660,7 +4661,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         room_id: scope.channel === 'clan'
             ? getClanChatRoomId()
             : (scope.channel === 'battle'
-                ? (canWriteBattleAnnouncementChat() ? '__all__' : getBattleChatRoomId())
+                ? getBattleChatRoomId()
                 : null),
         player_id: getValidChatPlayerId(),
         player_public_id: ownPublicId,
@@ -4668,6 +4669,10 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         player_nickname: getOwnChatLabel(),
         message: text
     };
+    if (scope.channel === 'battle' && canWriteBattleAnnouncementChat() && gameState === 'BATTLE' && !battleObserverMode) {
+        payload.room_id = '__all__';
+    }
+
 
     console.log('📤 SEND MESSAGE:', {
         scopeName,
