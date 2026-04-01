@@ -4462,7 +4462,7 @@ async function refreshBattleFeedFromDb() {
         .from("chat_messages")
         .select("*")
         .eq("channel", "battle")
-        .eq("room_id", roomId)
+        .or(`room_id.eq.${roomId},room_id.eq.__all__`)
         .order("created_at", { ascending: true })
         .limit(CHAT_MESSAGE_LIMIT);
 
@@ -4563,8 +4563,9 @@ async function handleIncomingRealtimeMessage(msg) {
     }
 
     if (msg.channel === "scene") {
-        const activeSceneRoomId = String(getSceneChatRoomId() || '');
-        if (activeSceneRoomId && String(msg.room_id || '') !== activeSceneRoomId) return;
+        const activeSceneRoomId = String(getSceneChatRoomId() || '').trim();
+        const incomingSceneRoomId = String(msg.room_id || '').trim();
+        if (incomingSceneRoomId !== '__all__' && activeSceneRoomId && incomingSceneRoomId !== activeSceneRoomId) return;
 
         if (!wasLocalHandledChatMessage(msg.id)) {
             showSceneMapMessageInActiveScene(msg);
@@ -4704,9 +4705,24 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         return false;
     }
 
+    const payloadsToInsert = [payload];
+
+    if (scope.channel === "battle" && canWriteBattleAnnouncementChat() && !battleObserverMode) {
+        payloadsToInsert.push({
+            channel: "scene",
+            room_id: "__all__",
+            player_id: payload.player_id,
+            player_public_id: payload.player_public_id,
+            recipient_public_id: null,
+            player_nickname: payload.player_nickname,
+            staff_role: getOwnStaffRole(),
+            message: text
+        });
+    }
+
     const { data, error } = await window.supabaseClient
         .from("chat_messages")
-        .insert(payload)
+        .insert(payloadsToInsert)
         .select('*');
 
     if (error) {
@@ -4716,44 +4732,21 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         return false;
     }
 
-    const insertedRow = Array.isArray(data) && data.length ? data[0] : null;
+    const insertedRows = Array.isArray(data) ? data : [];
+    const insertedBattle = insertedRows.find(row => row?.channel === "battle");
+    const insertedScene = insertedRows.find(row => row?.channel === "scene");
 
-    if (scope.channel === "battle" && insertedRow) {
-        markLocalHandledChatMessage(insertedRow.id);
+    if (insertedBattle) {
+        markLocalHandledChatMessage(insertedBattle.id);
     }
-
-    if (scope.channel === "battle" && insertedRow && insertedRow.room_id === '__all__' && canWriteBattleAnnouncementChat()) {
-        const sceneBroadcastPayload = {
-            channel: "scene",
-            room_id: "__all__",
-            player_id: payload.player_id,
-            player_public_id: payload.player_public_id,
-            recipient_public_id: null,
-            player_nickname: payload.player_nickname,
-            staff_role: getOwnStaffRole(),
-            message: text
-        };
-
-        const { data: sceneBroadcastData, error: sceneBroadcastError } = await window.supabaseClient
-            .from("chat_messages")
-            .insert(sceneBroadcastPayload)
-            .select('*');
-
-        if (!sceneBroadcastError) {
-            const insertedSceneBroadcast = Array.isArray(sceneBroadcastData) && sceneBroadcastData.length ? sceneBroadcastData[0] : null;
-            if (insertedSceneBroadcast) {
-                markLocalHandledChatMessage(insertedSceneBroadcast.id);
-                showSceneMapMessageInActiveScene(insertedSceneBroadcast);
-            }
-        } else {
-            console.error("❌ Ошибка отправки глобального scene сообщения:", sceneBroadcastError);
-        }
+    if (insertedScene) {
+        markLocalHandledChatMessage(insertedScene.id);
     }
 
     markChatMessageSentNow();
 
     if (scope.channel === "battle") {
-        const battleMessage = insertedRow || {
+        const battleMessage = insertedBattle || {
             id: `local-${Date.now()}`,
             channel: "battle",
             room_id: payload.room_id,
@@ -4768,7 +4761,10 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
             renderLobbyMessages();
         }
         renderBattleMessages?.();
-        showBattleAnnouncementInActiveScene(battleMessage);
+    }
+
+    if (insertedScene) {
+        showSceneMapMessageInActiveScene(insertedScene);
     }
 
     if (scope.channel === "battle") {
