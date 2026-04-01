@@ -4669,8 +4669,13 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         player_nickname: getOwnChatLabel(),
         message: text
     };
-    if (scope.channel === 'battle' && canWriteBattleAnnouncementChat() && gameState === 'BATTLE' && !battleObserverMode) {
+    if (scope.channel === 'battle' && canWriteBattleAnnouncementChat() && !battleObserverMode) {
         payload.room_id = '__all__';
+    }
+
+    if (scope.channel === 'battle' && !payload.room_id) {
+        addSystemBattleChatMessage("⚠ Не найден battle room_id для отправки сообщения.");
+        return false;
     }
 
 
@@ -4716,7 +4721,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         const optimisticMessage = {
             id: `local-${Date.now()}`,
             channel: "battle",
-            room_id: getBattleChatRoomId(),
+            room_id: payload.room_id,
             created_at: new Date().toISOString(),
             player_public_id: ownPublicId,
             player_nickname: getOwnChatLabel(),
@@ -4727,7 +4732,20 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         if (currentChat === "battle") {
             renderLobbyMessages();
         }
+        renderBattleMessages?.();
         showBattleAnnouncementInActiveScene(optimisticMessage);
+    }
+
+    if (scope.channel === "battle") {
+        try {
+            await loadChatHistory("battle");
+            if (currentChat === "battle") {
+                renderLobbyMessages();
+            }
+            renderBattleMessages?.();
+        } catch (e) {
+            console.warn("⚠ Не удалось сразу обновить battle-чат:", e);
+        }
     }
 
     if (scope.channel === "global" || scope.channel === "pm" || scope.channel === "clan") {
