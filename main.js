@@ -428,9 +428,23 @@ function pushBattleChatMessage(author, text){
 }
 
 function setBattleChatOpen(open){
-    battleChatOpen = open;
     const box = document.getElementById('battle-chat-box');
     const input = document.getElementById('battle-chat-input');
+
+    if (!canOpenBattleChatInput()) {
+        battleChatOpen = false;
+        if (box) {
+            box.classList.add('hidden');
+            box.classList.remove('input-only');
+        }
+        if (input) {
+            input.value = '';
+            input.blur();
+        }
+        return;
+    }
+
+    battleChatOpen = open;
 
     const inputOnlyMode = gameState === 'BATTLE' || gameState === 'OBSERVE';
 
@@ -552,9 +566,8 @@ function initBattleChat(){
         if(e.key === 'Enter'){
             if(e.repeat) return;
             if(!battleChatOpen){
-                if(gameState === 'OBSERVE' && !canWriteInObserverChat()) {
+                if (!canOpenBattleChatInput()) {
                     e.preventDefault();
-                    pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                     return;
                 }
                 e.preventDefault();
@@ -688,7 +701,10 @@ function clearBattleScene(){
     resetBattleInputState();
     battleChatOpen = false;
     const chatBox = document.getElementById('battle-chat-box');
-    if(chatBox) chatBox.classList.add('hidden');
+    if(chatBox) {
+        chatBox.classList.add('hidden');
+        chatBox.classList.remove('input-only');
+    }
     const cross = document.getElementById('battle-crosshair');
     if(cross) cross.style.display = 'block';
     const hud = document.getElementById('enemy-hud');
@@ -846,7 +862,6 @@ function switchState(newState){
 if(gameState === "BATTLE"){
     if(battleScreen) battleScreen.style.display = "block";
     updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
 
     if(canvas){
         canvas.style.display = "block";
@@ -864,7 +879,7 @@ if(gameState === "BATTLE"){
     battleObserverMode = false;
     enterBattleMap(targetMap);
     initBattleChat();
-try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
+    refreshBattleChatInputAccess();
     if(battleObserverMode){
         setupObserverBattle(targetMap);
         const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
@@ -881,7 +896,6 @@ try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(
 if(gameState === "OBSERVE"){
     battleObserverMode = true;
     updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
     if(battleScreen) battleScreen.style.display = "block";
     if(canvas){
         canvas.style.display = "block";
@@ -894,6 +908,7 @@ if(gameState === "OBSERVE"){
     }
     const targetMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "Земля";
     setupObserverBattle(targetMap);
+    refreshBattleChatInputAccess();
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
@@ -2699,7 +2714,6 @@ if((gameState === "BATTLE" || gameState === "OBSERVE") && battleObserverMode){
 }
 limitBattleArea();
 updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
 renderer.render(scene,camera);
 }
 
@@ -2745,7 +2759,6 @@ function tryFireLaser(){
         startBattleReload();
     }
     updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
     playEffectSound(clickSound);
 }
 
@@ -2789,7 +2802,6 @@ function startBattleReload(force=false){
     battleWeapon.isReloading = true;
     battleWeapon.reloadEndsAt = Date.now() + battleWeapon.reloadTime;
     updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
 }
 
 function updateBattleReloadState(){
@@ -2798,7 +2810,6 @@ function updateBattleReloadState(){
     battleWeapon.isReloading = false;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
     updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
 }
 
 function startShipCrashAnimation(){
@@ -3230,10 +3241,6 @@ function canWriteInObserverChat() {
 }
 
 function canWriteBattleAnnouncementChat() {
-    const role = player?.role || player?.staff_role;
-    if (!role) return false;
-    if (role === "owner" || role === "admin" || role === "owr" || role === "adm") return true;
-    return false;
     const role = getOwnStaffRole();
     return role === "adm" || role === "owr";
 }
@@ -3241,6 +3248,34 @@ function canWriteBattleAnnouncementChat() {
 function canWriteBattleAnnouncementChatByRole(role = "player") {
     const normalizedRole = normalizeStaffRole(role);
     return normalizedRole === "adm" || normalizedRole === "owr";
+}
+
+function canOpenBattleChatInput() {
+    if (gameState === "OBSERVE") return !!canWriteInObserverChat();
+    if (gameState === "BATTLE") return !!canWriteBattleAnnouncementChat();
+    return false;
+}
+
+function refreshBattleChatInputAccess() {
+    const box = document.getElementById('battle-chat-box');
+    const input = document.getElementById('battle-chat-input');
+    if (!box) return;
+
+    if (!canOpenBattleChatInput()) {
+        battleChatOpen = false;
+        box.classList.add('hidden');
+        box.classList.remove('input-only');
+        if (input) {
+            input.value = '';
+            input.blur();
+        }
+        return;
+    }
+
+    if (!battleChatOpen) {
+        box.classList.add('hidden');
+        box.classList.remove('input-only');
+    }
 }
 
 function getSharedBattleChatRoomId() {
@@ -5754,7 +5789,6 @@ function spawnPlayer() {
     scene.add(playerShip);
     camera.lookAt(playerShip.position);
     updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
     console.log("Игрок заспавнен в:", spawn);
 }
 
@@ -6132,7 +6166,6 @@ function initBattleUI(){
 
 initBattleUI();
 initBattleChat();
-try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
 
 
 function renderProfileStats(){
@@ -6778,7 +6811,6 @@ function limitBattleArea(){
         if(resourceBar) resourceBar.style.display = gameState === 'ORBIT' ? 'flex' : 'none';
         if(ui) ui.style.display = 'none';
         updateBattlePlayerHud();
-    try{updateBattleChatInputVisibility && updateBattleChatInputVisibility();}catch(e){}
     };
     window.switchState = switchState;
 
