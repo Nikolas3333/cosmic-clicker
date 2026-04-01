@@ -428,23 +428,9 @@ function pushBattleChatMessage(author, text){
 }
 
 function setBattleChatOpen(open){
+    battleChatOpen = open;
     const box = document.getElementById('battle-chat-box');
     const input = document.getElementById('battle-chat-input');
-
-    if (!canOpenBattleChatInput()) {
-        battleChatOpen = false;
-        if (box) {
-            box.classList.add('hidden');
-            box.classList.remove('input-only');
-        }
-        if (input) {
-            input.value = '';
-            input.blur();
-        }
-        return;
-    }
-
-    battleChatOpen = open;
 
     const inputOnlyMode = gameState === 'BATTLE' || gameState === 'OBSERVE';
 
@@ -566,8 +552,9 @@ function initBattleChat(){
         if(e.key === 'Enter'){
             if(e.repeat) return;
             if(!battleChatOpen){
-                if (!canOpenBattleChatInput()) {
+                if(gameState === 'OBSERVE' && !canWriteInObserverChat()) {
                     e.preventDefault();
+                    pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                     return;
                 }
                 e.preventDefault();
@@ -701,10 +688,7 @@ function clearBattleScene(){
     resetBattleInputState();
     battleChatOpen = false;
     const chatBox = document.getElementById('battle-chat-box');
-    if(chatBox) {
-        chatBox.classList.add('hidden');
-        chatBox.classList.remove('input-only');
-    }
+    if(chatBox) chatBox.classList.add('hidden');
     const cross = document.getElementById('battle-crosshair');
     if(cross) cross.style.display = 'block';
     const hud = document.getElementById('enemy-hud');
@@ -879,7 +863,6 @@ if(gameState === "BATTLE"){
     battleObserverMode = false;
     enterBattleMap(targetMap);
     initBattleChat();
-    refreshBattleChatInputAccess();
     if(battleObserverMode){
         setupObserverBattle(targetMap);
         const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
@@ -908,7 +891,6 @@ if(gameState === "OBSERVE"){
     }
     const targetMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "Земля";
     setupObserverBattle(targetMap);
-    refreshBattleChatInputAccess();
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
@@ -3250,34 +3232,6 @@ function canWriteBattleAnnouncementChatByRole(role = "player") {
     return normalizedRole === "adm" || normalizedRole === "owr";
 }
 
-function canOpenBattleChatInput() {
-    if (gameState === "OBSERVE") return !!canWriteInObserverChat();
-    if (gameState === "BATTLE") return !!canWriteBattleAnnouncementChat();
-    return false;
-}
-
-function refreshBattleChatInputAccess() {
-    const box = document.getElementById('battle-chat-box');
-    const input = document.getElementById('battle-chat-input');
-    if (!box) return;
-
-    if (!canOpenBattleChatInput()) {
-        battleChatOpen = false;
-        box.classList.add('hidden');
-        box.classList.remove('input-only');
-        if (input) {
-            input.value = '';
-            input.blur();
-        }
-        return;
-    }
-
-    if (!battleChatOpen) {
-        box.classList.add('hidden');
-        box.classList.remove('input-only');
-    }
-}
-
 function getSharedBattleChatRoomId() {
     const mapName = String(
         currentRoom?.real ||
@@ -4335,10 +4289,22 @@ function renderLobbyMessages() {
 
 function updateLobbyChatComposerVisibility() {
     const chatInputAreaEl = document.getElementById("chat-input-area");
+    const chatInputEl = document.getElementById("chat-input");
+    const chatSendEl = document.getElementById("chat-send");
     if (!chatInputAreaEl) return;
 
     const shouldHide = (currentChat === "battle" && !canWriteBattleAnnouncementChat()) || (currentChat === "clan" && !canUseClanChat());
     chatInputAreaEl.classList.toggle("chat-composer-hidden", shouldHide);
+
+    if (shouldHide) {
+        if (chatInputEl) {
+            chatInputEl.value = "";
+            chatInputEl.blur();
+        }
+        if (chatSendEl) {
+            chatSendEl.blur();
+        }
+    }
 }
 
 if (chatMessages && !chatMessages.dataset.playerActionsBound) {
@@ -4736,6 +4702,11 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
 
     if (scope.channel === "battle") {
         if (battleObserverMode && !canWriteInObserverChat()) {
+            return false;
+        }
+        if (!battleObserverMode && !canWriteBattleAnnouncementChat()) {
+            addSystemLobbyChatMessage("⚠ У вас нет прав писать в Battle чат.");
+            updateLobbyChatComposerVisibility?.();
             return false;
         }
     }
