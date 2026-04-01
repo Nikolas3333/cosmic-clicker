@@ -530,7 +530,14 @@ async function sendSceneMapMessage(text, options = {}) {
         renderChatTabs();
     }
 
-    return true;
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
 }
 
 function initBattleChat(){
@@ -3289,7 +3296,14 @@ function getBattleChatRoomId() {
 }
 
 function canWriteSceneMapChat() {
-    if (gameState === "BATTLE") return true;
+    if (gameState === "BATTLE") 
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
     if (gameState === "OBSERVE") return canWriteInObserverChat();
     return false;
 }
@@ -3640,7 +3654,14 @@ function wasLocalHandledChatMessage(id) {
     if (!key) return false;
     if (!localHandledChatMessageIds.has(key)) return false;
     localHandledChatMessageIds.delete(key);
-    return true;
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
 }
 
 function pushChatToCache(scope, msg) {
@@ -3674,7 +3695,14 @@ function pushChatToCache(scope, msg) {
     list.push(msg);
     list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
-    return true;
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
 }
 
 function formatChatTime(dateStr) {
@@ -4278,7 +4306,14 @@ function renderBattleMessages() {
     if (!battleLog) return;
     const activeRoomId = String(getBattleChatRoomId() || '');
     const visibleMessages = chatCache.battle.filter(msg => {
-        if (!activeRoomId) return true;
+        if (!activeRoomId) 
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
         return String(msg?.room_id || '') === activeRoomId;
     });
     const distanceFromBottom = battleLog.scrollHeight - battleLog.scrollTop - battleLog.clientHeight;
@@ -4720,7 +4755,14 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     }
 
     if (!forcedScopeName && chatInput) chatInput.value = "";
-    return true;
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
 }
 
 function openPrivateChat(peerId, label = null) {
@@ -8474,7 +8516,14 @@ async function joinRoomPlayers(roomId) {
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
     console.log('room_players уже содержит игрока:', existingRows[0]);
-    return true;
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
   }
 
   const insertPayload = {
@@ -8503,7 +8552,14 @@ async function joinRoomPlayers(roomId) {
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
   }
-  return true;
+  
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
 }
 
 async function leaveRoomPlayers(roomId) {
