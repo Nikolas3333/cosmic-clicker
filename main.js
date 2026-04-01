@@ -3227,6 +3227,11 @@ function canWriteBattleAnnouncementChat() {
     return role === "adm" || role === "owr";
 }
 
+function canWriteBattleAnnouncementChatByRole(role = "player") {
+    const normalizedRole = normalizeStaffRole(role);
+    return normalizedRole === "adm" || normalizedRole === "owr";
+}
+
 function getSharedBattleChatRoomId() {
     const mapName = String(
         currentRoom?.real ||
@@ -3711,6 +3716,17 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
         prefix = '<span class="chat-sep">→</span> ';
     }
 
+    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    if (isGlobalStaffAnnouncement) {
+        return `
+          <div class="chat-line${lineClass}" data-message-id="${msg.id}">
+            ${prefix}${roleBadge}
+            <span class="chat-time">[${time}]</span>
+            <span class="chat-text">${text}</span>
+          </div>
+        `;
+    }
+
     const idHtml = publicId ? `<span class="chat-id">[${safePublicId}]</span>` : '';
     return `
       <div class="chat-line${lineClass}" data-message-id="${msg.id}">
@@ -3733,8 +3749,9 @@ function buildBattleChatMessageHtml(msg) {
     const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
+    const isGlobalStaffAnnouncement = String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
 
-    if (shouldHideStaffIdentityInObserve(publicId, msg.staff_role)) {
+    if (shouldHideStaffIdentityInObserve(publicId, msg.staff_role) || isGlobalStaffAnnouncement) {
         return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
     }
 
@@ -4360,11 +4377,12 @@ function showSceneMapMessageInActiveScene(msg) {
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const visibleRoleBadge = roleBadge;
+    const isGlobalStaffAnnouncement = incomingSceneRoomId === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
     const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
-    item.innerHTML = shouldHideStaffIdentityInObserve(publicId, msg.staff_role)
+    item.innerHTML = (shouldHideStaffIdentityInObserve(publicId, msg.staff_role) || isGlobalStaffAnnouncement)
         ? `${visibleRoleBadge}<span class="chat-text">${text}</span>`
         : `${visibleRoleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
