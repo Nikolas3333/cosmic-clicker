@@ -573,12 +573,10 @@ function initBattleChat(){
                     let sent = false;
 
                     if(gameState === 'BATTLE'){
-                        sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
-
-                        if(sent && canWriteBattleAnnouncementChat()){
-                            try{
-                                await sendMessage('battle', text);
-                            }catch(_){}
+                        if (canWriteBattleAnnouncementChat()) {
+                            sent = await sendMessage('battle', text);
+                        } else {
+                            sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
                         }
                     }else if(gameState === 'OBSERVE'){
                         if(!canWriteInObserverChat()) {
@@ -4345,7 +4343,9 @@ function showBattleAnnouncementInActiveScene(msg) {
 function showSceneMapMessageInActiveScene(msg) {
     if (!msg) return;
     if (gameState !== "BATTLE" && gameState !== "OBSERVE") return;
-    if (String(msg.room_id || "") !== String(getSceneChatRoomId() || "")) return;
+    const activeSceneRoomId = String(getSceneChatRoomId() || "").trim();
+    const incomingSceneRoomId = String(msg.room_id || "").trim();
+    if (incomingSceneRoomId !== "__all__" && incomingSceneRoomId !== activeSceneRoomId) return;
 
     const feed = document.getElementById('kill-feed');
     if (!feed) return;
@@ -4704,9 +4704,10 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         return false;
     }
 
-    const { error } = await window.supabaseClient
+    const { data, error } = await window.supabaseClient
         .from("chat_messages")
-        .insert(payload);
+        .insert(payload)
+        .select('*');
 
     if (error) {
         console.error("❌ Ошибка отправки сообщения:", error);
@@ -4715,10 +4716,44 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         return false;
     }
 
+    const insertedRow = Array.isArray(data) && data.length ? data[0] : null;
+
+    if (scope.channel === "battle" && insertedRow) {
+        markLocalHandledChatMessage(insertedRow.id);
+    }
+
+    if (scope.channel === "battle" && insertedRow && insertedRow.room_id === '__all__' && canWriteBattleAnnouncementChat()) {
+        const sceneBroadcastPayload = {
+            channel: "scene",
+            room_id: "__all__",
+            player_id: payload.player_id,
+            player_public_id: payload.player_public_id,
+            recipient_public_id: null,
+            player_nickname: payload.player_nickname,
+            staff_role: getOwnStaffRole(),
+            message: text
+        };
+
+        const { data: sceneBroadcastData, error: sceneBroadcastError } = await window.supabaseClient
+            .from("chat_messages")
+            .insert(sceneBroadcastPayload)
+            .select('*');
+
+        if (!sceneBroadcastError) {
+            const insertedSceneBroadcast = Array.isArray(sceneBroadcastData) && sceneBroadcastData.length ? sceneBroadcastData[0] : null;
+            if (insertedSceneBroadcast) {
+                markLocalHandledChatMessage(insertedSceneBroadcast.id);
+                showSceneMapMessageInActiveScene(insertedSceneBroadcast);
+            }
+        } else {
+            console.error("❌ Ошибка отправки глобального scene сообщения:", sceneBroadcastError);
+        }
+    }
+
     markChatMessageSentNow();
 
     if (scope.channel === "battle") {
-        const optimisticMessage = {
+        const battleMessage = insertedRow || {
             id: `local-${Date.now()}`,
             channel: "battle",
             room_id: payload.room_id,
@@ -4728,12 +4763,12 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
             staff_role: getOwnStaffRole(),
             message: text
         };
-        pushChatToCache(scope, optimisticMessage);
+        pushChatToCache(scope, battleMessage);
         if (currentChat === "battle") {
             renderLobbyMessages();
         }
         renderBattleMessages?.();
-        showBattleAnnouncementInActiveScene(optimisticMessage);
+        showBattleAnnouncementInActiveScene(battleMessage);
     }
 
     if (scope.channel === "battle") {
