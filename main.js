@@ -530,14 +530,13 @@ async function sendSceneMapMessage(text, options = {}) {
         renderChatTabs();
     }
 
-    
-try {
-    renderBattleMessages && renderBattleMessages();
-    renderLobbyMessages && renderLobbyMessages();
-    renderChatTabs && renderChatTabs();
-} catch(e){}
+    try {
+        renderBattleMessages?.();
+        renderLobbyMessages?.();
+        renderChatTabs?.();
+    } catch (_) {}
 
-return true;
+    return true;
 }
 
 function initBattleChat(){
@@ -3296,14 +3295,7 @@ function getBattleChatRoomId() {
 }
 
 function canWriteSceneMapChat() {
-    if (gameState === "BATTLE") 
-try {
-    renderBattleMessages && renderBattleMessages();
-    renderLobbyMessages && renderLobbyMessages();
-    renderChatTabs && renderChatTabs();
-} catch(e){}
-
-return true;
+    if (gameState === "BATTLE") return true;
     if (gameState === "OBSERVE") return canWriteInObserverChat();
     return false;
 }
