@@ -428,9 +428,23 @@ function pushBattleChatMessage(author, text){
 }
 
 function setBattleChatOpen(open){
-    battleChatOpen = open;
     const box = document.getElementById('battle-chat-box');
     const input = document.getElementById('battle-chat-input');
+
+    if (!canOpenBattleChatInput()) {
+        battleChatOpen = false;
+        if (box) {
+            box.classList.add('hidden');
+            box.classList.remove('input-only');
+        }
+        if (input) {
+            input.value = '';
+            input.blur();
+        }
+        return;
+    }
+
+    battleChatOpen = open;
 
     const inputOnlyMode = gameState === 'BATTLE' || gameState === 'OBSERVE';
 
@@ -450,6 +464,37 @@ function setBattleChatOpen(open){
         }else{
             input.blur();
         }
+    }
+}
+
+
+function canOpenBattleChatInput() {
+    if (gameState === "OBSERVE") return !!canWriteInObserverChat?.();
+    if (gameState === "BATTLE") return !!canWriteBattleAnnouncementChat?.();
+    return false;
+}
+
+function updateBattleChatInputVisibility() {
+    const box = document.getElementById('battle-chat-box');
+    const input = document.getElementById('battle-chat-input');
+    if (!box) return;
+
+    const shouldShow = canOpenBattleChatInput();
+
+    if (!shouldShow) {
+        battleChatOpen = false;
+        box.classList.add('hidden');
+        box.classList.remove('input-only');
+        if (input) {
+            input.value = '';
+            input.blur();
+        }
+        return;
+    }
+
+    if (gameState === 'BATTLE' || gameState === 'OBSERVE') {
+        box.classList.remove('hidden');
+        box.classList.add('input-only');
     }
 }
 
@@ -552,9 +597,9 @@ function initBattleChat(){
         if(e.key === 'Enter'){
             if(e.repeat) return;
             if(!battleChatOpen){
-                if(gameState === 'OBSERVE' && !canWriteInObserverChat()) {
+                if (!canOpenBattleChatInput()) {
                     e.preventDefault();
-                    pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
+                    updateBattleChatInputVisibility();
                     return;
                 }
                 e.preventDefault();
@@ -688,7 +733,10 @@ function clearBattleScene(){
     resetBattleInputState();
     battleChatOpen = false;
     const chatBox = document.getElementById('battle-chat-box');
-    if(chatBox) chatBox.classList.add('hidden');
+    if(chatBox) {
+        chatBox.classList.add('hidden');
+        chatBox.classList.remove('input-only');
+    }
     const cross = document.getElementById('battle-crosshair');
     if(cross) cross.style.display = 'block';
     const hud = document.getElementById('enemy-hud');
@@ -846,6 +894,7 @@ function switchState(newState){
 if(gameState === "BATTLE"){
     if(battleScreen) battleScreen.style.display = "block";
     updateBattlePlayerHud();
+    updateBattleChatInputVisibility();
 
     if(canvas){
         canvas.style.display = "block";
@@ -879,6 +928,7 @@ if(gameState === "BATTLE"){
 if(gameState === "OBSERVE"){
     battleObserverMode = true;
     updateBattlePlayerHud();
+    updateBattleChatInputVisibility();
     if(battleScreen) battleScreen.style.display = "block";
     if(canvas){
         canvas.style.display = "block";
