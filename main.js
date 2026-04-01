@@ -3702,8 +3702,10 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const ownId = getOwnPublicChatId();
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
-    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
+    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role) || isGlobalStaffAnnouncement;
+    const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
     const nickAttrs = publicId
         ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
@@ -3716,7 +3718,6 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
         prefix = '<span class="chat-sep">→</span> ';
     }
 
-    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
     if (isGlobalStaffAnnouncement) {
         return `
           <div class="chat-line${lineClass}" data-message-id="${msg.id}">
@@ -3745,11 +3746,11 @@ function buildBattleChatMessageHtml(msg) {
     const time = formatChatTime(msg.created_at);
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role);
+    const isGlobalStaffAnnouncement = String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role) || isGlobalStaffAnnouncement;
     const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
-    const isGlobalStaffAnnouncement = String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
 
     if (shouldHideStaffIdentityInObserve(publicId, msg.staff_role) || isGlobalStaffAnnouncement) {
         return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
@@ -4371,13 +4372,13 @@ function showSceneMapMessageInActiveScene(msg) {
     const text = escapeChatHtml(msg.message || "");
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role);
+    const isGlobalStaffAnnouncement = incomingSceneRoomId === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role) || isGlobalStaffAnnouncement;
     const roleBadge = showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const visibleRoleBadge = roleBadge;
-    const isGlobalStaffAnnouncement = incomingSceneRoomId === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
 
     const item = document.createElement('div');
     item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
