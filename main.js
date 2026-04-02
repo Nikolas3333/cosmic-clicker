@@ -107,6 +107,7 @@ let observerCameraTarget = new THREE.Vector3();
 let observerFreeCameraPosition = new THREE.Vector3(0, 18, 48);
 let battlePlanetVisualScale = 1;
 let battleShipCrash = null;
+let battlePendingRespawnAt = 0;
 
 const authState = {
     mode: 'guest',
@@ -689,6 +690,7 @@ function clearBattleScene(){
     battleChatOpen = false;
     const chatBox = document.getElementById('battle-chat-box');
     if(chatBox) chatBox.classList.add('hidden');
+    closeBattlePauseMenu?.();
     const cross = document.getElementById('battle-crosshair');
     if(cross) cross.style.display = 'block';
     const hud = document.getElementById('enemy-hud');
@@ -745,6 +747,7 @@ function clearBattleScene(){
     observerCameraDistance = 34;
     battlePlanetVisualScale = 1;
     battleShipCrash = null;
+    battlePendingRespawnAt = 0;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
     battleWeapon.isReloading = false;
     battleWeapon.reloadEndsAt = 0;
@@ -2166,6 +2169,8 @@ function handlePlanetDestroyed(){
 /* ================= DEBUG MENU ================= */
 
 function createDebugMenu(){
+    return;
+
 
 const panel = document.createElement("div");
 
@@ -2209,7 +2214,7 @@ updateUI();
 
 }
 
-createDebugMenu();
+// createDebugMenu();
 
 /* ================= SAVE SYSTEM ================= */
 
@@ -2534,9 +2539,11 @@ const BATTLE_LIMIT = 920;
 
 if (gameState === "BATTLE" && playerShip) {
     updateBattleReloadState();
+    updateBattleRespawnState();
+    updateBattlePlayerWorldHp();
     if(battleShipCrash){
         updateShipCrashAnimation();
-    } else {
+    } else if(!isBattleRespawning()) {
     if(firing) tryFireLaser();
 
     const yawStep = 0.0021 * gameSettings.mouseSensitivity;
@@ -2644,12 +2651,10 @@ if (gameState === "BATTLE" && playerShip) {
                 battleStats.playerDeaths += 1;
                 pushKillFeed(`${enemyBot?.userData?.name || 'Drone_x1'} уничтожил ${player?.nickname || 'Commander'}`);
                 updateBattleScoreboard();
-                playerHp = playerMaxHp;
                 if(playerShip){
                     spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
-                    playerShip.position.copy(spawnPointA);
                 }
-                shipVelocity.set(0,0,0);
+                scheduleBattleRespawn(2000);
             }
             scene.remove(laser.mesh);
             enemyLasers.splice(i, 1);
@@ -2751,6 +2756,52 @@ function formatAmmoReserve(){
     return battleWeapon.reserveAmmo === Infinity ? '∞' : String(battleWeapon.reserveAmmo);
 }
 
+function isBattleRespawning(){
+    return battlePendingRespawnAt && Date.now() < battlePendingRespawnAt;
+}
+
+function scheduleBattleRespawn(delayMs=2000){
+    battlePendingRespawnAt = Date.now() + Math.max(0, delayMs);
+    if(playerShip){
+        playerShip.visible = false;
+        playerShip.position.set(99999,99999,99999);
+    }
+    shipVelocity.set(0,0,0);
+    firing = false;
+    updateBattlePlayerHud();
+}
+
+function updateBattleRespawnState(){
+    if(!battlePendingRespawnAt) return;
+    const remain = battlePendingRespawnAt - Date.now();
+    if(remain > 0){
+        const reloadText = document.getElementById('battle-reload-text');
+        if(reloadText) reloadText.textContent = `Респавн через ${(remain / 1000).toFixed(1)}с`;
+        return;
+    }
+    battlePendingRespawnAt = 0;
+    playerHp = playerMaxHp;
+    spawnPlayer();
+    updateBattlePlayerHud();
+}
+
+function updateBattlePlayerWorldHp(){
+    const wrap = document.getElementById('battle-player-world-hp');
+    const fill = document.getElementById('battle-player-world-hp-fill');
+    if(!wrap || !fill) return;
+    const visible = gameState === 'BATTLE' && !battleObserverMode && !!playerShip && playerShip.visible !== false;
+    wrap.classList.toggle('hidden', !visible);
+    if(!visible) return;
+    const pos = playerShip.position.clone();
+    pos.y += 3.1;
+    pos.project(camera);
+    const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+    wrap.style.transform = `translate(${Math.round(x - 60)}px, ${Math.round(y)}px)`;
+    const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
+    fill.style.width = hpPercent + '%';
+}
+
 function updateBattlePlayerHud(){
     const hud = document.getElementById('battle-player-hud');
     const hpFill = document.getElementById('battle-player-hp-fill');
@@ -2767,8 +2818,11 @@ function updateBattlePlayerHud(){
     hpText.textContent = `HP: ${Math.round(playerHp)} / ${playerMaxHp}`;
     ammoText.textContent = `Боеприпасы: ${battleWeapon.ammoInClip} / ${battleWeapon.clipSize} | запас ${formatAmmoReserve()}`;
     damageText.textContent = `Урон: ${battleWeapon.damage}`;
-    if(battleShipCrash){
-        reloadText.textContent = 'Корабль разбивается...';
+    if(isBattleRespawning()){
+        const remain = Math.max(0, battlePendingRespawnAt - Date.now());
+        reloadText.textContent = `Респавн через ${(remain / 1000).toFixed(1)}с`;
+    }else if(battleShipCrash){
+        reloadText.textContent = 'Корабль уничтожен';
     }else if(battleWeapon.isReloading){
         const remain = Math.max(0, battleWeapon.reloadEndsAt - Date.now());
         reloadText.textContent = `Перезарядка: ${(remain / 1000).toFixed(1)}с`;
@@ -2778,7 +2832,7 @@ function updateBattlePlayerHud(){
 }
 
 function startBattleReload(force=false){
-    if(gameState !== 'BATTLE' || !playerShip || battleShipCrash) return;
+    if(gameState !== 'BATTLE' || !playerShip || battleShipCrash || isBattleRespawning()) return;
     if(battleWeapon.isReloading) return;
     if(!force && battleWeapon.ammoInClip >= battleWeapon.clipSize) return;
     battleWeapon.isReloading = true;
@@ -2795,30 +2849,19 @@ function updateBattleReloadState(){
 }
 
 function startShipCrashAnimation(){
-    if(!playerShip || !battleMapPlanet || battleShipCrash) return;
-    battleShipCrash = {
-        startAt: Date.now(),
-        duration: 1800,
-        startPosition: playerShip.position.clone(),
-        targetPosition: battleMapPlanet.position.clone().add(playerShip.position.clone().sub(battleMapPlanet.position).normalize().multiplyScalar((battleMapPlanet.userData?.crashRadius || 0.1) - 0.4))
-    };
-    firing = false;
-    shipVelocity.multiplyScalar(0);
+    if(!playerShip || !battleMapPlanet || battleShipCrash || isBattleRespawning()) return;
+    battleShipCrash = { startAt: Date.now(), duration: 250 };
+    spawnShipDebris(playerShip.position.clone(), 0xffa36a);
+    battleStats.playerDeaths += 1;
+    updateBattleScoreboard();
     pushKillFeed(`${player?.nickname || 'Commander'} разбился о планету`, 'kill');
+    scheduleBattleRespawn(2000);
 }
 
 function updateShipCrashAnimation(){
-    if(!battleShipCrash || !playerShip) return;
-    const t = THREE.MathUtils.clamp((Date.now() - battleShipCrash.startAt) / battleShipCrash.duration, 0, 1);
-    playerShip.position.lerpVectors(battleShipCrash.startPosition, battleShipCrash.targetPosition, t);
-    playerShip.rotation.z += 0.18;
-    playerShip.rotation.x += 0.06;
-    if(t >= 1){
-        spawnShipDebris(playerShip.position.clone(), 0xffa36a);
-        battleStats.playerDeaths += 1;
-        updateBattleScoreboard();
+    if(!battleShipCrash) return;
+    if(Date.now() - battleShipCrash.startAt >= battleShipCrash.duration){
         battleShipCrash = null;
-        spawnPlayer();
     }
 }
 
@@ -5559,7 +5602,7 @@ async function syncLiveBattlePlayers(){
         if(isMe) return;
         if(!entryId) return;
 
-        visiblePlayers.push(displayName);
+        visiblePlayers.push({ nickname: displayName, clan: '', level: 'LIVE', deaths: 0, kills: 0, id: entryId });
         activeIds.add(entryId);
         if(!remoteBattleShips.has(entryId)){
             remoteBattleShips.set(entryId, createRemoteBattleShipMesh(displayName, remoteBattleShips.size));
@@ -5573,7 +5616,7 @@ async function syncLiveBattlePlayers(){
     });
 
     if(currentRoom){
-        const nextPlayers = gameState === 'OBSERVE' ? [...visiblePlayers] : (visiblePlayers.length ? visiblePlayers : [getDisplayPlayerTag()]);
+        const nextPlayers = gameState === 'OBSERVE' ? [...visiblePlayers] : (visiblePlayers.length ? visiblePlayers : [{ nickname: getDisplayPlayerTag(), clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: player?.id || '' }]);
         currentRoom.currentPlayers = nextPlayers;
         currentRoom.players = [...nextPlayers];
     }
@@ -5680,24 +5723,29 @@ function updateBattleScoreboard(){
 
     const normalizedPlayers = roomPlayers.length
         ? roomPlayers
-        : (gameState === 'OBSERVE' ? [] : [player?.nickname || 'Commander']);
+        : (gameState === 'OBSERVE' ? [] : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: player?.id || '' }]);
 
     if(gameState === 'OBSERVE' && !normalizedPlayers.length){
-      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span>[---]</span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>-</span><span>-</span></div>';
+      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>-</span></div>';
       return;
     }
 
-    body.innerHTML = normalizedPlayers.map((name, index) => {
-      const safeName = String(name?.name || name || `Pilot ${index + 1}`);
-      const isYou = safeName === (player?.nickname || 'Commander') || safeName === (typeof getDisplayPlayerTag === 'function' ? getDisplayPlayerTag() : 'Commander');
+    body.innerHTML = normalizedPlayers.map((entry, index) => {
+      const safeName = String(entry?.nickname || entry?.name || entry || `Pilot ${index + 1}`);
+      const entryId = String(entry?.player_id || entry?.id || '').trim();
+      const myId = String(player?.id || authState?.playerId || '').trim();
+      const isYou = safeName === (player?.nickname || 'Commander') || !!(entryId && myId && entryId === myId);
+      const clan = String(entry?.clan || '').trim();
+      const kills = isYou ? battleStats.playerKills : Number(entry?.kills || 0);
+      const deaths = isYou ? battleStats.playerDeaths : Number(entry?.deaths || 0);
+      const level = isYou ? (player?.level || 1) : (entry?.level || 'LIVE');
       return `
       <div class="battle-scoreboard-row ${isYou ? 'player' : 'enemy'}">
-        <span>${isYou ? '[YOU]' : '[PLY]'}</span>
+        <span>${clan}</span>
         <span>${safeName}</span>
-        <span>${isYou ? battleStats.playerKills : 0}</span>
-        <span>${isYou ? battleStats.playerDeaths : 0}</span>
-        <span>${isYou ? player?.level || 1 : 'LIVE'}</span>
-        <span>${isYou ? (player?.id || '1001') : 'LIVE'}</span>
+        <span>${kills}</span>
+        <span>${deaths}</span>
+        <span>${level}</span>
       </div>`;
     }).join('');
 }
@@ -6104,18 +6152,57 @@ window.addEventListener('load', () => {
 });
 
 
+function closeBattlePauseMenu(){
+    const menu = document.getElementById('battle-pause-menu');
+    if(menu) menu.classList.add('hidden');
+}
+
+function toggleBattlePauseMenu(forceOpen=null){
+    const menu = document.getElementById('battle-pause-menu');
+    if(!menu || (gameState !== 'BATTLE' && gameState !== 'OBSERVE')) return;
+    const shouldOpen = forceOpen === null ? menu.classList.contains('hidden') : !!forceOpen;
+    menu.classList.toggle('hidden', !shouldOpen);
+    if(shouldOpen){
+        if(document.pointerLockElement) document.exitPointerLock();
+    }else{
+        const canvas = document.querySelector('canvas');
+        if(canvas && gameState === 'BATTLE') setTimeout(() => safeRequestPointerLock(canvas), 40);
+    }
+}
+
 function initBattleUI(){
     const battleExitBtn = document.getElementById('battle-exit-btn');
+    const battleLeaveBtn = document.getElementById('battle-leave-map-btn');
+    const battleSaveBtn = document.getElementById('battle-save-settings-btn');
+    const battleOpenSettingsBtn = document.getElementById('battle-open-settings-btn');
     const scoreboard = document.getElementById('battle-scoreboard');
 
-    if(battleExitBtn && !battleExitBtn.dataset.bound){
-        battleExitBtn.dataset.bound = '1';
-        battleExitBtn.addEventListener('click', async () => {
-            await cleanupCurrentBattleRoom();
-            switchState('LOBBY');
-            if(typeof renderRoomsInLobby === 'function'){
-                await renderRoomsInLobby(true);
-            }
+    const leaveMap = async () => {
+        closeBattlePauseMenu();
+        await cleanupCurrentBattleRoom();
+        switchState('LOBBY');
+        if(typeof renderRoomsInLobby === 'function'){
+            await renderRoomsInLobby(true);
+        }
+    };
+
+    [battleExitBtn, battleLeaveBtn].forEach(btn => {
+        if(btn && !btn.dataset.bound){
+            btn.dataset.bound = '1';
+            btn.addEventListener('click', leaveMap);
+        }
+    });
+
+    if(battleSaveBtn && !battleSaveBtn.dataset.bound){
+        battleSaveBtn.dataset.bound = '1';
+        battleSaveBtn.addEventListener('click', () => closeBattlePauseMenu());
+    }
+
+    if(battleOpenSettingsBtn && !battleOpenSettingsBtn.dataset.bound){
+        battleOpenSettingsBtn.dataset.bound = '1';
+        battleOpenSettingsBtn.addEventListener('click', () => {
+            const settingsWindow = document.getElementById('settings-window');
+            if(settingsWindow) settingsWindow.classList.remove('hidden');
         });
     }
 
@@ -6125,6 +6212,10 @@ function initBattleUI(){
             if(e.code === 'Tab'){
                 e.preventDefault();
                 if(scoreboard && (gameState === 'BATTLE' || gameState === 'OBSERVE')) scoreboard.classList.remove('hidden');
+            }
+            if(e.code === 'Escape' && (gameState === 'BATTLE' || gameState === 'OBSERVE') && !battleChatOpen){
+                e.preventDefault();
+                toggleBattlePauseMenu();
             }
         });
         document.addEventListener('keyup', (e) => {
