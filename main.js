@@ -318,7 +318,6 @@ function isBattlePlanetCaptureActive(){
 
 function startBattlePlanetCapture(){
     if(!playerShip || !battleMapPlanet || battleShipCrash || isBattleRespawning() || battlePlanetCapture) return;
-    const direction = battleMapPlanet.position.clone().sub(playerShip.position).normalize();
     const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
     battlePlanetCapture = {
         startedAt: Date.now(),
@@ -332,7 +331,6 @@ function startBattlePlanetCapture(){
         battlePlanetCapture.normal.set(0, 1, 0);
     }
     resetBattleInputState();
-    if(document.pointerLockElement) document.exitPointerLock();
 }
 
 function updateBattlePlanetCapture(){
@@ -2953,26 +2951,41 @@ function updateBattlePlanetEffects(){
     const toPlanet = battleMapPlanet.position.clone().sub(playerShip.position);
     const distance = toPlanet.length();
     const radius = battleMapPlanet.userData?.radius || 50;
-    const atmosphereRadius = battleMapPlanet.userData?.atmosphereRadius || radius + 26;
-    const crashRadius = battleMapPlanet.userData?.crashRadius || radius + 4;
-    const nearSurfaceRadius = battleMapPlanet.userData?.nearSurfaceRadius || radius + 10;
+    const atmosphereRadius = battleMapPlanet.userData?.atmosphereRadius || radius + 42;
+    const nearSurfaceRadius = battleMapPlanet.userData?.nearSurfaceRadius || radius + 14;
+    const crashRadius = battleMapPlanet.userData?.crashRadius || radius + 10;
+    const captureRadius = Math.max(crashRadius + 10, radius + 24);
 
     const scaleBoost = THREE.MathUtils.clamp(1 + ((320 - Math.max(0, distance - radius)) / 320) * 0.5, 1, 1.5);
     battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.08;
     battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
 
+    const towardPlanet = toPlanet.clone().normalize();
+    if(!Number.isFinite(towardPlanet.x) || towardPlanet.lengthSq() === 0) return;
+
     if(distance <= crashRadius){
+        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(crashRadius)));
+        shipVelocity.set(0, 0, 0);
         startShipCrashAnimation();
         return;
     }
 
+    if(distance <= captureRadius){
+        if(!battlePlanetCapture){
+            startBattlePlanetCapture();
+        }
+        const lockDistance = Math.max(crashRadius, radius + 10);
+        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(lockDistance)));
+        shipVelocity.set(0, 0, 0);
+        return;
+    }
+
     if(distance < atmosphereRadius){
-        const towardPlanet = toPlanet.clone().normalize();
-        const gravityStrength = THREE.MathUtils.clamp((atmosphereRadius - distance) / atmosphereRadius, 0, 1);
-        shipVelocity.add(towardPlanet.multiplyScalar(0.028 * gravityStrength));
+        const gravityStrength = THREE.MathUtils.clamp((atmosphereRadius - distance) / Math.max(1, atmosphereRadius - radius), 0, 1);
+        shipVelocity.add(towardPlanet.multiplyScalar(0.022 + gravityStrength * 0.038));
 
         if(distance < nearSurfaceRadius){
-            shipVelocity.multiplyScalar(0.96);
+            shipVelocity.multiplyScalar(0.92);
         }
     }
 }
@@ -5470,6 +5483,8 @@ function enterBattleMap(mapName){
     selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
 
     clearBattleScene();
+    battleStats.playerKills = 0;
+    battleStats.playerDeaths = 0;
 
     if(solarSystem && scene.children.includes(solarSystem)){
         scene.remove(solarSystem);
@@ -5811,7 +5826,7 @@ function updateBattleScoreboard(){
             : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '' }]);
 
     if(gameState === 'OBSERVE' && !normalizedPlayers.length){
-      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>—</span><span>0</span><span>0</span></div>';
+      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span></div>';
       return;
     }
 
@@ -5821,16 +5836,18 @@ function updateBattleScoreboard(){
       const myId = String(authState?.playerId || player?.id || '').trim();
       const isYou = (!!entryId && !!myId && entryId === myId) || safeName === (player?.nickname || 'Commander');
       const clan = String(entry?.clan || '').trim();
-      const kills = isYou ? battleStats.playerKills : Number(entry?.kills || 0);
-      const deaths = isYou ? battleStats.playerDeaths : Number(entry?.deaths || 0);
+      const kills = Math.max(0, isYou ? Number(battleStats.playerKills || 0) : Number(entry?.kills || 0));
+      const deaths = Math.max(0, isYou ? Number(battleStats.playerDeaths || 0) : Number(entry?.deaths || 0));
+      const levelValue = Math.max(1, Number(isYou ? (player?.level || entry?.level || 1) : (entry?.level || 1)) || 1);
       const publicId = isYou ? String(authState?.playerId || entryId || '') : entryId;
       return `
       <div class="battle-scoreboard-row ${isYou ? 'player' : 'enemy'}">
         <span>${clan}</span>
         <span title="${safeName}">${safeName}</span>
-        <span>${publicId || '—'}</span>
         <span>${kills}</span>
         <span>${deaths}</span>
+        <span class="battle-level-cell"><span class="battle-level-icon">★</span>${levelValue}</span>
+        <span>${publicId || '—'}</span>
       </div>`;
     }).join('');
 }
