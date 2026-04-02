@@ -1383,6 +1383,77 @@ canvas {
 #battle-crosshair span{ display:none; }
 #battle-exit-btn{ display:none !important; }
 #battle-exit-btn:hover{ background:rgba(18,36,68,0.95); }
+
+#battle-top-meta{
+    position:absolute;
+    top:16px;
+    left:20px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    color:#9cff4f;
+    text-shadow:0 0 8px rgba(120,255,90,0.22);
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.3px;
+}
+#battle-room-line{
+    color:#b8ff7b;
+}
+#battle-room-name{
+    color:#cfff8d;
+}
+#battle-room-datetime{
+    color:#d9ffd0;
+}
+#battle-ping-line{
+    color:#7dff4f;
+    font-size:14px;
+}
+#battle-top-actions{
+    position:absolute;
+    top:10px;
+    right:16px;
+    display:flex;
+    gap:8px;
+    pointer-events:auto;
+}
+.battle-top-action{
+    width:34px;
+    height:34px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:6px;
+    border:1px solid rgba(255,255,255,0.26);
+    background:rgba(18,22,30,0.72);
+    color:#fff;
+    font-size:18px;
+    cursor:pointer;
+    box-shadow:0 0 10px rgba(0,0,0,0.22);
+}
+.battle-top-action:hover{
+    filter:brightness(1.12);
+}
+#battle-sound-btn.muted{
+    color:#ff9c3b;
+    border-color:rgba(255,160,70,0.42);
+}
+#battle-player-world-name{
+    position:fixed;
+    z-index:9600;
+    padding:2px 8px;
+    font-size:18px;
+    font-weight:700;
+    color:#7dff7d;
+    text-shadow:0 0 8px rgba(0,0,0,0.85), 0 0 10px rgba(125,255,125,0.3);
+    pointer-events:none;
+    white-space:nowrap;
+}
+#battle-player-world-name.hidden{
+    display:none !important;
+}
+
 #enemy-hud{
     position:absolute;
     top:24px;
@@ -1905,7 +1976,7 @@ color:#ffd700;
 #battle-chat-box,
 #battle-chat-input{ pointer-events:auto; }
 
-#battle-scoreboard, #battle-chat-box, #battle-chat-input, #battle-pause-menu{ pointer-events:auto; }
+#battle-scoreboard, #battle-chat-box, #battle-chat-input, #battle-pause-menu, #battle-top-actions{ pointer-events:auto; }
 #battle-chat-box{
   position:fixed;
   right:18px;
@@ -3629,6 +3700,15 @@ shop-main-head{
 
 <div id="battle-screen" style="display:none;">
   <div id="battle-crosshair"></div>
+  <div id="battle-top-meta">
+    <div id="battle-room-line"><span id="battle-room-name">Комната</span> | <span id="battle-room-datetime">--/--/---- --:--</span></div>
+    <div id="battle-ping-line">ping: <span id="battle-ping-value">--</span></div>
+  </div>
+  <div id="battle-top-actions">
+    <button id="battle-fullscreen-btn" class="battle-top-action" type="button" title="Полный экран">◱</button>
+    <button id="battle-sound-btn" class="battle-top-action" type="button" title="Звук">🔊</button>
+    <button id="battle-settings-icon-btn" class="battle-top-action" type="button" title="Настройки">⚙</button>
+  </div>
   <div id="enemy-hud">
     <div id="enemy-name">BOT DRONE</div>
     <div id="enemy-hp-bar-wrap"><div id="enemy-hp-bar"></div></div>
@@ -3642,6 +3722,7 @@ shop-main-head{
     <div id="battle-damage-text">Урон: 12</div>
     <div id="battle-reload-text">R — перезарядка</div>
   </div>
+  <div id="battle-player-world-name" class="hidden"></div>
   <div id="battle-player-world-hp" class="hidden">
     <div id="battle-player-world-hp-fill"></div>
   </div>
