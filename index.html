@@ -1768,7 +1768,7 @@ color:#ffd700;
   position:fixed;
   top:16px;
   right:16px;
-  width:min(470px, calc(100vw - 32px));
+  width:min(540px, calc(100vw - 32px));
   z-index:60010;
   background:linear-gradient(180deg, rgba(5,12,26,0.94), rgba(10,22,44,0.90));
   border:1px solid rgba(98,223,255,0.30);
@@ -1782,7 +1782,7 @@ color:#ffd700;
 .battle-scoreboard-header,
 .battle-scoreboard-row{
   display:grid;
-  grid-template-columns:58px minmax(0,1fr) 64px 54px 60px;
+  grid-template-columns:58px minmax(0,1fr) 58px 62px 82px 64px;
   align-items:center;
 }
 .battle-scoreboard-header{
@@ -1795,6 +1795,7 @@ color:#ffd700;
 .battle-scoreboard-row span{
   min-width:0;
   padding:7px 8px;
+  text-align:left;
   border-right:1px solid rgba(255,255,255,0.06);
   white-space:nowrap;
   overflow:hidden;
@@ -1811,6 +1812,8 @@ color:#ffd700;
   background:linear-gradient(90deg, rgba(26,88,150,0.54), rgba(24,58,120,0.28));
 }
 .battle-scoreboard-row:hover{ filter:brightness(1.08); }
+.battle-level-cell{ display:flex; align-items:center; gap:6px; }
+.battle-level-icon{ color:#ffd54f; text-shadow:0 0 8px rgba(255,213,79,0.35); font-size:13px; line-height:1; }
 
 
 /* ===== V6 FIXES ===== */
@@ -3648,15 +3651,17 @@ shop-main-head{
       <span>НИК</span>
       <span>ФРАГИ</span>
       <span>СМЕРТИ</span>
+      <span>УРОВЕНЬ</span>
       <span>ID</span>
     </div>
     <div id="battle-scoreboard-body">
       <div class="battle-scoreboard-row enemy">
         <span></span>
         <span>На карте нет активных игроков</span>
+        <span>0</span>
+        <span>0</span>
         <span>—</span>
-        <span>0</span>
-        <span>0</span>
+        <span>—</span>
       </div>
     </div>
   </div>
