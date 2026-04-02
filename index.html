@@ -1407,8 +1407,13 @@ canvas {
     color:#d9ffd0;
 }
 #battle-ping-line{
+    position:absolute;
+    top:48px;
+    right:18px;
     color:#7dff4f;
     font-size:14px;
+    text-align:right;
+    z-index:60042;
 }
 #battle-top-actions{
     position:absolute;
@@ -1417,6 +1422,7 @@ canvas {
     display:flex;
     gap:8px;
     pointer-events:auto;
+    z-index:60045;
 }
 .battle-top-action{
     width:34px;
@@ -1476,11 +1482,7 @@ canvas {
 }
 
 #enemy-hp-bar-wrap{
-    width:100%;
-    height:12px;
-    background:rgba(255,255,255,0.12);
-    border-radius:999px;
-    overflow:hidden;
+    display:none;
 }
 
 #enemy-hp-bar{
@@ -1490,10 +1492,7 @@ canvas {
 }
 
 #enemy-hp-text{
-    margin-top:6px;
-    font-size:12px;
-    text-align:center;
-    color:#ffd6d6;
+    display:none;
 }
 
 
@@ -1837,7 +1836,7 @@ color:#ffd700;
 /* ===== COSMIC SCOREBOARD ===== */
 #battle-scoreboard{
   position:fixed;
-  top:16px;
+  top:8px;
   right:16px;
   width:min(540px, calc(100vw - 32px));
   z-index:60010;
@@ -1846,26 +1845,26 @@ color:#ffd700;
   box-shadow:0 0 22px rgba(0,195,255,0.16), inset 0 0 30px rgba(255,255,255,0.03);
   backdrop-filter:blur(5px);
   color:#f4f7fb;
-  font-size:12px;
+  font-size:11px;
   border-radius:14px;
   overflow:hidden;
 }
 .battle-scoreboard-header,
 .battle-scoreboard-row{
   display:grid;
-  grid-template-columns:58px minmax(0,1fr) 58px 62px 82px 64px;
+  grid-template-columns:50px minmax(0,1fr) 58px 62px 72px 44px;
   align-items:center;
 }
 .battle-scoreboard-header{
   background:linear-gradient(90deg, rgba(0,255,255,0.14), rgba(136,80,255,0.10));
   font-weight:bold;
   text-transform:uppercase;
-  letter-spacing:0.02em;
+  letter-spacing:0;
 }
 .battle-scoreboard-header span,
 .battle-scoreboard-row span{
   min-width:0;
-  padding:7px 8px;
+  padding:6px 6px;
   text-align:left;
   border-right:1px solid rgba(255,255,255,0.06);
   white-space:nowrap;
@@ -1933,7 +1932,7 @@ color:#ffd700;
 }
 #kill-feed{
   position:fixed;
-  top:18px;
+  top:72px;
   left:18px;
   width:380px;
   display:flex;
@@ -1957,7 +1956,21 @@ color:#ffd700;
 
 #battle-player-hud{ position:fixed; left:18px; bottom:18px; width:320px; padding:14px; border-radius:14px; background:rgba(8,18,35,0.88); border:1px solid rgba(120,220,255,0.2); box-shadow:0 0 16px rgba(0,180,255,0.14); color:#eef8ff; z-index:60015; display:none; }
 #battle-player-hp-wrap, #battle-player-hp-text{ display:none; }
-#battle-player-world-hp{ position:fixed; left:0; top:0; width:120px; height:10px; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.28); border-radius:999px; overflow:hidden; z-index:60035; pointer-events:none; }
+#battle-player-world-hp{
+  position:fixed;
+  left:50%;
+  bottom:22px;
+  transform:translateX(-50%);
+  width:min(560px, calc(100vw - 280px));
+  height:18px;
+  background:rgba(0,0,0,0.62);
+  border:1px solid rgba(255,255,255,0.28);
+  border-radius:999px;
+  overflow:hidden;
+  z-index:60035;
+  pointer-events:none;
+  box-shadow:0 0 12px rgba(0,0,0,0.24);
+}
 #battle-player-world-hp-fill{ width:100%; height:100%; background:linear-gradient(90deg,#39ff88,#ffe45e,#ff5c5c); }
 #battle-pause-menu{ position:fixed; inset:0; background:rgba(0,0,0,0.42); display:flex; align-items:center; justify-content:center; z-index:60070; pointer-events:auto; }
 #battle-pause-menu.hidden{ display:none !important; }
