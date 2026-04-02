@@ -108,6 +108,7 @@ let observerFreeCameraPosition = new THREE.Vector3(0, 18, 48);
 let battlePlanetVisualScale = 1;
 let battleShipCrash = null;
 let battlePendingRespawnAt = 0;
+let battlePlanetCapture = null;
 
 const authState = {
     mode: 'guest',
@@ -309,6 +310,44 @@ function isSettingsWindowOpen(){
 function isBattleMenuOpen(){
     const pauseMenu = document.getElementById('battle-pause-menu');
     return !!((pauseMenu && !pauseMenu.classList.contains('hidden')) || isSettingsWindowOpen());
+}
+
+function isBattlePlanetCaptureActive(){
+    return !!(battlePlanetCapture && !isBattleRespawning() && !battleShipCrash);
+}
+
+function startBattlePlanetCapture(){
+    if(!playerShip || !battleMapPlanet || battleShipCrash || isBattleRespawning() || battlePlanetCapture) return;
+    const direction = battleMapPlanet.position.clone().sub(playerShip.position).normalize();
+    const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
+    battlePlanetCapture = {
+        startedAt: Date.now(),
+        duration: 900,
+        freezeCameraPosition: camera.position.clone(),
+        freezeCameraLookAt: playerShip.position.clone().add(lookDirection.multiplyScalar(40)),
+        startPosition: playerShip.position.clone(),
+        normal: playerShip.position.clone().sub(battleMapPlanet.position).normalize()
+    };
+    if(!Number.isFinite(battlePlanetCapture.normal.x) || battlePlanetCapture.normal.lengthSq() === 0){
+        battlePlanetCapture.normal.set(0, 1, 0);
+    }
+    resetBattleInputState();
+    if(document.pointerLockElement) document.exitPointerLock();
+}
+
+function updateBattlePlanetCapture(){
+    if(!battlePlanetCapture || !playerShip || !battleMapPlanet) return;
+    const progress = THREE.MathUtils.clamp((Date.now() - battlePlanetCapture.startedAt) / battlePlanetCapture.duration, 0, 1);
+    const radius = battleMapPlanet.userData?.radius || 100;
+    const impactRadius = Math.max(radius + 8, battleMapPlanet.userData?.captureRadius || (radius + 26));
+    const target = battleMapPlanet.position.clone().add(battlePlanetCapture.normal.clone().multiplyScalar(impactRadius));
+    playerShip.position.lerp(target, 0.08 + progress * 0.16);
+    shipVelocity.set(0, 0, 0);
+    camera.position.copy(battlePlanetCapture.freezeCameraPosition);
+    camera.lookAt(battlePlanetCapture.freezeCameraLookAt);
+    if(progress >= 1){
+        startShipCrashAnimation();
+    }
 }
 
 
@@ -759,6 +798,7 @@ function clearBattleScene(){
     battlePlanetVisualScale = 1;
     battleShipCrash = null;
     battlePendingRespawnAt = 0;
+    battlePlanetCapture = null;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
     battleWeapon.isReloading = false;
     battleWeapon.reloadEndsAt = 0;
@@ -2582,6 +2622,8 @@ if (gameState === "BATTLE" && playerShip) {
     updateBattlePlayerWorldHp();
     if(battleShipCrash){
         updateShipCrashAnimation();
+    } else if(isBattlePlanetCaptureActive()){
+        updateBattlePlanetCapture();
     } else if(!isBattleRespawning()) {
     if(firing) tryFireLaser();
 
@@ -2754,7 +2796,7 @@ function playEffectSound(sound){
 
 function tryFireLaser(){
     const now = Date.now();
-    if(!playerShip || battleShipCrash || battleWeapon.isReloading || now - lastLaserShotAt < laserCooldown) return;
+    if(!playerShip || battleShipCrash || battleWeapon.isReloading || isBattlePlanetCaptureActive() || now - lastLaserShotAt < laserCooldown) return;
     if(battleWeapon.ammoInClip <= 0){
         startBattleReload();
         return;
@@ -2806,6 +2848,7 @@ function scheduleBattleRespawn(delayMs=2000){
         playerShip.position.set(99999,99999,99999);
     }
     shipVelocity.set(0,0,0);
+    battlePlanetCapture = null;
     firing = false;
     updateBattlePlayerHud();
 }
@@ -5763,29 +5806,31 @@ function updateBattleScoreboard(){
 
     const normalizedPlayers = roomPlayers.length
         ? roomPlayers
-        : (gameState === 'OBSERVE' ? [] : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: player?.id || '' }]);
+        : (gameState === 'OBSERVE'
+            ? []
+            : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '' }]);
 
     if(gameState === 'OBSERVE' && !normalizedPlayers.length){
-      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>-</span></div>';
+      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>—</span><span>0</span><span>0</span></div>';
       return;
     }
 
     body.innerHTML = normalizedPlayers.map((entry, index) => {
       const safeName = String(entry?.nickname || entry?.name || entry || `Pilot ${index + 1}`);
-      const entryId = String(entry?.player_id || entry?.id || '').trim();
-      const myId = String(player?.id || authState?.playerId || '').trim();
-      const isYou = safeName === (player?.nickname || 'Commander') || !!(entryId && myId && entryId === myId);
+      const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
+      const myId = String(authState?.playerId || player?.id || '').trim();
+      const isYou = (!!entryId && !!myId && entryId === myId) || safeName === (player?.nickname || 'Commander');
       const clan = String(entry?.clan || '').trim();
       const kills = isYou ? battleStats.playerKills : Number(entry?.kills || 0);
       const deaths = isYou ? battleStats.playerDeaths : Number(entry?.deaths || 0);
-      const level = isYou ? (player?.level || 1) : (entry?.level || 'LIVE');
+      const publicId = isYou ? String(authState?.playerId || entryId || '') : entryId;
       return `
       <div class="battle-scoreboard-row ${isYou ? 'player' : 'enemy'}">
         <span>${clan}</span>
-        <span>${safeName}</span>
+        <span title="${safeName}">${safeName}</span>
+        <span>${publicId || '—'}</span>
         <span>${kills}</span>
         <span>${deaths}</span>
-        <span>${level}</span>
       </div>`;
     }).join('');
 }
@@ -5832,9 +5877,11 @@ function spawnPlayer() {
     engineRight.position.x = 0.6;
     shipGroup.add(engineRight);
 
+    battlePlanetCapture = null;
     playerShip = shipGroup;
     const spawn = spawnPointA.clone();
     playerShip.position.copy(spawn);
+    playerShip.visible = true;
     playerShip.lookAt(spawnPointB.clone());
 
     playerControl.yaw = playerShip.rotation.y;
@@ -7004,6 +7051,8 @@ function limitBattleArea(){
         battleMapPlanet.userData.solidRadius = config.size + 14;
         battleMapPlanet.userData.atmosphereRadius = config.size + 96;
         battleMapPlanet.userData.nearSurfaceRadius = config.size + 22;
+        battleMapPlanet.userData.dangerRadius = config.size + 104;
+        battleMapPlanet.userData.captureRadius = config.size + 30;
         battleMapPlanet.userData.crashRadius = config.size + 14;
         scene.add(battleMapPlanet);
 
@@ -7081,25 +7130,16 @@ function limitBattleArea(){
                 if(velocityRef) velocityRef.multiplyScalar(0.42);
             }
         }
-        if(!battleMapPlanet) return;
+        if(!battleMapPlanet || object === playerShip) return;
         const delta = object.position.clone().sub(battleMapPlanet.position);
         const dist = delta.length();
         const solidRadius = battleMapPlanet.userData?.solidRadius || (battleMapPlanet.userData?.radius || 100);
-        const crashRadius = battleMapPlanet.userData?.crashRadius || solidRadius + 6;
-        if(object === playerShip && !battleShipCrash && dist <= crashRadius){
-            startShipCrashAnimation();
-            return;
-        }
         const minDist = solidRadius + 4.5;
         if(dist < minDist){
             const push = delta.normalize();
             if(!Number.isFinite(push.x)) push.set(0,1,0);
             object.position.copy(battleMapPlanet.position.clone().add(push.multiplyScalar(minDist)));
             if(velocityRef) velocityRef.multiplyScalar(0.18);
-            if(object === playerShip && !battleShipCrash){
-                startShipCrashAnimation();
-                return;
-            }
         }
     };
 
@@ -7108,30 +7148,29 @@ function limitBattleArea(){
         const toPlanet = battleMapPlanet.position.clone().sub(playerShip.position);
         const distance = toPlanet.length();
         const radius = battleMapPlanet.userData?.radius || 100;
-        const solidRadius = battleMapPlanet.userData?.solidRadius || radius + 14;
-        const atmosphereRadius = battleMapPlanet.userData?.atmosphereRadius || radius + 96;
-        const crashRadius = Math.max(battleMapPlanet.userData?.crashRadius || radius + 14, solidRadius);
+        const dangerRadius = battleMapPlanet.userData?.dangerRadius || radius + 104;
+        const captureRadius = battleMapPlanet.userData?.captureRadius || radius + 30;
         const nearSurfaceRadius = battleMapPlanet.userData?.nearSurfaceRadius || radius + 22;
 
-        const closeness = THREE.MathUtils.clamp((atmosphereRadius - distance) / atmosphereRadius, 0, 1);
+        const closeness = THREE.MathUtils.clamp((dangerRadius - distance) / dangerRadius, 0, 1);
         const scaleBoost = THREE.MathUtils.clamp(1 + closeness * 1.1, 1, 2.15);
         battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.1;
         battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
 
-        if(distance <= crashRadius){
-            const push = playerShip.position.clone().sub(battleMapPlanet.position);
-            if(!Number.isFinite(push.x) || push.lengthSq() === 0) push.set(0, 1, 0);
-            playerShip.position.copy(battleMapPlanet.position.clone().add(push.normalize().multiplyScalar(solidRadius + 5)));
-            shipVelocity.multiplyScalar(0.12);
-            startShipCrashAnimation();
+        if(isBattlePlanetCaptureActive()){
             return;
         }
 
-        if(distance < atmosphereRadius){
+        if(distance <= captureRadius){
+            startBattlePlanetCapture();
+            return;
+        }
+
+        if(distance < dangerRadius){
             const towardPlanet = toPlanet.clone().normalize();
-            shipVelocity.add(towardPlanet.multiplyScalar(0.055 * Math.max(0.12, closeness)));
+            shipVelocity.add(towardPlanet.multiplyScalar(0.065 * Math.max(0.16, closeness)));
             if(distance < nearSurfaceRadius){
-                shipVelocity.multiplyScalar(0.88);
+                shipVelocity.multiplyScalar(0.92);
             }
         }
     };
