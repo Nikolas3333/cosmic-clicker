@@ -1356,75 +1356,33 @@ canvas {
     position:absolute;
     left:50%;
     top:50%;
-    width:34px;
-    height:34px;
+    width:28px;
+    height:28px;
     transform:translate(-50%,-50%);
-    border:2px solid rgba(0,255,255,0.9);
+    border:2px solid rgba(0,255,255,0.92);
     border-radius:50%;
-    box-shadow:0 0 12px rgba(0,255,255,0.35);
+    box-shadow:0 0 14px rgba(0,255,255,0.32);
 }
-
 #battle-crosshair::before,
-
-#battle-exit-btn{ display:none !important; }
-#battle-exit-btn:hover{ background:rgba(18,36,68,0.95); }
-#battle-scoreboard{
-  position:fixed;
-  top:18px;
-  right:18px;
-  width:560px;
-  z-index:60010;
-  background:rgba(16,28,48,0.82);
-  border:1px solid rgba(140,210,255,0.22);
-  box-shadow:0 0 16px rgba(0,0,0,0.25);
-  backdrop-filter:blur(2px);
-  color:#f4f7fb;
-  font-size:14px;
-}
-.battle-scoreboard-header,
-.battle-scoreboard-row{
-  display:grid;
-  grid-template-columns:96px 1.5fr 90px 90px 110px;
-  align-items:center;
-}
-.battle-scoreboard-header{
-  background:rgba(255,255,255,0.12);
-  font-weight:bold;
-}
-.battle-scoreboard-header span,
-.battle-scoreboard-row span{
-  padding:6px 8px;
-  border-right:1px solid rgba(255,255,255,0.08);
-}
-.battle-scoreboard-row.enemy{
-  background:rgba(170,50,60,0.55);
-}
-.battle-scoreboard-row.player{
-  background:rgba(50,115,170,0.55);
-}
-
 #battle-crosshair::after{
     content:"";
     position:absolute;
+    left:50%;
+    top:50%;
     background:rgba(0,255,255,0.95);
+    transform:translate(-50%,-50%);
 }
-
 #battle-crosshair::before{
     width:2px;
-    height:42px;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
+    height:16px;
 }
-
 #battle-crosshair::after{
-    width:42px;
+    width:16px;
     height:2px;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
 }
-
+#battle-crosshair span{ display:none; }
+#battle-exit-btn{ display:none !important; }
+#battle-exit-btn:hover{ background:rgba(18,36,68,0.95); }
 #enemy-hud{
     position:absolute;
     top:24px;
@@ -1808,35 +1766,43 @@ color:#ffd700;
 /* ===== COSMIC SCOREBOARD ===== */
 #battle-scoreboard{
   position:fixed;
-  top:18px;
-  right:18px;
-  width:620px;
+  top:16px;
+  right:16px;
+  width:min(470px, calc(100vw - 32px));
   z-index:60010;
   background:linear-gradient(180deg, rgba(5,12,26,0.94), rgba(10,22,44,0.90));
   border:1px solid rgba(98,223,255,0.30);
   box-shadow:0 0 22px rgba(0,195,255,0.16), inset 0 0 30px rgba(255,255,255,0.03);
   backdrop-filter:blur(5px);
   color:#f4f7fb;
-  font-size:14px;
+  font-size:12px;
   border-radius:14px;
   overflow:hidden;
 }
 .battle-scoreboard-header,
 .battle-scoreboard-row{
   display:grid;
-  grid-template-columns:80px 1.55fr 70px 76px 76px 72px;
+  grid-template-columns:58px minmax(0,1fr) 64px 54px 60px;
   align-items:center;
 }
 .battle-scoreboard-header{
   background:linear-gradient(90deg, rgba(0,255,255,0.14), rgba(136,80,255,0.10));
   font-weight:bold;
   text-transform:uppercase;
-  letter-spacing:0.04em;
+  letter-spacing:0.02em;
 }
 .battle-scoreboard-header span,
 .battle-scoreboard-row span{
-  padding:8px 10px;
+  min-width:0;
+  padding:7px 8px;
   border-right:1px solid rgba(255,255,255,0.06);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.battle-scoreboard-header span:last-child,
+.battle-scoreboard-row span:last-child{
+  border-right:none;
 }
 .battle-scoreboard-row.enemy{
   background:linear-gradient(90deg, rgba(150,36,58,0.52), rgba(88,30,60,0.32));
@@ -3682,15 +3648,15 @@ shop-main-head{
       <span>НИК</span>
       <span>ФРАГИ</span>
       <span>СМЕРТИ</span>
-      <span>УРОВЕНЬ</span>
+      <span>ID</span>
     </div>
     <div id="battle-scoreboard-body">
       <div class="battle-scoreboard-row enemy">
         <span></span>
         <span>На карте нет активных игроков</span>
+        <span>—</span>
         <span>0</span>
         <span>0</span>
-        <span>-</span>
       </div>
     </div>
   </div>
