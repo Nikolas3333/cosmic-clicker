@@ -301,6 +301,16 @@ function resetBattleInputState(){
     mouseDeltaY = 0;
 }
 
+function isSettingsWindowOpen(){
+    const settingsWindow = document.getElementById('settings-window');
+    return !!(settingsWindow && !settingsWindow.classList.contains('hidden'));
+}
+
+function isBattleMenuOpen(){
+    const pauseMenu = document.getElementById('battle-pause-menu');
+    return !!((pauseMenu && !pauseMenu.classList.contains('hidden')) || isSettingsWindowOpen());
+}
+
 
 
 document.addEventListener("mousedown", (event) => {
@@ -308,6 +318,7 @@ document.addEventListener("mousedown", (event) => {
     if(gameState !== "BATTLE") return;
     if(battleObserverMode) return;
     if(isBattleTyping()) return;
+    if(isBattleMenuOpen()) return;
     event.preventDefault();
     firing = true;
     tryFireLaser();
@@ -813,6 +824,7 @@ function switchState(newState){
     windows.forEach(win => {
         if(win) win.classList.add("hidden");
     });
+    updateNicknameSettingsState?.();
 
     if(gameState === "AUTH"){
         if(authScreen) authScreen.style.display = "flex";
@@ -1305,14 +1317,14 @@ function applyAudioSettings(){
     mouseSensitivity = 0.004 * gameSettings.mouseSensitivity;
 
     bgMusic.muted = !gameSettings.musicEnabled;
-    bgMusic.volume = BASE_BG_MUSIC_VOLUME * gameSettings.musicVolume;
+    bgMusic.volume = gameSettings.musicEnabled ? gameSettings.musicVolume : 0;
 
     if(typeof clickSound !== "undefined" && clickSound.buffer){
-        clickSound.setVolume(BASE_CLICK_VOLUME * (gameSettings.soundEnabled ? gameSettings.soundVolume : 0));
+        clickSound.setVolume(gameSettings.soundEnabled ? gameSettings.soundVolume : 0);
     }
 
     if(typeof bossMusic !== "undefined" && bossMusic.buffer){
-        bossMusic.setVolume(BASE_BOSS_MUSIC_VOLUME * (gameSettings.musicEnabled ? gameSettings.musicVolume : 0));
+        bossMusic.setVolume(gameSettings.musicEnabled ? gameSettings.musicVolume : 0);
     }
 }
 
@@ -1349,8 +1361,18 @@ function initSettingsUI(){
         });
     }
 
-    if(closeSettings && settingsWindow){
-        closeSettings.addEventListener("click", () => {
+    if(closeSettings && settingsWindow && !closeSettings.dataset.bound){
+        closeSettings.dataset.bound = '1';
+        closeSettings.addEventListener("click", async () => {
+            if(gameState === 'BATTLE' || gameState === 'OBSERVE'){
+                settingsWindow.classList.add("hidden");
+                await cleanupCurrentBattleRoom();
+                switchState('LOBBY');
+                if(typeof renderRoomsInLobby === 'function'){
+                    await renderRoomsInLobby(true);
+                }
+                return;
+            }
             settingsWindow.classList.add("hidden");
         });
     }
@@ -1364,6 +1386,22 @@ function initSettingsUI(){
     if(premiumLogoutBtn && !premiumLogoutBtn.dataset.bound){
         premiumLogoutBtn.dataset.bound = '1';
         premiumLogoutBtn.addEventListener('click', () => logoutToAuth('Выход выполнен. Теперь можно сменить аккаунт или сервер.'));
+    }
+
+
+    const battleSettingsSaveBtn = document.getElementById('battle-settings-save-btn');
+    if(battleSettingsSaveBtn && !battleSettingsSaveBtn.dataset.bound){
+        battleSettingsSaveBtn.dataset.bound = '1';
+        battleSettingsSaveBtn.addEventListener('click', () => {
+            updateSettingsLabels();
+            applyAudioSettings();
+            saveGameSettings();
+            if(settingsWindow) settingsWindow.classList.add('hidden');
+            if((gameState === 'BATTLE' || gameState === 'OBSERVE') && !battleObserverMode){
+                const canvas = document.querySelector('canvas');
+                if(canvas) setTimeout(() => safeRequestPointerLock(canvas), 40);
+            }
+        });
     }
 
     if(mouseInput){
@@ -2027,6 +2065,7 @@ window.addEventListener("keydown",(e)=>{
 window.addEventListener("click",(event)=>{
 
     if(gameState !== "ORBIT" && gameState !== "BATTLE") return;
+    if(gameState === 'BATTLE' && isBattleMenuOpen()) return;
 
     if (bgMusic.paused && gameSettings.musicEnabled) {
         bgMusic.play().catch(() => {});
@@ -5411,9 +5450,10 @@ function enterBattleMap(mapName){
     battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
     battleMapPlanet.position.set(0, -6, -320);
     battleMapPlanet.userData.radius = config.size;
-    battleMapPlanet.userData.atmosphereRadius = config.size + 28;
-    battleMapPlanet.userData.nearSurfaceRadius = config.size + 11;
-    battleMapPlanet.userData.crashRadius = config.size + 4;
+    battleMapPlanet.userData.solidRadius = config.size + 10;
+    battleMapPlanet.userData.atmosphereRadius = config.size + 42;
+    battleMapPlanet.userData.nearSurfaceRadius = config.size + 14;
+    battleMapPlanet.userData.crashRadius = config.size + 10;
     scene.add(battleMapPlanet);
 
     if(mapKey === 'saturn'){
@@ -6215,7 +6255,19 @@ function initBattleUI(){
             }
             if(e.code === 'Escape' && (gameState === 'BATTLE' || gameState === 'OBSERVE') && !battleChatOpen){
                 e.preventDefault();
-                toggleBattlePauseMenu();
+                const settingsWindow = document.getElementById('settings-window');
+                if(!settingsWindow) return;
+                const shouldOpen = settingsWindow.classList.contains('hidden');
+                settingsWindow.classList.toggle('hidden', !shouldOpen);
+                updateNicknameSettingsState();
+                if(shouldOpen){
+                    if(scoreboard) scoreboard.classList.add('hidden');
+                    resetBattleInputState();
+                    if(document.pointerLockElement) document.exitPointerLock();
+                }else if(!battleObserverMode){
+                    const canvas = document.querySelector('canvas');
+                    if(canvas) setTimeout(() => safeRequestPointerLock(canvas), 40);
+                }
             }
         });
         document.addEventListener('keyup', (e) => {
@@ -6589,8 +6641,16 @@ function updatePremiumAccountInfo(){
 function updateNicknameSettingsState(message=''){
     const nicknameInput = document.getElementById('nickname-input');
     const nicknameStatus = document.getElementById('nickname-status');
+    const nicknameGroup = document.getElementById('settings-nickname-group');
+    const battleSaveBtn = document.getElementById('battle-settings-save-btn');
+    const closeSettings = document.getElementById('close-settings');
+    const inBattleMenu = gameState === 'BATTLE' || gameState === 'OBSERVE';
+
     if(nicknameInput) nicknameInput.value = player?.nickname || '';
     if(nicknameStatus) nicknameStatus.textContent = message || (player?.nickname || '—');
+    if(nicknameGroup) nicknameGroup.style.display = inBattleMenu ? 'none' : '';
+    if(battleSaveBtn) battleSaveBtn.style.display = inBattleMenu ? 'inline-flex' : 'none';
+    if(closeSettings) closeSettings.textContent = inBattleMenu ? 'Выйти с карты' : 'Закрыть';
     updatePremiumAccountInfo();
 }
 function logoutToAuth(message='Возврат в меню входа.'){
@@ -6941,10 +7001,10 @@ function limitBattleArea(){
         battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
         battleMapPlanet.position.set(0, -12, -230);
         battleMapPlanet.userData.radius = config.size;
-        battleMapPlanet.userData.solidRadius = config.size + 3;
-        battleMapPlanet.userData.atmosphereRadius = config.size + 90;
-        battleMapPlanet.userData.nearSurfaceRadius = config.size + 18;
-        battleMapPlanet.userData.crashRadius = config.size + 8;
+        battleMapPlanet.userData.solidRadius = config.size + 14;
+        battleMapPlanet.userData.atmosphereRadius = config.size + 96;
+        battleMapPlanet.userData.nearSurfaceRadius = config.size + 22;
+        battleMapPlanet.userData.crashRadius = config.size + 14;
         scene.add(battleMapPlanet);
 
         if(mapKey === 'saturn'){
@@ -7030,12 +7090,16 @@ function limitBattleArea(){
             startShipCrashAnimation();
             return;
         }
-        const minDist = solidRadius + 2.6;
+        const minDist = solidRadius + 4.5;
         if(dist < minDist){
             const push = delta.normalize();
             if(!Number.isFinite(push.x)) push.set(0,1,0);
             object.position.copy(battleMapPlanet.position.clone().add(push.multiplyScalar(minDist)));
-            if(velocityRef) velocityRef.multiplyScalar(0.3);
+            if(velocityRef) velocityRef.multiplyScalar(0.18);
+            if(object === playerShip && !battleShipCrash){
+                startShipCrashAnimation();
+                return;
+            }
         }
     };
 
@@ -7044,9 +7108,10 @@ function limitBattleArea(){
         const toPlanet = battleMapPlanet.position.clone().sub(playerShip.position);
         const distance = toPlanet.length();
         const radius = battleMapPlanet.userData?.radius || 100;
-        const atmosphereRadius = battleMapPlanet.userData?.atmosphereRadius || radius + 90;
-        const crashRadius = battleMapPlanet.userData?.crashRadius || radius + 8;
-        const nearSurfaceRadius = battleMapPlanet.userData?.nearSurfaceRadius || radius + 18;
+        const solidRadius = battleMapPlanet.userData?.solidRadius || radius + 14;
+        const atmosphereRadius = battleMapPlanet.userData?.atmosphereRadius || radius + 96;
+        const crashRadius = Math.max(battleMapPlanet.userData?.crashRadius || radius + 14, solidRadius);
+        const nearSurfaceRadius = battleMapPlanet.userData?.nearSurfaceRadius || radius + 22;
 
         const closeness = THREE.MathUtils.clamp((atmosphereRadius - distance) / atmosphereRadius, 0, 1);
         const scaleBoost = THREE.MathUtils.clamp(1 + closeness * 1.1, 1, 2.15);
@@ -7054,6 +7119,10 @@ function limitBattleArea(){
         battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
 
         if(distance <= crashRadius){
+            const push = playerShip.position.clone().sub(battleMapPlanet.position);
+            if(!Number.isFinite(push.x) || push.lengthSq() === 0) push.set(0, 1, 0);
+            playerShip.position.copy(battleMapPlanet.position.clone().add(push.normalize().multiplyScalar(solidRadius + 5)));
+            shipVelocity.multiplyScalar(0.12);
             startShipCrashAnimation();
             return;
         }
