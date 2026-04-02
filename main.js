@@ -445,6 +445,133 @@ function safeRequestPointerLock(targetCanvas){
 
 
 
+
+let battleHudClockTimer = null;
+let battleHudPingTimer = null;
+
+function getBattleRoomDisplayName(){
+    return String(
+        currentRoom?.title ||
+        selectedLobbyMap?.title ||
+        currentRoom?.real ||
+        currentRoom?.map ||
+        selectedLobbyMap?.real ||
+        selectedLobbyMap?.name ||
+        'Комната'
+    ).trim() || 'Комната';
+}
+
+function formatBattleHudDateTime(now = new Date()){
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+function updateBattleHudMeta(){
+    const roomName = document.getElementById('battle-room-name');
+    const roomDatetime = document.getElementById('battle-room-datetime');
+    if(roomName) roomName.textContent = getBattleRoomDisplayName();
+    if(roomDatetime) roomDatetime.textContent = formatBattleHudDateTime(new Date());
+}
+
+function getBattlePingValue(){
+    const browserPing = Number(navigator?.connection?.rtt || 0);
+    if(Number.isFinite(window.__battlePingMs) && window.__battlePingMs > 0) return Math.round(window.__battlePingMs);
+    if(Number.isFinite(browserPing) && browserPing > 0) return Math.round(browserPing);
+    return 42;
+}
+
+function updateBattleHudPing(){
+    const pingValue = document.getElementById('battle-ping-value');
+    if(pingValue) pingValue.textContent = String(getBattlePingValue());
+}
+
+function updateBattleSoundButtonState(){
+    const btn = document.getElementById('battle-sound-btn');
+    if(!btn) return;
+    const muted = !gameSettings.soundEnabled && !gameSettings.musicEnabled;
+    btn.classList.toggle('muted', muted);
+    btn.textContent = muted ? '🔇' : '🔊';
+}
+
+function startBattleHudLoops(){
+    stopBattleHudLoops();
+    updateBattleHudMeta();
+    updateBattleHudPing();
+    updateBattleSoundButtonState();
+    battleHudClockTimer = setInterval(updateBattleHudMeta, 1000);
+    battleHudPingTimer = setInterval(updateBattleHudPing, 5000);
+}
+
+function stopBattleHudLoops(){
+    if(battleHudClockTimer){
+        clearInterval(battleHudClockTimer);
+        battleHudClockTimer = null;
+    }
+    if(battleHudPingTimer){
+        clearInterval(battleHudPingTimer);
+        battleHudPingTimer = null;
+    }
+}
+
+function initBattleHudControls(){
+    const fsBtn = document.getElementById('battle-fullscreen-btn');
+    const soundBtn = document.getElementById('battle-sound-btn');
+    const settingsBtn = document.getElementById('battle-settings-icon-btn');
+    if(fsBtn && !fsBtn.dataset.bound){
+        fsBtn.dataset.bound = '1';
+        fsBtn.addEventListener('click', async () => {
+            try{
+                if(document.fullscreenElement){
+                    await document.exitFullscreen();
+                }else{
+                    await document.documentElement.requestFullscreen?.();
+                }
+            }catch(_){}
+        });
+    }
+    if(soundBtn && !soundBtn.dataset.bound){
+        soundBtn.dataset.bound = '1';
+        soundBtn.addEventListener('click', () => {
+            const muted = gameSettings.soundEnabled || gameSettings.musicEnabled;
+            gameSettings.soundEnabled = !muted;
+            gameSettings.musicEnabled = !muted;
+            applyAudioSettings();
+            saveGameSettings();
+            updateBattleSoundButtonState();
+        });
+    }
+    if(settingsBtn && !settingsBtn.dataset.bound){
+        settingsBtn.dataset.bound = '1';
+        settingsBtn.addEventListener('click', () => {
+            const settingsWindow = document.getElementById('settings-window');
+            if(settingsWindow){
+                settingsWindow.classList.remove('hidden');
+                updateNicknameSettingsState?.();
+            }
+        });
+    }
+}
+
+function updateBattlePlayerWorldName(){
+    const label = document.getElementById('battle-player-world-name');
+    if(!label) return;
+    const visible = gameState === 'BATTLE' && !battleObserverMode && !!playerShip && playerShip.visible !== false;
+    label.classList.toggle('hidden', !visible);
+    if(!visible) return;
+    label.textContent = getDisplayPlayerTag();
+    const pos = playerShip.position.clone();
+    pos.y += 4.6;
+    pos.project(camera);
+    const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
+    label.style.transform = `translate(${Math.round(x - label.offsetWidth / 2)}px, ${Math.round(y)}px)`;
+}
+
+
 function pushKillFeed(text, type='kill'){
     const feed = document.getElementById('kill-feed');
     if(!feed) return;
@@ -741,6 +868,8 @@ function clearBattleScene(){
     closeBattlePauseMenu?.();
     const cross = document.getElementById('battle-crosshair');
     if(cross) cross.style.display = 'block';
+    const playerWorldName = document.getElementById('battle-player-world-name');
+    if(playerWorldName) playerWorldName.classList.add('hidden');
     const hud = document.getElementById('enemy-hud');
     if(hud) hud.style.display = 'block';
     if(playerShip){
@@ -849,6 +978,7 @@ function switchState(newState){
 
     if(newState !== "BATTLE" && newState !== "OBSERVE"){
         clearBattleScene();
+        stopBattleHudLoops();
     }
 
     const windows = [
@@ -899,6 +1029,8 @@ function switchState(newState){
 if(gameState === "BATTLE"){
     if(battleScreen) battleScreen.style.display = "block";
     updateBattlePlayerHud();
+    startBattleHudLoops();
+    initBattleHudControls();
 
     if(canvas){
         canvas.style.display = "block";
@@ -932,6 +1064,8 @@ if(gameState === "BATTLE"){
 if(gameState === "OBSERVE"){
     battleObserverMode = true;
     updateBattlePlayerHud();
+    startBattleHudLoops();
+    initBattleHudControls();
     if(battleScreen) battleScreen.style.display = "block";
     if(canvas){
         canvas.style.display = "block";
@@ -1364,6 +1498,7 @@ function applyAudioSettings(){
     if(typeof bossMusic !== "undefined" && bossMusic.buffer){
         bossMusic.setVolume(gameSettings.musicEnabled ? gameSettings.musicVolume : 0);
     }
+    updateBattleSoundButtonState?.();
 }
 
 function initSettingsUI(){
@@ -1391,6 +1526,7 @@ function initSettingsUI(){
 
     updateSettingsLabels();
     applyAudioSettings();
+    initBattleHudControls();
 
     if(settingsTab && settingsWindow){
         settingsTab.addEventListener("click", () => {
@@ -2618,6 +2754,7 @@ if (gameState === "BATTLE" && playerShip) {
     updateBattleReloadState();
     updateBattleRespawnState();
     updateBattlePlayerWorldHp();
+    updateBattlePlayerWorldName();
     if(battleShipCrash){
         updateShipCrashAnimation();
     } else if(isBattlePlanetCaptureActive()){
