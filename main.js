@@ -1252,6 +1252,14 @@ function applyPlayerResourcesFromRow(row = {}) {
     playerResources.coins = creditsValue;
   }
 
+  if(typeof row.level !== 'undefined' && row.level !== null){
+    player.level = Number(row.level) || 1;
+  }
+
+  if(typeof row.experience !== 'undefined' && row.experience !== null){
+    player.experience = Number(row.experience) || 0;
+  }
+
   updatePremiumAccountInfo?.();
   updateHUD?.();
   updateUI?.();
@@ -1260,7 +1268,7 @@ function applyPlayerResourcesFromRow(row = {}) {
 }
 
 function getPlayerResourceColumnsSelect(){
-  return ['credits', ...RESOURCE_SYNC_KEYS, 'staff_role', 'is_banned', 'ban_reason', 'ban_until', 'is_muted', 'mute_reason', 'mute_until'].join(',');
+  return ['credits', 'level', 'experience', ...RESOURCE_SYNC_KEYS, 'staff_role', 'is_banned', 'ban_reason', 'ban_until', 'is_muted', 'mute_reason', 'mute_until'].join(',');
 }
 
 async function loadPlayerResourcesFromSupabase(){
@@ -2442,6 +2450,7 @@ function applySaveData(save){
     currentLevel = Number(save.level || 1);
     damage = Number(save.damage || 1);
     player.level = Number(save.playerLevel || currentLevel || 1);
+    player.experience = Number(save.playerExperience || player.experience || 0);
     player.credits = Number(save.credits || player.credits || 0);
     playerResources.coins = Number(save.credits || playerResources.coins || player.credits || 0);
     if(save.nickname) player.nickname = String(save.nickname).slice(0, 20);
@@ -2493,6 +2502,7 @@ function buildSavePayload(){
         damage: damage,
         credits: player.credits,
         playerLevel: player.level,
+        playerExperience: player.experience,
         nickname: player.nickname,
         playerResources: playerResources
     };
@@ -2506,6 +2516,7 @@ async function saveRemoteProgress(){
         await window.supabaseClient.from('players').update({
             nickname: player.nickname,
             level: player.level,
+            experience: Number(player.experience || 0),
             credits: Number(playerResources.coins || player.credits || 0),
             mercury_ore: Number(playerResources.mercury_ore || 0),
             venus_gas: Number(playerResources.venus_gas || 0),
@@ -6984,7 +6995,7 @@ function loginLocalAccount(){
 
             const existingRes = await window.supabaseClient
                 .from('players')
-                .select('public_id,nickname,email,auth_id,level,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
                 .eq('auth_id', user?.id || '')
                 .maybeSingle();
 
@@ -7001,6 +7012,7 @@ function loginLocalAccount(){
                         email,
                         nickname,
                         level: player.level || 1,
+                        experience: Number(player.experience || 0),
                         credits: Number(playerResources.coins || player.credits || 500),
                         mercury_ore: Number(playerResources.mercury_ore || 0),
                         venus_gas: Number(playerResources.venus_gas || 0),
@@ -7014,7 +7026,7 @@ function loginLocalAccount(){
                         crystals: Number(playerResources.crystals || 0),
                         created_at: new Date().toISOString()
                     })
-                    .select('public_id,nickname,email,auth_id,level,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                    .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
                     .single();
 
                 if(insertRes.error){
@@ -7028,6 +7040,7 @@ function loginLocalAccount(){
             player.id = authState.playerId || user?.id || 'local_player';
             player.nickname = playerRow?.nickname || nickname;
             player.level = Number(playerRow?.level || player.level || 1);
+            player.experience = Number(playerRow?.experience || player.experience || 0);
             player.credits = Number(playerRow?.credits || player.credits || 500);
             applyPlayerIdentityRow(playerRow || { public_id: authState.playerId, staff_role: 'player' });
 
@@ -8897,6 +8910,7 @@ async function savePlayerToSupabase(playerData) {
     email: playerData.email || authState.email || null,
     nickname: playerData.nickname || player.nickname || 'Commander',
     level: Number(playerData.level || player.level || 1),
+    experience: Number(playerData.experience || player.experience || 0),
     credits: Number(playerData.credits || playerResources.coins || player.credits || 0),
     mercury_ore: Number(playerResources.mercury_ore || 0),
     venus_gas: Number(playerResources.venus_gas || 0),
@@ -8913,7 +8927,7 @@ async function savePlayerToSupabase(playerData) {
   const { data, error } = await window.supabaseClient
     .from('players')
     .upsert(payload, { onConflict: 'auth_id' })
-    .select('public_id,nickname,level,credits,auth_id,email,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+    .select('public_id,nickname,level,experience,credits,auth_id,email,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
     .single();
 
   if (error) {
@@ -8927,6 +8941,7 @@ async function savePlayerToSupabase(playerData) {
   }
   if(data?.nickname) player.nickname = data.nickname;
   if(typeof data?.level !== 'undefined') player.level = Number(data.level) || 1;
+  if(typeof data?.experience !== 'undefined') player.experience = Number(data.experience) || 0;
   if(typeof data?.credits !== 'undefined') player.credits = Number(data.credits) || 0;
   applyPlayerIdentityRow(data || {});
   applyPlayerResourcesFromRow(data || {});
