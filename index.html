@@ -1385,7 +1385,7 @@ canvas {
 #battle-exit-btn:hover{ background:rgba(18,36,68,0.95); }
 
 #battle-top-meta{
-    position:absolute;
+    position:fixed;
     top:16px;
     left:20px;
     display:flex;
@@ -1407,16 +1407,16 @@ canvas {
     color:#d9ffd0;
 }
 #battle-ping-line{
-    position:absolute;
-    top:48px;
+    position:fixed;
+    top:52px;
     right:18px;
     color:#7dff4f;
     font-size:14px;
     text-align:right;
-    z-index:60042;
+    z-index:60044;
 }
 #battle-top-actions{
-    position:absolute;
+    position:fixed;
     top:10px;
     right:16px;
     display:flex;
@@ -1839,7 +1839,7 @@ color:#ffd700;
   top:8px;
   right:16px;
   width:min(540px, calc(100vw - 32px));
-  z-index:60010;
+  z-index:60080;
   background:linear-gradient(180deg, rgba(5,12,26,0.94), rgba(10,22,44,0.90));
   border:1px solid rgba(98,223,255,0.30);
   box-shadow:0 0 22px rgba(0,195,255,0.16), inset 0 0 30px rgba(255,255,255,0.03);
@@ -1932,7 +1932,7 @@ color:#ffd700;
 }
 #kill-feed{
   position:fixed;
-  top:72px;
+  top:88px;
   left:18px;
   width:380px;
   display:flex;
@@ -2081,8 +2081,15 @@ body.state-orbit #ui{
 }
 body.state-battle #resource-bar,
 body.state-battle #ui,
+body.state-battle #inventory-button,
 body.state-observe #resource-bar,
-body.state-observe #ui{ display:none !important; }
+body.state-observe #ui,
+body.state-observe #inventory-button{ display:none !important; }
+body.state-orbit #inventory-button{
+  left:auto !important;
+  right:20px !important;
+  bottom:20px !important;
+}
 #battle-player-hud{
   left:18px !important;
   bottom:18px !important;
