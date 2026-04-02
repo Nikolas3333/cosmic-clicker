@@ -7596,6 +7596,19 @@ const SHOP_DATA = {
     }
 };
 
+window.closeShopView = window.closeShopView || function(){
+    try{
+        if(typeof shopState !== 'undefined' && shopState && shopState.open && typeof setShopMode === 'function'){
+            setShopMode(false);
+        }
+    }catch(_){ }
+};
+window.openShopView = window.openShopView || function(){
+    try{
+        if(typeof openShopView === 'function') openShopView();
+    }catch(_){ }
+};
+
 const shopState = {
     open:false,
     view:'ships',
@@ -7926,9 +7939,11 @@ function openShopView(){
 }
 
 function closeShopView(){
-    if(!shopState.open) return;
+    if(!shopState || !shopState.open) return;
     setShopMode(false);
 }
+window.openShopView = openShopView;
+window.closeShopView = closeShopView;
 
     function bindTopNavModes(){
         const battleTab = document.getElementById('battle-zone-tab');
@@ -7967,7 +7982,11 @@ function closeShopView(){
     switchState = function(newState){
         prevSwitchState(newState);
         if(newState === 'LOBBY'){
-            closeShopView();
+            try{
+                if(typeof closeShopView === 'function') closeShopView();
+                else if(typeof window.closeShopView === 'function') window.closeShopView();
+                else if(typeof setShopMode === 'function') setShopMode(false);
+            }catch(_){ }
         }
         if(newState === 'ORBIT'){
             ensureSunBackToOrbit();
