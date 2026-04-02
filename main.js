@@ -1227,6 +1227,15 @@ const RESOURCE_SYNC_KEYS = [
 ];
 
 let remotePlayerSyncTimer = null;
+let localResourceDirtyUntil = 0;
+
+function markLocalResourceDirty(ms = 6000){
+  localResourceDirtyUntil = Math.max(localResourceDirtyUntil || 0, Date.now() + ms);
+}
+
+function hasRecentLocalResourceChanges(){
+  return Number(localResourceDirtyUntil || 0) > Date.now();
+}
 
 function applyPlayerResourcesFromRow(row = {}) {
   if(!row || typeof row !== 'object') return;
@@ -1271,7 +1280,9 @@ async function loadPlayerResourcesFromSupabase(){
 
     if(data){
       applyPlayerIdentityRow(data);
-      applyPlayerResourcesFromRow(data);
+      if(!hasRecentLocalResourceChanges()){
+        applyPlayerResourcesFromRow(data);
+      }
       const isMutedNow = !!data.is_muted && (!data.mute_until || new Date(data.mute_until).getTime() > Date.now());
       window.playerMuted = isMutedNow;
       player.isMuted = isMutedNow;
@@ -2295,6 +2306,10 @@ if(planet.currentResourceAmount > 0){
 
     updateUI();
     updateHUD();
+    if(authState?.isAuthenticated){
+        markLocalResourceDirty(6000);
+        saveGame();
+    }
 }
 
 /* ===== ФОКУС ===== */
@@ -2485,6 +2500,7 @@ function buildSavePayload(){
 
 async function saveRemoteProgress(){
     if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return;
+    markLocalResourceDirty(6000);
     const payload = buildSavePayload();
     try{
         await window.supabaseClient.from('players').update({
@@ -2509,6 +2525,7 @@ async function saveRemoteProgress(){
             updated_at: new Date().toISOString()
         }, { onConflict: 'player_public_id' });
         if(error) console.warn('Не удалось сохранить remote progress:', error.message);
+        else localResourceDirtyUntil = 0;
     }catch(error){
         console.warn('Remote progress save error:', error?.message || error);
     }
@@ -7596,19 +7613,6 @@ const SHOP_DATA = {
     }
 };
 
-window.closeShopView = window.closeShopView || function(){
-    try{
-        if(typeof shopState !== 'undefined' && shopState && shopState.open && typeof setShopMode === 'function'){
-            setShopMode(false);
-        }
-    }catch(_){ }
-};
-window.openShopView = window.openShopView || function(){
-    try{
-        if(typeof openShopView === 'function') openShopView();
-    }catch(_){ }
-};
-
 const shopState = {
     open:false,
     view:'ships',
@@ -7939,11 +7943,9 @@ function openShopView(){
 }
 
 function closeShopView(){
-    if(!shopState || !shopState.open) return;
+    if(!shopState.open) return;
     setShopMode(false);
 }
-window.openShopView = openShopView;
-window.closeShopView = closeShopView;
 
     function bindTopNavModes(){
         const battleTab = document.getElementById('battle-zone-tab');
@@ -7982,11 +7984,7 @@ window.closeShopView = closeShopView;
     switchState = function(newState){
         prevSwitchState(newState);
         if(newState === 'LOBBY'){
-            try{
-                if(typeof closeShopView === 'function') closeShopView();
-                else if(typeof window.closeShopView === 'function') window.closeShopView();
-                else if(typeof setShopMode === 'function') setShopMode(false);
-            }catch(_){ }
+            closeShopView();
         }
         if(newState === 'ORBIT'){
             ensureSunBackToOrbit();
