@@ -1365,22 +1365,8 @@ canvas {
 
 #battle-crosshair::before,
 
-#battle-exit-btn{
-  position:fixed;
-  top:18px;
-  left:18px;
-  z-index:60020;
-  padding:10px 16px;
-  border:none;
-  border-radius:10px;
-  background:rgba(8,18,35,0.88);
-  color:#d9f3ff;
-  cursor:pointer;
-  box-shadow:0 0 16px rgba(0,180,255,0.22);
-}
-#battle-exit-btn:hover{
-  background:rgba(18,36,68,0.95);
-}
+#battle-exit-btn{ display:none !important; }
+#battle-exit-btn:hover{ background:rgba(18,36,68,0.95); }
 #battle-scoreboard{
   position:fixed;
   top:18px;
@@ -1397,7 +1383,7 @@ canvas {
 .battle-scoreboard-header,
 .battle-scoreboard-row{
   display:grid;
-  grid-template-columns:72px 1.4fr 70px 76px 76px 72px;
+  grid-template-columns:96px 1.5fr 90px 90px 110px;
   align-items:center;
 }
 .battle-scoreboard-header{
@@ -1929,6 +1915,15 @@ color:#ffd700;
 .kill-feed-item.chat{ color:#dff8ff; }
 
 #battle-player-hud{ position:fixed; left:18px; bottom:18px; width:320px; padding:14px; border-radius:14px; background:rgba(8,18,35,0.88); border:1px solid rgba(120,220,255,0.2); box-shadow:0 0 16px rgba(0,180,255,0.14); color:#eef8ff; z-index:60015; display:none; }
+#battle-player-hp-wrap, #battle-player-hp-text{ display:none; }
+#battle-player-world-hp{ position:fixed; left:0; top:0; width:120px; height:10px; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.28); border-radius:999px; overflow:hidden; z-index:60035; pointer-events:none; }
+#battle-player-world-hp-fill{ width:100%; height:100%; background:linear-gradient(90deg,#39ff88,#ffe45e,#ff5c5c); }
+#battle-pause-menu{ position:fixed; inset:0; background:rgba(0,0,0,0.42); display:flex; align-items:center; justify-content:center; z-index:60070; pointer-events:auto; }
+#battle-pause-menu.hidden{ display:none !important; }
+.battle-pause-box{ width:min(360px,92vw); display:flex; flex-direction:column; gap:12px; padding:22px; border-radius:18px; background:rgba(8,18,35,0.96); border:1px solid rgba(120,220,255,0.24); box-shadow:0 0 20px rgba(0,180,255,0.16); }
+.battle-pause-title{ text-align:center; font-weight:bold; color:#9fe8ff; font-size:20px; margin-bottom:4px; }
+.battle-pause-box button{ padding:12px 14px; border:none; border-radius:12px; background:rgba(22,46,82,0.95); color:#eef8ff; cursor:pointer; box-shadow:0 0 10px rgba(0,180,255,0.12); }
+.battle-pause-box button:hover{ background:rgba(32,62,104,0.98); }
 .battle-player-title{ font-weight:bold; margin-bottom:10px; color:#9fe8ff; }
 #battle-player-hp-wrap{ width:100%; height:12px; background:rgba(255,255,255,0.12); border-radius:999px; overflow:hidden; margin-bottom:8px; }
 #battle-player-hp-fill{ width:100%; height:100%; background:linear-gradient(90deg,#4ed0ff,#79ffb6); }
@@ -1937,11 +1932,10 @@ color:#ffd700;
 #battle-damage-text,
 #battle-reload-text{ font-size:13px; margin-top:6px; }
 #battle-screen{ pointer-events:none; }
-#battle-exit-btn,
 #battle-chat-box,
 #battle-chat-input{ pointer-events:auto; }
 
-#battle-exit-btn, #battle-scoreboard, #battle-chat-box, #battle-chat-input{ pointer-events:auto; }
+#battle-scoreboard, #battle-chat-box, #battle-chat-input, #battle-pause-menu{ pointer-events:auto; }
 #battle-chat-box{
   position:fixed;
   right:18px;
@@ -2041,6 +2035,8 @@ body.state-observe #ui{ display:none !important; }
   right:auto !important;
   top:auto !important;
 }
+body.state-battle #battle-player-world-hp{ display:block; }
+body.state-observe #battle-player-world-hp{ display:none !important; }
 
 
 
@@ -3662,7 +3658,6 @@ shop-main-head{
 
 <div id="battle-screen" style="display:none;">
   <div id="battle-crosshair"></div>
-  <button id="battle-exit-btn" type="button">⟵ Выйти из карты</button>
   <div id="enemy-hud">
     <div id="enemy-name">BOT DRONE</div>
     <div id="enemy-hp-bar-wrap"><div id="enemy-hp-bar"></div></div>
@@ -3676,32 +3671,33 @@ shop-main-head{
     <div id="battle-damage-text">Урон: 12</div>
     <div id="battle-reload-text">R — перезарядка</div>
   </div>
+  <div id="battle-player-world-hp" class="hidden">
+    <div id="battle-player-world-hp-fill"></div>
+  </div>
   <div id="battle-scoreboard" class="hidden">
     <div class="battle-scoreboard-header">
-      <span>Clan</span>
-      <span>Ник</span>
-      <span>Фраги</span>
-      <span>Смерти</span>
-      <span>Уровень</span>
-      <span>ID</span>
+      <span>CLAN</span>
+      <span>НИК</span>
+      <span>ФРАГИ</span>
+      <span>СМЕРТИ</span>
+      <span>УРОВЕНЬ</span>
     </div>
     <div id="battle-scoreboard-body">
       <div class="battle-scoreboard-row enemy">
-        <span>[BOT]</span>
-        <span>Drone_x1</span>
+        <span></span>
+        <span>На карте нет активных игроков</span>
         <span>0</span>
         <span>0</span>
-        <span>1</span>
-        <span>9001</span>
+        <span>-</span>
       </div>
-      <div class="battle-scoreboard-row player">
-        <span>[YOU]</span>
-        <span>Commander</span>
-        <span>0</span>
-        <span>0</span>
-        <span>1</span>
-        <span>1001</span>
-      </div>
+    </div>
+  </div>
+  <div id="battle-pause-menu" class="hidden">
+    <div class="battle-pause-box">
+      <div class="battle-pause-title">Меню карты</div>
+      <button id="battle-open-settings-btn" type="button">Настройки</button>
+      <button id="battle-save-settings-btn" type="button">Сохранить изменения</button>
+      <button id="battle-leave-map-btn" type="button">Выйти с карты</button>
     </div>
   </div>
 </div>
