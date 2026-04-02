@@ -559,16 +559,7 @@ function initBattleHudControls(){
 function updateBattlePlayerWorldName(){
     const label = document.getElementById('battle-player-world-name');
     if(!label) return;
-    const visible = gameState === 'BATTLE' && !battleObserverMode && !!playerShip && playerShip.visible !== false;
-    label.classList.toggle('hidden', !visible);
-    if(!visible) return;
-    label.textContent = getDisplayPlayerTag();
-    const pos = playerShip.position.clone();
-    pos.y += 4.6;
-    pos.project(camera);
-    const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
-    label.style.transform = `translate(${Math.round(x - label.offsetWidth / 2)}px, ${Math.round(y)}px)`;
+    label.classList.add('hidden');
 }
 
 
@@ -3006,15 +2997,9 @@ function updateBattlePlayerWorldHp(){
     const wrap = document.getElementById('battle-player-world-hp');
     const fill = document.getElementById('battle-player-world-hp-fill');
     if(!wrap || !fill) return;
-    const visible = gameState === 'BATTLE' && !battleObserverMode && !!playerShip && playerShip.visible !== false;
+    const visible = gameState === 'BATTLE' && !battleObserverMode;
     wrap.classList.toggle('hidden', !visible);
     if(!visible) return;
-    const pos = playerShip.position.clone();
-    pos.y += 3.1;
-    pos.project(camera);
-    const x = (pos.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (-pos.y * 0.5 + 0.5) * window.innerHeight;
-    wrap.style.transform = `translate(${Math.round(x - 60)}px, ${Math.round(y)}px)`;
     const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
     fill.style.width = hpPercent + '%';
 }
