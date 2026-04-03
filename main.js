@@ -3116,6 +3116,15 @@ function updateShipCrashAnimation(){
     }
 }
 
+function startSunProminenceDeath(){
+    if(!playerShip || battleShipCrash || isBattleRespawning()) return;
+    spawnShipDebris(playerShip.position.clone(), 0xffd36a);
+    battleStats.playerDeaths += 1;
+    updateBattleScoreboard();
+    pushKillFeed(`${player?.nickname || 'Commander'} сгорел в протуберанце`, 'kill');
+    scheduleBattleRespawn(2000);
+}
+
 function updateBattlePlanetEffects(){
     if(!battleMapPlanet || !playerShip || battleObserverMode) return;
 
@@ -3129,8 +3138,10 @@ function updateBattlePlanetEffects(){
     const captureRadius = Math.max(crashRadius + 10, radius + 24);
 
     const scaleBoost = THREE.MathUtils.clamp(1 + ((320 - Math.max(0, distance - radius)) / 320) * (isSunMap ? 0.64 : 0.5), 1, isSunMap ? 1.65 : 1.5);
-    battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.04;
+    battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.08;
     battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
+
+    let prominenceHit = false;
 
     if(isSunMap){
         battleMapPlanet.rotation.y += 0.0015;
@@ -3151,20 +3162,38 @@ function updateBattlePlanetEffects(){
         }
 
         if(prominenceGroup){
-            prominenceGroup.rotation.y += 0.0012;
+            prominenceGroup.rotation.y += 0.0007;
+
             prominenceGroup.children.forEach((arc, index) => {
-                const pulse = 1 + Math.sin(t * (arc.userData?.pulseSpeed || 1) + (arc.userData?.phase || 0)) * 0.04;
+                const pulse = 1 + Math.sin(t * (arc.userData?.pulseSpeed || 1) + (arc.userData?.phase || 0)) * 0.06;
                 const base = arc.userData?.baseScale || 1;
                 arc.scale.setScalar(base * pulse);
                 arc.rotation.z += arc.userData?.spinSpeed || 0;
 
                 arc.children.forEach((part, partIndex) => {
                     if(part.material){
-                        part.material.opacity = partIndex === 0
-                            ? 0.24 + Math.sin(t * 2.0 + index) * 0.06
-                            : 0.66 + Math.sin(t * 2.5 + index + 0.4) * 0.04;
+                        if(partIndex === 0){
+                            part.material.opacity = 0.07 + Math.sin(t * 1.6 + index) * 0.02;
+                        }else if(partIndex === 1){
+                            part.material.opacity = 0.20 + Math.sin(t * 1.9 + index) * 0.05;
+                        }else{
+                            part.material.opacity = 0.76 + Math.sin(t * 2.2 + index + 0.4) * 0.06;
+                        }
                     }
                 });
+
+                if(!prominenceHit && Array.isArray(arc.userData?.samplePoints) && arc.userData.samplePoints.length){
+                    arc.updateMatrixWorld(true);
+                    const hitRadius = arc.userData?.damageRadius || Math.max(3.8, radius * 0.028);
+
+                    for(const localPoint of arc.userData.samplePoints){
+                        const worldPoint = localPoint.clone().applyMatrix4(arc.matrixWorld);
+                        if(worldPoint.distanceTo(playerShip.position) <= hitRadius){
+                            prominenceHit = true;
+                            break;
+                        }
+                    }
+                }
             });
         }
     }
@@ -3196,7 +3225,32 @@ function updateBattlePlanetEffects(){
         if(distance < nearSurfaceRadius){
             shipVelocity.multiplyScalar(isSunMap ? 0.90 : 0.92);
         }
+
+        if(isSunMap){
+            const heatFactor = THREE.MathUtils.clamp((atmosphereRadius - distance) / Math.max(1, atmosphereRadius - radius), 0, 1);
+            const heatDamage = 0.03 + heatFactor * 0.22;
+            playerHp = Math.max(0, playerHp - heatDamage);
+
+            if(playerHp <= 0){
+                startSunProminenceDeath();
+                updateBattlePlayerHud?.();
+                return;
+            }
+        }
     }
+
+    if(isSunMap && prominenceHit){
+        playerHp = Math.max(0, playerHp - 1.35);
+        shipVelocity.add(towardPlanet.clone().multiplyScalar(0.06));
+
+        if(playerHp <= 0){
+            startSunProminenceDeath();
+            updateBattlePlayerHud?.();
+            return;
+        }
+    }
+
+    updateBattlePlayerHud?.();
 }
 // ===== POINTER LOCK =====
 const canvas = renderer.domElement;
@@ -6048,7 +6102,7 @@ function updateBattleScoreboard(){
             : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '' }]);
 
     if(gameState === 'OBSERVE' && !normalizedPlayers.length){
-      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span></div>';
+      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span><span>—</span></div>';
       return;
     }
 
@@ -6062,6 +6116,8 @@ function updateBattleScoreboard(){
       const deaths = Math.max(0, isYou ? Number(battleStats.playerDeaths || 0) : Number(entry?.deaths || 0));
       const levelValue = Math.max(1, Number(isYou ? (player?.level || entry?.level || 1) : (entry?.level || 1)) || 1);
       const publicId = isYou ? String(authState?.playerId || entryId || '') : entryId;
+      const pingValueRaw = isYou ? getBattlePingValue() : Number(entry?.ping || entry?.latency || 0);
+      const pingValue = Number.isFinite(pingValueRaw) && pingValueRaw > 0 ? Math.round(pingValueRaw) : '—';
       return `
       <div class="battle-scoreboard-row ${isYou ? 'player' : 'enemy'}">
         <span>${clan}</span>
@@ -6070,6 +6126,7 @@ function updateBattleScoreboard(){
         <span>${deaths}</span>
         <span class="battle-level-cell"><span class="battle-level-icon">★</span>${levelValue}</span>
         <span>${publicId || '—'}</span>
+        <span>${pingValue}</span>
       </div>`;
     }).join('');
 }
@@ -7258,54 +7315,72 @@ function limitBattleArea(){
 
 
     function createSunProminenceArc(radius, arcIndex = 0){
-        const curve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(-radius * 0.25, 0, 0),
-            new THREE.Vector3(-radius * 0.15, radius * (0.20 + Math.random() * 0.04), 0),
-            new THREE.Vector3(radius * 0.15, radius * (0.20 + Math.random() * 0.04), 0),
-            new THREE.Vector3(radius * 0.25, 0, 0)
-        ]);
+        const archHeight = radius * (0.18 + Math.random() * 0.05);
+        const sideOffset = radius * (0.12 + Math.random() * 0.04);
+        const curve = new THREE.CubicBezierCurve3(
+            new THREE.Vector3(-radius * 0.17, 0, 0),
+            new THREE.Vector3(-sideOffset, archHeight, 0),
+            new THREE.Vector3(sideOffset, archHeight, 0),
+            new THREE.Vector3(radius * 0.17, 0, 0)
+        );
+
+        const samplePoints = curve.getPoints(12);
 
         const glowTube = new THREE.Mesh(
-            new THREE.TubeGeometry(curve, 40, Math.max(1.8, radius * 0.020), 10, false),
+            new THREE.TubeGeometry(curve, 54, Math.max(1.25, radius * 0.010), 14, false),
             new THREE.MeshBasicMaterial({
-                color: 0xff7a1a,
+                color: 0xff8c22,
                 transparent: true,
-                opacity: 0.28,
+                opacity: 0.22,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false
             })
         );
 
         const coreTube = new THREE.Mesh(
-            new THREE.TubeGeometry(curve, 40, Math.max(0.8, radius * 0.008), 8, false),
+            new THREE.TubeGeometry(curve, 54, Math.max(0.45, radius * 0.0038), 12, false),
             new THREE.MeshBasicMaterial({
-                color: 0xffd36a,
+                color: 0xfff1a8,
                 transparent: true,
-                opacity: 0.70,
+                opacity: 0.82,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            })
+        );
+
+        const haloTube = new THREE.Mesh(
+            new THREE.TubeGeometry(curve, 40, Math.max(2.1, radius * 0.016), 10, false),
+            new THREE.MeshBasicMaterial({
+                color: 0xff5a12,
+                transparent: true,
+                opacity: 0.08,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false
             })
         );
 
         const group = new THREE.Group();
+        group.add(haloTube);
         group.add(glowTube);
         group.add(coreTube);
 
-        group.position.set(0, 0, radius * 1.01);
-        group.rotation.z = Math.random() * Math.PI * 2;
-        group.rotation.y = (Math.PI * 2 / 4) * arcIndex + Math.random() * 0.35;
-        group.rotation.x = (Math.random() - 0.5) * 0.55;
-        group.userData.baseScale = 0.92 + Math.random() * 0.18;
-        group.userData.pulseSpeed = 1.1 + Math.random() * 1.1;
-        group.userData.spinSpeed = 0.001 + Math.random() * 0.0015;
+        group.position.set(0, 0, radius * 1.013);
+        group.rotation.z = (Math.PI * 2 / 3) * arcIndex + (Math.random() - 0.5) * 0.16;
+        group.rotation.y = (Math.random() - 0.5) * 0.32;
+        group.rotation.x = (Math.random() - 0.5) * 0.22;
+        group.userData.baseScale = 0.98 + Math.random() * 0.08;
+        group.userData.pulseSpeed = 0.7 + Math.random() * 0.45;
+        group.userData.spinSpeed = 0.00035 + Math.random() * 0.00035;
         group.userData.phase = Math.random() * Math.PI * 2;
+        group.userData.damageRadius = Math.max(3.8, radius * 0.028);
+        group.userData.samplePoints = samplePoints.map(point => point.clone());
         return group;
     }
 
     function createSunProminenceGroup(radius){
         const group = new THREE.Group();
         group.name = 'sunProminenceGroup';
-        for(let i = 0; i < 2; i++){
+        for(let i = 0; i < 3; i++){
             group.add(createSunProminenceArc(radius, i));
         }
         return group;
