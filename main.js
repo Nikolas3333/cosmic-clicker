@@ -3119,6 +3119,7 @@ function updateShipCrashAnimation(){
 function updateBattlePlanetEffects(){
     if(!battleMapPlanet || !playerShip || battleObserverMode) return;
 
+    const isSunMap = !!battleMapPlanet.userData?.isSunMap;
     const toPlanet = battleMapPlanet.position.clone().sub(playerShip.position);
     const distance = toPlanet.length();
     const radius = battleMapPlanet.userData?.radius || 50;
@@ -3127,9 +3128,46 @@ function updateBattlePlanetEffects(){
     const crashRadius = battleMapPlanet.userData?.crashRadius || radius + 10;
     const captureRadius = Math.max(crashRadius + 10, radius + 24);
 
-    const scaleBoost = THREE.MathUtils.clamp(1 + ((320 - Math.max(0, distance - radius)) / 320) * 0.5, 1, 1.5);
+    const scaleBoost = THREE.MathUtils.clamp(1 + ((320 - Math.max(0, distance - radius)) / 320) * (isSunMap ? 0.64 : 0.5), 1, isSunMap ? 1.65 : 1.5);
     battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.08;
     battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
+
+    if(isSunMap){
+        battleMapPlanet.rotation.y += 0.0015;
+
+        const t = performance.now() * 0.001;
+        const glow = battleMapPlanet.getObjectByName('sunBattleGlow');
+        const outerGlow = battleMapPlanet.getObjectByName('sunBattleOuterGlow');
+        const prominenceGroup = battleMapPlanet.getObjectByName('sunProminenceGroup');
+
+        if(glow){
+            glow.material.opacity = 0.10 + Math.sin(t * 1.7) * 0.03;
+            const s = 1 + Math.sin(t * 1.2) * 0.012;
+            glow.scale.setScalar(s);
+        }
+
+        if(outerGlow){
+            outerGlow.material.opacity = 0.055 + Math.sin(t * 1.1 + 0.8) * 0.018;
+        }
+
+        if(prominenceGroup){
+            prominenceGroup.rotation.y += 0.0012;
+            prominenceGroup.children.forEach((arc, index) => {
+                const pulse = 1 + Math.sin(t * (arc.userData?.pulseSpeed || 1) + (arc.userData?.phase || 0)) * 0.08;
+                const base = arc.userData?.baseScale || 1;
+                arc.scale.setScalar(base * pulse);
+                arc.rotation.z += arc.userData?.spinSpeed || 0;
+
+                arc.children.forEach((part, partIndex) => {
+                    if(part.material){
+                        part.material.opacity = partIndex === 0
+                            ? 0.24 + Math.sin(t * 2.0 + index) * 0.06
+                            : 0.66 + Math.sin(t * 2.5 + index + 0.4) * 0.08;
+                    }
+                });
+            });
+        }
+    }
 
     const towardPlanet = toPlanet.clone().normalize();
     if(!Number.isFinite(towardPlanet.x) || towardPlanet.lengthSq() === 0) return;
@@ -3153,10 +3191,10 @@ function updateBattlePlanetEffects(){
 
     if(distance < atmosphereRadius){
         const gravityStrength = THREE.MathUtils.clamp((atmosphereRadius - distance) / Math.max(1, atmosphereRadius - radius), 0, 1);
-        shipVelocity.add(towardPlanet.multiplyScalar(0.022 + gravityStrength * 0.038));
+        shipVelocity.add(towardPlanet.multiplyScalar((isSunMap ? 0.03 : 0.022) + gravityStrength * (isSunMap ? 0.05 : 0.038)));
 
         if(distance < nearSurfaceRadius){
-            shipVelocity.multiplyScalar(0.92);
+            shipVelocity.multiplyScalar(isSunMap ? 0.90 : 0.92);
         }
     }
 }
@@ -7218,6 +7256,61 @@ function limitBattleArea(){
         setBodyStateClass();
     };
 
+
+    function createSunProminenceArc(radius, arcIndex = 0){
+        const curve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-radius * 0.38, 0, 0),
+            new THREE.Vector3(-radius * 0.15, radius * (0.20 + Math.random() * 0.08), 0),
+            new THREE.Vector3(radius * 0.15, radius * (0.20 + Math.random() * 0.08), 0),
+            new THREE.Vector3(radius * 0.38, 0, 0)
+        ]);
+
+        const glowTube = new THREE.Mesh(
+            new THREE.TubeGeometry(curve, 40, Math.max(1.8, radius * 0.020), 10, false),
+            new THREE.MeshBasicMaterial({
+                color: 0xff7a1a,
+                transparent: true,
+                opacity: 0.28,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            })
+        );
+
+        const coreTube = new THREE.Mesh(
+            new THREE.TubeGeometry(curve, 40, Math.max(0.8, radius * 0.008), 8, false),
+            new THREE.MeshBasicMaterial({
+                color: 0xffd36a,
+                transparent: true,
+                opacity: 0.70,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            })
+        );
+
+        const group = new THREE.Group();
+        group.add(glowTube);
+        group.add(coreTube);
+
+        group.position.set(0, 0, radius * 1.01);
+        group.rotation.z = Math.random() * Math.PI * 2;
+        group.rotation.y = (Math.PI * 2 / 4) * arcIndex + Math.random() * 0.35;
+        group.rotation.x = (Math.random() - 0.5) * 0.55;
+        group.userData.baseScale = 0.92 + Math.random() * 0.18;
+        group.userData.pulseSpeed = 1.1 + Math.random() * 1.1;
+        group.userData.spinSpeed = 0.001 + Math.random() * 0.0015;
+        group.userData.phase = Math.random() * Math.PI * 2;
+        return group;
+    }
+
+    function createSunProminenceGroup(radius){
+        const group = new THREE.Group();
+        group.name = 'sunProminenceGroup';
+        for(let i = 0; i < 4; i++){
+            group.add(createSunProminenceArc(radius, i));
+        }
+        return group;
+    }
+
     getBattlePlanetConfig = function(mapKey){
         const configs = {
             sun:{ color:0xffc84a, size:132, light:0xffdd88 },
@@ -7247,7 +7340,8 @@ function limitBattleArea(){
         scene.add(ambient, point);
 
         const planetGeometry = new THREE.SphereGeometry(config.size, 64, 64);
-        const planetMaterial = mapKey === 'sun'
+        const isSunMap = mapKey === 'sun';
+        const planetMaterial = isSunMap
         ? new THREE.MeshBasicMaterial({
             map: sunTexture,
             color: 0xffffff
@@ -7257,14 +7351,15 @@ function limitBattleArea(){
         battleMapPlanet.position.set(0, -12, -230);
         battleMapPlanet.userData.radius = config.size;
         battleMapPlanet.userData.solidRadius = config.size + 14;
-        battleMapPlanet.userData.atmosphereRadius = config.size + 96;
-        battleMapPlanet.userData.nearSurfaceRadius = config.size + 22;
-        battleMapPlanet.userData.dangerRadius = config.size + 104;
-        battleMapPlanet.userData.captureRadius = config.size + 30;
-        battleMapPlanet.userData.crashRadius = config.size + 14;
+        battleMapPlanet.userData.atmosphereRadius = isSunMap ? config.size + 118 : config.size + 96;
+        battleMapPlanet.userData.nearSurfaceRadius = isSunMap ? config.size + 28 : config.size + 22;
+        battleMapPlanet.userData.dangerRadius = isSunMap ? config.size + 138 : config.size + 104;
+        battleMapPlanet.userData.captureRadius = isSunMap ? config.size + 38 : config.size + 30;
+        battleMapPlanet.userData.crashRadius = isSunMap ? config.size + 18 : config.size + 14;
+        battleMapPlanet.userData.isSunMap = isSunMap;
         scene.add(battleMapPlanet);
 
-        if(mapKey === 'sun'){
+        if(isSunMap){
             const sunBattleGlow = new THREE.Mesh(
                 new THREE.SphereGeometry(config.size * 1.08, 40, 40),
                 new THREE.MeshBasicMaterial({
@@ -7276,7 +7371,24 @@ function limitBattleArea(){
                     side: THREE.DoubleSide
                 })
             );
+            sunBattleGlow.name = 'sunBattleGlow';
             battleMapPlanet.add(sunBattleGlow);
+
+            const sunOuterGlow = new THREE.Mesh(
+                new THREE.SphereGeometry(config.size * 1.16, 32, 32),
+                new THREE.MeshBasicMaterial({
+                    color: 0xff7a1a,
+                    transparent: true,
+                    opacity: 0.07,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                })
+            );
+            sunOuterGlow.name = 'sunBattleOuterGlow';
+            battleMapPlanet.add(sunOuterGlow);
+
+            battleMapPlanet.add(createSunProminenceGroup(config.size));
         }
 
         if(mapKey === 'saturn'){
