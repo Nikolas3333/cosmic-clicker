@@ -481,39 +481,7 @@ function getBattlePingValue(){
     const browserPing = Number(navigator?.connection?.rtt || 0);
     if(Number.isFinite(window.__battlePingMs) && window.__battlePingMs > 0) return Math.round(window.__battlePingMs);
     if(Number.isFinite(browserPing) && browserPing > 0) return Math.round(browserPing);
-    return 0;
-}
-
-async function measureBattlePing(){
-    try{
-        const startedAt = performance.now();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-        const pingUrl = String(location.href || '').split('#')[0] + (String(location.href || '').includes('?') ? '&' : '?') + 'ping=' + Date.now();
-
-        await fetch(pingUrl, {
-            method: 'HEAD',
-            cache: 'no-store',
-            signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-        const measured = Math.max(1, Math.round(performance.now() - startedAt));
-        const previous = Number(window.__battlePingMs || 0);
-        window.__battlePingMs = previous > 0
-            ? Math.round(previous * 0.55 + measured * 0.45)
-            : measured;
-        updateBattleScoreboard?.();
-        return window.__battlePingMs;
-    }catch(_){
-        const browserPing = Number(navigator?.connection?.rtt || 0);
-        if(Number.isFinite(browserPing) && browserPing > 0){
-            window.__battlePingMs = Math.round(browserPing);
-            updateBattleScoreboard?.();
-            return window.__battlePingMs;
-        }
-        return 0;
-    }
+    return 42;
 }
 
 function updateBattleHudPing(){
@@ -533,13 +501,9 @@ function startBattleHudLoops(){
     stopBattleHudLoops();
     updateBattleHudMeta();
     updateBattleHudPing();
-    measureBattlePing?.();
     updateBattleSoundButtonState();
     battleHudClockTimer = setInterval(updateBattleHudMeta, 1000);
-    battleHudPingTimer = setInterval(() => {
-        updateBattleHudPing();
-        measureBattlePing?.();
-    }, 4000);
+    battleHudPingTimer = setInterval(updateBattleHudPing, 5000);
 }
 
 function stopBattleHudLoops(){
@@ -1071,7 +1035,7 @@ if(gameState === "BATTLE"){
         scene.remove(solarSystem);
     }
 
-    const targetMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "Земля";
+    const targetMap = selectedLobbyMap?.real || currentRoom?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
     battleObserverMode = false;
     enterBattleMap(targetMap);
     initBattleChat();
@@ -1103,7 +1067,7 @@ if(gameState === "OBSERVE"){
     if(typeof scene !== "undefined" && typeof solarSystem !== "undefined" && scene.children.includes(solarSystem)){
         scene.remove(solarSystem);
     }
-    const targetMap = currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.name || "Земля";
+    const targetMap = selectedLobbyMap?.real || currentRoom?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
     setupObserverBattle(targetMap);
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
@@ -3194,7 +3158,7 @@ function updateBattlePlanetEffects(){
         }
 
         if(outerGlow){
-            outerGlow.material.opacity = 0.05 + Math.sin(t * 1.1 + 0.8) * 0.015;
+            outerGlow.material.opacity = 0.055 + Math.sin(t * 1.1 + 0.8) * 0.018;
         }
 
         if(prominenceGroup){
@@ -3211,9 +3175,9 @@ function updateBattlePlanetEffects(){
                         if(partIndex === 0){
                             part.material.opacity = 0.07 + Math.sin(t * 1.6 + index) * 0.02;
                         }else if(partIndex === 1){
-                            part.material.opacity = 0.22 + Math.sin(t * 1.9 + index) * 0.05;
+                            part.material.opacity = 0.20 + Math.sin(t * 1.9 + index) * 0.05;
                         }else{
-                            part.material.opacity = 0.78 + Math.sin(t * 2.2 + index + 0.4) * 0.06;
+                            part.material.opacity = 0.76 + Math.sin(t * 2.2 + index + 0.4) * 0.06;
                         }
                     }
                 });
@@ -3264,7 +3228,7 @@ function updateBattlePlanetEffects(){
 
         if(isSunMap){
             const heatFactor = THREE.MathUtils.clamp((atmosphereRadius - distance) / Math.max(1, atmosphereRadius - radius), 0, 1);
-            const heatDamage = 0.08 + heatFactor * 0.40;
+            const heatDamage = 0.03 + heatFactor * 0.22;
             playerHp = Math.max(0, playerHp - heatDamage);
 
             if(playerHp <= 0){
@@ -5748,6 +5712,17 @@ function enterMap(mapName) {
 
 function normalizeBattleMapName(mapName){
     const raw = String(mapName || '').trim().toLowerCase();
+
+    if(raw.includes('sun') || raw.includes('солн')) return 'sun';
+    if(raw.includes('mercury') || raw.includes('меркур')) return 'mercury';
+    if(raw.includes('venus') || raw.includes('венер')) return 'venus';
+    if(raw.includes('earth') || raw.includes('земл')) return 'earth';
+    if(raw.includes('mars') || raw.includes('марс')) return 'mars';
+    if(raw.includes('jupiter') || raw.includes('юпит')) return 'jupiter';
+    if(raw.includes('saturn') || raw.includes('сатур')) return 'saturn';
+    if(raw.includes('uranus') || raw.includes('уран')) return 'uranus';
+    if(raw.includes('neptune') || raw.includes('нептун')) return 'neptune';
+
     const mapNames = {
         'sun':'sun','солнце':'sun',
         'mercury':'mercury','меркурий':'mercury',
@@ -5811,61 +5786,20 @@ function enterBattleMap(mapName){
     scene.add(ambient);
     scene.add(point);
 
-    const isSunMap = mapKey === 'sun';
     const planetGeometry = new THREE.SphereGeometry(config.size, 48, 48);
-    const planetMaterial = isSunMap
-        ? new THREE.MeshBasicMaterial({
-            map: sunTexture,
-            color: 0xffffff
-        })
-        : new THREE.MeshStandardMaterial({
-            color: config.color,
-            roughness: 0.9,
-            metalness: 0.05
-        });
+    const planetMaterial = new THREE.MeshStandardMaterial({
+        color: config.color,
+        roughness: 0.9,
+        metalness: 0.05
+    });
     battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
     battleMapPlanet.position.set(0, -6, -320);
     battleMapPlanet.userData.radius = config.size;
     battleMapPlanet.userData.solidRadius = config.size + 10;
-    battleMapPlanet.userData.atmosphereRadius = isSunMap ? config.size + 168 : config.size + 42;
-    battleMapPlanet.userData.nearSurfaceRadius = isSunMap ? config.size + 72 : config.size + 14;
+    battleMapPlanet.userData.atmosphereRadius = config.size + 42;
+    battleMapPlanet.userData.nearSurfaceRadius = config.size + 14;
     battleMapPlanet.userData.crashRadius = config.size + 10;
-    battleMapPlanet.userData.isSunMap = isSunMap;
     scene.add(battleMapPlanet);
-
-    if(isSunMap){
-        const sunBattleGlow = new THREE.Mesh(
-            new THREE.SphereGeometry(config.size * 1.08, 36, 36),
-            new THREE.MeshBasicMaterial({
-                color: 0xff9a24,
-                transparent: true,
-                opacity: 0.12,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                side: THREE.DoubleSide
-            })
-        );
-        sunBattleGlow.name = 'sunBattleGlow';
-        battleMapPlanet.add(sunBattleGlow);
-
-        const sunBattleOuterGlow = new THREE.Mesh(
-            new THREE.SphereGeometry(config.size * 1.18, 28, 28),
-            new THREE.MeshBasicMaterial({
-                color: 0xff5a12,
-                transparent: true,
-                opacity: 0.055,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                side: THREE.DoubleSide
-            })
-        );
-        sunBattleOuterGlow.name = 'sunBattleOuterGlow';
-        battleMapPlanet.add(sunBattleOuterGlow);
-
-        if(typeof createSunProminenceGroup === 'function'){
-            battleMapPlanet.add(createSunProminenceGroup(config.size));
-        }
-    }
 
     if(mapKey === 'saturn'){
         const ringGeo = new THREE.RingGeometry(config.size * 1.35, config.size * 2.0, 96);
@@ -6067,18 +6001,7 @@ async function syncLiveBattlePlayers(){
     });
 
     if(currentRoom){
-        const selfEntry = {
-            nickname: getDisplayPlayerTag(),
-            clan: '',
-            level: player?.level || 1,
-            kills: battleStats.playerKills,
-            deaths: battleStats.playerDeaths,
-            id: authState?.playerId || player?.id || '',
-            ping: getBattlePingValue()
-        };
-        const nextPlayers = gameState === 'OBSERVE'
-            ? [...visiblePlayers]
-            : (visiblePlayers.length ? [...visiblePlayers, selfEntry] : [selfEntry]);
+        const nextPlayers = gameState === 'OBSERVE' ? [...visiblePlayers] : (visiblePlayers.length ? visiblePlayers : [{ nickname: getDisplayPlayerTag(), clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: player?.id || '' }]);
         currentRoom.currentPlayers = nextPlayers;
         currentRoom.players = [...nextPlayers];
     }
@@ -7490,7 +7413,8 @@ function limitBattleArea(){
     };
 
     enterBattleMap = function(mapName){
-        const mapKey = normalizeBattleMapName(mapName);
+        const rawMapName = String(mapName || selectedLobbyMap?.real || currentRoom?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || '').trim();
+        const mapKey = normalizeBattleMapName(rawMapName);
         selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
         clearBattleScene();
         if(solarSystem && scene.children.includes(solarSystem)) scene.remove(solarSystem);
