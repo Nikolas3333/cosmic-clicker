@@ -5628,7 +5628,7 @@ function getBattlePlanetConfig(mapKey){
     return configs[mapKey] || configs.earth;
 }
 
-function enterBattleMap(
+function enterBattleMap(mapName){
   // FIX: reset orbit leftovers
   try {
     if (window.selectedPlanet) {
@@ -5641,7 +5641,7 @@ function enterBattleMap(
     }
     window.selectedPlanet = null;
   } catch(e){}
-mapName){
+
     const mapKey = normalizeBattleMapName(mapName);
     selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
 
