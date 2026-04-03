@@ -1677,6 +1677,9 @@ const earthClouds = textureLoader.load("textures/earth_clouds.png");
 const earthNormal = textureLoader.load("textures/earth_normal.jpg");
 const earthSpecular = textureLoader.load("textures/earth_specular.jpg");
 
+const sunTexture = textureLoader.load("textures/sun.jpg");
+sunTexture.colorSpace = THREE.SRGBColorSpace;
+
 
 /* ================= PLANET SYSTEM ================= */
 
@@ -1973,9 +1976,11 @@ this.orbitPivot.rotation.y += this.orbitSpeed;
 const sunGeometry = new THREE.SphereGeometry(8, 64, 64);
 
 const sunMaterial = new THREE.MeshStandardMaterial({
-    emissive: 0xffaa00,
-    emissiveIntensity: 2,
-    color: 0xffdd88,
+    map: sunTexture,
+    emissiveMap: sunTexture,
+    emissive: 0xff8a1a,
+    emissiveIntensity: 1.2,
+    color: 0xffffff,
     roughness: 1,
     metalness: 0
 });
@@ -7226,7 +7231,17 @@ function limitBattleArea(){
         scene.add(ambient, point);
 
         const planetGeometry = new THREE.SphereGeometry(config.size, 64, 64);
-        const planetMaterial = new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.92, metalness: 0.04 });
+        const planetMaterial = new THREE.MeshStandardMaterial(mapKey === 'sun'
+        ? {
+            map: sunTexture,
+            emissiveMap: sunTexture,
+            emissive: 0xff8a1a,
+            emissiveIntensity: 1.2,
+            color: 0xffffff,
+            roughness: 0.95,
+            metalness: 0
+        }
+        : { color: config.color, roughness: 0.92, metalness: 0.04 });
         battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
         battleMapPlanet.position.set(0, -12, -230);
         battleMapPlanet.userData.radius = config.size;
