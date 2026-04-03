@@ -1677,7 +1677,7 @@ const earthClouds = textureLoader.load("textures/earth_clouds.png");
 const earthNormal = textureLoader.load("textures/earth_normal.jpg");
 const earthSpecular = textureLoader.load("textures/earth_specular.jpg");
 
-const sunTexture = textureLoader.load("textures/sun.jpg");
+const sunTexture = textureLoader.load("textures/2k_sun.jpg");
 sunTexture.colorSpace = THREE.SRGBColorSpace;
 
 
@@ -1975,18 +1975,27 @@ this.orbitPivot.rotation.y += this.orbitSpeed;
 
 const sunGeometry = new THREE.SphereGeometry(8, 64, 64);
 
-const sunMaterial = new THREE.MeshStandardMaterial({
+const sunMaterial = new THREE.MeshBasicMaterial({
     map: sunTexture,
-    emissiveMap: sunTexture,
-    emissive: 0xff8a1a,
-    emissiveIntensity: 1.2,
-    color: 0xffffff,
-    roughness: 1,
-    metalness: 0
+    color: 0xffffff
 });
 
 const sun = new THREE.Mesh(sunGeometry, sunMaterial);
 sun.position.set(0,0,0);
+
+const sunGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(9.6, 48, 48),
+    new THREE.MeshBasicMaterial({
+        color: 0xffaa33,
+        transparent: true,
+        opacity: 0.18,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+    })
+);
+sunGlow.name = 'sunOrbitGlow';
+sun.add(sunGlow);
 
 solarSystem.add(sun);
 
@@ -2015,6 +2024,13 @@ sunOrbitData.updateResourceLabel = Planet.prototype.updateResourceLabel;
 sunOrbitData.updateResourceSystem = Planet.prototype.updateResourceSystem;
 sunOrbitData.updateOrbit = function(){
     this.mesh.rotation.y += 0.0015;
+    const orbitGlow = this.mesh.getObjectByName('sunOrbitGlow');
+    if(orbitGlow){
+        const t = performance.now() * 0.001;
+        orbitGlow.material.opacity = 0.15 + Math.sin(t * 1.6) * 0.04;
+        const scale = 1 + Math.sin(t * 1.2) * 0.015;
+        orbitGlow.scale.setScalar(scale);
+    }
 };
 sunOrbitData.createResourceLabel();
 
@@ -7231,17 +7247,12 @@ function limitBattleArea(){
         scene.add(ambient, point);
 
         const planetGeometry = new THREE.SphereGeometry(config.size, 64, 64);
-        const planetMaterial = new THREE.MeshStandardMaterial(mapKey === 'sun'
-        ? {
+        const planetMaterial = mapKey === 'sun'
+        ? new THREE.MeshBasicMaterial({
             map: sunTexture,
-            emissiveMap: sunTexture,
-            emissive: 0xff8a1a,
-            emissiveIntensity: 1.2,
-            color: 0xffffff,
-            roughness: 0.95,
-            metalness: 0
-        }
-        : { color: config.color, roughness: 0.92, metalness: 0.04 });
+            color: 0xffffff
+        })
+        : new THREE.MeshStandardMaterial({ color: config.color, roughness: 0.92, metalness: 0.04 });
         battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
         battleMapPlanet.position.set(0, -12, -230);
         battleMapPlanet.userData.radius = config.size;
@@ -7252,6 +7263,21 @@ function limitBattleArea(){
         battleMapPlanet.userData.captureRadius = config.size + 30;
         battleMapPlanet.userData.crashRadius = config.size + 14;
         scene.add(battleMapPlanet);
+
+        if(mapKey === 'sun'){
+            const sunBattleGlow = new THREE.Mesh(
+                new THREE.SphereGeometry(config.size * 1.08, 40, 40),
+                new THREE.MeshBasicMaterial({
+                    color: 0xffaa33,
+                    transparent: true,
+                    opacity: 0.12,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                })
+            );
+            battleMapPlanet.add(sunBattleGlow);
+        }
 
         if(mapKey === 'saturn'){
             const ringGeo = new THREE.RingGeometry(config.size * 1.42, config.size * 2.2, 128);
