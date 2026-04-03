@@ -339,7 +339,7 @@ function updateBattlePlanetCapture(){
     const radius = battleMapPlanet.userData?.radius || 100;
     const impactRadius = Math.max(radius + 8, battleMapPlanet.userData?.captureRadius || (radius + 26));
     const target = battleMapPlanet.position.clone().add(battlePlanetCapture.normal.clone().multiplyScalar(impactRadius));
-    playerShip.position.lerp(target, 0.08 + progress * 0.16);
+    playerShip.position.lerp(target, 0.04 + progress * 0.16);
     shipVelocity.set(0, 0, 0);
     camera.position.copy(battlePlanetCapture.freezeCameraPosition);
     camera.lookAt(battlePlanetCapture.freezeCameraLookAt);
@@ -1186,7 +1186,7 @@ const PLANETS = {
     name: "OuterPlanets",
     resources: ["hydrogen", "helium"],
     dropChances: {
-      coins: 0.08,
+      coins: 0.04,
       crystals: 0.02
     }
   }
@@ -2763,23 +2763,23 @@ function animate(){
 
     if(selectedPlanet){
 
-        solarSystem.position.z += (-40 - solarSystem.position.z) * 0.08;
+        solarSystem.position.z += (-40 - solarSystem.position.z) * 0.04;
 
         selectedPlanet.mesh.scale.x += 
-            (1.8 - selectedPlanet.mesh.scale.x) * 0.08;
+            (1.8 - selectedPlanet.mesh.scale.x) * 0.04;
 
         selectedPlanet.mesh.scale.y += 
-            (1.8 - selectedPlanet.mesh.scale.y) * 0.08;
+            (1.8 - selectedPlanet.mesh.scale.y) * 0.04;
 
         selectedPlanet.mesh.scale.z += 
-            (1.8 - selectedPlanet.mesh.scale.z) * 0.08;
+            (1.8 - selectedPlanet.mesh.scale.z) * 0.04;
 
         selectedPlanet.updateResourceLabelPosition?.(true);
 
     }
     else{
 
-        solarSystem.position.z += (0 - solarSystem.position.z) * 0.08;
+        solarSystem.position.z += (0 - solarSystem.position.z) * 0.04;
         planets.forEach(p => p.updateResourceLabelPosition?.(false));
         sunOrbitData.updateResourceLabelPosition?.(false);
     }
@@ -2934,7 +2934,7 @@ if (gameState === "BATTLE" && playerShip) {
         enemyBot.position.lerp(desiredPos, 0.045);
         handleBattleCollisions(enemyBot);
         enemyBot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(6)));
-        enemyBot.rotation.z += ((Math.sin(enemyBot.userData.strafePhase) * 0.45) - enemyBot.rotation.z) * 0.08;
+        enemyBot.rotation.z += ((Math.sin(enemyBot.userData.strafePhase) * 0.45) - enemyBot.rotation.z) * 0.04;
 
         if (Date.now() - lastBotShotAt > botShotCooldown) {
             lastBotShotAt = Date.now();
@@ -3129,7 +3129,7 @@ function updateBattlePlanetEffects(){
     const captureRadius = Math.max(crashRadius + 10, radius + 24);
 
     const scaleBoost = THREE.MathUtils.clamp(1 + ((320 - Math.max(0, distance - radius)) / 320) * (isSunMap ? 0.64 : 0.5), 1, isSunMap ? 1.65 : 1.5);
-    battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.08;
+    battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.04;
     battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
 
     if(isSunMap){
@@ -3153,7 +3153,7 @@ function updateBattlePlanetEffects(){
         if(prominenceGroup){
             prominenceGroup.rotation.y += 0.0012;
             prominenceGroup.children.forEach((arc, index) => {
-                const pulse = 1 + Math.sin(t * (arc.userData?.pulseSpeed || 1) + (arc.userData?.phase || 0)) * 0.08;
+                const pulse = 1 + Math.sin(t * (arc.userData?.pulseSpeed || 1) + (arc.userData?.phase || 0)) * 0.04;
                 const base = arc.userData?.baseScale || 1;
                 arc.scale.setScalar(base * pulse);
                 arc.rotation.z += arc.userData?.spinSpeed || 0;
@@ -3162,7 +3162,7 @@ function updateBattlePlanetEffects(){
                     if(part.material){
                         part.material.opacity = partIndex === 0
                             ? 0.24 + Math.sin(t * 2.0 + index) * 0.06
-                            : 0.66 + Math.sin(t * 2.5 + index + 0.4) * 0.08;
+                            : 0.66 + Math.sin(t * 2.5 + index + 0.4) * 0.04;
                     }
                 });
             });
@@ -3268,7 +3268,7 @@ function updateHUD(){
 
 function tryPremiumDrop() {
 
-    const coinChance = 0.08;      // 8%
+    const coinChance = 0.04;      // 8%
     const crystalChance = 0.02;   // 2%
 
     let dropped = false;
@@ -5976,9 +5976,9 @@ function animateRemoteBattleShips(){
         if(!mesh) return;
         const seed = mesh.userData?.orbitSeed || 0;
         const slotIndex = mesh.userData?.slotIndex || 0;
-        mesh.position.y += ((8 + Math.sin(now + seed) * 2.4 + (slotIndex % 3) * 1.5) - mesh.position.y) * 0.08;
+        mesh.position.y += ((8 + Math.sin(now + seed) * 2.4 + (slotIndex % 3) * 1.5) - mesh.position.y) * 0.04;
         mesh.rotation.y += 0.01;
-        mesh.rotation.z = Math.sin(now * 1.3 + seed) * 0.08;
+        mesh.rotation.z = Math.sin(now * 1.3 + seed) * 0.04;
     });
 }
 
@@ -6746,7 +6746,7 @@ function handleBattleCollisions(object, velocityRef=null){
 
 function spawnShipDebris(position, color=0xffffff){
     for(let i=0;i<14;i++){
-        const piece = new THREE.Mesh(new THREE.BoxGeometry(0.2 + Math.random()*0.7, 0.12 + Math.random()*0.5, 0.2 + Math.random()*0.7), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity:0.08, roughness:0.9, metalness:0.15 }));
+        const piece = new THREE.Mesh(new THREE.BoxGeometry(0.2 + Math.random()*0.7, 0.12 + Math.random()*0.5, 0.2 + Math.random()*0.7), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity:0.04, roughness:0.9, metalness:0.15 }));
         piece.position.copy(position);
         piece.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
         scene.add(piece);
@@ -7259,10 +7259,10 @@ function limitBattleArea(){
 
     function createSunProminenceArc(radius, arcIndex = 0){
         const curve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(-radius * 0.38, 0, 0),
-            new THREE.Vector3(-radius * 0.15, radius * (0.20 + Math.random() * 0.08), 0),
-            new THREE.Vector3(radius * 0.15, radius * (0.20 + Math.random() * 0.08), 0),
-            new THREE.Vector3(radius * 0.38, 0, 0)
+            new THREE.Vector3(-radius * 0.25, 0, 0),
+            new THREE.Vector3(-radius * 0.15, radius * (0.20 + Math.random() * 0.04), 0),
+            new THREE.Vector3(radius * 0.15, radius * (0.20 + Math.random() * 0.04), 0),
+            new THREE.Vector3(radius * 0.25, 0, 0)
         ]);
 
         const glowTube = new THREE.Mesh(
@@ -7305,7 +7305,7 @@ function limitBattleArea(){
     function createSunProminenceGroup(radius){
         const group = new THREE.Group();
         group.name = 'sunProminenceGroup';
-        for(let i = 0; i < 4; i++){
+        for(let i = 0; i < 2; i++){
             group.add(createSunProminenceArc(radius, i));
         }
         return group;
@@ -9582,8 +9582,8 @@ function showPlayerActionMenu(anchorEl, targetId, nickname){
 
     menu.innerHTML = `
       <div style="color:#9fe7ff;font-weight:700;padding:4px 6px 8px;">${safeName}</div>
-      <button type="button" class="player-menu-btn" data-action="profile" style="width:100%;display:block;text-align:left;margin:0 0 6px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#fff;cursor:pointer;">👤 Открыть профиль</button>
-      <button type="button" class="player-menu-btn" data-action="pm" ${canPm ? '' : 'disabled'} style="width:100%;display:block;text-align:left;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:${canPm ? 'rgba(0,180,255,0.16)' : 'rgba(255,255,255,0.04)'};color:${canPm ? '#dff8ff' : '#7f8a96'};cursor:${canPm ? 'pointer' : 'not-allowed'};">✉️ Личное сообщение</button>
+      <button type="button" class="player-menu-btn" data-action="profile" style="width:100%;display:block;text-align:left;margin:0 0 6px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.04);color:#fff;cursor:pointer;">👤 Открыть профиль</button>
+      <button type="button" class="player-menu-btn" data-action="pm" ${canPm ? '' : 'disabled'} style="width:100%;display:block;text-align:left;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:${canPm ? 'rgba(0,180,255,0.16)' : 'rgba(255,255,255,0.04)'};color:${canPm ? '#dff8ff' : '#7f8a96'};cursor:${canPm ? 'pointer' : 'not-allowed'};">✉️ Личное сообщение</button>
     `;
 
     const rect = anchorEl.getBoundingClientRect();
