@@ -5628,7 +5628,20 @@ function getBattlePlanetConfig(mapKey){
     return configs[mapKey] || configs.earth;
 }
 
-function enterBattleMap(mapName){
+function enterBattleMap(
+  // FIX: reset orbit leftovers
+  try {
+    if (window.selectedPlanet) {
+      if (window.selectedPlanet.mesh && window.selectedPlanet.mesh.parent) {
+        window.selectedPlanet.mesh.parent.remove(window.selectedPlanet.mesh);
+      }
+      if (window.selectedPlanet.resourceLabel && window.selectedPlanet.resourceLabel.parent) {
+        window.selectedPlanet.resourceLabel.parent.remove(window.selectedPlanet.resourceLabel);
+      }
+    }
+    window.selectedPlanet = null;
+  } catch(e){}
+mapName){
     const mapKey = normalizeBattleMapName(mapName);
     selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
 
@@ -8153,14 +8166,14 @@ function closeShopView(){
     const prevResetOrbitView = resetOrbitView;
     resetOrbitView = function(forcePlanetReset=false){
         prevResetOrbitView(forcePlanetReset);
-        ensureSunStable();
+        if (window.gameState !== 'BATTLE') ensureSunStable();
         updateNebulaVisibility();
     };
 
     const prevClearBattleScene = clearBattleScene;
     clearBattleScene = function(){
         prevClearBattleScene();
-        ensureSunStable();
+        if (window.gameState !== 'BATTLE') ensureSunStable();
         updateNebulaVisibility();
     };
 
@@ -8742,7 +8755,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
     const prevSwitchState = switchState;
     switchState = function(newState){
         prevSwitchState(newState);
-        ensureSunStable();
+        if (window.gameState !== 'BATTLE') ensureSunStable();
         updateNebulaVisibility();
         if(newState === 'LOBBY'){
             bindLobbyModeButtons();
@@ -8762,7 +8775,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
             closeShopView();
         }
         if(newState === 'ORBIT'){
-            ensureSunStable();
+            if (window.gameState !== 'BATTLE') ensureSunStable();
         }
     };
     window.switchState = switchState;
@@ -8771,7 +8784,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
         bindLobbyModeButtons();
         bindActionButtons();
         bindCreateWindows();
-        ensureSunStable();
+        if (window.gameState !== 'BATTLE') ensureSunStable();
         updateNebulaVisibility();
         try{
             if(typeof fillLevelSelects === 'function') fillLevelSelects('tournament-min-level','tournament-max-level');
