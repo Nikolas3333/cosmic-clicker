@@ -481,12 +481,47 @@ function getBattlePingValue(){
     const browserPing = Number(navigator?.connection?.rtt || 0);
     if(Number.isFinite(window.__battlePingMs) && window.__battlePingMs > 0) return Math.round(window.__battlePingMs);
     if(Number.isFinite(browserPing) && browserPing > 0) return Math.round(browserPing);
-    return 42;
+    return 0;
+}
+
+async function measureBattlePing(){
+    try{
+        const startedAt = performance.now();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const pingUrl = String(location.href || '').split('#')[0] + (String(location.href || '').includes('?') ? '&' : '?') + 'ping=' + Date.now();
+
+        await fetch(pingUrl, {
+            method: 'HEAD',
+            cache: 'no-store',
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        const measured = Math.max(1, Math.round(performance.now() - startedAt));
+        const previous = Number(window.__battlePingMs || 0);
+        window.__battlePingMs = previous > 0
+            ? Math.round(previous * 0.55 + measured * 0.45)
+            : measured;
+        updateBattleScoreboard?.();
+        refreshLobbyPingForCurrentPlayer?.();
+        return window.__battlePingMs;
+    }catch(_){
+        const browserPing = Number(navigator?.connection?.rtt || 0);
+        if(Number.isFinite(browserPing) && browserPing > 0){
+            window.__battlePingMs = Math.round(browserPing);
+            updateBattleScoreboard?.();
+            refreshLobbyPingForCurrentPlayer?.();
+            return window.__battlePingMs;
+        }
+        return 0;
+    }
 }
 
 function updateBattleHudPing(){
     const pingValue = document.getElementById('battle-ping-value');
-    if(pingValue) pingValue.textContent = String(getBattlePingValue());
+    const value = getBattlePingValue();
+    if(pingValue) pingValue.textContent = String(value > 0 ? value : '—');
 }
 
 function updateBattleSoundButtonState(){
@@ -501,9 +536,13 @@ function startBattleHudLoops(){
     stopBattleHudLoops();
     updateBattleHudMeta();
     updateBattleHudPing();
+    measureBattlePing?.();
     updateBattleSoundButtonState();
     battleHudClockTimer = setInterval(updateBattleHudMeta, 1000);
-    battleHudPingTimer = setInterval(updateBattleHudPing, 5000);
+    battleHudPingTimer = setInterval(() => {
+        updateBattleHudPing();
+        measureBattlePing?.();
+    }, 4000);
 }
 
 function stopBattleHudLoops(){
@@ -560,6 +599,14 @@ function updateBattlePlayerWorldName(){
     const label = document.getElementById('battle-player-world-name');
     if(!label) return;
     label.classList.add('hidden');
+}
+
+function refreshLobbyPingForCurrentPlayer(){
+    const pingValue = getBattlePingValue();
+    const labels = document.querySelectorAll('[data-player-ping-self="1"]');
+    labels.forEach(label => {
+        label.textContent = pingValue > 0 ? String(pingValue) : '—';
+    });
 }
 
 
@@ -3141,61 +3188,8 @@ function updateBattlePlanetEffects(){
     battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.08;
     battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
 
-    let prominenceHit = false;
-
     if(isSunMap){
         battleMapPlanet.rotation.y += 0.0015;
-
-        const t = performance.now() * 0.001;
-        const glow = battleMapPlanet.getObjectByName('sunBattleGlow');
-        const outerGlow = battleMapPlanet.getObjectByName('sunBattleOuterGlow');
-        const prominenceGroup = battleMapPlanet.getObjectByName('sunProminenceGroup');
-
-        if(glow){
-            glow.material.opacity = 0.10 + Math.sin(t * 1.7) * 0.03;
-            const s = 1 + Math.sin(t * 1.2) * 0.012;
-            glow.scale.setScalar(s);
-        }
-
-        if(outerGlow){
-            outerGlow.material.opacity = 0.055 + Math.sin(t * 1.1 + 0.8) * 0.018;
-        }
-
-        if(prominenceGroup){
-            prominenceGroup.rotation.y += 0.0007;
-
-            prominenceGroup.children.forEach((arc, index) => {
-                const pulse = 1 + Math.sin(t * (arc.userData?.pulseSpeed || 1) + (arc.userData?.phase || 0)) * 0.06;
-                const base = arc.userData?.baseScale || 1;
-                arc.scale.setScalar(base * pulse);
-                arc.rotation.z += arc.userData?.spinSpeed || 0;
-
-                arc.children.forEach((part, partIndex) => {
-                    if(part.material){
-                        if(partIndex === 0){
-                            part.material.opacity = 0.07 + Math.sin(t * 1.6 + index) * 0.02;
-                        }else if(partIndex === 1){
-                            part.material.opacity = 0.20 + Math.sin(t * 1.9 + index) * 0.05;
-                        }else{
-                            part.material.opacity = 0.76 + Math.sin(t * 2.2 + index + 0.4) * 0.06;
-                        }
-                    }
-                });
-
-                if(!prominenceHit && Array.isArray(arc.userData?.samplePoints) && arc.userData.samplePoints.length){
-                    arc.updateMatrixWorld(true);
-                    const hitRadius = arc.userData?.damageRadius || Math.max(3.8, radius * 0.028);
-
-                    for(const localPoint of arc.userData.samplePoints){
-                        const worldPoint = localPoint.clone().applyMatrix4(arc.matrixWorld);
-                        if(worldPoint.distanceTo(playerShip.position) <= hitRadius){
-                            prominenceHit = true;
-                            break;
-                        }
-                    }
-                }
-            });
-        }
     }
 
     const towardPlanet = toPlanet.clone().normalize();
@@ -3225,32 +3219,7 @@ function updateBattlePlanetEffects(){
         if(distance < nearSurfaceRadius){
             shipVelocity.multiplyScalar(isSunMap ? 0.90 : 0.92);
         }
-
-        if(isSunMap){
-            const heatFactor = THREE.MathUtils.clamp((atmosphereRadius - distance) / Math.max(1, atmosphereRadius - radius), 0, 1);
-            const heatDamage = 0.03 + heatFactor * 0.22;
-            playerHp = Math.max(0, playerHp - heatDamage);
-
-            if(playerHp <= 0){
-                startSunProminenceDeath();
-                updateBattlePlayerHud?.();
-                return;
-            }
-        }
     }
-
-    if(isSunMap && prominenceHit){
-        playerHp = Math.max(0, playerHp - 1.35);
-        shipVelocity.add(towardPlanet.clone().multiplyScalar(0.06));
-
-        if(playerHp <= 0){
-            startSunProminenceDeath();
-            updateBattlePlayerHud?.();
-            return;
-        }
-    }
-
-    updateBattlePlayerHud?.();
 }
 // ===== POINTER LOCK =====
 const canvas = renderer.domElement;
@@ -5598,7 +5567,7 @@ function createRoom(mapName, password = null, title = null) {
 
 const confirmCreateBtn = document.getElementById("confirm-create");
 
-if (confirmCreateBtn) {
+if (false && confirmCreateBtn) {
 
     confirmCreateBtn.addEventListener("click", () => {
 
@@ -5641,7 +5610,7 @@ if (confirmCreateBtn) {
 
 const joinButton = document.getElementById("join-map-btn");
 
-if (joinButton) {
+if (false && joinButton) {
 
     joinButton.onclick = () => {
 
@@ -6110,7 +6079,7 @@ function updateBattleScoreboard(){
         ? roomPlayers
         : (gameState === 'OBSERVE'
             ? []
-            : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '' }]);
+            : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '', ping: getBattlePingValue() }]);
 
     if(gameState === 'OBSERVE' && !normalizedPlayers.length){
       body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span><span>—</span></div>';
@@ -7483,7 +7452,9 @@ function limitBattleArea(){
             sunOuterGlow.name = 'sunBattleOuterGlow';
             battleMapPlanet.add(sunOuterGlow);
 
-            battleMapPlanet.add(createSunProminenceGroup(config.size));
+            if(typeof createSunProminenceGroup === 'function'){
+                battleMapPlanet.add(createSunProminenceGroup(config.size));
+            }
         }
 
         if(mapKey === 'saturn'){
@@ -8919,49 +8890,45 @@ window.renderPlayersOnPlanet = function(entry = {}){
             confirmOld.replaceWith(btn);
             btn.dataset.v27Bound = '1';
             btn.addEventListener('click', async () => {
-                const selected = (typeof getSelectedLobbyMapConfig === 'function' ? getSelectedLobbyMapConfig() : selectedLobbyMap) || selectedLobbyMap || (typeof LOBBY_MAP_DATA !== 'undefined' ? LOBBY_MAP_DATA[0] : null);
-                if(!selected) return;
+                const uiSelected = (typeof getSelectedLobbyMapFromUI === 'function' ? getSelectedLobbyMapFromUI() : null);
+                const selectedBase = uiSelected || (selectedLobbyMap?.isBaseMap ? selectedLobbyMap : null) || (typeof LOBBY_MAP_DATA !== 'undefined' ? LOBBY_MAP_DATA[0] : null);
+                if(!selectedBase) return;
 
-                const roomTitle = document.getElementById('room-title')?.value?.trim() || `${selected.title || selected.name} Room`;
+                const normalizedMap = normalizeBattleMapName(selectedBase.real || selectedBase.name || selectedBase.title || 'sun');
+                const roomTitleInput = document.getElementById('room-title');
+                const roomTitleRaw = roomTitleInput?.value?.trim() || '';
+                const roomTitle = roomTitleRaw && !/^\d+$/.test(roomTitleRaw)
+                    ? roomTitleRaw
+                    : `${selectedBase.title || normalizedMap} Room`;
                 const playerCount = Number(document.getElementById('player-count')?.value || 8);
                 const minLevel = Number(document.getElementById('min-level')?.value || 1);
                 const maxLevel = Number(document.getElementById('max-level')?.value || 120);
                 const hostName = (typeof player !== 'undefined' && player?.nickname) ? player.nickname : 'Commander';
-                const mapName = selected.title || selected.name || selected.real || 'Меркурий';
 
-                const created = await createGameRoom(roomTitle, mapName, playerCount, hostName);
+                const created = await createGameRoom(roomTitle, normalizedMap, playerCount, hostName);
                 if(!created) return;
-
-                const normalizedCreatedMap = normalizeBattleMapName(
-                    selected?.real ||
-                    selected?.name ||
-                    mapName ||
-                    created?.map_name ||
-                    created?.room_name ||
-                    'earth'
-                );
 
                 currentRoom = {
                     id: created.id,
                     title: created.room_name,
-                    map: normalizedCreatedMap,
-                    real: normalizedCreatedMap,
-                    name: normalizedCreatedMap,
-                    img: selected.img || normalizedCreatedMap,
+                    map: normalizedMap,
+                    real: normalizedMap,
+                    name: normalizedMap,
+                    img: selectedBase.img || normalizedMap,
                     mode: 'DM',
                     minLevel,
                     maxLevel,
                     maxPlayers: created.max_players || playerCount,
                     players:[getDisplayPlayerTag()],
                     currentPlayers:[getDisplayPlayerTag()],
-                    state:'battle'
+                    state:'battle',
+                    isBaseMap:false
                 };
 
-                selectedLobbyMap = { ...currentRoom, isBaseMap:false };
+                selectedLobbyMap = { ...currentRoom };
                 window.currentRoomId = currentRoom.id || null;
                 document.getElementById('create-match-window')?.classList.add('hidden');
-                const titleInput = document.getElementById('room-title');
-                if(titleInput) titleInput.value = '';
+                if(roomTitleInput) roomTitleInput.value = '';
 
                 switchState('BATTLE');
             });
@@ -9476,15 +9443,22 @@ async function loadRoomsFromSupabase() {
       .in('id', emptyRoomIds);
     if (emptyDeleteError) {
       console.warn('Не удалось удалить пустые комнаты:', emptyDeleteError);
-    } else {
-      allRooms = allRooms.filter(room => !emptyRoomIds.includes(room.id));
     }
+    allRooms = allRooms.filter(room => !emptyRoomIds.includes(room.id));
   }
 
   rebuildBattleMapOccupants(allRooms, presenceRows);
 
   const visibleRooms = allRooms.filter(room => room?.id && Array.isArray(room.room_players) && room.room_players.length > 0);
-  supabaseBattleRoomsCache = visibleRooms.map(room => mapSupabaseRoomToLobbyEntry(room, presenceRows));
+  supabaseBattleRoomsCache = visibleRooms.map(room => {
+    const mapped = mapSupabaseRoomToLobbyEntry(room, presenceRows);
+    const myName = getDisplayPlayerTag?.() || '';
+    const players = Array.isArray(mapped.currentPlayers) ? mapped.currentPlayers : [];
+    if(players.includes(myName)){
+      mapped.ping = getBattlePingValue();
+    }
+    return mapped;
+  });
 
   const selectedId = String(selectedLobbyMap?.id || currentRoom?.id || '');
   if(selectedId){
