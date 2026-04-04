@@ -690,8 +690,7 @@ function ensureSelfRoomPlayerState(){
         .upsert(payload, { onConflict: 'room_id,player_id' })
         .then(() => {})
         .catch((error) => {
-            console.warn('Не удалось обновить состояние игрока комнаты:', error);
-        });
+                    });
 }
 
 
@@ -772,7 +771,7 @@ async function sendSceneMapMessage(text, options = {}) {
     if (!roomId) return false;
     persistBattleChatRoomId(roomId);
 
-    const mirrorToBattle = options?.mirrorToBattle === true && gameState === 'BATTLE';
+    const mirrorToBattle = options?.mirrorToBattle !== false && (gameState === 'BATTLE' || gameState === 'OBSERVE');
 
     const scenePayload = {
         channel: "scene",
@@ -872,12 +871,12 @@ function initBattleChat(){
                     let sent = false;
 
                     if(gameState === 'BATTLE'){
-                        sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
+                        sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
                     }else if(gameState === 'OBSERVE'){
                         if(!canWriteInObserverChat()) {
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                         } else {
-                            sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
+                            sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
                         }
                     }
 
@@ -4859,7 +4858,7 @@ function showSceneMapMessageInActiveScene(msg) {
         const roleBadge = getForcedSceneRoleBadgeHtml(msg.staff_role);
         item.innerHTML = `${roleBadge}<span class="chat-text">${text}</span>`;
     } else {
-        const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
+        const idHtml = publicId ? ` <span class="chat-id">(${safePublicId})</span>` : '';
         item.innerHTML = `<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
     }
 
