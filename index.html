@@ -3392,9 +3392,7 @@ shop-main-head{
   max-width:760px;
 }
 .hangar-resource-line{
-  display:flex;
-  gap:10px;
-  padding-top:8px;
+  display:none;
 }
 .hangar-res-chip,.hangar-price-chip{
   display:inline-flex;
@@ -3477,6 +3475,26 @@ shop-main-head{
   color:#a8c7d8;
   font-size:13px;
   line-height:1.5;
+}
+.hangar-module-action{
+  width:100%;
+  margin-top:14px;
+  padding:12px 14px;
+  border:none;
+  border-radius:16px;
+  cursor:pointer;
+  color:#f2fcff;
+  font-weight:700;
+  background:linear-gradient(180deg, #1c5e92, #103252);
+  box-shadow:0 0 18px rgba(0,170,255,0.16);
+}
+.hangar-module-action.equipped{
+  background:linear-gradient(180deg, #2a7846, #174429);
+}
+.hangar-module-action.locked{
+  background:linear-gradient(180deg, #6a4f24, #3f2d12);
+  cursor:not-allowed;
+  opacity:0.7;
 }
 .hangar-arrow{
   border:none;
@@ -4102,10 +4120,7 @@ shop-main-head{
         <h2>Ангар</h2>
         <div class="hangar-subtitle">Корабли на вращающейся платформе и модули слева в отдельном 3D-отсеке.</div>
       </div>
-      <div class="hangar-resource-line">
-        <span class="hangar-res-chip">🪙 <span id="hangar-coins">0</span></span>
-        <span class="hangar-res-chip">💎 <span id="hangar-diamonds">0</span></span>
-      </div>
+
     </div>
 
     <div class="hangar-layout">
@@ -4119,6 +4134,7 @@ shop-main-head{
             <div id="hangar-module-tier" class="hangar-module-tier">—</div>
             <div id="hangar-module-type" class="hangar-module-type">—</div>
             <div id="hangar-module-desc" class="hangar-module-desc">—</div>
+            <button id="hangar-module-action" class="hangar-module-action" type="button">Установить модуль</button>
           </div>
         </div>
         <button id="hangar-module-down" class="hangar-arrow vertical" type="button">▼</button>
