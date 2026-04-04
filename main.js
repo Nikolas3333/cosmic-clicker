@@ -2726,6 +2726,10 @@ renderer.setSize(window.innerWidth,window.innerHeight);
 /* ================= ANIMATION ================= */
 
 function animate(){
+    if (typeof battleMapPlanet !== 'undefined' && battleMapPlanet) {
+        battleMapPlanet.rotation.y += 0.0025;
+    }
+
 
     requestAnimationFrame(animate);
 
