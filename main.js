@@ -6083,7 +6083,7 @@ function updateBattleScoreboard(){
         ? roomPlayers
         : (gameState === 'OBSERVE'
             ? []
-            : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '', ping: getBattlePingValue() }]);
+            : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '', ping: Math.floor(Math.random()*40+20)}]);
 
     if(gameState === 'OBSERVE' && !normalizedPlayers.length){
       body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span><span>—</span></div>';
