@@ -872,11 +872,7 @@ function initBattleChat(){
                     let sent = false;
 
                     if(gameState === 'BATTLE'){
-                        if (canWriteBattleAnnouncementChat()) {
-                            sent = await sendMessage('battle', text);
-                        } else {
-                            sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
-                        }
+                        sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
                     }else if(gameState === 'OBSERVE'){
                         if(!canWriteInObserverChat()) {
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
@@ -3970,12 +3966,10 @@ function getOwnChatLabel() {
 
 function getObserveStaffChatIdentity() {
     const role = getOwnStaffRole();
-    const meta = getStaffRoleMeta(role);
-    const isObserveStaff = gameState === 'OBSERVE' && isStaffRole(role);
     return {
-        isObserveStaff,
-        publicId: isObserveStaff ? null : getOwnPublicChatId(),
-        nickname: isObserveStaff ? (meta?.label || 'Staff') : getOwnChatLabel(),
+        isObserveStaff: false,
+        publicId: getOwnPublicChatId(),
+        nickname: getOwnChatLabel(),
         staffRole: role
     };
 }
@@ -4842,6 +4836,7 @@ function showBattleAnnouncementInActiveScene(msg) {
 function showSceneMapMessageInActiveScene(msg) {
     if (!msg) return;
     if (gameState !== "BATTLE" && gameState !== "OBSERVE") return;
+
     const activeSceneRoomId = String(getSceneChatRoomId() || "").trim();
     const incomingSceneRoomId = String(msg.room_id || "").trim();
     if (incomingSceneRoomId !== "__all__" && incomingSceneRoomId !== activeSceneRoomId) return;
@@ -4854,30 +4849,24 @@ function showSceneMapMessageInActiveScene(msg) {
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
     const isGlobalStaffAnnouncement = incomingSceneRoomId === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
-    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role);
-    const roleBadge = isGlobalStaffAnnouncement
-        ? getForcedSceneRoleBadgeHtml(msg.staff_role)
-        : (showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '');
-    const roleClass = isGlobalStaffAnnouncement
-        ? getChatRoleCssClassByRole(msg.staff_role)
-        : (showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '');
-    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
-
-    const visibleRoleBadge = roleBadge;
 
     const item = document.createElement('div');
-    item.className = `kill-feed-item chat-announcement scene-chat${lineClass}`;
-    const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
-    item.innerHTML = (shouldHideStaffIdentityInObserve(publicId, msg.staff_role) || isGlobalStaffAnnouncement)
-        ? `${visibleRoleBadge}<span class="chat-text">${text}</span>`
-        : `${visibleRoleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    item.className = isGlobalStaffAnnouncement
+        ? 'kill-feed-item chat-announcement'
+        : 'kill-feed-item chat-announcement scene-chat';
+
+    if (isGlobalStaffAnnouncement) {
+        const roleBadge = getForcedSceneRoleBadgeHtml(msg.staff_role);
+        item.innerHTML = `${roleBadge}<span class="chat-text">${text}</span>`;
+    } else {
+        const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
+        item.innerHTML = `<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    }
 
     feed.prepend(item);
-
     while (feed.children.length > 8) {
         feed.removeChild(feed.lastChild);
     }
-
     setTimeout(() => {
         item.remove();
     }, 9000);
@@ -4998,20 +4987,6 @@ async function refreshBattleFeedFromDb() {
 
 async function handleIncomingRealtimeMessage(msg) {
     if (!msg || !msg.channel) return;
-    console.log('📥 RECEIVE MESSAGE:', {
-        id: msg.id || null,
-        channel: msg.channel || null,
-        room_id: msg.room_id || null,
-        player_id: msg.player_id || null,
-        player_public_id: msg.player_public_id || null,
-        nickname: msg.player_nickname || null,
-        currentChat,
-        gameState,
-        battleRoomId: getBattleChatRoomId ? getBattleChatRoomId() : null,
-        sceneRoomId: getSceneChatRoomId ? getSceneChatRoomId() : null,
-        observerMode: !!battleObserverMode,
-        text: msg.message || ''
-    });
     await hydrateStaffRolesForMessages([msg]);
 
     if (msg.channel === "global") {
@@ -5042,21 +5017,10 @@ async function handleIncomingRealtimeMessage(msg) {
         const activeBattleRoomId = String(getBattleChatRoomId() || '').trim();
         const incomingRoomId = String(msg.room_id || '').trim();
         if (activeBattleRoomId && incomingRoomId !== activeBattleRoomId && incomingRoomId !== '__all__') {
-            console.log('⛔ BATTLE FILTER SKIP:', {
-                incomingRoomId,
-                activeBattleRoomId,
-                id: msg.id || null,
-                text: msg.message || ''
-            });
             return;
         }
         const scope = { key: 'battle', channel: 'battle' };
         if (!pushChatToCache(scope, msg)) {
-            console.log('♻️ BATTLE DUPLICATE SKIP:', {
-                id: msg.id || null,
-                room_id: msg.room_id || null,
-                text: msg.message || ''
-            });
             return;
         }
         if (currentChat !== "battle") incrementUnread("battle");
