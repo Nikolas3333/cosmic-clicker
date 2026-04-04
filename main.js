@@ -4162,16 +4162,25 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
 
-    const isObserveHiddenStaff = scope.channel === "battle" && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
-    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const resolvedRole = getResolvedStaffRole(publicId, msg?.staff_role || "");
+    const isObserveHiddenStaff = scope.channel === "battle" && shouldHideStaffIdentityInObserve(publicId, resolvedRole);
+    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(resolvedRole);
 
     const shouldShowLobbyRoleBadge =
         (scope.channel === "global" || scope.channel === "clan") &&
-        isStaffRole(msg?.staff_role);
+        isStaffRole(resolvedRole);
 
     const showRoleBadge = isGlobalStaffAnnouncement || isObserveHiddenStaff || shouldShowLobbyRoleBadge;
-    const roleBadge = showRoleBadge ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
-    const roleClass = showRoleBadge ? getChatRoleCssClassByRole(msg.staff_role) : '';
+    const roleBadge = showRoleBadge
+        ? (shouldShowLobbyRoleBadge
+            ? getChatRoleBadgeHtmlByPublicId(publicId, resolvedRole)
+            : getForcedSceneRoleBadgeHtml(resolvedRole))
+        : '';
+    const roleClass = showRoleBadge
+        ? (shouldShowLobbyRoleBadge
+            ? getChatRoleCssClassByPublicIdOrRole(publicId, resolvedRole)
+            : getChatRoleCssClassByRole(resolvedRole))
+        : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const nickAttrs = publicId
