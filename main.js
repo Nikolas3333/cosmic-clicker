@@ -624,6 +624,20 @@ function getBattleRoomPlayerTeam(entryId = ''){
     return String(key).slice(-1).charCodeAt(0) % 2 === 0 ? 'blue' : 'red';
 }
 
+const ROOM_PLAYER_STALE_MS = 12000;
+
+function getRoomPlayerFreshCutoffIso(){
+    return new Date(Date.now() - ROOM_PLAYER_STALE_MS).toISOString();
+}
+
+function isFreshRoomPlayerRow(row = {}){
+    const stamp = row?.updated_at || row?.joined_at || null;
+    if(!stamp) return false;
+    const time = new Date(stamp).getTime();
+    if(!Number.isFinite(time)) return false;
+    return (Date.now() - time) <= ROOM_PLAYER_STALE_MS;
+}
+
 function getBattleShipColorHex(team = 'blue'){
     return String(team || '').trim().toLowerCase() === 'red' ? 0xff6b6b : 0x7ee7ff;
 }
@@ -758,7 +772,7 @@ async function sendSceneMapMessage(text, options = {}) {
     if (!roomId) return false;
     persistBattleChatRoomId(roomId);
 
-    const mirrorToBattle = options?.mirrorToBattle !== false && (gameState === 'BATTLE' || gameState === 'OBSERVE');
+    const mirrorToBattle = options?.mirrorToBattle === true && gameState === 'BATTLE';
 
     const scenePayload = {
         channel: "scene",
@@ -861,13 +875,13 @@ function initBattleChat(){
                         if (canWriteBattleAnnouncementChat()) {
                             sent = await sendMessage('battle', text);
                         } else {
-                            sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                            sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
                         }
                     }else if(gameState === 'OBSERVE'){
                         if(!canWriteInObserverChat()) {
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                         } else {
-                            sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                            sent = await sendSceneMapMessage(text, { mirrorToBattle:false });
                         }
                     }
 
@@ -1062,7 +1076,6 @@ function switchState(newState){
         cleanupBattleRoomSilently();
     }
 
-    console.log("STATE:", newState);
     gameState = newState;
 
     const canvas = document.querySelector("canvas");
@@ -3304,9 +3317,7 @@ const canvas = renderer.domElement;
 
 document.addEventListener("pointerlockchange", () => {
     if (document.pointerLockElement === canvas) {
-        console.log("Pointer locked");
     } else {
-        console.log("Pointer unlocked");
     }
 });
 
@@ -3563,7 +3574,6 @@ function updateMap(){
     if(mapImage) mapImage.src = map.img;
     if(mapName) mapName.textContent = map.name;
 
-    console.log("Текущая карта:", map.name);
 }
 
 if(prevBtn){
@@ -4716,7 +4726,6 @@ function renderChatTabs() {
 
     saveChatUiState();
     renderBattleHistorySearchUi();
-    console.log("CHAT_NOTIFY_STATE", JSON.stringify(chatUnread), "current=", currentChat);
 }
 
 function renderLobbyMessages() {
@@ -5101,7 +5110,6 @@ function startRealtimeChat() {
             }
         )
         .subscribe((status) => {
-            console.log("💬 CHAT REALTIME:", status);
         });
 }
 
@@ -5583,7 +5591,6 @@ function initMapDropdown() {
 
             mapDropdown.classList.add("hidden");
 
-            console.log("Выбрана карта:", map.name);
         });
 
         mapDropdown.appendChild(option);
@@ -5633,7 +5640,6 @@ function createRoom(mapName, password = null, title = null) {
 
     rooms[roomId].players.push(player);
 
-    console.log("Создана комната:", rooms[roomId]);
 
     return roomId;
 }
@@ -5656,7 +5662,6 @@ if (false && confirmCreateBtn) {
         const roomTitle = roomTitleInput?.value?.trim() || `${selectedMap.name} Room`;
         const roomId = createRoom(selectedMap.name, null, roomTitle);
 
-        console.log("Игрок создал комнату:", roomId);
 
         // 👉 ЗАПОМИНАЕМ ТЕКУЩУЮ КОМНАТУ
         currentRoom = rooms[roomId];
@@ -5695,7 +5700,6 @@ if (false && joinButton) {
             return;
         }
 
-        console.log("Вход на карту:", selectedMap);
 
         loadPlanet(selectedMap);
 
@@ -6149,11 +6153,12 @@ async function fetchCurrentRoomLivePlayers(){
         .order('joined_at', { ascending: true });
 
     if(error){
-        console.warn('Не удалось загрузить игроков комнаты:', error);
-        return [];
+                return [];
     }
 
-    return (data || []).map((item, index) => ({
+    return (data || [])
+        .filter(item => isFreshRoomPlayerRow(item))
+        .map((item, index) => ({
         player_id: item.player_id ? String(item.player_id) : `guest_${index}`,
         nickname: item.nickname || `Pilot ${index + 1}`,
         joined_at: item.joined_at || null,
@@ -6387,7 +6392,7 @@ function updateBattleScoreboard(){
     const selfTeam = getBattleRoomPlayerTeam(myId);
     const selfRow = (gameState === 'OBSERVE') ? null : {
         nickname: player?.nickname || 'Commander',
-        clan: selfTeam === 'red' ? 'RED' : 'BLUE',
+        clan: '',
         level: Number(player?.level || 1) || 1,
         kills: Number(battleStats.playerKills || 0) || 0,
         deaths: Number(battleStats.playerDeaths || 0) || 0,
@@ -6413,7 +6418,7 @@ function updateBattleScoreboard(){
         const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
         rows.push({
             nickname: remoteState?.nickname || safeName || 'Pilot',
-            clan: team === 'red' ? 'RED' : 'BLUE',
+            clan: '',
             level: Number(entry?.level || remoteState?.level || 1) || 1,
             kills: Number(entry?.kills || 0) || 0,
             deaths: Number(entry?.deaths || 0) || 0,
@@ -6433,17 +6438,17 @@ function updateBattleScoreboard(){
       const entryId = String(entry?.id || '').trim();
       const isYou = !!(myId && entryId && myId === entryId) || safeName === (player?.nickname || 'Commander');
       const team = String(entry?.team || (isYou ? selfTeam : getBattleRoomPlayerTeam(entryId))).trim().toLowerCase() === 'red' ? 'red' : 'blue';
-      const clan = String(entry?.clan || (team === 'red' ? 'RED' : 'BLUE')).trim();
       const kills = Math.max(0, Number(isYou ? battleStats.playerKills : entry?.kills) || 0);
       const deaths = Math.max(0, Number(isYou ? battleStats.playerDeaths : entry?.deaths) || 0);
       const levelValue = Math.max(1, Number(isYou ? player?.level : entry?.level) || 1);
       const publicId = isYou ? (myId || '—') : (entryId || '—');
       const pingValueRaw = Number(isYou ? getBattlePingValue() : entry?.ping || 0);
       const pingValue = Number.isFinite(pingValueRaw) && pingValueRaw > 0 ? Math.round(pingValueRaw) : '—';
+      const nickColor = team === 'red' ? '#ff8f8f' : '#8fd8ff';
       return `
       <div class="battle-scoreboard-row ${team === 'red' ? 'enemy' : 'player'}">
-        <span>${clan}</span>
-        <span title="${safeName}">${safeName}</span>
+        <span></span>
+        <span title="${safeName}" style="color:${nickColor};font-weight:700;">${safeName}</span>
         <span>${kills}</span>
         <span>${deaths}</span>
         <span class="battle-level-cell"><span class="battle-level-icon">★</span>${levelValue}</span>
@@ -6453,7 +6458,7 @@ function updateBattleScoreboard(){
     }).join('');
 }
 
-// ================= SPAWN PLAYER =================// ================= SPAWN PLAYER =================
+// ================= SPAWN PLAYER =================
 
 function spawnPlayer() {
 
@@ -6469,14 +6474,17 @@ function spawnPlayer() {
     const shipGroup = new THREE.Group();
     shipGroup.rotation.order = 'YXZ';
 
+    const selfTeam = getBattleRoomPlayerTeam(getSelfBattlePlayerId());
+    const hullColor = getBattleShipColorHex(selfTeam);
+
     const hull = new THREE.Mesh(
         new THREE.ConeGeometry(1.15, 4.4, 8),
-        new THREE.MeshStandardMaterial({ color:0x7fd8ff, emissive:0x05263f, roughness:0.45, metalness:0.65 })
+        new THREE.MeshStandardMaterial({ color:hullColor, emissive:0x05263f, roughness:0.45, metalness:0.65 })
     );
     hull.rotation.x = -Math.PI / 2;
     shipGroup.add(hull);
 
-    const wingMaterial = new THREE.MeshStandardMaterial({ color:0x3a7fc9, roughness:0.55, metalness:0.45 });
+    const wingMaterial = new THREE.MeshStandardMaterial({ color:selfTeam === 'red' ? 0xaa4a58 : 0x3a7fc9, roughness:0.55, metalness:0.45 });
     const leftWing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.12, 1.0), wingMaterial);
     leftWing.position.set(-1.7, 0, -0.05);
     shipGroup.add(leftWing);
@@ -6495,12 +6503,14 @@ function spawnPlayer() {
     engineRight.position.x = 0.6;
     shipGroup.add(engineRight);
 
-    battlePlanetCapture = null;
     playerShip = shipGroup;
-    const spawn = spawnPointA.clone();
+
+    const spawn = selfTeam === 'red' ? spawnPointB.clone() : spawnPointA.clone();
+    const lookTarget = selfTeam === 'red' ? spawnPointA.clone() : spawnPointB.clone();
+
     playerShip.position.copy(spawn);
     playerShip.visible = true;
-    playerShip.lookAt(spawnPointB.clone());
+    playerShip.lookAt(lookTarget);
 
     playerControl.yaw = playerShip.rotation.y;
     playerControl.pitch = 0;
@@ -6513,7 +6523,6 @@ function spawnPlayer() {
     scene.add(playerShip);
     camera.lookAt(playerShip.position);
     updateBattlePlayerHud();
-    console.log("Игрок заспавнен в:", spawn);
 }
 
 // ================= KEY SYSTEM =================
@@ -9479,8 +9488,7 @@ function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
 
 async function savePlayerToSupabase(playerData) {
   if (!window.supabaseReady || !window.supabaseClient) {
-    console.warn('Supabase не готов');
-    return null;
+        return null;
   }
   if (authState?.mode !== 'account' || !authState?.isAuthenticated) {
     return null;
@@ -9557,7 +9565,6 @@ async function joinRoomPlayers(roomId) {
   }
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
-    console.log('room_players уже содержит игрока:', existingRows[0]);
     
 try {
     renderBattleMessages && renderBattleMessages();
@@ -9575,7 +9582,11 @@ return true;
     room_id: roomId,
     player_id: identity.playerId,
     nickname: identity.displayName,
-    joined_at: new Date().toISOString()
+    joined_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    team: getBattleRoomPlayerTeam(identity.playerId),
+    level: Number(player?.level || 1) || 1,
+    ping: Number(getBattlePingValue() || 0) || 0
   };
 
   const { data: insertedRow, error } = await window.supabaseClient
@@ -9588,7 +9599,6 @@ return true;
     return false;
   }
 
-  console.log('room_players insert ok:', insertedRow);
 
   await loadRoomsFromSupabase();
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
@@ -9624,10 +9634,21 @@ async function leaveRoomPlayers(roomId) {
     removeRemoteBattleShipById(identity.playerId);
   } catch(_) {}
 
+  const freshCutoff = getRoomPlayerFreshCutoffIso();
+
+  try{
+    await window.supabaseClient
+      .from('room_players')
+      .delete()
+      .eq('room_id', roomId)
+      .lt('updated_at', freshCutoff);
+  }catch(_){}
+
   const { count, error: countError } = await window.supabaseClient
     .from('room_players')
     .select('*', { count: 'exact', head: true })
-    .eq('room_id', roomId);
+    .eq('room_id', roomId)
+    .gte('updated_at', freshCutoff);
 
   if (countError) {
     console.error('Ошибка подсчёта игроков в комнате:', countError);
@@ -9642,8 +9663,6 @@ async function leaveRoomPlayers(roomId) {
 
     if (roomDeleteError) {
       console.error('Ошибка удаления пустой комнаты:', roomDeleteError);
-    } else {
-      console.log('Пустая комната удалена:', roomId);
     }
   }
 
@@ -9738,22 +9757,20 @@ function startLiveRoomsRefresh(){
         }
       }
     }catch(error){
-      console.warn('Live refresh rooms error:', error);
-    }
+          }
   }, LIVE_ROOMS_REFRESH_MS);
 }
 
 async function loadRoomsFromSupabase() {
   if (!window.supabaseReady || !window.supabaseClient) {
-    console.warn('Supabase не готов');
-    return [];
+        return [];
   }
 
   const cutoffIso = getOnlineFreshCutoffIso();
   const [roomsResponse, onlineResponse] = await Promise.all([
     window.supabaseClient
       .from('rooms')
-      .select('*, room_players(player_id,nickname,joined_at)')
+      .select('*, room_players(player_id,nickname,joined_at,updated_at,team,level,ping)')
       .order('created_at', { ascending: true }),
     window.supabaseClient
       .from('online_players')
@@ -9775,6 +9792,26 @@ async function loadRoomsFromSupabase() {
 
   const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
   let allRooms = Array.isArray(data) ? data : [];
+
+  const staleRoomPlayers = [];
+  allRooms.forEach(room => {
+    const rows = Array.isArray(room?.room_players) ? room.room_players : [];
+    rows.forEach(row => {
+      if(row?.room_id && !isFreshRoomPlayerRow(row)){
+        staleRoomPlayers.push(row.player_id);
+      }
+    });
+    room.room_players = rows.filter(row => isFreshRoomPlayerRow(row));
+  });
+
+  if(staleRoomPlayers.length){
+    try{
+      await window.supabaseClient
+        .from('room_players')
+        .delete()
+        .in('player_id', staleRoomPlayers);
+    }catch(_){}
+  }
 
   const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
   if (emptyRooms.length) {
@@ -9815,7 +9852,6 @@ async function loadRoomsFromSupabase() {
     selectedLobbyMap.players = [...occupants];
   }
 
-  console.log('Комнаты из Supabase загружены:', visibleRooms);
   return supabaseBattleRoomsCache;
 }
 
@@ -9829,8 +9865,7 @@ async function renderRoomsInLobby(forceBattleMode = false) {
 
   const matchList = document.getElementById('match-list');
   if (!matchList) {
-    console.warn('match-list не найден');
-    return;
+        return;
   }
 
   const baseMaps = (typeof LOBBY_MAP_DATA !== 'undefined' && Array.isArray(LOBBY_MAP_DATA))
@@ -9876,8 +9911,7 @@ async function renderRoomsInLobby(forceBattleMode = false) {
 
 async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   if (!window.supabaseReady || !window.supabaseClient) {
-    console.warn('Supabase не готов');
-    return null;
+        return null;
   }
 
   const normalizedMap = normalizeBattleMapName(mapName);
@@ -9906,7 +9940,6 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
     const existingRoom = existingRows[0];
     const joinedExisting = await joinRoomPlayers(existingRoom.id);
     if (!joinedExisting) return null;
-    console.log('Используем существующую комнату:', existingRoom);
     await loadRoomsFromSupabase();
     if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
       renderLobbyListV27('battle');
@@ -9940,7 +9973,6 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
     return null;
   }
 
-  console.log('Комната создана:', data);
   await loadRoomsFromSupabase();
   if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
