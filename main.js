@@ -341,7 +341,7 @@ function updateBattlePlanetCapture(){
     const target = battleMapPlanet.position.clone().add(battlePlanetCapture.normal.clone().multiplyScalar(impactRadius));
     playerShip.position.lerp(target, 0.04 + progress * 0.16);
     shipVelocity.set(0, 0, 0);
-    camera.position.copy(battlePlanetCapture.freezeCameraPosition);
+    camera.position.set(battlePlanetCapture.freezeCameraPosition);
     camera.lookAt(battlePlanetCapture.freezeCameraLookAt);
     if(progress >= 1){
         startShipCrashAnimation();
@@ -883,7 +883,7 @@ function resetOrbitView(forcePlanetReset=false){
             }
 
             if(selectedPlanet.originalLocalPosition){
-                selectedPlanet.mesh.position.copy(selectedPlanet.originalLocalPosition);
+                selectedPlanet.mesh.position.set(selectedPlanet.originalLocalPosition);
             }else{
                 selectedPlanet.mesh.position.set(selectedPlanet.orbitRadius || 0, 0, 0);
             }
@@ -2396,7 +2396,7 @@ if(selectedPlanet === planet){
 if(selectedPlanet){
 
     scene.remove(selectedPlanet.mesh);
-    selectedPlanet.mesh.position.copy(selectedPlanet.originalLocalPosition);
+    selectedPlanet.mesh.position.set(selectedPlanet.originalLocalPosition);
     selectedPlanet.orbitPivot.add(selectedPlanet.mesh);
     selectedPlanet.mesh.scale.set(1,1,1);
     selectedPlanet.updateResourceLabelPosition?.(false);
@@ -2411,7 +2411,7 @@ scene.add(planet.mesh);
 const direction = new THREE.Vector3();
 camera.getWorldDirection(direction);
 
-planet.mesh.position.copy(
+planet.mesh.position.set(
     camera.position.clone().add(direction.multiplyScalar(30))
 );
 
@@ -3038,7 +3038,7 @@ function tryFireLaser(){
     [-1.1, 1.1].forEach(offsetX => {
         const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
         const localOffset = new THREE.Vector3(offsetX, 0, -2.2).applyQuaternion(playerShip.quaternion);
-        laserMesh.position.copy(playerShip.position.clone().add(localOffset));
+        laserMesh.position.set(playerShip.position.clone().add(localOffset));
         laserMesh.lookAt(playerShip.position.clone().add(forward));
         scene.add(laserMesh);
         activeLasers.push({
@@ -3200,7 +3200,7 @@ function updateBattlePlanetEffects(){
     if(!Number.isFinite(towardPlanet.x) || towardPlanet.lengthSq() === 0) return;
 
     if(distance <= crashRadius){
-        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(crashRadius)));
+        playerShip.position.set(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(crashRadius)));
         shipVelocity.set(0, 0, 0);
         startShipCrashAnimation();
         return;
@@ -3211,7 +3211,7 @@ function updateBattlePlanetEffects(){
             startBattlePlanetCapture();
         }
         const lockDistance = Math.max(crashRadius, radius + 10);
-        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(lockDistance)));
+        playerShip.position.set(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(lockDistance)));
         shipVelocity.set(0, 0, 0);
         return;
     }
@@ -6059,7 +6059,7 @@ function fireBotLaser(){
     [-0.7, 0.7].forEach(offsetX => {
         const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
         const localOffset = new THREE.Vector3(offsetX, 0, -1.8).applyQuaternion(enemyBot.quaternion);
-        laserMesh.position.copy(enemyBot.position.clone().add(localOffset));
+        laserMesh.position.set(enemyBot.position.clone().add(localOffset));
         laserMesh.lookAt(enemyBot.position.clone().add(toPlayer));
         scene.add(laserMesh);
         enemyLasers.push({
@@ -6160,7 +6160,7 @@ function spawnPlayer() {
     battlePlanetCapture = null;
     playerShip = shipGroup;
     const spawn = spawnPointA.clone();
-    playerShip.position.copy(spawn);
+    playerShip.position.set(spawn);
     playerShip.visible = true;
     playerShip.lookAt(spawnPointB.clone());
 
@@ -6779,7 +6779,7 @@ function handleBattleCollisions(object, velocityRef=null){
         if(dist < radius + 2.5){
             const push = object.position.clone().sub(obstacle.position).normalize();
             if(!Number.isFinite(push.x)) push.set(1,0,0);
-            object.position.copy(obstacle.position.clone().add(push.multiplyScalar(radius + 2.6)));
+            object.position.set(obstacle.position.clone().add(push.multiplyScalar(radius + 2.6)));
             if(velocityRef) velocityRef.multiplyScalar(0.55);
         }
     }
@@ -6788,7 +6788,7 @@ function handleBattleCollisions(object, velocityRef=null){
 function spawnShipDebris(position, color=0xffffff){
     for(let i=0;i<14;i++){
         const piece = new THREE.Mesh(new THREE.BoxGeometry(0.2 + Math.random()*0.7, 0.12 + Math.random()*0.5, 0.2 + Math.random()*0.7), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity:0.04, roughness:0.9, metalness:0.15 }));
-        piece.position.copy(position);
+        piece.position.set(position);
         piece.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
         scene.add(piece);
         debrisPieces.push({
@@ -6852,7 +6852,7 @@ function setupObserverBattle(mapName){
     enterBattleMap(mapName);
     observerBots = [];
     observerFreeCameraPosition.set(0, 12, 38);
-    camera.position.copy(observerFreeCameraPosition);
+    camera.position.set(observerFreeCameraPosition);
     const hud = document.getElementById('enemy-hud');
     if(hud) hud.style.display = 'none';
 }
@@ -6878,7 +6878,7 @@ function updateObserverBattle(){
         observerFreeCameraPosition.add(move);
     }
 
-    camera.position.copy(observerFreeCameraPosition);
+    camera.position.set(observerFreeCameraPosition);
     camera.lookAt(observerFreeCameraPosition.clone().add(forward.multiplyScalar(80)));
 }
 
@@ -6887,7 +6887,7 @@ function fireObserverLaser(shooter, target){
     [-0.8,0.8].forEach(offsetX => {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,1.6), new THREE.MeshBasicMaterial({ color:0xfff1a8 }));
         const localOffset = new THREE.Vector3(offsetX,0,-1.6).applyQuaternion(shooter.quaternion);
-        mesh.position.copy(shooter.position.clone().add(localOffset));
+        mesh.position.set(shooter.position.clone().add(localOffset));
         mesh.lookAt(shooter.position.clone().add(dir));
         scene.add(mesh);
         enemyLasers.push({ mesh, velocity: dir.clone().multiplyScalar(2.5), life: 90, damage: 10, shooter });
@@ -7531,7 +7531,7 @@ function limitBattleArea(){
             if(dist < minDist){
                 const push = delta.normalize();
                 if(!Number.isFinite(push.x)) push.set(1,0,0);
-                object.position.copy(obstacle.position.clone().add(push.multiplyScalar(minDist + 0.2)));
+                object.position.set(obstacle.position.clone().add(push.multiplyScalar(minDist + 0.2)));
                 if(velocityRef) velocityRef.multiplyScalar(0.42);
             }
         }
@@ -7543,7 +7543,7 @@ function limitBattleArea(){
         if(dist < minDist){
             const push = delta.normalize();
             if(!Number.isFinite(push.x)) push.set(0,1,0);
-            object.position.copy(battleMapPlanet.position.clone().add(push.multiplyScalar(minDist)));
+            object.position.set(battleMapPlanet.position.clone().add(push.multiplyScalar(minDist)));
             if(velocityRef) velocityRef.multiplyScalar(0.18);
         }
     };
@@ -8409,7 +8409,7 @@ function closeShopView(){
         observerCameraDistance = 42;
         observerCameraTarget.set(0,0,0);
         observerFreeCameraPosition.set(0, 18, 48);
-        camera.position.copy(observerFreeCameraPosition);
+        camera.position.set(observerFreeCameraPosition);
         const canvas = document.querySelector('canvas');
         if(canvas){
             setTimeout(() => {
