@@ -147,6 +147,40 @@ let inventory = {
     addResource(){}
 };
 
+
+// ===== EARLY SHOP HELPERS =====
+function getAllShopShips(){
+    try{
+        const source = (typeof SHOP_DATA !== 'undefined' && SHOP_DATA)
+            ? SHOP_DATA
+            : (window.__cosmicShopData || null);
+        return Object.values(source?.shipsByType || {}).flat();
+    }catch(_){
+        return [];
+    }
+}
+
+function getShopShipById(shipId){
+    try{
+        const safeId = String(shipId || '').trim();
+        if(!safeId) return null;
+        return getAllShopShips().find(item => String(item?.id || '').trim() === safeId) || null;
+    }catch(_){
+        return null;
+    }
+}
+
+function getShipCoinPrice(item){
+    return Math.max(0, Number(item?.price || 0) || 0);
+}
+
+function getShipDiamondPrice(item){
+    const coins = getShipCoinPrice(item);
+    const tier = String(item?.tier || '').toLowerCase();
+    const extra = tier.includes('топ') ? 12 : (tier.includes('соврем') ? 7 : 3);
+    return Math.max(0, Math.round(coins / 220 + extra));
+}
+
 // ===== EARLY SHOP SAFETY =====
 function closeShopView(){
     const shopWindow = document.getElementById('shop-window');
@@ -9016,9 +9050,11 @@ const SHOP_DATA = {
         ]
     }
 };
+try{ window.__cosmicShopData = SHOP_DATA; }catch(_){}
 
 
-function getAllShopShips(){
+
+function getAllShopShipsLegacy(){
     try{
         return Object.values(SHOP_DATA?.shipsByType || {}).flat();
     }catch(_){
@@ -9026,16 +9062,16 @@ function getAllShopShips(){
     }
 }
 
-function getShopShipById(shipId){
+function getShopShipByIdLegacy(shipId){
     const safeId = String(shipId || '').trim();
     return getAllShopShips().find(item => String(item?.id || '').trim() === safeId) || null;
 }
 
-function getShipCoinPrice(item){
+function getShipCoinPriceLegacy(item){
     return Math.max(0, Number(item?.price || 0) || 0);
 }
 
-function getShipDiamondPrice(item){
+function getShipDiamondPriceLegacy(item){
     const coins = getShipCoinPrice(item);
     const tier = String(item?.tier || '').toLowerCase();
     const extra = tier.includes('топ') ? 12 : (tier.includes('соврем') ? 7 : 3);
