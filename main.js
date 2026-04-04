@@ -137,6 +137,31 @@ let inventory = {
     addResource(){}
 };
 
+// ===== SHOP SAFETY STUBS =====
+var refreshOwnedShipsInventory = globalThis.refreshOwnedShipsInventory || function(){
+    try{
+        if(!player || typeof player !== 'object') return;
+        if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
+            player.ownedShipIds = ['scout_1'];
+        }
+        player.ownedShipIds = Array.from(new Set(
+            player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
+        ));
+        if(!player.ownedShipIds.includes('scout_1')){
+            player.ownedShipIds.unshift('scout_1');
+        }
+        if(!player.selectedShipId || !player.ownedShipIds.includes(player.selectedShipId)){
+            player.selectedShipId = player.ownedShipIds[0] || 'scout_1';
+        }
+    }catch(_){}
+};
+
+var ensureShopOwnershipDefaults = globalThis.ensureShopOwnershipDefaults || function(){
+    try{
+        try{ refreshOwnedShipsInventory(); }catch(_){}
+    }catch(_){}
+};
+
 // ===== SHOP BOOTSTRAP SAFETY =====
 function ensureShopOwnershipDefaultsFull(){
     if(!player || typeof player !== 'object') return;
@@ -8340,7 +8365,7 @@ function refreshOwnedShipsInventoryFull(){
 refreshOwnedShipsInventory = refreshOwnedShipsInventoryFull;
 
 
-function ensureShopOwnershipDefaults(){
+function ensureShopOwnershipDefaultsFull(){
     if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
         player.ownedShipIds = ['scout_1'];
     }
@@ -8355,14 +8380,14 @@ function ensureShopOwnershipDefaults(){
         item.coinPrice = getShopShipCoinPrice(item);
         item.diamondPrice = getShopShipDiamondPrice(item);
     });
-    try{ refreshOwnedShipsInventory(); }catch(_){}
+    try{ try{ refreshOwnedShipsInventory(); }catch(_){} }catch(_){}
 }
 
 ensureShopOwnershipDefaults = ensureShopOwnershipDefaultsFull;
 
 
 function isOwnedShip(itemOrId){
-    ensureShopOwnershipDefaults();
+    try{ ensureShopOwnershipDefaults(); }catch(_){}
     const itemId = typeof itemOrId === 'string' ? String(itemOrId || '').trim() : String(itemOrId?.id || '').trim();
     return !!itemId && player.ownedShipIds.includes(itemId);
 }
@@ -8371,7 +8396,7 @@ function equipOwnedShip(shipId){
     const safeId = String(shipId || '').trim();
     if(!safeId || !isOwnedShip(safeId)) return false;
     player.selectedShipId = safeId;
-    try{ refreshOwnedShipsInventory(); }catch(_){}
+    try{ try{ refreshOwnedShipsInventory(); }catch(_){} }catch(_){}
     updatePremiumAccountInfo?.();
     saveGame?.();
     renderShopScreen?.();
@@ -8379,7 +8404,7 @@ function equipOwnedShip(shipId){
 }
 
 function buyShipFromShop(shipId){
-    ensureShopOwnershipDefaults();
+    try{ ensureShopOwnershipDefaults(); }catch(_){}
     const ship = getShopShipById(shipId);
     if(!ship) return false;
     if(isOwnedShip(ship)){
@@ -8407,7 +8432,7 @@ function buyShipFromShop(shipId){
     player.ownedShipIds.push(ship.id);
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds));
     player.selectedShipId = ship.id;
-    try{ refreshOwnedShipsInventory(); }catch(_){}
+    try{ try{ refreshOwnedShipsInventory(); }catch(_){} }catch(_){}
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
@@ -8416,7 +8441,7 @@ function buyShipFromShop(shipId){
     return true;
 }
 
-ensureShopOwnershipDefaults();
+try{ ensureShopOwnershipDefaults(); }catch(_){}
 const shopState = {
     open:false,
     view:'ships',
@@ -8424,7 +8449,7 @@ const shopState = {
     moduleType:'engine',
     selectedId:'scout_1'
 };
-ensureShopOwnershipDefaults();
+try{ ensureShopOwnershipDefaults(); }catch(_){}
 
 function getCurrentShopShips(){
     return SHOP_DATA.shipsByType[shopState.shipType] || [];
@@ -8726,7 +8751,7 @@ function renderShopCatalog(){
 }
 
 function renderShopScreen(){
-    ensureShopOwnershipDefaults();
+    try{ ensureShopOwnershipDefaults(); }catch(_){}
     renderShopMainSwitch();
     renderShopTypeTabs();
     renderShopLists();
