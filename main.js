@@ -19,7 +19,15 @@ let player = {
   staff_role: 'player'
 };
 
-// Базовый корабль теперь управляется магазином и ownedShipIds.
+// 🔥 ТЕСТОВЫЙ КОРАБЛЬ (можешь потом удалить)
+player.ships.push({
+  id: 1,
+  name: "Scout",
+  level: 1,
+  hp: 100,
+  attack: 10,
+  speed: 5
+});
 
 /* ================= GAME STATE ================= */
 
@@ -136,48 +144,6 @@ let inventory = {
     render(){},
     addResource(){}
 };
-
-// ===== SHOP SAFETY STUBS =====
-var refreshOwnedShipsInventory = globalThis.refreshOwnedShipsInventory || function(){
-    try{
-        if(!player || typeof player !== 'object') return;
-        if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
-            player.ownedShipIds = ['scout_1'];
-        }
-        player.ownedShipIds = Array.from(new Set(
-            player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
-        ));
-        if(!player.ownedShipIds.includes('scout_1')){
-            player.ownedShipIds.unshift('scout_1');
-        }
-        if(!player.selectedShipId || !player.ownedShipIds.includes(player.selectedShipId)){
-            player.selectedShipId = player.ownedShipIds[0] || 'scout_1';
-        }
-    }catch(_){}
-};
-
-var ensureShopOwnershipDefaults = globalThis.ensureShopOwnershipDefaults || function(){
-    try{
-        try{ refreshOwnedShipsInventory(); }catch(_){}
-    }catch(_){}
-};
-
-// ===== SHOP BOOTSTRAP SAFETY =====
-function ensureShopOwnershipDefaultsFull(){
-    if(!player || typeof player !== 'object') return;
-    if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
-        player.ownedShipIds = ['scout_1'];
-    }
-    player.ownedShipIds = Array.from(new Set(
-        player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
-    ));
-    if(!player.ownedShipIds.includes('scout_1')){
-        player.ownedShipIds.unshift('scout_1');
-    }
-    if(!player.selectedShipId || !player.ownedShipIds.includes(player.selectedShipId)){
-        player.selectedShipId = player.ownedShipIds[0] || 'scout_1';
-    }
-}
 
 
 let lobbyModeV27 = (typeof window !== 'undefined' && window.lobbyModeV27) ? window.lobbyModeV27 : 'battle';
@@ -2650,7 +2616,7 @@ function applySaveData(save){
         player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId;
     }
     for(let i=0;i<planets.length;i++) planets[i].unlocked = i < currentLevel;
-    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
+    ensureShopOwnershipDefaults?.();
     refreshOwnedShipsInventory?.();
     updatePremiumAccountInfo?.();
     updateHUD?.();
@@ -2677,7 +2643,7 @@ async function loadRemoteSaveFromSupabase(){
 }
 
 async function loadGame(){
-    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
+    ensureShopOwnershipDefaults?.();
     const saveKey = getActiveSaveKey();
     if(saveKey){
         const localData = localStorage.getItem(saveKey);
@@ -2687,7 +2653,7 @@ async function loadGame(){
     }
     const remoteSave = await loadRemoteSaveFromSupabase();
     if(remoteSave) applySaveData(remoteSave);
-    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
+    ensureShopOwnershipDefaults?.();
     refreshOwnedShipsInventory?.();
 }
 
@@ -3153,7 +3119,7 @@ function playEffectSound(sound){
 function tryFireLaser(){
     const now = Date.now();
     const shipTuning = getBattleShipTuning();
-    if(!playerShip || battleShipCrash || battleWeapon.isReloading || isBattlePlanetCaptureActive() || now - lastLaserShotAt < shipTuning.laserCooldown) return;
+    if(!playerShip || battleShipCrash || battleWeapon.isReloading || isBattlePlanetCaptureActive() || now - lastLaserShotAt < shipTuning.shotCooldown) return;
     if(battleWeapon.ammoInClip <= 0){
         startBattleReload();
         return;
@@ -3166,7 +3132,7 @@ function tryFireLaser(){
     const laserMaterial = new THREE.MeshBasicMaterial({ color: shipTuning.projectileColor });
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
 
-    shipTuning.shotOffsets.forEach(offsetX => {
+    (shipTuning.shotOffsets || [-0.55, 0.55]).forEach(offsetX => {
         const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
         const localOffset = new THREE.Vector3(offsetX, 0, -2.2).applyQuaternion(playerShip.quaternion);
         laserMesh.position.copy(playerShip.position.clone().add(localOffset));
@@ -6511,16 +6477,11 @@ function spawnPlayer() {
     activeLasers.forEach(laser => scene.remove(laser.mesh));
     activeLasers = [];
 
-    const shipDef = getBattleShipDefinition();
-    const shipTuning = getBattleShipTuning(shipDef);
-
     const shipGroup = new THREE.Group();
     shipGroup.rotation.order = 'YXZ';
 
     const selfTeam = getBattleRoomPlayerTeam(getSelfBattlePlayerId());
     const hullColor = getBattleShipColorHex(selfTeam);
-    const accentColor = shipDef?.accent || '#7a8cff';
-    const engineColor = shipDef?.engine || '#64d8ff';
 
     const hull = new THREE.Mesh(
         new THREE.ConeGeometry(1.15, 4.4, 8),
@@ -6529,7 +6490,7 @@ function spawnPlayer() {
     hull.rotation.x = -Math.PI / 2;
     shipGroup.add(hull);
 
-    const wingMaterial = new THREE.MeshStandardMaterial({ color:selfTeam === 'red' ? 0xaa4a58 : 0x3a7fc9, roughness:0.55, metalness:0.45, emissive:new THREE.Color(accentColor).multiplyScalar(0.08) });
+    const wingMaterial = new THREE.MeshStandardMaterial({ color:selfTeam === 'red' ? 0xaa4a58 : 0x3a7fc9, roughness:0.55, metalness:0.45 });
     const leftWing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.12, 1.0), wingMaterial);
     leftWing.position.set(-1.7, 0, -0.05);
     shipGroup.add(leftWing);
@@ -6541,7 +6502,7 @@ function spawnPlayer() {
     cockpit.position.set(0, 0.18, -1.1);
     shipGroup.add(cockpit);
 
-    const engineLeft = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.8), new THREE.MeshBasicMaterial({ color:engineColor }));
+    const engineLeft = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.8), new THREE.MeshBasicMaterial({ color:0x64d8ff }));
     engineLeft.position.set(-0.6, 0, 2.0);
     shipGroup.add(engineLeft);
     const engineRight = engineLeft.clone();
@@ -6549,15 +6510,6 @@ function spawnPlayer() {
     shipGroup.add(engineRight);
 
     playerShip = shipGroup;
-
-    battleWeapon.clipSize = shipTuning.clipSize;
-    battleWeapon.ammoInClip = shipTuning.clipSize;
-    battleWeapon.damage = shipTuning.shotDamage;
-    battleWeapon.reloadTime = shipTuning.reloadTime;
-    battleWeapon.isReloading = false;
-    battleWeapon.reloadEndsAt = 0;
-    playerMaxHp = shipTuning.maxHp;
-    playerHp = playerMaxHp;
 
     const spawn = selfTeam === 'red' ? spawnPointB.clone() : spawnPointA.clone();
     const lookTarget = selfTeam === 'red' ? spawnPointA.clone() : spawnPointB.clone();
@@ -6570,6 +6522,15 @@ function spawnPlayer() {
     playerControl.pitch = 0;
     playerControl.roll = 0;
 
+    const shipTuning = getBattleShipTuning();
+    playerMaxHp = shipTuning.maxHp;
+    playerHp = playerMaxHp;
+    battleWeapon.damage = shipTuning.shotDamage;
+    battleWeapon.clipSize = shipTuning.clipSize;
+    battleWeapon.ammoInClip = battleWeapon.clipSize;
+    battleWeapon.reloadTime = shipTuning.reloadTime;
+    battleWeapon.isReloading = false;
+    battleWeapon.reloadEndsAt = 0;
     scene.add(playerShip);
     camera.lookAt(playerShip.position);
     updateBattlePlayerHud();
@@ -8264,60 +8225,61 @@ function getAllShopShips(){
     return Object.values(SHOP_DATA.shipsByType || {}).flat();
 }
 
-function getShopShipById(shipId=''){
+function getShopShipById(shipId){
     const safeId = String(shipId || '').trim();
-    return getAllShopShips().find(item => item.id === safeId) || null;
+    return getAllShopShips().find(item => String(item?.id || '').trim() === safeId) || null;
+}
+
+function getShopStatNumber(item, key, fallback = 0){
+    const pair = (Array.isArray(item?.stats) ? item.stats : []).find(([k]) => String(k || '').trim() === key);
+    const raw = String(pair?.[1] ?? fallback).replace(',', '.');
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : fallback;
 }
 
 function getShopShipCoinPrice(item){
-    return Math.max(0, Number(item?.price || item?.coinPrice || 0) || 0);
+    return Math.max(0, Number(item?.price || 0) || 0);
 }
 
 function getShopShipDiamondPrice(item){
-    if(!item) return 0;
-    if(Number.isFinite(Number(item.diamondPrice))) return Math.max(0, Number(item.diamondPrice) || 0);
     const coinPrice = getShopShipCoinPrice(item);
-    return Math.max(3, Math.round(coinPrice / 180));
+    const tierBoost = String(item?.tier || '').includes('Топ') ? 10 : (String(item?.tier || '').includes('Соврем') ? 6 : 3);
+    return Math.max(0, Math.round(coinPrice / 220 + tierBoost));
 }
 
-function parseShipStatNumber(item, key){
-    const row = Array.isArray(item?.stats) ? item.stats.find(pair => String(pair?.[0] || '').trim() === key) : null;
-    const raw = row ? row[1] : 0;
-    const numeric = Number(String(raw || '').replace(',', '.'));
-    return Number.isFinite(numeric) ? numeric : 0;
-}
-
-function getBattleShipDefinition(){
-    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
-    return getShopShipById(player.selectedShipId) || getShopShipById('scout_1') || getAllShopShips()[0] || null;
+function getCurrentBattleShipItem(){
+    ensureShopOwnershipDefaults?.();
+    return getShopShipById(player?.selectedShipId || 'scout_1') || getShopShipById('scout_1');
 }
 
 function getBattleShipTuning(item = null){
-    const ship = item || getBattleShipDefinition();
-    const speed = parseShipStatNumber(ship, 'Скорость');
-    const armor = parseShipStatNumber(ship, 'Броня');
-    const damageStat = parseShipStatNumber(ship, 'Урон');
-    const energy = parseShipStatNumber(ship, 'Энергия');
-    const weapon = String((Array.isArray(ship?.stats) ? ship.stats.find(pair => String(pair?.[0] || '').trim() === 'Оружие')?.[1] : '') || ship?.weapon || 'laser').toLowerCase();
+    const ship = item || getCurrentBattleShipItem();
+    const speed = getShopStatNumber(ship, 'Скорость', 7.0);
+    const armor = getShopStatNumber(ship, 'Броня', 5.0);
+    const damageStat = getShopStatNumber(ship, 'Урон', 6.0);
+    const energy = getShopStatNumber(ship, 'Энергия', 6.0);
+    const weapon = String((Array.isArray(ship?.stats) ? ship.stats : []).find(([k]) => k === 'Оружие')?.[1] || ship?.weapon || 'laser').toLowerCase();
 
-    const isBeam = weapon.includes('луч');
-    const isPlasma = weapon.includes('плаз');
-    const isDouble = weapon.includes('двойн') || weapon.includes('double');
-    const isImpulse = weapon.includes('импульс');
+    const isBeam = /луч/.test(weapon) || /beam/.test(weapon);
+    const isPlasma = /плазм|plasma/.test(weapon);
+    const isImpulse = /импульс|pulse/.test(weapon);
+    const isMissile = /ракет|missile/.test(weapon);
+    const isPhase = /фаз|phase/.test(weapon);
+    const isDouble = /двойн|double/.test(weapon);
 
-    const forwardAcceleration = 0.045 + speed * 0.012;
-    const backwardAcceleration = 0.022 + speed * 0.005;
-    const strafeAcceleration = 0.018 + speed * 0.004 + energy * 0.0015;
-    const maxSpeed = 1.8 + speed * 0.25;
-    const damping = Math.min(0.992, 0.962 + energy * 0.0025);
-    const maxHp = Math.round(35 + armor * 11 + energy * 3.5);
-    const shotDamage = Number((2.2 + damageStat * 1.08 + (isPlasma ? 1.2 : 0) + (isBeam ? 0.8 : 0)).toFixed(2));
-    const clipSize = Math.max(16, Math.round(10 + energy * 2.2 + damageStat * 1.2));
-    const reloadTime = Math.max(700, Math.round(2200 - energy * 95 - speed * 40));
-    const laserCooldown = Math.max(55, Math.round(220 - speed * 11 - damageStat * 6 - (isImpulse ? 18 : 0) + (isBeam ? 22 : 0) + (isPlasma ? 16 : 0)));
-    const projectileSpeed = 2.3 + speed * 0.12 + damageStat * 0.05 + (isBeam ? 0.35 : 0);
-    const projectileLife = Math.max(70, Math.round(68 + damageStat * 4 + (isBeam ? 18 : 0)));
-    const projectileColor = isPlasma ? 0xff7a3d : (isBeam ? 0x78f0ff : (isImpulse ? 0xffdc5a : 0xff3355));
+    const forwardAcceleration = Math.max(0.08, +(0.07 + speed * 0.008).toFixed(3));
+    const backwardAcceleration = Math.max(0.04, +(0.04 + speed * 0.0045).toFixed(3));
+    const strafeAcceleration = Math.max(0.025, +(0.02 + speed * 0.003).toFixed(3));
+    const damping = Math.min(0.992, +(0.972 + energy * 0.0015).toFixed(3));
+    const maxSpeed = Math.max(2.8, +(1.6 + speed * 0.34).toFixed(2));
+    const maxHp = Math.max(70, Math.round(42 + armor * 9.5));
+    const shotDamage = Math.max(6, +(2.0 + damageStat * 1.35 + (isPlasma ? 1.2 : 0) + (isBeam ? 0.6 : 0) + (isMissile ? 0.9 : 0) + (isPhase ? 1.1 : 0)).toFixed(1));
+    const clipSize = Math.max(18, Math.round(10 + energy * 2.1 + damageStat * 1.1));
+    const reloadTime = Math.max(700, Math.round(2250 - energy * 90 - speed * 35));
+    const shotCooldown = Math.max(55, Math.round(220 - speed * 10 - damageStat * 6 - (isImpulse ? 15 : 0) + (isBeam ? 20 : 0) + (isPlasma ? 8 : 0)));
+    const projectileSpeed = +(2.3 + speed * 0.12 + (isBeam ? 0.4 : 0) + (isMissile ? 0.2 : 0)).toFixed(2);
+    const projectileLife = Math.max(70, Math.round(68 + damageStat * 4 + (isBeam ? 20 : 0) + (isMissile ? 12 : 0)));
+    const projectileColor = isPlasma ? 0xff7a3d : (isBeam ? 0x78f0ff : (isImpulse ? 0xffdc5a : (isPhase ? 0xc486ff : 0xff3355)));
     const shotOffsets = isDouble ? [-1.15, 1.15] : [-0.55, 0.55];
 
     return {
@@ -8330,13 +8292,13 @@ function getBattleShipTuning(item = null){
         forwardAcceleration,
         backwardAcceleration,
         strafeAcceleration,
-        maxSpeed,
         damping,
+        maxSpeed,
         maxHp,
         shotDamage,
         clipSize,
         reloadTime,
-        laserCooldown,
+        shotCooldown,
         projectileSpeed,
         projectileLife,
         projectileColor,
@@ -8344,8 +8306,8 @@ function getBattleShipTuning(item = null){
     };
 }
 
-function refreshOwnedShipsInventoryFull(){
-    const owned = Array.isArray(player.ownedShipIds) ? player.ownedShipIds : ['scout_1'];
+function refreshOwnedShipsInventory(){
+    const owned = Array.isArray(player?.ownedShipIds) ? player.ownedShipIds : ['scout_1'];
     player.ships = owned
         .map(id => getShopShipById(id))
         .filter(Boolean)
@@ -8362,17 +8324,12 @@ function refreshOwnedShipsInventoryFull(){
         });
 }
 
-refreshOwnedShipsInventory = refreshOwnedShipsInventoryFull;
-
-
-function ensureShopOwnershipDefaultsFull(){
-    if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
+function ensureShopOwnershipDefaults(){
+    if(!Array.isArray(player?.ownedShipIds) || !player.ownedShipIds.length){
         player.ownedShipIds = ['scout_1'];
     }
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)));
-    if(!player.ownedShipIds.includes('scout_1')){
-        player.ownedShipIds.unshift('scout_1');
-    }
+    if(!player.ownedShipIds.includes('scout_1')) player.ownedShipIds.unshift('scout_1');
     if(!player.selectedShipId || !player.ownedShipIds.includes(player.selectedShipId)){
         player.selectedShipId = player.ownedShipIds[0] || 'scout_1';
     }
@@ -8380,14 +8337,11 @@ function ensureShopOwnershipDefaultsFull(){
         item.coinPrice = getShopShipCoinPrice(item);
         item.diamondPrice = getShopShipDiamondPrice(item);
     });
-    try{ try{ refreshOwnedShipsInventory(); }catch(_){} }catch(_){}
+    refreshOwnedShipsInventory();
 }
 
-ensureShopOwnershipDefaults = ensureShopOwnershipDefaultsFull;
-
-
 function isOwnedShip(itemOrId){
-    try{ ensureShopOwnershipDefaults(); }catch(_){}
+    ensureShopOwnershipDefaults();
     const itemId = typeof itemOrId === 'string' ? String(itemOrId || '').trim() : String(itemOrId?.id || '').trim();
     return !!itemId && player.ownedShipIds.includes(itemId);
 }
@@ -8396,7 +8350,7 @@ function equipOwnedShip(shipId){
     const safeId = String(shipId || '').trim();
     if(!safeId || !isOwnedShip(safeId)) return false;
     player.selectedShipId = safeId;
-    try{ try{ refreshOwnedShipsInventory(); }catch(_){} }catch(_){}
+    refreshOwnedShipsInventory();
     updatePremiumAccountInfo?.();
     saveGame?.();
     renderShopScreen?.();
@@ -8404,12 +8358,10 @@ function equipOwnedShip(shipId){
 }
 
 function buyShipFromShop(shipId){
-    try{ ensureShopOwnershipDefaults(); }catch(_){}
+    ensureShopOwnershipDefaults();
     const ship = getShopShipById(shipId);
     if(!ship) return false;
-    if(isOwnedShip(ship)){
-        return equipOwnedShip(ship.id);
-    }
+    if(isOwnedShip(ship)) return equipOwnedShip(ship.id);
 
     const coinPrice = getShopShipCoinPrice(ship);
     const diamondPrice = getShopShipDiamondPrice(ship);
@@ -8432,7 +8384,8 @@ function buyShipFromShop(shipId){
     player.ownedShipIds.push(ship.id);
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds));
     player.selectedShipId = ship.id;
-    try{ try{ refreshOwnedShipsInventory(); }catch(_){} }catch(_){}
+
+    refreshOwnedShipsInventory();
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
@@ -8441,7 +8394,8 @@ function buyShipFromShop(shipId){
     return true;
 }
 
-try{ ensureShopOwnershipDefaults(); }catch(_){}
+ensureShopOwnershipDefaults();
+
 const shopState = {
     open:false,
     view:'ships',
@@ -8449,7 +8403,7 @@ const shopState = {
     moduleType:'engine',
     selectedId:'scout_1'
 };
-try{ ensureShopOwnershipDefaults(); }catch(_){}
+ensureShopOwnershipDefaults();
 
 function getCurrentShopShips(){
     return SHOP_DATA.shipsByType[shopState.shipType] || [];
@@ -8669,6 +8623,8 @@ function renderShopCatalog(){
     const subtitle = document.getElementById('shop-main-subtitle');
     if(!wrap) return;
 
+    ensureShopOwnershipDefaults?.();
+
     const head = getShopCurrentTitle();
     if(title) title.textContent = head.title;
     if(subtitle) subtitle.textContent = head.subtitle;
@@ -8683,19 +8639,18 @@ function renderShopCatalog(){
     wrap.innerHTML = list.map((item, index) => {
         const selected = shopState.selectedId === item.id;
         const cols = splitItemStats(item);
-        const coinPrice = item.type === 'ship' ? getShopShipCoinPrice(item) : Math.max(0, Number(item.price || 0) || 0);
+        const owned = item.type === 'ship' ? isOwnedShip(item.id) : false;
+        const coinPrice = item.type === 'ship' ? getShopShipCoinPrice(item) : Number(item.price || 0);
         const diamondPrice = item.type === 'ship' ? getShopShipDiamondPrice(item) : 0;
-        const owned = item.type === 'ship' ? isOwnedShip(item) : false;
-        const equipped = item.type === 'ship' && player.selectedShipId === item.id;
-        const valueLine = coinPrice
-            ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${coinPrice}</span>${item.type === 'ship' ? `<span class="shop-price-chip"><span class="shop-coin">💎</span>${diamondPrice}</span>` : ''}</div>`
-            : '';
+        const valueLine = item.type === 'ship'
+            ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${coinPrice}</span><span class="shop-price-chip"><span class="shop-coin">💎</span>${diamondPrice}</span></div>`
+            : (item.price ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${item.price}</span></div>` : '');
         const buyText = item.type === 'module'
             ? 'Установить'
-            : (equipped ? 'Выбран' : (owned ? 'Выбрать' : 'Купить'));
+            : (owned ? ((player.selectedShipId === item.id) ? 'Выбран' : 'Выбрать') : 'Купить');
         const rowNote = item.type === 'module'
             ? 'Модуль парит и вращается без площадки'
-            : (equipped ? 'Этот корабль активен в бою' : (owned ? 'Корабль уже куплен — можно выбрать' : `Стрельба: ${(item.stats || []).find(([k]) => k === 'Оружие')?.[1] || 'боевой комплект'}`));
+            : `Стрельба: ${(item.stats || []).find(([k]) => k === 'Оружие')?.[1] || 'боевой комплект'}`;
 
         return `
           <div class="shop-row ${selected ? 'selected' : ''} ${item.type}" data-shop-row="${item.id}">
@@ -8723,7 +8678,7 @@ function renderShopCatalog(){
             </div>
             <div class="shop-buy-wrap">
               <div class="shop-type-badge">${item.tier}</div>
-              <button type="button" class="shop-buy-btn" data-shop-buy="${item.id}" ${equipped ? "disabled" : ""}>${buyText}</button>
+              <button type="button" class="shop-buy-btn" data-shop-buy="${item.id}">${buyText}</button>
               <div class="shop-buy-note">${rowNote}</div>
             </div>
           </div>
@@ -8742,16 +8697,13 @@ function renderShopCatalog(){
         btn.addEventListener('click', (event) => {
             event.stopPropagation();
             const shipId = btn.dataset.shopBuy || '';
-            const item = getShopShipById(shipId);
-            if(item){
-                buyShipFromShop(shipId);
-            }
+            if(!shipId) return;
+            buyShipFromShop(shipId);
         });
     });
 }
 
 function renderShopScreen(){
-    try{ ensureShopOwnershipDefaults(); }catch(_){}
     renderShopMainSwitch();
     renderShopTypeTabs();
     renderShopLists();
