@@ -137,6 +137,23 @@ let inventory = {
     addResource(){}
 };
 
+// ===== SHOP BOOTSTRAP SAFETY =====
+function ensureShopOwnershipDefaultsFull(){
+    if(!player || typeof player !== 'object') return;
+    if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
+        player.ownedShipIds = ['scout_1'];
+    }
+    player.ownedShipIds = Array.from(new Set(
+        player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
+    ));
+    if(!player.ownedShipIds.includes('scout_1')){
+        player.ownedShipIds.unshift('scout_1');
+    }
+    if(!player.selectedShipId || !player.ownedShipIds.includes(player.selectedShipId)){
+        player.selectedShipId = player.ownedShipIds[0] || 'scout_1';
+    }
+}
+
 
 let lobbyModeV27 = (typeof window !== 'undefined' && window.lobbyModeV27) ? window.lobbyModeV27 : 'battle';
 
@@ -2608,7 +2625,7 @@ function applySaveData(save){
         player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId;
     }
     for(let i=0;i<planets.length;i++) planets[i].unlocked = i < currentLevel;
-    ensureShopOwnershipDefaults?.();
+    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
     refreshOwnedShipsInventory?.();
     updatePremiumAccountInfo?.();
     updateHUD?.();
@@ -2635,7 +2652,7 @@ async function loadRemoteSaveFromSupabase(){
 }
 
 async function loadGame(){
-    ensureShopOwnershipDefaults?.();
+    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
     const saveKey = getActiveSaveKey();
     if(saveKey){
         const localData = localStorage.getItem(saveKey);
@@ -2645,7 +2662,7 @@ async function loadGame(){
     }
     const remoteSave = await loadRemoteSaveFromSupabase();
     if(remoteSave) applySaveData(remoteSave);
-    ensureShopOwnershipDefaults?.();
+    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
     refreshOwnedShipsInventory?.();
 }
 
@@ -8246,7 +8263,7 @@ function parseShipStatNumber(item, key){
 }
 
 function getBattleShipDefinition(){
-    ensureShopOwnershipDefaults?.();
+    try{ ensureShopOwnershipDefaults?.(); }catch(_){ if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length) player.ownedShipIds=['scout_1']; if(!player.selectedShipId) player.selectedShipId='scout_1'; }
     return getShopShipById(player.selectedShipId) || getShopShipById('scout_1') || getAllShopShips()[0] || null;
 }
 
@@ -8337,6 +8354,9 @@ function ensureShopOwnershipDefaults(){
     });
     refreshOwnedShipsInventory();
 }
+
+ensureShopOwnershipDefaults = ensureShopOwnershipDefaultsFull;
+
 
 function isOwnedShip(itemOrId){
     ensureShopOwnershipDefaults();
