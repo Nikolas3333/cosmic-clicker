@@ -3965,10 +3965,12 @@ function getOwnChatLabel() {
 
 function getObserveStaffChatIdentity() {
     const role = getOwnStaffRole();
+    const meta = getStaffRoleMeta(role);
+    const isObserveStaff = gameState === 'OBSERVE' && isStaffRole(role);
     return {
-        isObserveStaff: false,
-        publicId: getOwnPublicChatId(),
-        nickname: getOwnChatLabel(),
+        isObserveStaff,
+        publicId: isObserveStaff ? null : getOwnPublicChatId(),
+        nickname: isObserveStaff ? (meta?.label || 'Staff') : getOwnChatLabel(),
         staffRole: role
     };
 }
@@ -4160,8 +4162,11 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
     const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
-    const roleBadge = isGlobalStaffAnnouncement ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
-    const roleClass = isGlobalStaffAnnouncement ? getChatRoleCssClassByRole(msg.staff_role) : '';
+    const hideIdentity = scope.channel === "battle" && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
+
+    const showRoleBadge = isGlobalStaffAnnouncement || hideIdentity;
+    const roleBadge = showRoleBadge ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByRole(msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
     const nickAttrs = publicId
         ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
@@ -4174,7 +4179,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
         prefix = '<span class="chat-sep">→</span> ';
     }
 
-    if (isGlobalStaffAnnouncement) {
+    if (isGlobalStaffAnnouncement || hideIdentity) {
         return `
           <div class="chat-line${lineClass}" data-message-id="${msg.id}">
             ${prefix}${roleBadge}
@@ -4805,8 +4810,9 @@ function showBattleAnnouncementInActiveScene(msg) {
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
     const isGlobalStaffAnnouncement = String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const hideIdentity = !isGlobalStaffAnnouncement && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
 
-    const showRoleBadge = isGlobalStaffAnnouncement;
+    const showRoleBadge = isGlobalStaffAnnouncement || hideIdentity;
     const roleBadge = showRoleBadge ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByRole(msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : '';
@@ -4815,7 +4821,7 @@ function showBattleAnnouncementInActiveScene(msg) {
     item.className = `kill-feed-item chat-announcement${lineClass}`;
     const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
 
-    item.innerHTML = isGlobalStaffAnnouncement
+    item.innerHTML = (isGlobalStaffAnnouncement || hideIdentity)
         ? `${roleBadge}<span class="chat-text">${text}</span>`
         : `${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
 
@@ -4848,18 +4854,23 @@ function showSceneMapMessageInActiveScene(msg) {
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
     const isGlobalStaffAnnouncement = incomingSceneRoomId === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const hideIdentity = !isGlobalStaffAnnouncement && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
+
+    const showRoleBadge = isGlobalStaffAnnouncement || hideIdentity;
+    const roleBadge = showRoleBadge ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByRole(msg.staff_role) : '';
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
 
     const item = document.createElement('div');
     item.className = isGlobalStaffAnnouncement
-        ? 'kill-feed-item chat-announcement'
-        : 'kill-feed-item chat-announcement scene-chat';
+        ? `kill-feed-item chat-announcement${lineClass}`
+        : `kill-feed-item chat-announcement scene-chat${lineClass}`;
 
-    if (isGlobalStaffAnnouncement) {
-        const roleBadge = getForcedSceneRoleBadgeHtml(msg.staff_role);
+    if (hideIdentity || isGlobalStaffAnnouncement) {
         item.innerHTML = `${roleBadge}<span class="chat-text">${text}</span>`;
     } else {
         const idHtml = publicId ? ` <span class="chat-id">(${safePublicId})</span>` : '';
-        item.innerHTML = `<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+        item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
     }
 
     feed.prepend(item);
