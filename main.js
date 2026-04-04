@@ -1035,7 +1035,7 @@ if(gameState === "BATTLE"){
         scene.remove(solarSystem);
     }
 
-    const targetMap = selectedLobbyMap?.real || currentRoom?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
+    const targetMap = currentRoom?.real || selectedLobbyMap?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
     battleObserverMode = false;
     enterBattleMap(targetMap);
     initBattleChat();
@@ -1067,7 +1067,7 @@ if(gameState === "OBSERVE"){
     if(typeof scene !== "undefined" && typeof solarSystem !== "undefined" && scene.children.includes(solarSystem)){
         scene.remove(solarSystem);
     }
-    const targetMap = selectedLobbyMap?.real || currentRoom?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
+    const targetMap = currentRoom?.real || selectedLobbyMap?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
     setupObserverBattle(targetMap);
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
     const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'none';
@@ -7413,7 +7413,15 @@ function limitBattleArea(){
     };
 
     enterBattleMap = function(mapName){
-        const rawMapName = String(mapName || selectedLobbyMap?.real || currentRoom?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || '').trim();
+        const rawMapName = String(
+            mapName ||
+            currentRoom?.real ||
+            selectedLobbyMap?.real ||
+            currentRoom?.map ||
+            selectedLobbyMap?.name ||
+            currentRoom?.title ||
+            ''
+        ).trim();
         const mapKey = normalizeBattleMapName(rawMapName);
         selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
         clearBattleScene();
@@ -8924,12 +8932,22 @@ window.renderPlayersOnPlanet = function(entry = {}){
                 const created = await createGameRoom(roomTitle, mapName, playerCount, hostName);
                 if(!created) return;
 
+                const normalizedCreatedMap = normalizeBattleMapName(
+                    selected?.real ||
+                    selected?.name ||
+                    mapName ||
+                    created?.map_name ||
+                    created?.room_name ||
+                    'earth'
+                );
+
                 currentRoom = {
                     id: created.id,
                     title: created.room_name,
-                    map: created.map_name,
-                    real: selected.real || selected.name || 'earth',
-                    img: selected.img || selected.real || 'earth',
+                    map: normalizedCreatedMap,
+                    real: normalizedCreatedMap,
+                    name: normalizedCreatedMap,
+                    img: selected.img || normalizedCreatedMap,
                     mode: 'DM',
                     minLevel,
                     maxLevel,
@@ -8939,6 +8957,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     state:'battle'
                 };
 
+                selectedLobbyMap = { ...currentRoom, isBaseMap:false };
                 window.currentRoomId = currentRoom.id || null;
                 document.getElementById('create-match-window')?.classList.add('hidden');
                 const titleInput = document.getElementById('room-title');
@@ -9199,6 +9218,7 @@ async function savePlayerToSupabase(playerData) {
   applyPlayerIdentityRow(data || {});
   applyPlayerResourcesFromRow(data || {});
   updatePremiumAccountInfo?.();
+  data.map_name = normalizeBattleMapName(data.map_name || data.room_name || 'earth');
   return data;
 }
 
@@ -9341,15 +9361,37 @@ async function cleanupCurrentBattleRoom() {
 }
 
 function cleanupBattleRoomSilently(){
-  const roomId = currentRoom?.id || currentRoom?.roomId || null;
-  const shouldLeave = !!(roomId && currentRoom?.state !== 'solo' && currentRoom?.observer !== true);
+  const roomSnapshot = currentRoom ? { ...currentRoom } : null;
+  const roomId = roomSnapshot?.id || roomSnapshot?.roomId || null;
+  const shouldLeave = !!(roomId && roomSnapshot?.state !== 'solo' && roomSnapshot?.observer !== true);
+
   currentRoom = null;
   window.currentRoomId = null;
   selectedLobbyMap = null;
+
   if(shouldLeave){
-    leaveRoomPlayers(roomId).catch(error => {
-      console.warn('cleanupBattleRoomSilently error:', error);
-    });
+    leaveRoomPlayers(roomId)
+      .then(async (leftCount) => {
+        if((leftCount || 0) <= 0 && window.supabaseReady && window.supabaseClient){
+          await window.supabaseClient.from('rooms').delete().eq('id', roomId);
+        }
+        await loadRoomsFromSupabase();
+        if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
+          renderLobbyListV27('battle');
+        }
+      })
+      .catch(async (error) => {
+        console.warn('cleanupBattleRoomSilently error:', error);
+        try{
+          if(window.supabaseReady && window.supabaseClient){
+            await window.supabaseClient.from('rooms').delete().eq('id', roomId);
+            await loadRoomsFromSupabase();
+            if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
+              renderLobbyListV27('battle');
+            }
+          }
+        }catch(_){}
+      });
   }
 }
 
@@ -9553,6 +9595,7 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
     if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
       renderLobbyListV27('battle');
     }
+    existingRoom.map_name = normalizeBattleMapName(existingRoom.map_name || existingRoom.room_name || 'earth');
     return existingRoom;
   }
 
