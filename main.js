@@ -610,6 +610,77 @@ function refreshLobbyPingForCurrentPlayer(){
 }
 
 
+function getSelfBattlePlayerId(){
+    return String(authState?.playerId || player?.id || '').trim();
+}
+
+function getBattleRoomIdSafe(){
+    return String(currentRoom?.id || currentRoom?.roomId || '').trim();
+}
+
+function getBattleRoomPlayerTeam(entryId = ''){
+    const key = String(entryId || '').trim();
+    if(!key) return 'blue';
+    return String(key).slice(-1).charCodeAt(0) % 2 === 0 ? 'blue' : 'red';
+}
+
+function getBattleShipColorHex(team = 'blue'){
+    return String(team || '').trim().toLowerCase() === 'red' ? 0xff6b6b : 0x7ee7ff;
+}
+
+function getRemoteShipLabelColor(team = 'blue'){
+    return String(team || '').trim().toLowerCase() === 'red' ? '#ff9a9a' : '#8deaff';
+}
+
+function tryApplyRemoteShipTeamVisual(entry){
+    const mesh = entry?.mesh;
+    if(!mesh) return;
+    const colorHex = getBattleShipColorHex(entry?.team || 'blue');
+    mesh.traverse?.((child) => {
+        if(child?.isMesh && child.material && 'color' in child.material){
+            try{ child.material.color.setHex(colorHex); }catch(_){}
+        }
+    });
+}
+
+function ensureSelfRoomPlayerState(){
+    if(!window.supabaseClient) return;
+    const roomId = getBattleRoomIdSafe();
+    const playerId = getSelfBattlePlayerId();
+    if(!roomId || !playerId || !playerShip) return;
+
+    const team = getBattleRoomPlayerTeam(playerId);
+    const payload = {
+        room_id: roomId,
+        player_id: playerId,
+        nickname: player?.nickname || 'Commander',
+        team,
+        level: Number(player?.level || 1) || 1,
+        ping: Number(getBattlePingValue() || 0) || 0,
+        position: {
+            x: Number(playerShip.position.x || 0),
+            y: Number(playerShip.position.y || 0),
+            z: Number(playerShip.position.z || 0)
+        },
+        rotation: {
+            x: Number(playerShip.quaternion.x || 0),
+            y: Number(playerShip.quaternion.y || 0),
+            z: Number(playerShip.quaternion.z || 0),
+            w: Number(playerShip.quaternion.w || 1)
+        },
+        updated_at: new Date().toISOString()
+    };
+
+    window.supabaseClient
+        .from('room_players')
+        .upsert(payload, { onConflict: 'room_id,player_id' })
+        .then(() => {})
+        .catch((error) => {
+            console.warn('Не удалось обновить состояние игрока комнаты:', error);
+        });
+}
+
+
 function pushKillFeed(text, type='kill'){
     const feed = document.getElementById('kill-feed');
     if(!feed) return;
@@ -1093,6 +1164,7 @@ if(gameState === "BATTLE"){
     } else {
         const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'block';
         spawnPlayer();
+        setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
         updateEnemyHud();
         updateBattleScoreboard();
         startLiveBattleSync();
@@ -5827,35 +5899,50 @@ function stopLiveBattleSync(){
     clearRemoteBattleShips();
 }
 
-function createRemotePilotLabel(name){
+function createRemotePilotLabel(name, team = 'blue'){
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
+    canvas.width = 512;
+    canvas.height = 96;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,256,64);
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(10,14,236,34);
-    ctx.strokeStyle = 'rgba(0,255,255,0.35)';
-    ctx.strokeRect(10,14,236,34);
-    ctx.fillStyle = '#dff9ff';
-    ctx.font = 'bold 24px Arial';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(5,10,18,0.78)';
+    ctx.fillRect(0, 18, canvas.width, 50);
+    ctx.strokeStyle = getRemoteShipLabelColor(team);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(3, 18, canvas.width - 6, 50);
+    ctx.font = 'bold 42px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(String(name || 'Pilot'), 128, 38);
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f3fbff';
+    ctx.fillText(String(name || 'Pilot'), canvas.width / 2, 43);
+
     const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ map:texture, transparent:true, depthWrite:false });
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false
+    });
+
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(18, 4.5, 1);
-    sprite.position.set(0, 5.5, 0);
+    sprite.scale.set(9.2, 1.7, 1);
+    sprite.position.set(0, 3.4, 0);
+    sprite.renderOrder = 1000;
+    sprite.center.set(0.5, 0.0);
     return sprite;
 }
 
-function createRemoteBattleShipMesh(name, slotIndex){
+function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     const shipGroup = new THREE.Group();
     shipGroup.rotation.order = 'YXZ';
 
     const body = new THREE.Mesh(
         new THREE.CylinderGeometry(0.0, 1.2, 7, 10),
-        new THREE.MeshStandardMaterial({ color: 0x7ee7ff, metalness: 0.45, roughness: 0.32 })
+        new THREE.MeshStandardMaterial({ color: getBattleShipColorHex(team), metalness: 0.45, roughness: 0.32 })
     );
     body.rotation.z = Math.PI / 2;
     shipGroup.add(body);
@@ -5882,7 +5969,7 @@ function createRemoteBattleShipMesh(name, slotIndex){
     engine2.position.y = -0.55;
     shipGroup.add(engine1, engine2);
 
-    const labelSprite = createRemotePilotLabel(name);
+    const labelSprite = createRemotePilotLabel(name, team);
     shipGroup.add(labelSprite);
 
     const side = slotIndex % 2 === 0 ? 1 : -1;
@@ -5899,7 +5986,8 @@ function createRemoteBattleShipMesh(name, slotIndex){
         orbitSeed: Math.random() * Math.PI * 2,
         slotIndex,
         hp: 100,
-        maxHp: 100
+        maxHp: 100,
+        team
     };
     scene.add(shipGroup);
     return {
@@ -5911,7 +5999,8 @@ function createRemoteBattleShipMesh(name, slotIndex){
         nickname: String(name || 'Pilot'),
         level: 1,
         ping: 0,
-        playerId: ''
+        playerId: '',
+        team
     };
 }
 
@@ -5929,10 +6018,11 @@ function upsertRemoteBattlePresence(payload = {}){
     const nickname = String(payload.nickname || payload.name || 'Pilot').trim() || 'Pilot';
     const level = Math.max(1, Number(payload.level || 1) || 1);
     const ping = Math.max(0, Number(payload.ping || 0) || 0);
+    const team = String(payload.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
 
     let entry = remoteBattleShips.get(entryId);
     if(!entry){
-        entry = createRemoteBattleShipMesh(nickname, remoteBattleShips.size);
+        entry = createRemoteBattleShipMesh(nickname, remoteBattleShips.size, team);
         remoteBattleShips.set(entryId, entry);
     }
 
@@ -5940,17 +6030,15 @@ function upsertRemoteBattlePresence(payload = {}){
     entry.nickname = nickname;
     entry.level = level;
     entry.ping = ping;
+    entry.team = team;
     entry.lastSeenAt = Date.now();
 
     if(entry.mesh?.userData){
         entry.mesh.userData.pilotName = nickname;
+        entry.mesh.userData.team = team;
     }
 
-    if(entry.labelSprite){
-        entry.mesh.remove(entry.labelSprite);
-        entry.labelSprite = createRemotePilotLabel(nickname);
-        entry.mesh.add(entry.labelSprite);
-    }
+    tryApplyRemoteShipTeamVisual(entry);
 
     const x = Number(payload.x);
     const y = Number(payload.y);
@@ -6006,6 +6094,7 @@ async function broadcastSelfBattleState(){
                 playerId,
                 nickname: player?.nickname || 'Commander',
                 level: Number(player?.level || 1) || 1,
+                team: getBattleRoomPlayerTeam(playerId),
                 ping: Number(getBattlePingValue() || 0),
                 x: Number(playerShip.position.x || 0),
                 y: Number(playerShip.position.y || 0),
@@ -6055,7 +6144,7 @@ async function fetchCurrentRoomLivePlayers(){
 
     const { data, error } = await window.supabaseClient
         .from('room_players')
-        .select('player_id,nickname,joined_at')
+        .select('player_id,nickname,joined_at,team,level,ping,position,rotation,updated_at')
         .eq('room_id', roomId)
         .order('joined_at', { ascending: true });
 
@@ -6067,17 +6156,25 @@ async function fetchCurrentRoomLivePlayers(){
     return (data || []).map((item, index) => ({
         player_id: item.player_id ? String(item.player_id) : `guest_${index}`,
         nickname: item.nickname || `Pilot ${index + 1}`,
-        joined_at: item.joined_at || null
+        joined_at: item.joined_at || null,
+        team: item.team || getBattleRoomPlayerTeam(item.player_id ? String(item.player_id) : `guest_${index}`),
+        level: Number(item.level || 1) || 1,
+        ping: Number(item.ping || 0) || 0,
+        position: item.position || null,
+        rotation: item.rotation || null,
+        updated_at: item.updated_at || item.joined_at || null
     }));
 }
 
 async function syncLiveBattlePlayers(){
     if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
+    if(gameState === 'BATTLE' && playerShip){
+        ensureSelfRoomPlayerState();
+    }
+
     const livePlayers = await fetchCurrentRoomLivePlayers();
-    const myId = (typeof authState !== 'undefined' && authState?.playerId)
-        ? String(authState.playerId)
-        : (player?.id ? String(player.id) : null);
+    const myId = getSelfBattlePlayerId();
 
     const activeIds = new Set();
     const visiblePlayers = [];
@@ -6085,35 +6182,76 @@ async function syncLiveBattlePlayers(){
     livePlayers.forEach(entry => {
         const entryId = entry?.player_id ? String(entry.player_id) : '';
         const isMe = !!(entryId && myId && entryId === myId);
-        const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
-        const displayName = remoteState?.nickname || entry.nickname || `Pilot`;
+        const team = String(entry?.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+        const displayName = String(entry?.nickname || 'Pilot').trim() || 'Pilot';
+
+        if(entryId) activeIds.add(entryId);
 
         if(isMe){
-            activeIds.add(entryId);
             return;
         }
         if(!entryId) return;
 
+        let remoteState = remoteBattleShips.get(entryId);
+        if(!remoteState){
+            remoteState = createRemoteBattleShipMesh(displayName, remoteBattleShips.size, team);
+            remoteBattleShips.set(entryId, remoteState);
+        }
+
+        remoteState.nickname = displayName;
+        remoteState.level = Number(entry?.level || remoteState.level || 1) || 1;
+        remoteState.ping = Number(entry?.ping || remoteState.ping || 0) || 0;
+        remoteState.team = team;
+        remoteState.lastSeenAt = Date.now();
+
+        if(remoteState.mesh?.userData){
+            remoteState.mesh.userData.team = team;
+            remoteState.mesh.userData.pilotName = displayName;
+        }
+        tryApplyRemoteShipTeamVisual(remoteState);
+
+        const pos = entry?.position || {};
+        const x = Number(pos?.x);
+        const y = Number(pos?.y);
+        const z = Number(pos?.z);
+        if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+            remoteState.targetPosition.set(x, y, z);
+            if(remoteState.mesh && !remoteState.mesh.userData.hasInitialSync){
+                remoteState.mesh.position.copy(remoteState.targetPosition);
+                remoteState.mesh.userData.hasInitialSync = true;
+            }
+        }
+
+        const rot = entry?.rotation || {};
+        const qx = Number(rot?.x);
+        const qy = Number(rot?.y);
+        const qz = Number(rot?.z);
+        const qw = Number(rot?.w);
+        if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
+            remoteState.targetQuaternion.set(qx, qy, qz, qw);
+            if(remoteState.mesh && !remoteState.mesh.userData.hasInitialQuatSync){
+                remoteState.mesh.quaternion.copy(remoteState.targetQuaternion);
+                remoteState.mesh.userData.hasInitialQuatSync = true;
+            }
+        }
+
         visiblePlayers.push({
             nickname: displayName,
-            clan: '',
-            level: Number(remoteState?.level || 1) || 1,
+            clan: team === 'red' ? 'RED' : 'BLUE',
+            level: Number(entry?.level || remoteState.level || 1) || 1,
             deaths: Number(remoteState?.deaths || 0) || 0,
             kills: Number(remoteState?.kills || 0) || 0,
             id: entryId,
-            ping: Number(remoteState?.ping || 0) || 0
+            ping: Number(entry?.ping || remoteState?.ping || 0) || 0,
+            team
         });
-        activeIds.add(entryId);
-        if(!remoteBattleShips.has(entryId)){
-            remoteBattleShips.set(entryId, createRemoteBattleShipMesh(displayName, remoteBattleShips.size));
-        }
     });
 
-    const expireBefore = Date.now() - 6000;
+    const expireBefore = Date.now() - 3500;
     Array.from(remoteBattleShips.keys()).forEach(entryId => {
         const item = remoteBattleShips.get(entryId);
         const stale = !!item && Number(item.lastSeenAt || 0) < expireBefore;
-        if(!activeIds.has(String(entryId)) && stale){
+        if(!activeIds.has(String(entryId)) || stale){
             removeRemoteBattleShipById(entryId);
         }
     });
@@ -6122,12 +6260,13 @@ async function syncLiveBattlePlayers(){
         ? null
         : {
             nickname: player?.nickname || 'Commander',
-            clan: '',
+            clan: getBattleRoomPlayerTeam(myId) === 'red' ? 'RED' : 'BLUE',
             level: Number(player?.level || 1) || 1,
             kills: Number(battleStats.playerKills || 0) || 0,
             deaths: Number(battleStats.playerDeaths || 0) || 0,
-            id: String(authState?.playerId || player?.id || '').trim(),
-            ping: Number(getBattlePingValue() || 0) || 0
+            id: myId,
+            ping: Number(getBattlePingValue() || 0) || 0,
+            team: getBattleRoomPlayerTeam(myId)
         };
 
     if(currentRoom){
@@ -6140,6 +6279,7 @@ async function syncLiveBattlePlayers(){
 
     updateBattleScoreboard();
 }
+
 
 function removeRemoteBattleShipById(entryId){
     const key = String(entryId || '').trim();
@@ -6163,10 +6303,10 @@ function startLiveBattleSync(){
     ensureLiveBattlePresenceChannel();
     syncLiveBattlePlayers();
     broadcastSelfBattleState();
-    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 1500);
+    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 250);
     liveBattlePresencePushTimer = setInterval(() => {
         broadcastSelfBattleState();
-    }, 120);
+    }, 90);
 }
 
 function animateRemoteBattleShips(){
@@ -6176,14 +6316,14 @@ function animateRemoteBattleShips(){
         if(!mesh) return;
 
         if(entry.targetPosition){
-            mesh.position.lerp(entry.targetPosition, 0.28);
+            mesh.position.lerp(entry.targetPosition, 0.16);
         }
         if(entry.targetQuaternion){
-            mesh.quaternion.slerp(entry.targetQuaternion, 0.28);
+            mesh.quaternion.slerp(entry.targetQuaternion, 0.18);
         }
 
         if(entry.labelSprite){
-            entry.labelSprite.position.y += (3.4 - entry.labelSprite.position.y) * 0.18;
+            entry.labelSprite.position.set(0, 3.4, 0);
         }
     });
 }
@@ -6243,15 +6383,17 @@ function updateBattleScoreboard(){
     const body = document.getElementById('battle-scoreboard-body');
     if(!body) return;
 
-    const myId = String(authState?.playerId || player?.id || '').trim();
+    const myId = getSelfBattlePlayerId();
+    const selfTeam = getBattleRoomPlayerTeam(myId);
     const selfRow = (gameState === 'OBSERVE') ? null : {
         nickname: player?.nickname || 'Commander',
-        clan: '',
+        clan: selfTeam === 'red' ? 'RED' : 'BLUE',
         level: Number(player?.level || 1) || 1,
         kills: Number(battleStats.playerKills || 0) || 0,
         deaths: Number(battleStats.playerDeaths || 0) || 0,
         id: myId,
-        ping: Number(getBattlePingValue() || 0) || 0
+        ping: Number(getBattlePingValue() || 0) || 0,
+        team: selfTeam
     };
 
     const roomPlayers = Array.isArray(currentRoom?.currentPlayers) && currentRoom.currentPlayers.length
@@ -6267,15 +6409,17 @@ function updateBattleScoreboard(){
         const isYou = (!!entryId && !!myId && entryId === myId) || safeName === (player?.nickname || 'Commander');
         if(isYou) return;
 
+        const team = String(entry?.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
         const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
         rows.push({
             nickname: remoteState?.nickname || safeName || 'Pilot',
-            clan: String(entry?.clan || '').trim(),
-            level: Number(remoteState?.level || entry?.level || 1) || 1,
+            clan: team === 'red' ? 'RED' : 'BLUE',
+            level: Number(entry?.level || remoteState?.level || 1) || 1,
             kills: Number(entry?.kills || 0) || 0,
             deaths: Number(entry?.deaths || 0) || 0,
             id: entryId,
-            ping: Number(remoteState?.ping || entry?.ping || entry?.latency || window.__battlePingMs || 0) || 0
+            ping: Number(entry?.ping || remoteState?.ping || 0) || 0,
+            team
         });
     });
 
@@ -6288,7 +6432,8 @@ function updateBattleScoreboard(){
       const safeName = String(entry?.nickname || 'Pilot');
       const entryId = String(entry?.id || '').trim();
       const isYou = !!(myId && entryId && myId === entryId) || safeName === (player?.nickname || 'Commander');
-      const clan = String(entry?.clan || '').trim();
+      const team = String(entry?.team || (isYou ? selfTeam : getBattleRoomPlayerTeam(entryId))).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+      const clan = String(entry?.clan || (team === 'red' ? 'RED' : 'BLUE')).trim();
       const kills = Math.max(0, Number(isYou ? battleStats.playerKills : entry?.kills) || 0);
       const deaths = Math.max(0, Number(isYou ? battleStats.playerDeaths : entry?.deaths) || 0);
       const levelValue = Math.max(1, Number(isYou ? player?.level : entry?.level) || 1);
@@ -6296,7 +6441,7 @@ function updateBattleScoreboard(){
       const pingValueRaw = Number(isYou ? getBattlePingValue() : entry?.ping || 0);
       const pingValue = Number.isFinite(pingValueRaw) && pingValueRaw > 0 ? Math.round(pingValueRaw) : '—';
       return `
-      <div class="battle-scoreboard-row ${isYou ? 'player' : 'enemy'}">
+      <div class="battle-scoreboard-row ${team === 'red' ? 'enemy' : 'player'}">
         <span>${clan}</span>
         <span title="${safeName}">${safeName}</span>
         <span>${kills}</span>
@@ -6308,7 +6453,7 @@ function updateBattleScoreboard(){
     }).join('');
 }
 
-// ================= SPAWN PLAYER =================
+// ================= SPAWN PLAYER =================// ================= SPAWN PLAYER =================
 
 function spawnPlayer() {
 
