@@ -4161,13 +4161,19 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const ownId = getOwnPublicChatId();
     const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
     const safePublicId = escapeChatHtml(publicId || "0");
-    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
-    const hideIdentity = scope.channel === "battle" && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
 
-    const showRoleBadge = isGlobalStaffAnnouncement || hideIdentity;
+    const isObserveHiddenStaff = scope.channel === "battle" && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
+    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+
+    const shouldShowLobbyRoleBadge =
+        (scope.channel === "global" || scope.channel === "clan") &&
+        isStaffRole(msg?.staff_role);
+
+    const showRoleBadge = isGlobalStaffAnnouncement || isObserveHiddenStaff || shouldShowLobbyRoleBadge;
     const roleBadge = showRoleBadge ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
     const roleClass = showRoleBadge ? getChatRoleCssClassByRole(msg.staff_role) : '';
     const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
+
     const nickAttrs = publicId
         ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
         : ` data-player-nickname="${author}"`;
@@ -4179,7 +4185,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
         prefix = '<span class="chat-sep">→</span> ';
     }
 
-    if (isGlobalStaffAnnouncement || hideIdentity) {
+    if (isGlobalStaffAnnouncement || isObserveHiddenStaff) {
         return `
           <div class="chat-line${lineClass}" data-message-id="${msg.id}">
             ${prefix}${roleBadge}
@@ -4192,7 +4198,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const idHtml = publicId ? `<span class="chat-id">[${safePublicId}]</span>` : '';
     return `
       <div class="chat-line${lineClass}" data-message-id="${msg.id}">
-        ${prefix}
+        ${prefix}${roleBadge}
         <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
         ${idHtml}
         <span class="chat-time">[${time}]</span>
