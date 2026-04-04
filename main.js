@@ -8319,7 +8319,7 @@ function getBattleShipTuning(item = null){
     };
 }
 
-function refreshOwnedShipsInventory(){
+function refreshOwnedShipsInventoryFull(){
     const owned = Array.isArray(player.ownedShipIds) ? player.ownedShipIds : ['scout_1'];
     player.ships = owned
         .map(id => getShopShipById(id))
@@ -8337,6 +8337,9 @@ function refreshOwnedShipsInventory(){
         });
 }
 
+refreshOwnedShipsInventory = refreshOwnedShipsInventoryFull;
+
+
 function ensureShopOwnershipDefaults(){
     if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
         player.ownedShipIds = ['scout_1'];
@@ -8352,7 +8355,7 @@ function ensureShopOwnershipDefaults(){
         item.coinPrice = getShopShipCoinPrice(item);
         item.diamondPrice = getShopShipDiamondPrice(item);
     });
-    refreshOwnedShipsInventory();
+    try{ refreshOwnedShipsInventory(); }catch(_){}
 }
 
 ensureShopOwnershipDefaults = ensureShopOwnershipDefaultsFull;
@@ -8368,7 +8371,7 @@ function equipOwnedShip(shipId){
     const safeId = String(shipId || '').trim();
     if(!safeId || !isOwnedShip(safeId)) return false;
     player.selectedShipId = safeId;
-    refreshOwnedShipsInventory();
+    try{ refreshOwnedShipsInventory(); }catch(_){}
     updatePremiumAccountInfo?.();
     saveGame?.();
     renderShopScreen?.();
@@ -8404,7 +8407,7 @@ function buyShipFromShop(shipId){
     player.ownedShipIds.push(ship.id);
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds));
     player.selectedShipId = ship.id;
-    refreshOwnedShipsInventory();
+    try{ refreshOwnedShipsInventory(); }catch(_){}
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
