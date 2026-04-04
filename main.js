@@ -341,7 +341,7 @@ function updateBattlePlanetCapture(){
     const target = battleMapPlanet.position.clone().add(battlePlanetCapture.normal.clone().multiplyScalar(impactRadius));
     playerShip.position.lerp(target, 0.04 + progress * 0.16);
     shipVelocity.set(0, 0, 0);
-    camera.position.set(battlePlanetCapture.freezeCameraPosition);
+    camera.position.copy(battlePlanetCapture.freezeCameraPosition);
     camera.lookAt(battlePlanetCapture.freezeCameraLookAt);
     if(progress >= 1){
         startShipCrashAnimation();
@@ -883,7 +883,7 @@ function resetOrbitView(forcePlanetReset=false){
             }
 
             if(selectedPlanet.originalLocalPosition){
-                selectedPlanet.mesh.position.set(selectedPlanet.originalLocalPosition);
+                selectedPlanet.mesh.position.copy(selectedPlanet.originalLocalPosition);
             }else{
                 selectedPlanet.mesh.position.set(selectedPlanet.orbitRadius || 0, 0, 0);
             }
@@ -2396,7 +2396,7 @@ if(selectedPlanet === planet){
 if(selectedPlanet){
 
     scene.remove(selectedPlanet.mesh);
-    selectedPlanet.mesh.position.set(selectedPlanet.originalLocalPosition);
+    selectedPlanet.mesh.position.copy(selectedPlanet.originalLocalPosition);
     selectedPlanet.orbitPivot.add(selectedPlanet.mesh);
     selectedPlanet.mesh.scale.set(1,1,1);
     selectedPlanet.updateResourceLabelPosition?.(false);
@@ -2411,7 +2411,7 @@ scene.add(planet.mesh);
 const direction = new THREE.Vector3();
 camera.getWorldDirection(direction);
 
-planet.mesh.position.set(
+planet.mesh.position.copy(
     camera.position.clone().add(direction.multiplyScalar(30))
 );
 
@@ -3038,7 +3038,7 @@ function tryFireLaser(){
     [-1.1, 1.1].forEach(offsetX => {
         const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
         const localOffset = new THREE.Vector3(offsetX, 0, -2.2).applyQuaternion(playerShip.quaternion);
-        laserMesh.position.set(playerShip.position.clone().add(localOffset));
+        laserMesh.position.copy(playerShip.position.clone().add(localOffset));
         laserMesh.lookAt(playerShip.position.clone().add(forward));
         scene.add(laserMesh);
         activeLasers.push({
@@ -3200,7 +3200,7 @@ function updateBattlePlanetEffects(){
     if(!Number.isFinite(towardPlanet.x) || towardPlanet.lengthSq() === 0) return;
 
     if(distance <= crashRadius){
-        playerShip.position.set(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(crashRadius)));
+        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(crashRadius)));
         shipVelocity.set(0, 0, 0);
         startShipCrashAnimation();
         return;
@@ -3211,7 +3211,7 @@ function updateBattlePlanetEffects(){
             startBattlePlanetCapture();
         }
         const lockDistance = Math.max(crashRadius, radius + 10);
-        playerShip.position.set(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(lockDistance)));
+        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(lockDistance)));
         shipVelocity.set(0, 0, 0);
         return;
     }
@@ -5794,6 +5794,9 @@ function enterBattleMap(mapName){
 
 var remoteBattleShips = new Map();
 var liveBattleSyncTimer = null;
+var liveBattlePresencePushTimer = null;
+var liveBattlePresenceChannel = null;
+var liveBattlePresenceChannelName = '';
 
 function clearRemoteBattleShips(){
     if(!(remoteBattleShips instanceof Map)){
@@ -5812,6 +5815,15 @@ function stopLiveBattleSync(){
         clearInterval(liveBattleSyncTimer);
         liveBattleSyncTimer = null;
     }
+    if(typeof liveBattlePresencePushTimer !== 'undefined' && liveBattlePresencePushTimer){
+        clearInterval(liveBattlePresencePushTimer);
+        liveBattlePresencePushTimer = null;
+    }
+    if(liveBattlePresenceChannel && window.supabaseClient){
+        try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+    }
+    liveBattlePresenceChannel = null;
+    liveBattlePresenceChannelName = '';
     clearRemoteBattleShips();
 }
 
@@ -5877,6 +5889,10 @@ function createRemoteBattleShipMesh(name, slotIndex){
     const rank = Math.floor(slotIndex / 2);
     shipGroup.position.set(side * (70 + rank * 28), 8 + ((slotIndex % 3) - 1) * 6, -40 - rank * 26);
     shipGroup.lookAt(new THREE.Vector3(0, 0, 0));
+
+    const targetPosition = shipGroup.position.clone();
+    const targetQuaternion = shipGroup.quaternion.clone();
+
     shipGroup.userData = {
         remote: true,
         pilotName: String(name || 'Pilot'),
@@ -5886,7 +5902,121 @@ function createRemoteBattleShipMesh(name, slotIndex){
         maxHp: 100
     };
     scene.add(shipGroup);
-    return { mesh: shipGroup, labelSprite };
+    return {
+        mesh: shipGroup,
+        labelSprite,
+        targetPosition,
+        targetQuaternion,
+        lastSeenAt: Date.now(),
+        nickname: String(name || 'Pilot'),
+        level: 1,
+        ping: 0,
+        playerId: ''
+    };
+}
+
+function getLiveBattleChannelName(){
+    const roomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return '';
+    return `cosmic-battle-room:${roomId}`;
+}
+
+function upsertRemoteBattlePresence(payload = {}){
+    const entryId = String(payload.playerId || payload.player_id || payload.id || '').trim();
+    const myId = String(authState?.playerId || player?.id || '').trim();
+    if(!entryId || (myId && entryId === myId)) return;
+
+    const nickname = String(payload.nickname || payload.name || 'Pilot').trim() || 'Pilot';
+    const level = Math.max(1, Number(payload.level || 1) || 1);
+    const ping = Math.max(0, Number(payload.ping || 0) || 0);
+
+    let entry = remoteBattleShips.get(entryId);
+    if(!entry){
+        entry = createRemoteBattleShipMesh(nickname, remoteBattleShips.size);
+        remoteBattleShips.set(entryId, entry);
+    }
+
+    entry.playerId = entryId;
+    entry.nickname = nickname;
+    entry.level = level;
+    entry.ping = ping;
+    entry.lastSeenAt = Date.now();
+
+    if(entry.mesh?.userData){
+        entry.mesh.userData.pilotName = nickname;
+    }
+
+    if(entry.labelSprite){
+        entry.mesh.remove(entry.labelSprite);
+        entry.labelSprite = createRemotePilotLabel(nickname);
+        entry.mesh.add(entry.labelSprite);
+    }
+
+    const x = Number(payload.x);
+    const y = Number(payload.y);
+    const z = Number(payload.z);
+    if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+        entry.targetPosition.set(x, y, z);
+    }
+
+    const qx = Number(payload.qx);
+    const qy = Number(payload.qy);
+    const qz = Number(payload.qz);
+    const qw = Number(payload.qw);
+    if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
+        entry.targetQuaternion.set(qx, qy, qz, qw);
+    }
+
+    updateBattleScoreboard?.();
+}
+
+function ensureLiveBattlePresenceChannel(){
+    if(!window.supabaseClient) return;
+    const channelName = getLiveBattleChannelName();
+    if(!channelName) return;
+    if(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName) return;
+
+    if(liveBattlePresenceChannel){
+        try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+        liveBattlePresenceChannel = null;
+    }
+
+    liveBattlePresenceChannelName = channelName;
+    liveBattlePresenceChannel = window.supabaseClient.channel(channelName, {
+        config: { broadcast: { self: false, ack: false } }
+    });
+
+    liveBattlePresenceChannel
+        .on('broadcast', { event: 'pilot-state' }, ({ payload }) => {
+            upsertRemoteBattlePresence(payload || {});
+        })
+        .subscribe();
+}
+
+async function broadcastSelfBattleState(){
+    if(gameState !== 'BATTLE' || !playerShip || !liveBattlePresenceChannel) return;
+    const playerId = String(authState?.playerId || player?.id || '').trim();
+    if(!playerId) return;
+
+    try{
+        await liveBattlePresenceChannel.send({
+            type: 'broadcast',
+            event: 'pilot-state',
+            payload: {
+                playerId,
+                nickname: player?.nickname || 'Commander',
+                level: Number(player?.level || 1) || 1,
+                ping: Number(getBattlePingValue() || 0),
+                x: Number(playerShip.position.x || 0),
+                y: Number(playerShip.position.y || 0),
+                z: Number(playerShip.position.z || 0),
+                qx: Number(playerShip.quaternion.x || 0),
+                qy: Number(playerShip.quaternion.y || 0),
+                qz: Number(playerShip.quaternion.z || 0),
+                qw: Number(playerShip.quaternion.w || 1)
+            }
+        });
+    }catch(_){}
 }
 
 function getObservedRoomId(targetMap = ''){
@@ -5955,33 +6085,61 @@ async function syncLiveBattlePlayers(){
     livePlayers.forEach(entry => {
         const entryId = entry?.player_id ? String(entry.player_id) : '';
         const isMe = !!(entryId && myId && entryId === myId);
-        const displayName = entry.nickname || `Pilot`;
+        const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
+        const displayName = remoteState?.nickname || entry.nickname || `Pilot`;
 
-        if(isMe) return;
+        if(isMe){
+            activeIds.add(entryId);
+            return;
+        }
         if(!entryId) return;
 
-        visiblePlayers.push({ nickname: displayName, clan: '', level: 'LIVE', deaths: 0, kills: 0, id: entryId });
+        visiblePlayers.push({
+            nickname: displayName,
+            clan: '',
+            level: Number(remoteState?.level || 1) || 1,
+            deaths: Number(remoteState?.deaths || 0) || 0,
+            kills: Number(remoteState?.kills || 0) || 0,
+            id: entryId,
+            ping: Number(remoteState?.ping || 0) || 0
+        });
         activeIds.add(entryId);
         if(!remoteBattleShips.has(entryId)){
             remoteBattleShips.set(entryId, createRemoteBattleShipMesh(displayName, remoteBattleShips.size));
         }
     });
 
+    const expireBefore = Date.now() - 6000;
     Array.from(remoteBattleShips.keys()).forEach(entryId => {
-        if(!activeIds.has(String(entryId))){
+        const item = remoteBattleShips.get(entryId);
+        const stale = !!item && Number(item.lastSeenAt || 0) < expireBefore;
+        if(!activeIds.has(String(entryId)) && stale){
             removeRemoteBattleShipById(entryId);
         }
     });
 
+    const selfRow = gameState === 'OBSERVE'
+        ? null
+        : {
+            nickname: player?.nickname || 'Commander',
+            clan: '',
+            level: Number(player?.level || 1) || 1,
+            kills: Number(battleStats.playerKills || 0) || 0,
+            deaths: Number(battleStats.playerDeaths || 0) || 0,
+            id: String(authState?.playerId || player?.id || '').trim(),
+            ping: Number(getBattlePingValue() || 0) || 0
+        };
+
     if(currentRoom){
-        const nextPlayers = gameState === 'OBSERVE' ? [...visiblePlayers] : (visiblePlayers.length ? visiblePlayers : [{ nickname: getDisplayPlayerTag(), clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: player?.id || '' }]);
+        const nextPlayers = [];
+        if(selfRow) nextPlayers.push(selfRow);
+        nextPlayers.push(...visiblePlayers);
         currentRoom.currentPlayers = nextPlayers;
         currentRoom.players = [...nextPlayers];
     }
 
     updateBattleScoreboard();
 }
-
 
 function removeRemoteBattleShipById(entryId){
     const key = String(entryId || '').trim();
@@ -6002,21 +6160,31 @@ function removeRemoteBattleShipById(entryId){
 
 function startLiveBattleSync(){
     stopLiveBattleSync();
+    ensureLiveBattlePresenceChannel();
     syncLiveBattlePlayers();
-    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 1800);
+    broadcastSelfBattleState();
+    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 1500);
+    liveBattlePresencePushTimer = setInterval(() => {
+        broadcastSelfBattleState();
+    }, 120);
 }
 
 function animateRemoteBattleShips(){
     if(!remoteBattleShips.size) return;
-    const now = Date.now() * 0.001;
     remoteBattleShips.forEach((entry) => {
         const mesh = entry?.mesh;
         if(!mesh) return;
-        const seed = mesh.userData?.orbitSeed || 0;
-        const slotIndex = mesh.userData?.slotIndex || 0;
-        mesh.position.y += ((8 + Math.sin(now + seed) * 2.4 + (slotIndex % 3) * 1.5) - mesh.position.y) * 0.04;
-        mesh.rotation.y += 0.01;
-        mesh.rotation.z = Math.sin(now * 1.3 + seed) * 0.04;
+
+        if(entry.targetPosition){
+            mesh.position.lerp(entry.targetPosition, 0.28);
+        }
+        if(entry.targetQuaternion){
+            mesh.quaternion.slerp(entry.targetQuaternion, 0.28);
+        }
+
+        if(entry.labelSprite){
+            entry.labelSprite.position.y += (3.4 - entry.labelSprite.position.y) * 0.18;
+        }
     });
 }
 
@@ -6059,7 +6227,7 @@ function fireBotLaser(){
     [-0.7, 0.7].forEach(offsetX => {
         const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
         const localOffset = new THREE.Vector3(offsetX, 0, -1.8).applyQuaternion(enemyBot.quaternion);
-        laserMesh.position.set(enemyBot.position.clone().add(localOffset));
+        laserMesh.position.copy(enemyBot.position.clone().add(localOffset));
         laserMesh.lookAt(enemyBot.position.clone().add(toPlayer));
         scene.add(laserMesh);
         enemyLasers.push({
@@ -6075,32 +6243,57 @@ function updateBattleScoreboard(){
     const body = document.getElementById('battle-scoreboard-body');
     if(!body) return;
 
+    const myId = String(authState?.playerId || player?.id || '').trim();
+    const selfRow = (gameState === 'OBSERVE') ? null : {
+        nickname: player?.nickname || 'Commander',
+        clan: '',
+        level: Number(player?.level || 1) || 1,
+        kills: Number(battleStats.playerKills || 0) || 0,
+        deaths: Number(battleStats.playerDeaths || 0) || 0,
+        id: myId,
+        ping: Number(getBattlePingValue() || 0) || 0
+    };
+
     const roomPlayers = Array.isArray(currentRoom?.currentPlayers) && currentRoom.currentPlayers.length
         ? currentRoom.currentPlayers
         : (Array.isArray(currentRoom?.players) ? currentRoom.players : []);
 
-    const normalizedPlayers = roomPlayers.length
-        ? roomPlayers
-        : (gameState === 'OBSERVE'
-            ? []
-            : [{ nickname: player?.nickname || 'Commander', clan: '', level: player?.level || 1, kills: battleStats.playerKills, deaths: battleStats.playerDeaths, id: authState?.playerId || player?.id || '', ping: Math.floor(Math.random()*40+20)}]);
+    const rows = [];
+    if(selfRow) rows.push(selfRow);
 
-    if(gameState === 'OBSERVE' && !normalizedPlayers.length){
+    roomPlayers.forEach((entry) => {
+        const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
+        const safeName = String(entry?.nickname || entry?.name || entry || '').trim();
+        const isYou = (!!entryId && !!myId && entryId === myId) || safeName === (player?.nickname || 'Commander');
+        if(isYou) return;
+
+        const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
+        rows.push({
+            nickname: remoteState?.nickname || safeName || 'Pilot',
+            clan: String(entry?.clan || '').trim(),
+            level: Number(remoteState?.level || entry?.level || 1) || 1,
+            kills: Number(entry?.kills || 0) || 0,
+            deaths: Number(entry?.deaths || 0) || 0,
+            id: entryId,
+            ping: Number(remoteState?.ping || entry?.ping || entry?.latency || window.__battlePingMs || 0) || 0
+        });
+    });
+
+    if(gameState === 'OBSERVE' && !rows.length){
       body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span><span>—</span></div>';
       return;
     }
 
-    body.innerHTML = normalizedPlayers.map((entry, index) => {
-      const safeName = String(entry?.nickname || entry?.name || entry || `Pilot ${index + 1}`);
-      const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
-      const myId = String(authState?.playerId || player?.id || '').trim();
-      const isYou = (!!entryId && !!myId && entryId === myId) || safeName === (player?.nickname || 'Commander');
+    body.innerHTML = rows.map((entry) => {
+      const safeName = String(entry?.nickname || 'Pilot');
+      const entryId = String(entry?.id || '').trim();
+      const isYou = !!(myId && entryId && myId === entryId) || safeName === (player?.nickname || 'Commander');
       const clan = String(entry?.clan || '').trim();
-      const kills = Math.max(0, isYou ? Number(battleStats.playerKills || 0) : Number(entry?.kills || 0));
-      const deaths = Math.max(0, isYou ? Number(battleStats.playerDeaths || 0) : Number(entry?.deaths || 0));
-      const levelValue = Math.max(1, Number(isYou ? (player?.level || entry?.level || 1) : (entry?.level || 1)) || 1);
-      const publicId = isYou ? String(authState?.playerId || entryId || '') : entryId;
-      const pingValueRaw = isYou ? getBattlePingValue() : Number(entry?.ping || entry?.latency || 0);
+      const kills = Math.max(0, Number(isYou ? battleStats.playerKills : entry?.kills) || 0);
+      const deaths = Math.max(0, Number(isYou ? battleStats.playerDeaths : entry?.deaths) || 0);
+      const levelValue = Math.max(1, Number(isYou ? player?.level : entry?.level) || 1);
+      const publicId = isYou ? (myId || '—') : (entryId || '—');
+      const pingValueRaw = Number(isYou ? getBattlePingValue() : entry?.ping || 0);
       const pingValue = Number.isFinite(pingValueRaw) && pingValueRaw > 0 ? Math.round(pingValueRaw) : '—';
       return `
       <div class="battle-scoreboard-row ${isYou ? 'player' : 'enemy'}">
@@ -6109,7 +6302,7 @@ function updateBattleScoreboard(){
         <span>${kills}</span>
         <span>${deaths}</span>
         <span class="battle-level-cell"><span class="battle-level-icon">★</span>${levelValue}</span>
-        <span>${publicId || '—'}</span>
+        <span>${publicId}</span>
         <span>${pingValue}</span>
       </div>`;
     }).join('');
@@ -6160,7 +6353,7 @@ function spawnPlayer() {
     battlePlanetCapture = null;
     playerShip = shipGroup;
     const spawn = spawnPointA.clone();
-    playerShip.position.set(spawn);
+    playerShip.position.copy(spawn);
     playerShip.visible = true;
     playerShip.lookAt(spawnPointB.clone());
 
@@ -6779,7 +6972,7 @@ function handleBattleCollisions(object, velocityRef=null){
         if(dist < radius + 2.5){
             const push = object.position.clone().sub(obstacle.position).normalize();
             if(!Number.isFinite(push.x)) push.set(1,0,0);
-            object.position.set(obstacle.position.clone().add(push.multiplyScalar(radius + 2.6)));
+            object.position.copy(obstacle.position.clone().add(push.multiplyScalar(radius + 2.6)));
             if(velocityRef) velocityRef.multiplyScalar(0.55);
         }
     }
@@ -6788,7 +6981,7 @@ function handleBattleCollisions(object, velocityRef=null){
 function spawnShipDebris(position, color=0xffffff){
     for(let i=0;i<14;i++){
         const piece = new THREE.Mesh(new THREE.BoxGeometry(0.2 + Math.random()*0.7, 0.12 + Math.random()*0.5, 0.2 + Math.random()*0.7), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity:0.04, roughness:0.9, metalness:0.15 }));
-        piece.position.set(position);
+        piece.position.copy(position);
         piece.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
         scene.add(piece);
         debrisPieces.push({
@@ -6852,7 +7045,7 @@ function setupObserverBattle(mapName){
     enterBattleMap(mapName);
     observerBots = [];
     observerFreeCameraPosition.set(0, 12, 38);
-    camera.position.set(observerFreeCameraPosition);
+    camera.position.copy(observerFreeCameraPosition);
     const hud = document.getElementById('enemy-hud');
     if(hud) hud.style.display = 'none';
 }
@@ -6878,7 +7071,7 @@ function updateObserverBattle(){
         observerFreeCameraPosition.add(move);
     }
 
-    camera.position.set(observerFreeCameraPosition);
+    camera.position.copy(observerFreeCameraPosition);
     camera.lookAt(observerFreeCameraPosition.clone().add(forward.multiplyScalar(80)));
 }
 
@@ -6887,7 +7080,7 @@ function fireObserverLaser(shooter, target){
     [-0.8,0.8].forEach(offsetX => {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,1.6), new THREE.MeshBasicMaterial({ color:0xfff1a8 }));
         const localOffset = new THREE.Vector3(offsetX,0,-1.6).applyQuaternion(shooter.quaternion);
-        mesh.position.set(shooter.position.clone().add(localOffset));
+        mesh.position.copy(shooter.position.clone().add(localOffset));
         mesh.lookAt(shooter.position.clone().add(dir));
         scene.add(mesh);
         enemyLasers.push({ mesh, velocity: dir.clone().multiplyScalar(2.5), life: 90, damage: 10, shooter });
@@ -7531,7 +7724,7 @@ function limitBattleArea(){
             if(dist < minDist){
                 const push = delta.normalize();
                 if(!Number.isFinite(push.x)) push.set(1,0,0);
-                object.position.set(obstacle.position.clone().add(push.multiplyScalar(minDist + 0.2)));
+                object.position.copy(obstacle.position.clone().add(push.multiplyScalar(minDist + 0.2)));
                 if(velocityRef) velocityRef.multiplyScalar(0.42);
             }
         }
@@ -7543,7 +7736,7 @@ function limitBattleArea(){
         if(dist < minDist){
             const push = delta.normalize();
             if(!Number.isFinite(push.x)) push.set(0,1,0);
-            object.position.set(battleMapPlanet.position.clone().add(push.multiplyScalar(minDist)));
+            object.position.copy(battleMapPlanet.position.clone().add(push.multiplyScalar(minDist)));
             if(velocityRef) velocityRef.multiplyScalar(0.18);
         }
     };
@@ -8409,7 +8602,7 @@ function closeShopView(){
         observerCameraDistance = 42;
         observerCameraTarget.set(0,0,0);
         observerFreeCameraPosition.set(0, 18, 48);
-        camera.position.set(observerFreeCameraPosition);
+        camera.position.copy(observerFreeCameraPosition);
         const canvas = document.querySelector('canvas');
         if(canvas){
             setTimeout(() => {
