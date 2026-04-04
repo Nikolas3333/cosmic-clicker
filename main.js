@@ -7006,19 +7006,472 @@ function renderProfileStats(){
       </div>`;
 }
 
-function renderHangarCosmic(){
-    const hangarList = document.getElementById('hangar-list');
-    if(!hangarList) return;
-    hangarList.innerHTML = player.ships.map(ship => `
-      <div class="ship-card">
-        <div class="cosmic-badge">${ship.name}</div>
-        <div>Уровень: ${ship.level}</div>
-        <div>HP: ${ship.hp}</div>
-        <div>Атака: ${ship.attack}</div>
-        <div>Скорость: ${ship.speed}</div>
-      </div>`).join('');
+
+const hangarState = {
+    shipIndex: 0,
+    moduleIndex: 0,
+    renderer: null,
+    scene: null,
+    camera: null,
+    platform: null,
+    shipPivot: null,
+    modulePivot: null,
+    frameId: 0,
+    resizeBound: false,
+    shipItem: null,
+    moduleItem: null
+};
+
+function getAllHangarModules(){
+    try{
+        return Object.entries(SHOP_DATA?.modulesByType || {}).flatMap(([typeId, list]) =>
+            (Array.isArray(list) ? list : []).map(item => ({ ...item, typeId }))
+        );
+    }catch(_){
+        return [];
+    }
 }
 
+function getOwnedHangarShips(){
+    if(Array.isArray(player?.ownedShipIds) && player.ownedShipIds.length && typeof getShopShipById === 'function'){
+        const owned = player.ownedShipIds
+            .map(id => getShopShipById(id))
+            .filter(Boolean);
+        if(owned.length) return owned;
+    }
+    if(Array.isArray(player?.ships) && player.ships.length){
+        return player.ships.map((ship, index) => ({
+            id: String(ship.id || `legacy_${index}`),
+            name: ship.name || `Корабль ${index + 1}`,
+            subtitle: 'Старый ангар',
+            description: 'Корабль из старого ангара. Для полного отображения открой магазин и купи новые корпуса.',
+            tier: 'Legacy',
+            stats: [
+                ['Скорость', ship.speed || 5],
+                ['Броня', ship.hp || 100],
+                ['Урон', ship.attack || 10],
+                ['Энергия', ship.level || 1]
+            ],
+            neon: '#7efcff',
+            engine: '#63d1ff',
+            accent: '#7a8cff',
+            art: 'classic',
+            weapon: 'laser'
+        }));
+    }
+    return [];
+}
+
+function ensureHangarIndexes(){
+    const ships = getOwnedHangarShips();
+    const modules = getAllHangarModules();
+    if(hangarState.shipIndex >= ships.length) hangarState.shipIndex = Math.max(0, ships.length - 1);
+    if(hangarState.moduleIndex >= modules.length) hangarState.moduleIndex = Math.max(0, modules.length - 1);
+    if(hangarState.shipIndex < 0) hangarState.shipIndex = 0;
+    if(hangarState.moduleIndex < 0) hangarState.moduleIndex = 0;
+    if(player?.selectedShipId && ships.length){
+        const selectedIndex = ships.findIndex(item => String(item?.id || '') === String(player.selectedShipId || ''));
+        if(selectedIndex >= 0) hangarState.shipIndex = selectedIndex;
+    }
+}
+
+function createHangarPlatform(){
+    const group = new THREE.Group();
+
+    const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(7.6, 8.4, 1.1, 40, 1),
+        new THREE.MeshStandardMaterial({ color:0x213b62, metalness:0.72, roughness:0.38 })
+    );
+    group.add(base);
+
+    const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(6.25, 0.22, 20, 56),
+        new THREE.MeshBasicMaterial({ color:0x78d9ff })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.48;
+    group.add(ring);
+
+    const glowDisc = new THREE.Mesh(
+        new THREE.CylinderGeometry(5.8, 5.8, 0.08, 36),
+        new THREE.MeshBasicMaterial({ color:0x55bfff, transparent:true, opacity:0.18 })
+    );
+    glowDisc.position.y = 0.6;
+    group.add(glowDisc);
+
+    return group;
+}
+
+function createHangarShipMesh(item){
+    const art = String(item?.art || 'classic').toLowerCase();
+    const neon = item?.neon || '#7efcff';
+    const engine = item?.engine || '#63d1ff';
+    const accent = item?.accent || '#7a8cff';
+
+    const group = new THREE.Group();
+    const hullColor = new THREE.Color(accent);
+    const metal = new THREE.MeshStandardMaterial({ color:hullColor, metalness:0.72, roughness:0.32 });
+    const lightMetal = new THREE.MeshStandardMaterial({ color:0xdbeeff, metalness:0.35, roughness:0.24 });
+    const glowMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(neon) });
+    const engineMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(engine) });
+
+    const body = new THREE.Mesh(new THREE.ConeGeometry(1.15, 5.2, 8), metal);
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+
+    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 18), lightMetal);
+    cockpit.position.set(0, 0.4, -0.55);
+    group.add(cockpit);
+
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 2.7), lightMetal);
+    spine.position.set(0, 0.18, 0.55);
+    group.add(spine);
+
+    const wingMat = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent), metalness:0.64, roughness:0.38 });
+    if(['classic','arrow','dart','lancer','stinger','razor'].includes(art)){
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.16, 1.05), wingMat);
+        wing.position.set(0, -0.05, 0.25);
+        group.add(wing);
+        const finL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 1.3), wingMat);
+        finL.position.set(-1.48, 0.22, 0.55);
+        const finR = finL.clone();
+        finR.position.x = 1.48;
+        group.add(finL, finR);
+    } else {
+        const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.2, 1.25), wingMat);
+        wingL.position.set(-1.15, -0.02, 0.32);
+        const wingR = wingL.clone();
+        wingR.position.x = 1.15;
+        group.add(wingL, wingR);
+        const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 2.1, 16), lightMetal);
+        shield.rotation.z = Math.PI / 2;
+        shield.position.set(0, 0.2, 0.95);
+        group.add(shield);
+    }
+
+    const noseGlow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), glowMat);
+    noseGlow.position.set(0, 0.12, -2.75);
+    group.add(noseGlow);
+
+    const engineL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.9), engineMat);
+    engineL.position.set(-0.48, -0.02, 2.52);
+    const engineR = engineL.clone();
+    engineR.position.x = 0.48;
+    group.add(engineL, engineR);
+
+    const glowTrail = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.38, 1.15, 14), engineMat);
+    glowTrail.rotation.x = Math.PI / 2;
+    glowTrail.position.set(0, 0, 3.05);
+    group.add(glowTrail);
+
+    group.scale.setScalar(1.34);
+    return group;
+}
+
+function createHangarModuleMesh(item){
+    const art = String(item?.art || item?.typeId || 'module').toLowerCase();
+    const neon = item?.neon || '#7efcff';
+    const accent = item?.accent || '#7a8cff';
+
+    const group = new THREE.Group();
+    const shell = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent), metalness:0.58, roughness:0.34 });
+    const glow = new THREE.MeshBasicMaterial({ color:new THREE.Color(neon) });
+
+    if(art.includes('shield')){
+        const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), shell);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.14, 18, 44), glow);
+        ring.rotation.x = Math.PI / 2;
+        group.add(core, ring);
+    } else if(art.includes('reactor') || art.includes('plasma')){
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.86, 18, 18), glow);
+        const shellRing = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.18, 16, 40), shell);
+        shellRing.rotation.x = Math.PI / 2;
+        group.add(core, shellRing);
+    } else if(art.includes('matrix') || art.includes('phase')){
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.55, 1.55), shell);
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16), glow);
+        group.add(cube, core);
+    } else {
+        const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.9, 2.0, 16), shell);
+        pod.rotation.z = Math.PI / 2;
+        const glowStrip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.3, 0.14), glow);
+        glowStrip.position.set(0, 0, 0.78);
+        group.add(pod, glowStrip);
+    }
+
+    group.scale.setScalar(1.22);
+    return group;
+}
+
+function disposeHangarRenderer(){
+    if(hangarState.frameId){
+        cancelAnimationFrame(hangarState.frameId);
+        hangarState.frameId = 0;
+    }
+    const stage = document.getElementById('hangar-3d-stage');
+    if(hangarState.renderer){
+        try{ hangarState.renderer.dispose(); }catch(_){}
+        if(stage && hangarState.renderer.domElement.parentNode === stage){
+            stage.removeChild(hangarState.renderer.domElement);
+        }
+    }
+    hangarState.renderer = null;
+    hangarState.scene = null;
+    hangarState.camera = null;
+    hangarState.platform = null;
+    hangarState.shipPivot = null;
+    hangarState.modulePivot = null;
+}
+
+function updateHangarHeaderNumbers(){
+    const coinsEl = document.getElementById('hangar-coins');
+    const diamondsEl = document.getElementById('hangar-diamonds');
+    if(coinsEl) coinsEl.textContent = String(Number(playerResources?.coins || player?.credits || 0) || 0);
+    if(diamondsEl) diamondsEl.textContent = String(Number(playerResources?.crystals || 0) || 0);
+}
+
+function updateHangarButtons(){
+    const ships = getOwnedHangarShips();
+    const modules = getAllHangarModules();
+
+    const leftBtn = document.getElementById('hangar-ship-left');
+    const rightBtn = document.getElementById('hangar-ship-right');
+    const upBtn = document.getElementById('hangar-module-up');
+    const downBtn = document.getElementById('hangar-module-down');
+    const actionBtn = document.getElementById('hangar-ship-action');
+    const posLabel = document.getElementById('hangar-ship-position');
+
+    if(leftBtn) leftBtn.disabled = hangarState.shipIndex <= 0;
+    if(rightBtn) rightBtn.disabled = hangarState.shipIndex >= ships.length - 1;
+    if(upBtn) upBtn.disabled = hangarState.moduleIndex <= 0;
+    if(downBtn) downBtn.disabled = hangarState.moduleIndex >= modules.length - 1;
+
+    if(posLabel) posLabel.textContent = ships.length ? `${hangarState.shipIndex + 1} / ${ships.length}` : '0 / 0';
+
+    if(actionBtn){
+        const currentShip = ships[hangarState.shipIndex];
+        const isSelected = !!currentShip && String(player.selectedShipId || '') === String(currentShip.id || '');
+        actionBtn.textContent = isSelected ? 'Выбран' : 'Сделать активным';
+        actionBtn.classList.toggle('equipped', isSelected);
+        actionBtn.classList.toggle('locked', !ships.length);
+        actionBtn.disabled = !ships.length;
+    }
+}
+
+function fillHangarText(){
+    const ships = getOwnedHangarShips();
+    const modules = getAllHangarModules();
+    const ship = ships[hangarState.shipIndex] || null;
+    const module = modules[hangarState.moduleIndex] || null;
+    hangarState.shipItem = ship;
+    hangarState.moduleItem = module;
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if(el) el.textContent = value || '—';
+    };
+
+    setText('hangar-ship-tier', ship?.tier || '—');
+    setText('hangar-ship-name', ship?.name || 'Нет кораблей');
+    setText('hangar-ship-subtitle', ship?.subtitle || 'Покупай корабли в магазине, они появятся здесь');
+    setText('hangar-ship-desc', ship?.description || 'Открой магазин и пополни ангар новыми корпусами.');
+    setText('hangar-ship-price-coins', ship && typeof getShipCoinPrice === 'function' ? String(getShipCoinPrice(ship)) : '0');
+    setText('hangar-ship-price-diamonds', ship && typeof getShipDiamondPrice === 'function' ? String(getShipDiamondPrice(ship)) : '0');
+
+    setText('hangar-module-name', module?.name || 'Нет модулей');
+    setText('hangar-module-tier', module?.tier || '—');
+    setText('hangar-module-type', module?.typeId ? `Тип: ${module.typeId}` : '—');
+    setText('hangar-module-desc', module?.description || 'Модули из магазина будут видны здесь и доступны для просмотра.');
+
+    const statsWrap = document.getElementById('hangar-ship-stats');
+    if(statsWrap){
+        const stats = Array.isArray(ship?.stats) ? ship.stats : [];
+        statsWrap.innerHTML = stats.slice(0, 6).map(([key, value]) => `
+            <div class="hangar-stat-box">
+              <div class="hangar-stat-label">${key}</div>
+              <div class="hangar-stat-value">${value}</div>
+            </div>
+        `).join('');
+    }
+
+    updateHangarHeaderNumbers();
+    updateHangarButtons();
+}
+
+function rebuildHangarSceneObjects(){
+    if(!hangarState.scene || !hangarState.shipPivot || !hangarState.modulePivot) return;
+
+    while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+    while(hangarState.modulePivot.children.length) hangarState.modulePivot.remove(hangarState.modulePivot.children[0]);
+
+    const ships = getOwnedHangarShips();
+    const modules = getAllHangarModules();
+    const currentShip = ships[hangarState.shipIndex];
+    const currentModule = modules[hangarState.moduleIndex];
+
+    if(currentShip){
+        const shipMesh = createHangarShipMesh(currentShip);
+        shipMesh.position.set(0, 2.3, 0);
+        hangarState.shipPivot.add(shipMesh);
+    }
+
+    if(currentModule){
+        const moduleMesh = createHangarModuleMesh(currentModule);
+        moduleMesh.position.set(-6.8, 3.2, 0.25);
+        hangarState.modulePivot.add(moduleMesh);
+    }
+
+    fillHangarText();
+}
+
+function ensureHangarRenderer(){
+    const stage = document.getElementById('hangar-3d-stage');
+    if(!stage) return;
+
+    if(!hangarState.renderer){
+        hangarState.renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+        hangarState.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        hangarState.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        stage.appendChild(hangarState.renderer.domElement);
+
+        hangarState.scene = new THREE.Scene();
+        hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
+        hangarState.camera.position.set(0, 5.2, 20);
+
+        const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+        const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
+        key.position.set(8, 12, 10);
+        const rim = new THREE.DirectionalLight(0x7e8dff, 0.8);
+        rim.position.set(-9, 6, -8);
+        const floorGlow = new THREE.PointLight(0x4ac8ff, 1.6, 38);
+        floorGlow.position.set(0, 1.6, 0);
+
+        hangarState.scene.add(ambient, key, rim, floorGlow);
+
+        const stars = new THREE.Points(
+            new THREE.BufferGeometry().setAttribute(
+                'position',
+                new THREE.Float32BufferAttribute([
+                    -24, 10, -14, -16, 18, -12, 15, 9, -18, 18, 16, -10, -12, 7, -16, 12, 20, -18,
+                    -20, 14, -20, 22, 6, -16, 0, 21, -24, 9, 4, -22, -7, 18, -12, 17, 13, -15
+                ], 3)
+            ),
+            new THREE.PointsMaterial({ color:0x9fdfff, size:0.22 })
+        );
+        hangarState.scene.add(stars);
+
+        hangarState.platform = createHangarPlatform();
+        hangarState.platform.position.set(0, -1.05, 0);
+        hangarState.scene.add(hangarState.platform);
+
+        hangarState.shipPivot = new THREE.Group();
+        hangarState.modulePivot = new THREE.Group();
+        hangarState.scene.add(hangarState.shipPivot, hangarState.modulePivot);
+    }
+
+    const width = stage.clientWidth || 1000;
+    const height = stage.clientHeight || 700;
+    hangarState.renderer.setSize(width, height, false);
+    hangarState.camera.aspect = width / Math.max(1, height);
+    hangarState.camera.updateProjectionMatrix();
+
+    if(!hangarState.resizeBound){
+        hangarState.resizeBound = true;
+        window.addEventListener('resize', () => {
+            if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
+            ensureHangarRenderer();
+        });
+    }
+
+    rebuildHangarSceneObjects();
+
+    const animate = () => {
+        if(document.getElementById('hangar-window')?.classList.contains('hidden')){
+            hangarState.frameId = 0;
+            return;
+        }
+
+        const time = performance.now() * 0.001;
+        if(hangarState.platform) hangarState.platform.rotation.y += 0.006;
+        if(hangarState.shipPivot){
+            hangarState.shipPivot.rotation.y += 0.012;
+            hangarState.shipPivot.position.y = Math.sin(time * 1.2) * 0.18;
+        }
+        if(hangarState.modulePivot){
+            hangarState.modulePivot.rotation.y -= 0.016;
+            hangarState.modulePivot.rotation.x = Math.sin(time * 0.8) * 0.16;
+            hangarState.modulePivot.position.y = Math.sin(time * 1.5) * 0.22;
+        }
+
+        hangarState.renderer.render(hangarState.scene, hangarState.camera);
+        hangarState.frameId = requestAnimationFrame(animate);
+    };
+
+    if(!hangarState.frameId){
+        hangarState.frameId = requestAnimationFrame(animate);
+    }
+}
+
+function bindHangarControls(){
+    const bindOnce = (id, handler) => {
+        const el = document.getElementById(id);
+        if(!el || el.dataset.hangarBound) return;
+        el.dataset.hangarBound = '1';
+        el.addEventListener('click', handler);
+    };
+
+    bindOnce('hangar-ship-left', () => {
+        hangarState.shipIndex = Math.max(0, hangarState.shipIndex - 1);
+        const ships = getOwnedHangarShips();
+        const current = ships[hangarState.shipIndex];
+        if(current) player.selectedShipId = current.id;
+        rebuildHangarSceneObjects();
+    });
+
+    bindOnce('hangar-ship-right', () => {
+        const ships = getOwnedHangarShips();
+        hangarState.shipIndex = Math.min(Math.max(0, ships.length - 1), hangarState.shipIndex + 1);
+        const current = ships[hangarState.shipIndex];
+        if(current) player.selectedShipId = current.id;
+        rebuildHangarSceneObjects();
+    });
+
+    bindOnce('hangar-module-up', () => {
+        hangarState.moduleIndex = Math.max(0, hangarState.moduleIndex - 1);
+        rebuildHangarSceneObjects();
+    });
+
+    bindOnce('hangar-module-down', () => {
+        const modules = getAllHangarModules();
+        hangarState.moduleIndex = Math.min(Math.max(0, modules.length - 1), hangarState.moduleIndex + 1);
+        rebuildHangarSceneObjects();
+    });
+
+    bindOnce('hangar-ship-action', () => {
+        const ships = getOwnedHangarShips();
+        const current = ships[hangarState.shipIndex];
+        if(!current) return;
+        player.selectedShipId = current.id;
+        if(typeof equipOwnedShip === 'function'){
+            try{ equipOwnedShip(current.id); }catch(_){}
+        }else{
+            try{ saveGame?.(); }catch(_){}
+        }
+        fillHangarText();
+    });
+
+    bindOnce('close-hangar', () => {
+        document.getElementById('hangar-window')?.classList.add('hidden');
+        disposeHangarRenderer();
+    });
+}
+
+function renderHangarCosmic(){
+    ensureHangarIndexes();
+    bindHangarControls();
+    fillHangarText();
+    ensureHangarRenderer();
+}
 function renderClansWindow(){
     const clansInfo = document.getElementById('clans-info');
     if(!clansInfo) return;
@@ -7057,7 +7510,7 @@ function initExtraLobbyWindows(){
       const win = document.getElementById(winId);
       if(tab && win && !tab.dataset.boundExtra){
         tab.dataset.boundExtra = '1';
-        tab.addEventListener('click', () => { closeAll(); renderer(); win.classList.remove('hidden'); });
+        tab.addEventListener('click', () => { closeAll(); renderer(); win.classList.remove('hidden'); if(winId === 'hangar-window'){ setTimeout(() => renderHangarCosmic?.(), 0); } });
       }
     });
     [['close-profile','profile-window'],['close-hangar','hangar-window'],['close-clans','clans-window'],['close-leaders','leaders-window']].forEach(([btnId,winId]) => {
@@ -7065,7 +7518,7 @@ function initExtraLobbyWindows(){
       const win = document.getElementById(winId);
       if(btn && win && !btn.dataset.boundExtra){
         btn.dataset.boundExtra = '1';
-        btn.addEventListener('click', () => win.classList.add('hidden'));
+        btn.addEventListener('click', () => { win.classList.add('hidden'); if(winId === 'hangar-window'){ try{ disposeHangarRenderer?.(); }catch(_){} } });
       }
     });
 }
