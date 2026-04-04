@@ -16,6 +16,8 @@ let player = {
   ships: [],
   ownedShipIds: ['scout_1'],
   selectedShipId: 'scout_1',
+  ownedModuleIds: [],
+  activeModulesByShip: {},
   staff_role: 'player'
 };
 
@@ -172,6 +174,7 @@ function ensureShopOwnershipDefaults(){
 function refreshOwnedShipsInventory(){
     try{
         ensureShopOwnershipDefaults();
+        ensureModuleOwnershipDefaults();
         if(!Array.isArray(player.ships)) player.ships = [];
     }catch(_){}
 }
@@ -2640,6 +2643,19 @@ function applySaveData(save){
             if(typeof save.playerResources[key] === 'number') playerResources[key] = save.playerResources[key];
         }
     }
+    if(Array.isArray(save.ownedShipIds) && save.ownedShipIds.length){
+        player.ownedShipIds = Array.from(new Set(save.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)));
+    }
+    if(save.selectedShipId) player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId;
+    if(Array.isArray(save.ownedModuleIds)){
+        player.ownedModuleIds = Array.from(new Set(save.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean)));
+    }
+    if(save.activeModulesByShip && typeof save.activeModulesByShip === 'object'){
+        player.activeModulesByShip = save.activeModulesByShip;
+    }
+    ensureShopOwnershipDefaults?.();
+    ensureModuleOwnershipDefaults?.();
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     for(let i=0;i<planets.length;i++) planets[i].unlocked = i < currentLevel;
     updatePremiumAccountInfo?.();
     updateHUD?.();
@@ -2677,6 +2693,8 @@ async function loadGame(){
     const remoteSave = await loadRemoteSaveFromSupabase();
     if(remoteSave) applySaveData(remoteSave);
     ensureShopOwnershipDefaults?.();
+    ensureModuleOwnershipDefaults?.();
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     refreshOwnedShipsInventory?.();
 }
 
@@ -2690,7 +2708,9 @@ function buildSavePayload(){
         nickname: player.nickname,
         playerResources: playerResources,
         ownedShipIds: Array.isArray(player.ownedShipIds) ? [...player.ownedShipIds] : ['scout_1'],
-        selectedShipId: player.selectedShipId || 'scout_1'
+        selectedShipId: player.selectedShipId || 'scout_1',
+        ownedModuleIds: Array.isArray(player.ownedModuleIds) ? [...player.ownedModuleIds] : [],
+        activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {}
     };
 }
 
@@ -2976,11 +2996,12 @@ if (gameState === "BATTLE" && playerShip) {
     const invertFactor = gameSettings.invertY ? -1 : 1;
     const maxPitch = Math.PI / 3.1;
     const maxRoll = 0.72;
-    const forwardAcceleration = 0.14;
-    const backwardAcceleration = 0.07;
-    const strafeAcceleration = 0.045;
-    const damping = 0.985;
-    const maxSpeed = 4.2;
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    const forwardAcceleration = Number(currentBattleShipStats.forwardAcceleration || 0.14);
+    const backwardAcceleration = Number(currentBattleShipStats.backwardAcceleration || 0.07);
+    const strafeAcceleration = Number(currentBattleShipStats.strafeAcceleration || 0.045);
+    const damping = Number(currentBattleShipStats.damping || 0.985);
+    const maxSpeed = Number(currentBattleShipStats.maxSpeed || 4.2);
 
     playerControl.yaw -= mouseDeltaX * yawStep;
     playerControl.pitch += mouseDeltaY * pitchStep * invertFactor;
@@ -3149,7 +3170,10 @@ function tryFireLaser(){
     lastLaserShotAt = now;
     battleWeapon.ammoInClip = Math.max(0, battleWeapon.ammoInClip - 1);
 
-    const laserGeometry = new THREE.BoxGeometry(0.14, 0.14, 2.2);
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    const laserScale = Number(currentBattleShipStats?.laserScale || 1) || 1;
+    const laserVelocity = Number(currentBattleShipStats?.laserVelocity || 3.2) || 3.2;
+    const laserGeometry = new THREE.BoxGeometry(0.14 * laserScale, 0.14 * laserScale, 2.2);
     const laserMaterial = new THREE.MeshBasicMaterial({ color: 0xff3355 });
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
 
@@ -3161,7 +3185,7 @@ function tryFireLaser(){
         scene.add(laserMesh);
         activeLasers.push({
             mesh: laserMesh,
-            velocity: forward.clone().multiplyScalar(3.2),
+            velocity: forward.clone().multiplyScalar(laserVelocity),
             life: 100,
             damage: battleWeapon.damage
         });
@@ -6503,55 +6527,3403 @@ function spawnPlayer() {
     activeLasers.forEach(laser => scene.remove(laser.mesh));
     activeLasers = [];
 
-    const shipGroup = new THREE.Group();
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+
+    const shipGroup = createHangarShipMesh(currentBattleShipStats.ship || getSelectedShipItem() || { art:'classic' });
     shipGroup.rotation.order = 'YXZ';
+    shipGroup.scale.multiplyScalar(0.52);
 
     const selfTeam = getBattleRoomPlayerTeam(getSelfBattlePlayerId());
     const hullColor = getBattleShipColorHex(selfTeam);
-
-    const hull = new THREE.Mesh(
-        new THREE.ConeGeometry(1.15, 4.4, 8),
-        new THREE.MeshStandardMaterial({ color:hullColor, emissive:0x05263f, roughness:0.45, metalness:0.65 })
-    );
-    hull.rotation.x = -Math.PI / 2;
-    shipGroup.add(hull);
-
-    const wingMaterial = new THREE.MeshStandardMaterial({ color:selfTeam === 'red' ? 0xaa4a58 : 0x3a7fc9, roughness:0.55, metalness:0.45 });
-    const leftWing = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.12, 1.0), wingMaterial);
-    leftWing.position.set(-1.7, 0, -0.05);
-    shipGroup.add(leftWing);
-    const rightWing = leftWing.clone();
-    rightWing.position.x = 1.7;
-    shipGroup.add(rightWing);
-
-    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), new THREE.MeshBasicMaterial({ color:0xdff6ff }));
-    cockpit.position.set(0, 0.18, -1.1);
-    shipGroup.add(cockpit);
-
-    const engineLeft = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.8), new THREE.MeshBasicMaterial({ color:0x64d8ff }));
-    engineLeft.position.set(-0.6, 0, 2.0);
-    shipGroup.add(engineLeft);
-    const engineRight = engineLeft.clone();
-    engineRight.position.x = 0.6;
-    shipGroup.add(engineRight);
+    shipGroup.traverse?.((child) => {
+        if(child?.isMesh && child.material){
+            if(child.material.color){
+                try{ child.material.color.offsetHSL(0, 0, selfTeam === 'red' ? -0.02 : 0.02); }catch(_){ }
+            }
+            if(child.material.emissive && child.material.emissive.isColor){
+                try{ child.material.emissive = new THREE.Color(hullColor).multiplyScalar(0.08); }catch(_){ }
+            }
+        }
+    });
 
     playerShip = shipGroup;
+    playerShip.position.set(0, 0, 120);
+    playerShip.userData = {
+        hp: currentBattleShipStats.hp,
+        weapon: currentBattleShipStats.ship?.weapon || 'laser',
+        speed: currentBattleShipStats.maxSpeed,
+        modules: currentBattleShipStats.installedModules
+    };
+    scene.add(playerShip);
 
+    playerMaxHp = currentBattleShipStats.hp;
+    playerHp = playerMaxHp;
+    battleWeapon.damage = currentBattleShipStats.weaponDamage;
+    battleWeapon.clipSize = currentBattleShipStats.clipSize;
+    battleWeapon.ammoInClip = battleWeapon.clipSize;
+    battleWeapon.reloadTime = currentBattleShipStats.reloadTime;
+    battleWeapon.isReloading = false;
+    battleWeapon.reloadEndsAt = 0;
+
+    playerControl = { yaw:0, pitch:0, roll:0 };
+    const roomName = getBattleRoomDisplayName();
+    pushKillFeed(`Вы вошли на карту: ${roomName}`, 'chat');
+    updateBattlePlayerHud();
+    updateBattleScoreboard();
+}
+
+function updateBattleRespawnState(){
+    if(!battlePendingRespawnAt) return;
+    const remain = battlePendingRespawnAt - Date.now();
+    if(remain > 0){
+        const reloadText = document.getElementById('battle-reload-text');
+        if(reloadText) reloadText.textContent = `Респавн через ${(remain / 1000).toFixed(1)}с`;
+        return;
+    }
+    battlePendingRespawnAt = 0;
+    playerHp = playerMaxHp;
+    spawnPlayer();
+    updateBattlePlayerHud();
+}
+
+function updateBattlePlayerWorldHp(){
+    const wrap = document.getElementById('battle-player-world-hp');
+    const fill = document.getElementById('battle-player-world-hp-fill');
+    if(!wrap || !fill) return;
+    const visible = gameState === 'BATTLE' && !battleObserverMode;
+    wrap.classList.toggle('hidden', !visible);
+    if(!visible) return;
+    const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
+    fill.style.width = hpPercent + '%';
+}
+
+function updateBattlePlayerHud(){
+    const hud = document.getElementById('battle-player-hud');
+    const hpFill = document.getElementById('battle-player-hp-fill');
+    const hpText = document.getElementById('battle-player-hp-text');
+    const ammoText = document.getElementById('battle-ammo-text');
+    const damageText = document.getElementById('battle-damage-text');
+    const reloadText = document.getElementById('battle-reload-text');
+    if(!hud || !hpFill || !hpText || !ammoText || !damageText || !reloadText) return;
+    const visible = gameState === 'BATTLE' && !battleObserverMode;
+    hud.style.display = visible ? 'block' : 'none';
+    if(!visible) return;
+    const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
+    hpFill.style.width = hpPercent + '%';
+    hpText.textContent = `HP: ${Math.round(playerHp)} / ${playerMaxHp}`;
+    ammoText.textContent = `Боеприпасы: ${battleWeapon.ammoInClip} / ${battleWeapon.clipSize} | запас ${formatAmmoReserve()}`;
+    damageText.textContent = `Урон: ${battleWeapon.damage}`;
+    if(isBattleRespawning()){
+        const remain = Math.max(0, battlePendingRespawnAt - Date.now());
+        reloadText.textContent = `Респавн через ${(remain / 1000).toFixed(1)}с`;
+    }else if(battleShipCrash){
+        reloadText.textContent = 'Корабль уничтожен';
+    }else if(battleWeapon.isReloading){
+        const remain = Math.max(0, battleWeapon.reloadEndsAt - Date.now());
+        reloadText.textContent = `Перезарядка: ${(remain / 1000).toFixed(1)}с`;
+    }else{
+        reloadText.textContent = 'R — перезарядка';
+    }
+}
+
+function startBattleReload(force=false){
+    if(gameState !== 'BATTLE' || !playerShip || battleShipCrash || isBattleRespawning()) return;
+    if(battleWeapon.isReloading) return;
+    if(!force && battleWeapon.ammoInClip >= battleWeapon.clipSize) return;
+    battleWeapon.isReloading = true;
+    battleWeapon.reloadEndsAt = Date.now() + battleWeapon.reloadTime;
+    updateBattlePlayerHud();
+}
+
+function updateBattleReloadState(){
+    if(!battleWeapon.isReloading) return;
+    if(Date.now() < battleWeapon.reloadEndsAt) return;
+    battleWeapon.isReloading = false;
+    battleWeapon.ammoInClip = battleWeapon.clipSize;
+    updateBattlePlayerHud();
+}
+
+function startShipCrashAnimation(){
+    if(!playerShip || !battleMapPlanet || battleShipCrash || isBattleRespawning()) return;
+    battleShipCrash = { startAt: Date.now(), duration: 250 };
+    spawnShipDebris(playerShip.position.clone(), 0xffa36a);
+    battleStats.playerDeaths += 1;
+    updateBattleScoreboard();
+    pushKillFeed(`${player?.nickname || 'Commander'} разбился о планету`, 'kill');
+    scheduleBattleRespawn(2000);
+}
+
+function updateShipCrashAnimation(){
+    if(!battleShipCrash) return;
+    if(Date.now() - battleShipCrash.startAt >= battleShipCrash.duration){
+        battleShipCrash = null;
+    }
+}
+
+function startSunProminenceDeath(){
+    if(!playerShip || battleShipCrash || isBattleRespawning()) return;
+    spawnShipDebris(playerShip.position.clone(), 0xffd36a);
+    battleStats.playerDeaths += 1;
+    updateBattleScoreboard();
+    pushKillFeed(`${player?.nickname || 'Commander'} сгорел в протуберанце`, 'kill');
+    scheduleBattleRespawn(2000);
+}
+
+function updateBattlePlanetEffects(){
+    if(!battleMapPlanet || !playerShip || battleObserverMode) return;
+
+    const isSunMap = !!battleMapPlanet.userData?.isSunMap;
+    const toPlanet = battleMapPlanet.position.clone().sub(playerShip.position);
+    const distance = toPlanet.length();
+    const radius = battleMapPlanet.userData?.radius || 50;
+    const atmosphereRadius = battleMapPlanet.userData?.atmosphereRadius || radius + 42;
+    const nearSurfaceRadius = battleMapPlanet.userData?.nearSurfaceRadius || radius + 14;
+    const crashRadius = battleMapPlanet.userData?.crashRadius || radius + 10;
+    const captureRadius = Math.max(crashRadius + 10, radius + 24);
+
+    const scaleBoost = THREE.MathUtils.clamp(1 + ((320 - Math.max(0, distance - radius)) / 320) * (isSunMap ? 0.64 : 0.5), 1, isSunMap ? 1.65 : 1.5);
+    battlePlanetVisualScale += (scaleBoost - battlePlanetVisualScale) * 0.08;
+    battleMapPlanet.scale.setScalar(battlePlanetVisualScale);
+
+    if(isSunMap){
+        battleMapPlanet.rotation.y += 0.0015;
+    }
+
+    const towardPlanet = toPlanet.clone().normalize();
+    if(!Number.isFinite(towardPlanet.x) || towardPlanet.lengthSq() === 0) return;
+
+    if(distance <= crashRadius){
+        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(crashRadius)));
+        shipVelocity.set(0, 0, 0);
+        startShipCrashAnimation();
+        return;
+    }
+
+    if(distance <= captureRadius){
+        if(!battlePlanetCapture){
+            startBattlePlanetCapture();
+        }
+        const lockDistance = Math.max(crashRadius, radius + 10);
+        playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(lockDistance)));
+        shipVelocity.set(0, 0, 0);
+        return;
+    }
+
+    if(distance < atmosphereRadius){
+        const gravityStrength = THREE.MathUtils.clamp((atmosphereRadius - distance) / Math.max(1, atmosphereRadius - radius), 0, 1);
+        shipVelocity.add(towardPlanet.multiplyScalar((isSunMap ? 0.03 : 0.022) + gravityStrength * (isSunMap ? 0.05 : 0.038)));
+
+        if(distance < nearSurfaceRadius){
+            shipVelocity.multiplyScalar(isSunMap ? 0.90 : 0.92);
+        }
+    }
+}
+// ===== POINTER LOCK =====
+const canvas = renderer.domElement;
+
+
+
+document.addEventListener("pointerlockchange", () => {
+    if (document.pointerLockElement === canvas) {
+    } else {
+    }
+});
+
+
+
+
+/* ================= HUD SYSTEM ================= */
+
+function updateHUD(){
+
+    const bar = document.getElementById("resource-bar");
+    if(!bar) return;
+
+    let html = "";
+
+    for(const planetName in planetResources){
+
+        html += `<div class="planet-block">`;
+        html += `<div class="planet-title">${planetName}</div>`;
+
+        const resources = planetResources[planetName];
+
+        for(const resId of resources){
+
+            if(!playerResources[resId])
+                playerResources[resId] = 0;
+
+            const info = resourceInfo[resId];
+
+            html += `
+                <div class="resource-item">
+                    <span class="icon">${info.icon}</span>
+                    <span class="amount">${playerResources[resId]}</span>
+                    <span class="tooltip">${info.name}</span>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+    }
+
+    bar.innerHTML = html;
+    inventory.syncFromPlayerResources?.();
+    if(!playerResources.coins) playerResources.coins = 0;
+    if(!playerResources.crystals) playerResources.crystals = 0;
+    const premiumBar = document.getElementById('premium-bar');
+    const crystalsEl = document.getElementById('premium-crystals');
+    const coinsEl = document.getElementById('premium-coins');
+    if(crystalsEl) crystalsEl.textContent = `💎 ${playerResources.crystals || 0}`;
+    if(coinsEl) coinsEl.textContent = `🪙 ${playerResources.coins || 0}`;
+    updatePremiumAccountInfo();
+    if(premiumBar){
+        premiumBar.style.display = gameState === 'LOBBY' ? 'flex' : 'none';
+    }
+}
+
+/* ================= PREMIUM DROP SYSTEM ================= */
+
+function tryPremiumDrop() {
+
+    const coinChance = 0.04;      // 8%
+    const crystalChance = 0.02;   // 2%
+
+    let dropped = false;
+
+    if (Math.random() < coinChance) {
+        playerResources.coins += 1;
+        dropped = true;
+    }
+
+    if (Math.random() < crystalChance) {
+        playerResources.crystals += 1;
+        dropped = true;
+    }
+
+    if (dropped) {
+        updateHUD();
+    }
+}
+
+initSettingsUI();
+initLobbyBackground();
+initAuthScreen();
+updateHUD();
+updateUI();
+switchState('AUTH');
+animate();
+
+// ===== INVENTORY MANAGER =====
+
+class InventoryManager {
+  constructor() {
+    this.items = [];
+  }
+
+  render(items = this.items) {
+    const container = document.getElementById("inventory");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    items.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "inventory-item";
+      div.innerHTML = `
+        <span>${item.icon} ${item.name}</span>
+        <span>x${item.amount}</span>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  addResource(resourceId, amount = 1, planetName = "") {
+    const config = resourceInfo[resourceId];
+    if (!config) {
+      console.warn("Unknown resource:", resourceId);
+      return;
+    }
+
+    let existing = this.items.find(r => r.id === resourceId);
+    if (existing) {
+      existing.amount += amount;
+    } else {
+      this.items.push({
+        id: resourceId,
+        name: config.name,
+        icon: config.icon,
+        planet: planetName,
+        amount
+      });
+    }
+
+    this.items.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    this.render();
+  }
+
+  syncFromPlayerResources() {
+    this.items = [];
+    Object.keys(resourceInfo).forEach(resourceId => {
+      if(resourceId === 'coins' || resourceId === 'crystals') return;
+      const amount = Number(playerResources[resourceId] || 0);
+      if(amount > 0){
+        this.items.push({
+          id: resourceId,
+          name: resourceInfo[resourceId].name,
+          icon: resourceInfo[resourceId].icon,
+          planet: '',
+          amount
+        });
+      }
+    });
+    this.items.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    this.render();
+  }
+}
+
+inventory = new InventoryManager();
+inventory.syncFromPlayerResources();
+
+// ===== INVENTORY UI LOGIC =====
+
+const inventoryButton = document.getElementById("inventory-button");
+const inventoryWindow = document.getElementById("inventory-window");
+const closeInventory = document.getElementById("close-inventory");
+
+if(inventoryButton && inventoryWindow){
+  inventoryButton.addEventListener("click", () => {
+    inventoryWindow.classList.toggle("hidden");
+  });
+}
+
+if(closeInventory && inventoryWindow){
+  closeInventory.addEventListener("click", () => {
+    inventoryWindow.classList.add("hidden");
+  });
+}
+window.switchState = switchState;
+// старт только через AUTH
+
+
+
+
+
+/* ===== SOLAR SYSTEM MAP DATA ===== */
+
+const mapImages = {
+
+  "Солнце": "maps/sun.jpg",
+  "Меркурий": "maps/mercury.jpg",
+  "Венера": "maps/venus.jpg",
+  "Земля": "maps/earth.jpg",
+  "Марс": "maps/mars.jpg",
+  "Юпитер": "maps/jupiter.jpg",
+  "Сатурн": "maps/saturn.jpg",
+  "Уран": "maps/uranus.jpg",
+  "Нептун": "maps/neptune.jpg"
+
+};
+
+const mapPlayers = {
+
+  "Солнце": [],
+  "Меркурий": [],
+  "Венера": [],
+  "Земля": [],
+  "Марс": [],
+  "Юпитер": [],
+  "Сатурн": [],
+  "Уран": [],
+  "Нептун": []
+
+};
+
+
+
+
+
+
+
+
+/* ===== MATCH SELECT SYSTEM ===== */
+
+const matchItems = document.querySelectorAll(".match-item");
+const preview = document.getElementById("map-mini-preview");
+
+matchItems.forEach(item => {
+
+  item.addEventListener("click", () => {
+
+    // убрать выделение со всех
+    matchItems.forEach(i => i.classList.remove("selected"));
+
+    // выделить выбранную
+    item.classList.add("selected");
+
+  });
+
+});
+
+
+
+// ================= MAP SLIDER INIT =================
+
+let currentMapIndex = 0;
+
+const mapImage = document.getElementById("map-image");
+const mapName = document.getElementById("map-name");
+const prevBtn = document.getElementById("map-prev");
+const nextBtn = document.getElementById("map-next");
+
+function updateMap(){
+    const map = MAPS[currentMapIndex];
+
+    if(mapImage) mapImage.src = map.img;
+    if(mapName) mapName.textContent = map.name;
+
+}
+
+if(prevBtn){
+    prevBtn.onclick = () => {
+        currentMapIndex = (currentMapIndex - 1 + MAPS.length) % MAPS.length;
+        updateMap();
+    };
+}
+
+if(nextBtn){
+    nextBtn.onclick = () => {
+        currentMapIndex = (currentMapIndex + 1) % MAPS.length;
+        updateMap();
+    };
+}
+
+updateMap();
+
+
+
+/* ================= CHAT SYSTEM ================= */
+
+const chatInput = document.getElementById("chat-input");
+const chatSend = document.getElementById("chat-send");
+const chatMessages = document.getElementById("chat-messages");
+const chatTabsWrap = document.getElementById("chat-tabs");
+
+let currentChat = "global";
+let chatRealtimeChannel = null;
+const CHAT_MESSAGE_LIMIT = 50;
+const chatCache = {
+    global: [],
+    clan: [],
+    battle: [],
+    pm: {}
+};
+const privateChatTabs = {};
+const chatUnread = {
+    global: 0,
+    clan: 0,
+    battle: 0,
+    pm: {}
+};
+const onlinePmPeers = new Set();
+const inGamePmPeers = new Set();
+const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
+const localHandledChatMessageIds = new Set();
+const BATTLE_HISTORY_SEARCH_LIMIT = 80;
+const battleHistorySearchState = {
+    playerId: '',
+    loading: false,
+    error: '',
+    messages: [],
+    playerLabel: '',
+    dateQuery: '',
+    keywordQuery: ''
+};
+
+const playerStaffRoleCache = {};
+const STAFF_ROLE_META = {
+    player: { short: "", label: "Игрок", color: "#9fd7ff" },
+    mod: { short: "mod", label: "Moderator", color: "#ff2a2a" },
+    adm: { short: "adm", label: "Admin", color: "#ff8a1c" },
+    owr: { short: "owr", label: "Owner", color: "#ffd400" }
+};
+
+function normalizeStaffRole(role = "player") {
+    const value = String(role || "player").trim().toLowerCase();
+    if (value === "mod" || value === "adm" || value === "owr") return value;
+    return "player";
+}
+
+function getStaffRoleMeta(role = "player") {
+    return STAFF_ROLE_META[normalizeStaffRole(role)] || STAFF_ROLE_META.player;
+}
+
+function setCachedStaffRole(publicId, role = "player") {
+    const key = String(publicId || "").trim();
+    if (!key) return;
+    playerStaffRoleCache[key] = normalizeStaffRole(role);
+}
+
+function getCachedStaffRole(publicId) {
+    const key = String(publicId || "").trim();
+    if (!key) return "player";
+    if (authState?.playerId && key === String(authState.playerId)) {
+        return normalizeStaffRole(player?.staff_role || "player");
+    }
+    return normalizeStaffRole(playerStaffRoleCache[key] || "player");
+}
+
+function getOwnStaffRole() {
+    return normalizeStaffRole(player?.staff_role || "player");
+}
+
+function isStaffRole(role = "player") {
+    const normalized = normalizeStaffRole(role);
+    return normalized === "mod" || normalized === "adm" || normalized === "owr";
+}
+
+function canWriteInObserverChat() {
+    return isStaffRole(getOwnStaffRole());
+}
+
+function canWriteBattleAnnouncementChat() {
+    const role = getOwnStaffRole();
+    return role === "adm" || role === "owr";
+}
+
+function canWriteBattleAnnouncementChatByRole(role = "player") {
+    const normalizedRole = normalizeStaffRole(role);
+    return normalizedRole === "adm" || normalizedRole === "owr";
+}
+
+function getSharedBattleChatRoomId() {
+    const mapName = String(
+        currentRoom?.real ||
+        currentRoom?.map ||
+        currentRoom?.rawRoom?.map_name ||
+        selectedLobbyMap?.real ||
+        selectedLobbyMap?.map ||
+        selectedLobbyMap?.name ||
+        ''
+    ).trim().toLowerCase();
+
+    if (!mapName) return '';
+
+    return `public_${mapName}`;
+}
+
+function getSceneChatRoomId() {
+    const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
+    if (sharedBattleRoomId) {
+        persistBattleChatRoomId(sharedBattleRoomId);
+        return sharedBattleRoomId;
+    }
+
+    const fromCurrentRoom = currentRoom?.id || currentRoom?.roomId || null;
+    if (fromCurrentRoom) {
+        const currentRoomId = String(fromCurrentRoom).trim();
+        persistBattleChatRoomId(currentRoomId);
+        return currentRoomId;
+    }
+
+    const rememberedRoomId = getPersistedBattleChatRoomId();
+    if (rememberedRoomId) return rememberedRoomId;
+
+    const fallbackMap = currentRoom?.map || currentRoom?.real || selectedLobbyMap?.real || selectedLobbyMap?.name || "scene";
+    const fallbackRoomId = String(`scene_${String(fallbackMap).toLowerCase()}`);
+    persistBattleChatRoomId(fallbackRoomId);
+    return fallbackRoomId;
+}
+
+function getBattleChatRoomId() {
+    const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
+    if (sharedBattleRoomId) {
+        persistBattleChatRoomId(sharedBattleRoomId);
+        return sharedBattleRoomId;
+    }
+
+    const sceneRoomId = String(getSceneChatRoomId() || '').trim();
+    if (sceneRoomId) {
+        persistBattleChatRoomId(sceneRoomId);
+        return sceneRoomId;
+    }
+    return getPersistedBattleChatRoomId();
+}
+
+function canWriteSceneMapChat() {
+    if (gameState === "BATTLE") return true;
+    if (gameState === "OBSERVE") return canWriteInObserverChat();
+    return false;
+}
+
+function getPlayerClanChatId() {
+    const directClanId = player?.clan_id || player?.clanId || authState?.clanId || null;
+    if (directClanId !== null && typeof directClanId !== 'undefined' && String(directClanId).trim()) {
+        return String(directClanId).trim();
+    }
+    try {
+        const saved = localStorage.getItem('cosmicClanChatId');
+        if (saved && String(saved).trim()) return String(saved).trim();
+    } catch (_) {}
+    return null;
+}
+
+function canUseClanChat() {
+    return !!getPlayerClanChatId();
+}
+
+function getClanChatRoomId() {
+    const clanId = getPlayerClanChatId();
+    return clanId ? `clan_${clanId}` : null;
+}
+
+function getPmPresenceState(peerId) {
+    const key = String(peerId || '').trim();
+    if (!key) return 'offline';
+    if (inGamePmPeers.has(key)) return 'in-game';
+    if (onlinePmPeers.has(key)) return 'online';
+    return 'offline';
+}
+
+function saveChatUiState() {
+    try {
+        localStorage.setItem(CHAT_UI_STATE_KEY, JSON.stringify({
+            currentChat: currentChat || 'global',
+            privateTabs: privateChatTabs,
+            savedAt: Date.now()
+        }));
+    } catch (error) {
+        console.warn('Не удалось сохранить состояние чата:', error);
+    }
+}
+
+function restoreChatUiState() {
+    try {
+        const raw = localStorage.getItem(CHAT_UI_STATE_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        const tabs = state?.privateTabs && typeof state.privateTabs === 'object' ? state.privateTabs : {};
+        Object.keys(privateChatTabs).forEach(key => delete privateChatTabs[key]);
+        Object.entries(tabs).forEach(([peerId, meta]) => {
+            const safePeerId = String(peerId || '').trim();
+            if (!safePeerId || !/^\d+$/.test(safePeerId)) return;
+            privateChatTabs[safePeerId] = {
+                label: String(meta?.label || `ID ${safePeerId}`),
+                updatedAt: Number(meta?.updatedAt) || Date.now(),
+                pinned: !!meta?.pinned,
+                preview: String(meta?.preview || '')
+            };
+        });
+        const savedCurrent = String(state?.currentChat || 'global');
+        if (savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')) {
+            currentChat = savedCurrent;
+        }
+    } catch (error) {
+        console.warn('Не удалось восстановить состояние чата:', error);
+    }
+}
+
+const chatRateLimitState = {
+    lastSentAt: 0,
+    cooldownMs: 1800
+};
+
+function canBypassChatRateLimit() {
+    return isStaffRole(getOwnStaffRole());
+}
+
+function getChatCooldownRemainingMs() {
+    if (canBypassChatRateLimit()) return 0;
+    return Math.max(0, chatRateLimitState.cooldownMs - (Date.now() - chatRateLimitState.lastSentAt));
+}
+
+function markChatMessageSentNow() {
+    chatRateLimitState.lastSentAt = Date.now();
+}
+
+function getChatRoleCssClassByRole(role = "player") {
+    const normalized = normalizeStaffRole(role);
+    if (normalized === "mod") return "role-mod";
+    if (normalized === "adm") return "role-adm";
+    if (normalized === "owr") return "role-owr";
+    return "";
+}
+
+function getChatRoleCssClassByPublicId(publicId) {
+    return getChatRoleCssClassByRole(getCachedStaffRole(publicId));
+}
+
+function getChatRoleBadgeHtmlByRole(role = "player") {
+    const meta = getStaffRoleMeta(role);
+    const roleClass = getChatRoleCssClassByRole(role);
+    if (!meta.short) return "";
+    return `<span class="chat-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
+}
+
+function getResolvedStaffRole(publicId, explicitRole = "") {
+    const directRole = String(explicitRole || "").trim().toLowerCase();
+    if (directRole) return directRole;
+    return String(getCachedStaffRole(publicId) || "").trim().toLowerCase();
+}
+
+function getChatRoleBadgeHtmlByPublicId(publicId, explicitRole = "") {
+    return getChatRoleBadgeHtmlByRole(getResolvedStaffRole(publicId, explicitRole));
+}
+
+function getChatRoleCssClassByPublicIdOrRole(publicId, explicitRole = "") {
+    return getChatRoleCssClassByRole(getResolvedStaffRole(publicId, explicitRole));
+}
+
+function shouldHideStaffIdentityInScene(publicId, explicitRole = "") {
+    const role = getResolvedStaffRole(publicId, explicitRole);
+    const safeId = String(publicId || '').trim();
+    return isStaffRole(role) && !safeId;
+}
+
+function shouldHideStaffIdentityInObserve(publicId, explicitRole = "") {
+    return shouldHideStaffIdentityInScene(publicId, explicitRole);
+}
+
+function shouldShowSceneRoleBadgeInCurrentMode(publicId = "", explicitRole = "") {
+    return gameState === 'OBSERVE' || shouldHideStaffIdentityInScene(publicId, explicitRole);
+}
+
+function getSceneRoleBadgeHtml(publicId, explicitRole = "") {
+    const role = getResolvedStaffRole(publicId, explicitRole);
+    const meta = getStaffRoleMeta(role);
+    const roleClass = getChatRoleCssClassByRole(role);
+    if (!meta || !meta.short) return "";
+    return `<span class="scene-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
+}
+
+function getForcedSceneRoleBadgeHtml(explicitRole = "") {
+    const role = normalizeStaffRole(explicitRole);
+    const meta = getStaffRoleMeta(role);
+    const roleClass = getChatRoleCssClassByRole(role);
+    if (!meta || !meta.short || role === "player") return "";
+    return `<span class="scene-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
+}
+
+function applyPlayerIdentityRow(row = {}) {
+    if (!row || typeof row !== "object") return;
+    if (typeof row.staff_role !== "undefined") {
+        player.staff_role = normalizeStaffRole(row.staff_role);
+        if (row.public_id) {
+            setCachedStaffRole(String(row.public_id), player.staff_role);
+        } else if (authState?.playerId) {
+            setCachedStaffRole(String(authState.playerId), player.staff_role);
+        }
+    } else if (!player.staff_role) {
+        player.staff_role = "player";
+    }
+}
+
+async function hydrateStaffRolesForMessages(messages = []) {
+    if (!window.supabaseClient || !Array.isArray(messages) || !messages.length) return;
+
+    const idsToLoad = [...new Set(
+        messages
+            .map(msg => msg?.player_public_id ? String(msg.player_public_id).trim() : "")
+            .filter(Boolean)
+            .filter(id => !(id in playerStaffRoleCache))
+            .filter(id => !(authState?.playerId && id === String(authState.playerId)))
+            .map(id => Number(id))
+            .filter(Number.isFinite)
+    )];
+
+    if (!idsToLoad.length) return;
+
+    const { data, error } = await window.supabaseClient
+        .from('players')
+        .select('public_id,staff_role')
+        .in('public_id', idsToLoad);
+
+    if (error) {
+        console.warn('Не удалось загрузить staff_role для чата:', error.message || error);
+        return;
+    }
+
+    (data || []).forEach(row => {
+        if (row?.public_id) {
+            setCachedStaffRole(String(row.public_id), row.staff_role || 'player');
+        }
+    });
+}
+
+function escapeChatHtml(text = "") {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function canUsePrivateChat() {
+    return !!(typeof authState !== "undefined" && authState?.mode === "account" && authState?.playerId);
+}
+
+function getOwnPublicChatId() {
+    if (canUsePrivateChat()) {
+        return String(authState.playerId);
+    }
+    return null;
+}
+
+function getOwnChatLabel() {
+    return typeof getDisplayPlayerTag === "function"
+        ? getDisplayPlayerTag()
+        : (player?.nickname || "Commander");
+}
+
+function getObserveStaffChatIdentity() {
+    const role = getOwnStaffRole();
+    const meta = getStaffRoleMeta(role);
+    const isObserveStaff = gameState === 'OBSERVE' && isStaffRole(role);
+    return {
+        isObserveStaff,
+        publicId: isObserveStaff ? null : getOwnPublicChatId(),
+        nickname: isObserveStaff ? (meta?.label || 'Staff') : getOwnChatLabel(),
+        staffRole: role
+    };
+}
+
+function getValidChatPlayerId(){
+    const rawId = player?.id ?? null;
+    if(rawId === null || typeof rawId === "undefined") return null;
+
+    const value = String(rawId).trim();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value) ? value : null;
+}
+
+function sanitizeOnlineRoomId(roomId) {
+    if (roomId === null || typeof roomId === 'undefined') return null;
+    const value = String(roomId).trim();
+    if (!value) return null;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value) ? value : null;
+}
+
+function getPrivateScopeKey(peerId) {
+    return `pm:${String(peerId)}`;
+}
+
+function parseChatScope(scopeName = currentChat) {
+    if (scopeName === "clan") {
+        return { key: "clan", channel: "clan", roomId: getClanChatRoomId() };
+    }
+    if (scopeName === "battle") {
+        return { key: "battle", channel: "battle" };
+    }
+    if (scopeName && String(scopeName).startsWith("pm:")) {
+        const peerId = String(scopeName).slice(3);
+        return {
+            key: getPrivateScopeKey(peerId),
+            channel: "pm",
+            peerId
+        };
+    }
+    return { key: "global", channel: "global" };
+}
+
+function getChatCacheList(scope) {
+    if (scope.channel === "clan") return chatCache.clan;
+    if (scope.channel === "battle") return chatCache.battle;
+    if (scope.channel === "pm") {
+        const peerId = String(scope.peerId || "");
+        if (!chatCache.pm[peerId]) chatCache.pm[peerId] = [];
+        return chatCache.pm[peerId];
+    }
+    return chatCache.global;
+}
+
+function getUnreadCount(scopeName) {
+    const scope = parseChatScope(scopeName);
+    if (scope.channel === "clan") return Number(chatUnread.clan || 0);
+    if (scope.channel === "battle") return Number(chatUnread.battle || 0);
+    if (scope.channel === "pm") return Number(chatUnread.pm[String(scope.peerId)] || 0);
+    return Number(chatUnread.global || 0);
+}
+
+function setUnreadCount(scopeName, count = 0) {
+    const safeCount = Math.max(0, Number(count) || 0);
+    const scope = parseChatScope(scopeName);
+    if (scope.channel === "clan") {
+        chatUnread.clan = safeCount;
+    } else if (scope.channel === "battle") {
+        chatUnread.battle = safeCount;
+    } else if (scope.channel === "pm") {
+        chatUnread.pm[String(scope.peerId)] = safeCount;
+    } else {
+        chatUnread.global = safeCount;
+    }
+}
+
+function incrementUnread(scopeName, amount = 1) {
+    setUnreadCount(scopeName, getUnreadCount(scopeName) + Math.max(1, Number(amount) || 1));
+}
+
+function getLastMessagePreview(scopeName) {
+    const scope = parseChatScope(scopeName);
+    const list = getChatCacheList(scope);
+    const last = list[list.length - 1];
+    if (!last?.message) return "";
+    const trimmed = String(last.message).replace(/\s+/g, ' ').trim();
+    if (!trimmed) return "";
+    return trimmed.length > 32 ? trimmed.slice(0, 32) + '…' : trimmed;
+}
+
+function setPrivateTabPreview(peerId, preview = "") {
+    const key = String(peerId || "").trim();
+    if (!key) return;
+    if (!privateChatTabs[key]) {
+        privateChatTabs[key] = { label: `ID ${key}`, updatedAt: Date.now(), pinned: false, preview: "" };
+    }
+    privateChatTabs[key].preview = preview || "";
+    saveChatUiState();
+}
+
+function isPmPeerOnline(peerId) {
+    return onlinePmPeers.has(String(peerId || ""));
+}
+
+function syncPrivateTabFromScope(scopeName) {
+    const scope = parseChatScope(scopeName);
+    if (scope.channel !== "pm" || !scope.peerId) return;
+    setPrivateTabPreview(scope.peerId, getLastMessagePreview(scopeName));
+    if (privateChatTabs[String(scope.peerId)]) {
+        privateChatTabs[String(scope.peerId)].updatedAt = Date.now();
+    }
+}
+
+
+function markLocalHandledChatMessage(id) {
+    const key = String(id || '').trim();
+    if (!key) return;
+    localHandledChatMessageIds.add(key);
+    setTimeout(() => localHandledChatMessageIds.delete(key), 15000);
+}
+
+function wasLocalHandledChatMessage(id) {
+    const key = String(id || '').trim();
+    if (!key) return false;
+    if (!localHandledChatMessageIds.has(key)) return false;
+    localHandledChatMessageIds.delete(key);
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
+}
+
+function pushChatToCache(scope, msg) {
+    const list = getChatCacheList(scope);
+    if (list.some(item => String(item.id) === String(msg.id))) return false;
+
+    if (scope?.channel === 'battle') {
+        const sourceSceneId = String(msg?.source_scene_id || '').trim();
+        if (sourceSceneId && list.some(item => String(item?.source_scene_id || '') === sourceSceneId || String(item?.id || '') === sourceSceneId)) {
+            return false;
+        }
+
+        const msgText = String(msg?.message || '').trim();
+        const msgRoom = String(msg?.room_id || '').trim();
+        const msgAuthor = String(msg?.player_public_id || msg?.player_id || '').trim();
+        const msgTime = new Date(msg?.created_at || 0).getTime();
+
+        if (msgText && msgRoom && msgAuthor && Number.isFinite(msgTime)) {
+            const nearDuplicate = list.some(item => {
+                const itemText = String(item?.message || '').trim();
+                const itemRoom = String(item?.room_id || '').trim();
+                const itemAuthor = String(item?.player_public_id || item?.player_id || '').trim();
+                const itemTime = new Date(item?.created_at || 0).getTime();
+                if (!Number.isFinite(itemTime)) return false;
+                return itemText === msgText && itemRoom === msgRoom && itemAuthor === msgAuthor && Math.abs(itemTime - msgTime) < 2500;
+            });
+            if (nearDuplicate) return false;
+        }
+    }
+
+    list.push(msg);
+    list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    while (list.length > CHAT_MESSAGE_LIMIT) list.shift();
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
+}
+
+function formatChatTime(dateStr) {
+    const d = new Date(dateStr || Date.now());
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
+    const author = escapeChatHtml(msg.player_nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const time = formatChatTime(msg.created_at);
+    const recipientId = msg.recipient_public_id ? String(msg.recipient_public_id) : null;
+    const ownId = getOwnPublicChatId();
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
+
+    const resolvedRole = getResolvedStaffRole(publicId, msg?.staff_role || "");
+    const isObserveHiddenStaff = scope.channel === "battle" && shouldHideStaffIdentityInObserve(publicId, resolvedRole);
+    const isGlobalStaffAnnouncement = scope.channel === "battle" && String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(resolvedRole);
+
+    const shouldShowLobbyRoleBadge =
+        (scope.channel === "global" || scope.channel === "clan") &&
+        isStaffRole(resolvedRole);
+
+    const showRoleBadge = isGlobalStaffAnnouncement || isObserveHiddenStaff || shouldShowLobbyRoleBadge;
+    const roleBadge = showRoleBadge
+        ? (shouldShowLobbyRoleBadge
+            ? getChatRoleBadgeHtmlByPublicId(publicId, resolvedRole)
+            : getForcedSceneRoleBadgeHtml(resolvedRole))
+        : '';
+    const roleClass = showRoleBadge
+        ? (shouldShowLobbyRoleBadge
+            ? getChatRoleCssClassByPublicIdOrRole(publicId, resolvedRole)
+            : getChatRoleCssClassByRole(resolvedRole))
+        : '';
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
+
+    const nickAttrs = publicId
+        ? ` data-player-public-id="${escapeChatHtml(publicId)}" data-player-nickname="${author}"`
+        : ` data-player-nickname="${author}"`;
+
+    let prefix = "";
+    if (scope.channel === "battle") {
+        prefix = '<span class="chat-sep">⚔</span> ';
+    } else if (scope.channel === "pm" && ownId && recipientId && ownId === recipientId) {
+        prefix = '<span class="chat-sep">→</span> ';
+    }
+
+    if (isGlobalStaffAnnouncement || isObserveHiddenStaff) {
+        return `
+          <div class="chat-line${lineClass}" data-message-id="${msg.id}">
+            ${prefix}${roleBadge}
+            <span class="chat-time">[${time}]</span>
+            <span class="chat-text">${text}</span>
+          </div>
+        `;
+    }
+
+    const idHtml = publicId ? `<span class="chat-id">[${safePublicId}]</span>` : '';
+    return `
+      <div class="chat-line${lineClass}" data-message-id="${msg.id}">
+        ${prefix}${roleBadge}
+        <button class="chat-nick" type="button"${nickAttrs}>${author}</button>
+        ${idHtml}
+        <span class="chat-time">[${time}]</span>
+        <span class="chat-text">${text}</span>
+      </div>
+    `;
+}
+
+function buildBattleChatMessageHtml(msg) {
+    const author = escapeChatHtml(msg.player_nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const time = formatChatTime(msg.created_at);
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
+    const isGlobalStaffAnnouncement = String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const showRoleBadge = shouldShowSceneRoleBadgeInCurrentMode(publicId, msg.staff_role);
+    const roleBadge = isGlobalStaffAnnouncement
+        ? getForcedSceneRoleBadgeHtml(msg.staff_role)
+        : (showRoleBadge ? getSceneRoleBadgeHtml(publicId, msg.staff_role) : '');
+    const roleClass = isGlobalStaffAnnouncement
+        ? getChatRoleCssClassByRole(msg.staff_role)
+        : (showRoleBadge ? getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role) : '');
+    const lineClass = roleClass ? `chat-line chat-staff ${roleClass}` : 'chat-line';
+
+    if (shouldHideStaffIdentityInObserve(publicId, msg.staff_role) || isGlobalStaffAnnouncement) {
+        return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    }
+
+    const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
+    return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml} <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+}
+
+function addSystemLobbyChatMessage(text) {
+    if (!chatMessages) return;
+    const row = document.createElement("div");
+    row.className = "chat-line system";
+    row.textContent = text;
+    chatMessages.appendChild(row);
+    while (chatMessages.children.length > CHAT_MESSAGE_LIMIT) {
+        chatMessages.removeChild(chatMessages.firstChild);
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addSystemBattleChatMessage(text) {
+    const battleLog = document.getElementById("battle-chat-log");
+    if (!battleLog) return;
+    const row = document.createElement("div");
+    row.style.color = "#ffd166";
+    row.textContent = text;
+    battleLog.appendChild(row);
+    battleLog.scrollTop = battleLog.scrollHeight;
+}
+
+function resetPrivateChatState() {
+    Object.keys(privateChatTabs).forEach(key => delete privateChatTabs[key]);
+    Object.keys(chatCache.pm).forEach(key => delete chatCache.pm[key]);
+    Object.keys(chatUnread.pm).forEach(key => delete chatUnread.pm[key]);
+    onlinePmPeers.clear();
+    inGamePmPeers.clear();
+    currentChat = "global";
+    saveChatUiState();
+}
+
+async function deletePmHistoryWithPeer(peerId) {
+    if (!window.supabaseClient) return;
+    const ownId = getOwnPublicChatId();
+    const peer = String(peerId || '').trim();
+    if (!ownId || !peer) return;
+
+    const { error } = await window.supabaseClient
+        .from('chat_messages')
+        .delete()
+        .eq('channel', 'pm')
+        .or(`and(player_public_id.eq.${ownId},recipient_public_id.eq.${peer}),and(player_public_id.eq.${peer},recipient_public_id.eq.${ownId})`);
+
+    if (error) {
+        console.warn('Не удалось удалить историю PM:', error);
+    }
+}
+
+async function deleteAllOwnPmHistory() {
+    if (!window.supabaseClient) return;
+    const ownId = getOwnPublicChatId();
+    if (!ownId) return;
+
+    const { error } = await window.supabaseClient
+        .from('chat_messages')
+        .delete()
+        .eq('channel', 'pm')
+        .or(`player_public_id.eq.${ownId},recipient_public_id.eq.${ownId}`);
+
+    if (error) {
+        console.warn('Не удалось удалить всю историю PM:', error);
+    }
+}
+
+function setUnreadForScope(scopeName, state = true) {
+    if (typeof state === 'number') {
+        setUnreadCount(scopeName, state);
+        return;
+    }
+    if (state) incrementUnread(scopeName);
+    else setUnreadCount(scopeName, 0);
+}
+
+function clearUnreadForCurrentScope() {
+    setUnreadCount(currentChat, 0);
+}
+
+function ensurePmTab(peerId, label = null) {
+    const key = String(peerId || "").trim();
+    if (!key) return;
+    const previous = privateChatTabs[key] || {};
+    const safeLabel = (label || previous.label || `ID ${key}`).trim();
+    privateChatTabs[key] = {
+        label: safeLabel,
+        updatedAt: Date.now(),
+        pinned: !!previous.pinned,
+        preview: previous.preview || getLastMessagePreview(getPrivateScopeKey(key)) || ""
+    };
+    saveChatUiState();
+    renderChatTabs();
+}
+
+function getPeerIdFromPmMessage(msg) {
+    const ownId = getOwnPublicChatId();
+    if (!ownId || !msg) return null;
+    const senderId = msg.player_public_id ? String(msg.player_public_id) : null;
+    const recipientId = msg.recipient_public_id ? String(msg.recipient_public_id) : null;
+
+    if (senderId === ownId) return recipientId;
+    if (recipientId === ownId) return senderId;
+    return null;
+}
+
+function getPeerLabelFromPmMessage(msg, peerId) {
+    const ownId = getOwnPublicChatId();
+    const senderId = msg?.player_public_id ? String(msg.player_public_id) : null;
+    if (senderId && senderId !== ownId) {
+        return msg.player_nickname || `ID ${peerId}`;
+    }
+    return privateChatTabs[String(peerId)]?.label || `ID ${peerId}`;
+}
+
+
+function formatBattleHistoryDateTime(dateStr) {
+    const d = new Date(dateStr || Date.now());
+    const date = d.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `${date} ${time}`;
+}
+
+function buildBattleHistoryMessageHtml(msg) {
+    const author = escapeChatHtml(msg.player_nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const dateTime = formatBattleHistoryDateTime(msg.created_at);
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
+    const roleBadge = getSceneRoleBadgeHtml(publicId, msg.staff_role);
+    const roleClass = getChatRoleCssClassByPublicIdOrRole(publicId, msg.staff_role);
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
+    const idHtml = publicId ? `<span class="chat-id">[${safePublicId}]</span>` : '';
+    return `
+      <div class="chat-line battle-history-line${lineClass}" data-message-id="${msg.id}">
+        ${roleBadge}
+        <span class="chat-nick-static">${author}</span>
+        ${idHtml}
+        <span class="chat-time">[${escapeChatHtml(dateTime)}]</span>
+        <span class="chat-text">${text}</span>
+      </div>
+    `;
+}
+
+function ensureBattleHistorySearchUi() {
+    const panel = document.getElementById('chat-panel');
+    const tabs = document.getElementById('chat-tabs');
+    if (!panel || !tabs) return null;
+
+    let wrap = document.getElementById('battle-history-search-wrap');
+    if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.id = 'battle-history-search-wrap';
+        wrap.className = 'battle-history-search-wrap hidden';
+        wrap.innerHTML = `
+            <div class="battle-history-search-bar">
+                <input id="battle-history-player-id" type="text" inputmode="numeric" placeholder="ID игрока">
+                <button id="battle-history-search-btn" type="button" title="Поиск истории battle">🔎</button>
+            </div>
+        `;
+        tabs.appendChild(wrap);
+
+        let modal = document.getElementById('battle-history-search-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'battle-history-search-modal';
+            modal.className = 'battle-history-search-modal hidden';
+            modal.innerHTML = `
+                <div class="battle-history-search-backdrop" data-role="history-close"></div>
+                <div class="battle-history-search-window">
+                    <div class="battle-history-search-panel-head">
+                        <span id="battle-history-search-caption">История battle</span>
+                        <div class="battle-history-search-panel-tools">
+                            <input id="battle-history-date-filter" type="text" placeholder="Дата: 30.03.2026">
+                            <input id="battle-history-keyword-filter" type="text" placeholder="Ключевые слова">
+                            <button id="battle-history-search-close" type="button">×</button>
+                        </div>
+                    </div>
+                    <div id="battle-history-search-results" class="battle-history-search-results"></div>
+                </div>
+            `;
+            const lobbyScreen = document.getElementById('lobby-screen') || document.body;
+            lobbyScreen.appendChild(modal);
+            modal.querySelector('[data-role="history-close"]')?.addEventListener('click', closeBattleHistorySearchModal);
+            modal.querySelector('#battle-history-search-close')?.addEventListener('click', closeBattleHistorySearchModal);
+            modal.querySelector('#battle-history-date-filter')?.addEventListener('input', (e) => {
+                battleHistorySearchState.dateQuery = String(e.target?.value || '').trim();
+                renderBattleHistorySearchUi();
+            });
+            modal.querySelector('#battle-history-keyword-filter')?.addEventListener('input', (e) => {
+                battleHistorySearchState.keywordQuery = String(e.target?.value || '').trim();
+                renderBattleHistorySearchUi();
+            });
+        }
+
+        wrap.querySelector('#battle-history-search-btn')?.addEventListener('click', () => {
+            runBattleHistorySearch();
+        });
+        wrap.querySelector('#battle-history-player-id')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                runBattleHistorySearch();
+            }
+        });
+    }
+    return wrap;
+}
+
+function closeBattleHistorySearchModal() {
+    battleHistorySearchState.messages = [];
+    battleHistorySearchState.error = '';
+    battleHistorySearchState.playerLabel = '';
+    battleHistorySearchState.loading = false;
+    battleHistorySearchState.dateQuery = '';
+    battleHistorySearchState.keywordQuery = '';
+    renderBattleHistorySearchUi();
+}
+
+function normalizeBattleHistoryDateStrings(createdAt) {
+    if (!createdAt) return [];
+    const date = new Date(createdAt);
+    if (Number.isNaN(date.getTime())) return [];
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(date.getFullYear());
+    return [
+        `${dd}.${mm}.${yyyy}`,
+        `${yyyy}-${mm}-${dd}`,
+        `${dd}/${mm}/${yyyy}`
+    ];
+}
+
+function getFilteredBattleHistoryMessages() {
+    const dateQuery = String(battleHistorySearchState.dateQuery || '').trim().toLowerCase();
+    const keywordQuery = String(battleHistorySearchState.keywordQuery || '').trim().toLowerCase();
+    return (battleHistorySearchState.messages || []).filter(msg => {
+        const msgText = String(msg?.message || '').toLowerCase();
+        const matchesKeyword = !keywordQuery || msgText.includes(keywordQuery);
+        const dateStrings = normalizeBattleHistoryDateStrings(msg?.created_at).map(v => v.toLowerCase());
+        const matchesDate = !dateQuery || dateStrings.some(v => v.includes(dateQuery));
+        return matchesKeyword && matchesDate;
+    });
+}
+
+function renderBattleHistorySearchUi() {
+    const wrap = ensureBattleHistorySearchUi();
+    if (!wrap) return;
+
+    const shouldShowToolbar = currentChat === 'battle';
+    wrap.classList.toggle('hidden', !shouldShowToolbar);
+
+    const input = document.getElementById('battle-history-player-id');
+    const searchBtn = document.getElementById('battle-history-search-btn');
+    const modal = document.getElementById('battle-history-search-modal');
+    const caption = document.getElementById('battle-history-search-caption');
+    const results = document.getElementById('battle-history-search-results');
+    const dateFilterInput = document.getElementById('battle-history-date-filter');
+    const keywordFilterInput = document.getElementById('battle-history-keyword-filter');
+    if (!input || !searchBtn || !modal || !caption || !results || !dateFilterInput || !keywordFilterInput) return;
+
+    if (document.activeElement !== input) {
+        input.value = battleHistorySearchState.playerId || '';
+    }
+    if (document.activeElement !== dateFilterInput) {
+        dateFilterInput.value = battleHistorySearchState.dateQuery || '';
+    }
+    if (document.activeElement !== keywordFilterInput) {
+        keywordFilterInput.value = battleHistorySearchState.keywordQuery || '';
+    }
+
+    searchBtn.disabled = !!battleHistorySearchState.loading;
+    searchBtn.textContent = battleHistorySearchState.loading ? '…' : '🔎';
+
+    const filteredMessages = getFilteredBattleHistoryMessages();
+    const hasVisiblePanel = !!battleHistorySearchState.loading || !!battleHistorySearchState.error || battleHistorySearchState.messages.length > 0;
+    modal.classList.toggle('hidden', !hasVisiblePanel || !shouldShowToolbar);
+
+    if (!hasVisiblePanel || !shouldShowToolbar) {
+        results.innerHTML = '';
+        return;
+    }
+
+    const safePlayerId = escapeChatHtml(battleHistorySearchState.playerId || '');
+    const safeLabel = escapeChatHtml(battleHistorySearchState.playerLabel || '');
+    caption.textContent = safeLabel ? `История Battle: ${safeLabel}` : `История Battle ID ${safePlayerId || '?'}`;
+
+    if (battleHistorySearchState.loading) {
+        results.innerHTML = '<div class="chat-line system">Загрузка истории battle...</div>';
+        return;
+    }
+
+    if (battleHistorySearchState.error) {
+        results.innerHTML = `<div class="chat-line system">${escapeChatHtml(battleHistorySearchState.error)}</div>`;
+        return;
+    }
+
+    if (!battleHistorySearchState.messages.length) {
+        results.innerHTML = '<div class="chat-line system">Сообщения battle для этого ID не найдены.</div>';
+        return;
+    }
+
+    if (!filteredMessages.length) {
+        results.innerHTML = '<div class="chat-line system">По выбранным фильтрам ничего не найдено.</div>';
+        return;
+    }
+
+    const previousTop = results.scrollTop;
+    const shouldStickToBottom = (results.scrollHeight - results.scrollTop - results.clientHeight) <= 28;
+    const wasEmpty = !results.children.length;
+    results.innerHTML = filteredMessages.map(msg => buildBattleHistoryMessageHtml(msg)).join('');
+    if (wasEmpty) {
+        results.scrollTop = 0;
+    } else if (shouldStickToBottom) {
+        results.scrollTop = results.scrollHeight;
+    } else {
+        results.scrollTop = previousTop;
+    }
+}
+
+async function runBattleHistorySearch(forcedPlayerId = null) {
+    if (!window.supabaseClient) {
+        battleHistorySearchState.error = 'Supabase ещё не готов.';
+        battleHistorySearchState.messages = [];
+        renderBattleHistorySearchUi();
+        return;
+    }
+
+    const input = document.getElementById('battle-history-player-id');
+    const safePlayerId = String(forcedPlayerId ?? input?.value ?? battleHistorySearchState.playerId ?? '').trim();
+    if (!/^\d+$/.test(safePlayerId)) {
+        battleHistorySearchState.playerId = safePlayerId;
+        battleHistorySearchState.error = 'Введите числовой ID игрока.';
+        battleHistorySearchState.messages = [];
+        battleHistorySearchState.playerLabel = '';
+        renderBattleHistorySearchUi();
+        return;
+    }
+
+    battleHistorySearchState.playerId = safePlayerId;
+    battleHistorySearchState.loading = true;
+    battleHistorySearchState.error = '';
+    battleHistorySearchState.messages = [];
+    battleHistorySearchState.playerLabel = '';
+    renderBattleHistorySearchUi();
+
+    const { data, error } = await window.supabaseClient
+        .from('chat_messages')
+        .select('*')
+        .eq('channel', 'battle')
+        .eq('player_public_id', safePlayerId)
+        .order('created_at', { ascending: false })
+        .limit(BATTLE_HISTORY_SEARCH_LIMIT);
+
+    battleHistorySearchState.loading = false;
+
+    if (error) {
+        console.error('❌ Ошибка поиска history battle:', error);
+        battleHistorySearchState.error = 'Ошибка поиска истории battle.';
+        battleHistorySearchState.messages = [];
+        renderBattleHistorySearchUi();
+        return;
+    }
+
+    const messages = (data || []).slice().reverse();
+    await hydrateStaffRolesForMessages(messages);
+
+    battleHistorySearchState.messages = messages;
+    battleHistorySearchState.error = '';
+    const latest = messages[messages.length - 1] || data?.[0] || null;
+    if (latest) {
+        const nick = String(latest.player_nickname || '').trim();
+        battleHistorySearchState.playerLabel = nick ? `${nick} [${safePlayerId}]` : `ID ${safePlayerId}`;
+    } else {
+        battleHistorySearchState.playerLabel = `ID ${safePlayerId}`;
+    }
+    renderBattleHistorySearchUi();
+}
+
+function renderChatTabs() {
+    if (!chatTabsWrap) return;
+
+    const pmEntries = Object.entries(privateChatTabs)
+        .sort((a, b) => {
+            const aPinned = a[1]?.pinned ? 1 : 0;
+            const bPinned = b[1]?.pinned ? 1 : 0;
+            if (bPinned !== aPinned) return bPinned - aPinned;
+            return (b[1]?.updatedAt || 0) - (a[1]?.updatedAt || 0);
+        });
+
+    let html = `
+      <button class="chat-tab${currentChat === "global" ? " active" : ""}${getUnreadCount("global") > 0 && currentChat !== "global" ? " notify" : ""}" data-scope="global" type="button">
+        <span class="chat-tab-title">Global</span>
+        ${getUnreadCount("global") > 0 && currentChat !== "global" ? `<span class="chat-tab-badge">${getUnreadCount("global") > 99 ? '99+' : getUnreadCount("global")}</span>` : ''}
+      </button>
+      <button class="chat-tab${currentChat === "clan" ? " active" : ""}${getUnreadCount("clan") > 0 && currentChat !== "clan" ? " notify" : ""}${!canUseClanChat() ? " disabled" : ""}" data-scope="clan" type="button" title="${canUseClanChat() ? 'Клановый чат' : 'Сначала нужен clan_id игрока'}">
+        <span class="chat-tab-title">Clan</span>
+        ${getUnreadCount("clan") > 0 && currentChat !== "clan" ? `<span class="chat-tab-badge">${getUnreadCount("clan") > 99 ? '99+' : getUnreadCount("clan")}</span>` : ''}
+      </button>
+      <button class="chat-tab${currentChat === "battle" ? " active" : ""}${getUnreadCount("battle") > 0 && currentChat !== "battle" ? " notify" : ""}" data-scope="battle" type="button">
+        <span class="chat-tab-title">Battle</span>
+        ${getUnreadCount("battle") > 0 && currentChat !== "battle" ? `<span class="chat-tab-badge">${getUnreadCount("battle") > 99 ? '99+' : getUnreadCount("battle")}</span>` : ''}
+      </button>
+    `;
+
+    pmEntries.forEach(([peerId, meta]) => {
+        const label = escapeChatHtml(meta?.label || `ID ${peerId}`);
+        const scope = getPrivateScopeKey(peerId);
+        const unread = getUnreadCount(scope);
+        const notify = unread > 0 && currentChat !== scope ? " notify" : "";
+        const preview = escapeChatHtml(meta?.preview || "Без сообщений");
+        const pinClass = meta?.pinned ? ' pinned' : '';
+        const presenceState = getPmPresenceState(peerId);
+        const presenceClass = presenceState === 'in-game' ? ' in-game' : (presenceState === 'online' ? ' online' : '');
+        const presenceTitle = presenceState === 'in-game' ? 'В игре' : (presenceState === 'online' ? 'Онлайн' : 'Оффлайн');
+        html += `
+          <button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}${pinClass}${presenceClass}" data-scope="${scope}" type="button">
+            <span class="pm-online-dot" title="${presenceTitle}"></span>
+            <span class="pm-tab-content">
+              <span class="pm-tab-main">
+                <span class="pm-tab-label">${label}</span>
+                ${meta?.pinned ? '<span class="pin-state" title="Закреплён">📌</span>' : ''}
+              </span>
+              <span class="pm-tab-preview">${preview}</span>
+            </span>
+            ${unread > 0 && currentChat !== scope ? `<span class="chat-tab-badge">${unread > 99 ? '99+' : unread}</span>` : ''}
+            <span class="pin-tab" data-pin="${peerId}" title="Закрепить ЛС">📌</span>
+            <span class="close-tab" data-close="${peerId}" title="Закрыть ЛС">×</span>
+          </button>
+        `;
+    });
+
+    chatTabsWrap.innerHTML = html;
+
+    chatTabsWrap.querySelectorAll(".chat-tab").forEach((tab) => {
+        tab.addEventListener("click", async (e) => {
+            if (e.target.closest(".pin-tab") || e.target.closest(".close-tab")) return;
+
+            currentChat = tab.dataset.scope || "global";
+            clearUnreadForCurrentScope();
+
+            renderChatTabs();
+            saveChatUiState();
+            await loadChatHistory(currentChat);
+            renderLobbyMessages();
+        });
+    });
+
+    chatTabsWrap.querySelectorAll(".pin-tab").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+        });
+
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const peerId = btn.dataset.pin;
+            if (!peerId || !privateChatTabs[peerId]) return;
+
+            privateChatTabs[peerId].pinned = !privateChatTabs[peerId].pinned;
+            saveChatUiState();
+
+            renderChatTabs();
+        });
+    });
+
+    chatTabsWrap.querySelectorAll(".close-tab").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+        });
+
+        btn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const peerId = btn.dataset.close;
+            if (!peerId) return;
+
+            delete privateChatTabs[peerId];
+            delete chatCache.pm[peerId];
+            delete chatUnread.pm[peerId];
+            onlinePmPeers.delete(String(peerId));
+            inGamePmPeers.delete(String(peerId));
+            deletePmHistoryWithPeer(peerId);
+            saveChatUiState();
+
+            if (currentChat === `pm:${peerId}`) {
+                currentChat = "global";
+                await loadChatHistory("global");
+                renderLobbyMessages();
+            }
+
+            renderChatTabs();
+        });
+    });
+
+    saveChatUiState();
+    renderBattleHistorySearchUi();
+}
+
+function renderLobbyMessages() {
+    if (!chatMessages) return;
+    const scope = parseChatScope(currentChat);
+    if (scope.channel === 'clan' && !canUseClanChat()) {
+        chatMessages.innerHTML = '<div class="chat-line system">👥 Клановый чат готов, но для него нужен clan_id игрока/клана из базы.</div>';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return;
+    }
+    const list = getChatCacheList(scope);
+    chatMessages.innerHTML = list.map(msg => buildLobbyChatMessageHtml(msg, scope)).join("");
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    renderBattleHistorySearchUi();
+}
+
+function updateLobbyChatComposerVisibility() {
+    const chatInputAreaEl = document.getElementById("chat-input-area");
+    const chatInputEl = document.getElementById("chat-input");
+    const chatSendEl = document.getElementById("chat-send");
+    if (!chatInputAreaEl) return;
+
+    const shouldHide = (currentChat === "battle" && !canWriteBattleAnnouncementChat()) || (currentChat === "clan" && !canUseClanChat());
+    chatInputAreaEl.classList.toggle("chat-composer-hidden", shouldHide);
+
+    if (shouldHide) {
+        if (chatInputEl) {
+            chatInputEl.value = "";
+            chatInputEl.blur();
+        }
+        if (chatSendEl) {
+            chatSendEl.blur();
+        }
+    }
+}
+
+if (chatMessages && !chatMessages.dataset.playerActionsBound) {
+    chatMessages.dataset.playerActionsBound = '1';
+    chatMessages.addEventListener('click', async (e) => {
+        const nickBtn = e.target.closest('.chat-nick');
+        if (!nickBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const targetId = nickBtn.dataset.playerPublicId ? String(nickBtn.dataset.playerPublicId) : '';
+        const nickname = nickBtn.dataset.playerNickname || nickBtn.textContent || 'Player';
+        if (!targetId) {
+            await openPlayerProfile('', nickname);
+            return;
+        }
+        showPlayerActionMenu(nickBtn, targetId, nickname);
+    });
+}
+
+function renderBattleMessages() {
+    const battleLog = document.getElementById("battle-chat-log");
+    if (!battleLog) return;
+
+    const activeRoomId = String(getBattleChatRoomId() || '').trim();
+    const visibleMessages = chatCache.battle.filter(msg => {
+        const incomingRoomId = String(msg?.room_id || '').trim();
+        if (!activeRoomId) return true;
+        return incomingRoomId === activeRoomId || incomingRoomId === '__all__';
+    });
+
+    const distanceFromBottom = battleLog.scrollHeight - battleLog.scrollTop - battleLog.clientHeight;
+    const shouldStickToBottom = distanceFromBottom <= 28;
+    const prevScrollTop = battleLog.scrollTop;
+
+    battleLog.innerHTML = visibleMessages.map(buildBattleChatMessageHtml).join("");
+
+    if (shouldStickToBottom) {
+        battleLog.scrollTop = battleLog.scrollHeight;
+    } else {
+        battleLog.scrollTop = prevScrollTop;
+    }
+}
+
+function showBattleAnnouncementInActiveScene(msg) {
+    if (!msg) return;
+    if (gameState !== "BATTLE" && gameState !== "OBSERVE") return;
+
+    const feed = document.getElementById('kill-feed');
+    if (!feed) return;
+
+    const author = escapeChatHtml(msg.player_nickname || msg.nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
+    const isGlobalStaffAnnouncement = String(msg?.room_id || '').trim() === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const hideIdentity = !isGlobalStaffAnnouncement && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
+
+    const showRoleBadge = isGlobalStaffAnnouncement || hideIdentity;
+    const roleBadge = showRoleBadge ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByRole(msg.staff_role) : '';
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : '';
+
+    const item = document.createElement('div');
+    item.className = `kill-feed-item chat-announcement${lineClass}`;
+    const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
+
+    item.innerHTML = (isGlobalStaffAnnouncement || hideIdentity)
+        ? `${roleBadge}<span class="chat-text">${text}</span>`
+        : `${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+
+    feed.prepend(item);
+
+    while (feed.children.length > 8) {
+        feed.removeChild(feed.lastChild);
+    }
+
+    setTimeout(() => {
+        item.remove();
+    }, 9000);
+
+    renderBattleMessages?.();
+}
+
+function showSceneMapMessageInActiveScene(msg) {
+    if (!msg) return;
+    if (gameState !== "BATTLE" && gameState !== "OBSERVE") return;
+
+    const activeSceneRoomId = String(getSceneChatRoomId() || "").trim();
+    const incomingSceneRoomId = String(msg.room_id || "").trim();
+    if (incomingSceneRoomId !== "__all__" && incomingSceneRoomId !== activeSceneRoomId) return;
+
+    const feed = document.getElementById('kill-feed');
+    if (!feed) return;
+
+    const author = escapeChatHtml(msg.player_nickname || msg.nickname || "Unknown");
+    const text = escapeChatHtml(msg.message || "");
+    const publicId = msg.player_public_id ? String(msg.player_public_id) : "";
+    const safePublicId = escapeChatHtml(publicId || "0");
+    const isGlobalStaffAnnouncement = incomingSceneRoomId === '__all__' && canWriteBattleAnnouncementChatByRole(msg?.staff_role);
+    const hideIdentity = !isGlobalStaffAnnouncement && shouldHideStaffIdentityInObserve(publicId, msg.staff_role);
+
+    const showRoleBadge = isGlobalStaffAnnouncement || hideIdentity;
+    const roleBadge = showRoleBadge ? getForcedSceneRoleBadgeHtml(msg.staff_role) : '';
+    const roleClass = showRoleBadge ? getChatRoleCssClassByRole(msg.staff_role) : '';
+    const lineClass = roleClass ? ` chat-staff ${roleClass}` : "";
+
+    const item = document.createElement('div');
+    item.className = isGlobalStaffAnnouncement
+        ? `kill-feed-item chat-announcement${lineClass}`
+        : `kill-feed-item chat-announcement scene-chat${lineClass}`;
+
+    if (hideIdentity || isGlobalStaffAnnouncement) {
+        item.innerHTML = `${roleBadge}<span class="chat-text">${text}</span>`;
+    } else {
+        const idHtml = publicId ? ` <span class="chat-id">(${safePublicId})</span>` : '';
+        item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    }
+
+    feed.prepend(item);
+    while (feed.children.length > 8) {
+        feed.removeChild(feed.lastChild);
+    }
+    setTimeout(() => {
+        item.remove();
+    }, 9000);
+}
+
+async function loadChatHistory(scopeName = currentChat) {
+    if (!window.supabaseClient) return;
+
+    const scope = parseChatScope(scopeName);
+    let query = window.supabaseClient
+        .from("chat_messages")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(CHAT_MESSAGE_LIMIT);
+
+    query = query.eq("channel", scope.channel);
+
+    if (scope.channel === "clan") {
+        if (!scope.roomId) {
+            const list = getChatCacheList(scope);
+            list.length = 0;
+            if (currentChat === scopeName) renderLobbyMessages();
+            return;
+        }
+        query = query.eq('room_id', scope.roomId);
+    }
+
+    if (scope.channel === "battle") {
+        const battleRoomId = String(getBattleChatRoomId() || '').trim();
+        if (battleRoomId) {
+            query = query.or(`room_id.eq.${battleRoomId},room_id.eq.__all__`);
+        } else {
+            query = query.eq('room_id', '__all__');
+        }
+    }
+
+    if (scope.channel === "pm") {
+        const ownId = getOwnPublicChatId();
+        if (!ownId || !scope.peerId) {
+            if (currentChat === scopeName) renderLobbyMessages();
+            return;
+        }
+        query = query.or(`and(player_public_id.eq.${ownId},recipient_public_id.eq.${scope.peerId}),and(player_public_id.eq.${scope.peerId},recipient_public_id.eq.${ownId})`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+        console.error("❌ Ошибка загрузки чата:", error);
+        if (scope.channel === "battle") addSystemBattleChatMessage("Ошибка загрузки боевого чата");
+        else addSystemLobbyChatMessage("Ошибка загрузки чата");
+        return;
+    }
+
+    await hydrateStaffRolesForMessages(data || []);
+
+    const list = getChatCacheList(scope);
+    list.length = 0;
+    (data || []).slice().reverse().forEach(msg => list.push(msg));
+
+    if (scope.channel === "pm") {
+        const peerId = scope.peerId;
+        if (peerId && list.length) {
+            const sample = list[list.length - 1];
+            ensurePmTab(peerId, getPeerLabelFromPmMessage(sample, peerId));
+            setPrivateTabPreview(peerId, getLastMessagePreview(scopeName));
+            deletePmHistoryWithPeer(peerId);
+        }
+    }
+
+    if (scopeName === currentChat) clearUnreadForCurrentScope();
+
+    if (currentChat === scopeName) renderLobbyMessages();
+    if (scope.channel === "battle" && (gameState === "BATTLE" || gameState === "OBSERVE" || currentChat === "battle")) {
+        renderBattleMessages();
+    }
+}
+
+
+async function refreshBattleFeedFromDb() {
+    if (!window.supabaseClient) return;
+    const roomId = String(getBattleChatRoomId() || '').trim();
+    if (!roomId) return;
+
+    const { data, error } = await window.supabaseClient
+        .from("chat_messages")
+        .select("*")
+        .eq("channel", "battle")
+        .or(`room_id.eq.${roomId},room_id.eq.__all__`)
+        .order("created_at", { ascending: true })
+        .limit(CHAT_MESSAGE_LIMIT);
+
+    if (error) {
+        console.error('❌ Ошибка обновления battle потока:', error);
+        return;
+    }
+
+    await hydrateStaffRolesForMessages(data || []);
+
+    const scope = { key: 'battle', channel: 'battle' };
+    const roomList = [];
+    (data || []).forEach(msg => {
+        if (!roomList.some(item => String(item?.id || '') === String(msg?.id || ''))) {
+            roomList.push(msg);
+        }
+    });
+    roomList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    const otherRooms = chatCache.battle.filter(msg => String(msg?.room_id || '') !== roomId);
+    chatCache.battle.length = 0;
+    otherRooms.forEach(msg => chatCache.battle.push(msg));
+    roomList.forEach(msg => pushChatToCache(scope, msg));
+
+    renderBattleMessages();
+    if (currentChat === 'battle') renderLobbyMessages();
+    renderChatTabs();
+}
+
+async function handleIncomingRealtimeMessage(msg) {
+    if (!msg || !msg.channel) return;
+    await hydrateStaffRolesForMessages([msg]);
+
+    if (msg.channel === "global") {
+        const scope = { key: "global", channel: "global" };
+        if (!pushChatToCache(scope, msg)) return;
+        if (currentChat !== "global") incrementUnread("global");
+        if (currentChat === "global") renderLobbyMessages();
+        renderChatTabs();
+        return;
+    }
+
+    if (msg.player_public_id && msg.staff_role) {
+        setCachedStaffRole(String(msg.player_public_id), String(msg.staff_role).toLowerCase());
+    }
+
+    if (msg.channel === "clan") {
+        const activeClanRoomId = getClanChatRoomId();
+        if (!activeClanRoomId || String(msg.room_id || '') !== String(activeClanRoomId)) return;
+        const scope = { key: 'clan', channel: 'clan', roomId: activeClanRoomId };
+        if (!pushChatToCache(scope, msg)) return;
+        if (currentChat !== 'clan') incrementUnread('clan');
+        if (currentChat === 'clan') renderLobbyMessages();
+        renderChatTabs();
+        return;
+    }
+
+    if (msg.channel === "battle") {
+        const activeBattleRoomId = String(getBattleChatRoomId() || '').trim();
+        const incomingRoomId = String(msg.room_id || '').trim();
+        if (activeBattleRoomId && incomingRoomId !== activeBattleRoomId && incomingRoomId !== '__all__') {
+            return;
+        }
+        const scope = { key: 'battle', channel: 'battle' };
+        if (!pushChatToCache(scope, msg)) {
+            return;
+        }
+        if (currentChat !== "battle") incrementUnread("battle");
+        renderBattleMessages();
+        if (currentChat === 'battle') renderLobbyMessages();
+        renderChatTabs();
+        return;
+    }
+
+    if (msg.channel === "scene") {
+        const activeSceneRoomId = String(getSceneChatRoomId() || '').trim();
+        const incomingSceneRoomId = String(msg.room_id || '').trim();
+        if (incomingSceneRoomId !== '__all__' && activeSceneRoomId && incomingSceneRoomId !== activeSceneRoomId) return;
+
+        if (!wasLocalHandledChatMessage(msg.id)) {
+            showSceneMapMessageInActiveScene(msg);
+        }
+
+        return;
+    }
+
+    if (msg.channel === "pm") {
+        const ownId = getOwnPublicChatId();
+        if (!ownId) return;
+        const peerId = getPeerIdFromPmMessage(msg);
+        if (!peerId) return;
+
+        const scope = { key: getPrivateScopeKey(peerId), channel: "pm", peerId };
+        if (!pushChatToCache(scope, msg)) return;
+
+        ensurePmTab(peerId, getPeerLabelFromPmMessage(msg, peerId));
+        syncPrivateTabFromScope(scope.key);
+        if (currentChat !== scope.key) incrementUnread(scope.key);
+
+        if (currentChat === scope.key) renderLobbyMessages();
+        renderChatTabs();
+    }
+}
+
+function startRealtimeChat() {
+    if (!window.supabaseClient) return;
+    if (chatRealtimeChannel) return;
+
+    chatRealtimeChannel = window.supabaseClient
+        .channel("cosmic-clicker-chat-realtime")
+        .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "chat_messages" },
+            async (payload) => {
+                await handleIncomingRealtimeMessage(payload.new);
+            }
+        )
+        .subscribe((status) => {
+        });
+}
+
+async function sendMessage(forcedScopeName = null, explicitText = null) {
+    if (!window.supabaseClient) {
+        addSystemLobbyChatMessage("Supabase ещё не готов для чата.");
+        return false;
+    }
+
+    if (window.playerMuted || player.isMuted) {
+        if ((forcedScopeName || currentChat) === "battle") {
+            addSystemBattleChatMessage("🔇 Мут активен. Сообщение не отправлено.");
+        } else {
+            addSystemLobbyChatMessage("🔇 Мут активен. Вы не можете писать в чат.");
+        }
+        return false;
+    }
+
+    const text = (typeof explicitText === "string" ? explicitText : (chatInput?.value || "")).trim();
+    if (!text) return false;
+
+    const cooldownRemainingMs = getChatCooldownRemainingMs();
+    if (cooldownRemainingMs > 0) {
+        const remainSec = (cooldownRemainingMs / 1000).toFixed(1);
+        const spamText = `⏳ Не так быстро. Следующее сообщение через ${remainSec} сек.`;
+        if (forcedScopeName === "battle" || currentChat === "battle") addSystemBattleChatMessage(spamText);
+        else addSystemLobbyChatMessage(spamText);
+        return false;
+    }
+
+    const scopeName = forcedScopeName || currentChat;
+    const scope = parseChatScope(scopeName);
+    const ownPublicId = getOwnPublicChatId();
+
+    if (scope.channel === "pm" && !canUsePrivateChat()) {
+        addSystemLobbyChatMessage("⚠ ЛС доступны только для аккаунтов, не для гостя.");
+        return false;
+    }
+
+    if (scope.channel === "clan" && !canUseClanChat()) {
+        addSystemLobbyChatMessage('⚠ Клановый чат пока недоступен: у игрока нет clan_id.');
+        return false;
+    }
+
+    if (scope.channel === "battle") {
+        if (battleObserverMode && !canWriteInObserverChat()) {
+            return false;
+        }
+        if (!battleObserverMode && !canWriteBattleAnnouncementChat()) {
+            addSystemLobbyChatMessage("⚠ У вас нет прав писать в Battle чат.");
+            updateLobbyChatComposerVisibility?.();
+            return false;
+        }
+    }
+
+    const payload = {
+        channel: scope.channel,
+        room_id: scope.channel === 'clan'
+            ? getClanChatRoomId()
+            : (scope.channel === 'battle'
+                ? getBattleChatRoomId()
+                : null),
+        player_id: getValidChatPlayerId(),
+        player_public_id: ownPublicId,
+        recipient_public_id: scope.channel === "pm" ? String(scope.peerId || "") : null,
+        player_nickname: getOwnChatLabel(),
+        message: text
+    };
+    if (scope.channel === 'battle' && canWriteBattleAnnouncementChat() && !battleObserverMode) {
+        payload.room_id = '__all__';
+    }
+
+    if (scope.channel === 'battle' && !payload.room_id) {
+        addSystemBattleChatMessage("⚠ Не найден battle room_id для отправки сообщения.");
+        return false;
+    }
+
+
+    console.log('📤 SEND MESSAGE:', {
+        scopeName,
+        channel: payload.channel,
+        room_id: payload.room_id,
+        player_id: payload.player_id,
+        player_public_id: payload.player_public_id,
+        nickname: payload.player_nickname,
+        currentChat,
+        gameState,
+        battleRoomId: getBattleChatRoomId ? getBattleChatRoomId() : null,
+        sceneRoomId: getSceneChatRoomId ? getSceneChatRoomId() : null,
+        observerMode: !!battleObserverMode,
+        text
+    });
+
+    if (scope.channel === 'clan' && !payload.room_id) {
+        addSystemLobbyChatMessage('⚠ Не найден room_id клана для отправки сообщения.');
+        return false;
+    }
+
+    if (scope.channel === "pm" && !payload.recipient_public_id) {
+        addSystemLobbyChatMessage("⚠ Не выбран получатель для личного сообщения.");
+        return false;
+    }
+
+    const payloadsToInsert = [payload];
+
+    if (scope.channel === "battle" && canWriteBattleAnnouncementChat() && !battleObserverMode) {
+        payloadsToInsert.push({
+            channel: "scene",
+            room_id: "__all__",
+            player_id: payload.player_id,
+            player_public_id: payload.player_public_id,
+            recipient_public_id: null,
+            player_nickname: payload.player_nickname,
+            staff_role: getOwnStaffRole(),
+            message: text
+        });
+    }
+
+    const { data, error } = await window.supabaseClient
+        .from("chat_messages")
+        .insert(payloadsToInsert)
+        .select('*');
+
+    if (error) {
+        console.error("❌ Ошибка отправки сообщения:", error);
+        if (scope.channel === "battle") addSystemBattleChatMessage("Ошибка отправки сообщения");
+        else addSystemLobbyChatMessage("Ошибка отправки сообщения");
+        return false;
+    }
+
+    const insertedRows = Array.isArray(data) ? data : [];
+    const insertedBattle = insertedRows.find(row => row?.channel === "battle");
+    const insertedScene = insertedRows.find(row => row?.channel === "scene");
+
+    if (insertedBattle) {
+        markLocalHandledChatMessage(insertedBattle.id);
+    }
+    if (insertedScene) {
+        markLocalHandledChatMessage(insertedScene.id);
+    }
+
+    markChatMessageSentNow();
+
+    if (scope.channel === "battle") {
+        const battleMessage = insertedBattle || {
+            id: `local-${Date.now()}`,
+            channel: "battle",
+            room_id: payload.room_id,
+            created_at: new Date().toISOString(),
+            player_public_id: ownPublicId,
+            player_nickname: getOwnChatLabel(),
+            staff_role: getOwnStaffRole(),
+            message: text
+        };
+        pushChatToCache(scope, battleMessage);
+        if (currentChat === "battle") {
+            renderLobbyMessages();
+        }
+        renderBattleMessages?.();
+    }
+
+    if (insertedScene) {
+        showSceneMapMessageInActiveScene(insertedScene);
+    }
+
+    if (scope.channel === "battle") {
+        try {
+            await loadChatHistory("battle");
+            if (currentChat === "battle") {
+                renderLobbyMessages();
+            }
+            renderBattleMessages?.();
+        } catch (e) {
+            console.warn("⚠ Не удалось сразу обновить battle-чат:", e);
+        }
+    }
+
+    if (scope.channel === "global" || scope.channel === "pm" || scope.channel === "clan") {
+        try {
+            await loadChatHistory(scope.key);
+            if (currentChat === scope.key) {
+                renderLobbyMessages();
+            }
+        } catch (e) {
+            console.warn("⚠ Не удалось сразу обновить лобби-чат:", e);
+        }
+    }
+
+    if (!forcedScopeName && chatInput) chatInput.value = "";
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
+
+return true;
+}
+
+function openPrivateChat(peerId, label = null) {
+    if (!canUsePrivateChat()) {
+        addSystemLobbyChatMessage("⚠ ЛС доступны только после входа в аккаунт.");
+        return;
+    }
+
+    const safePeerId = String(peerId || "").trim();
+    if (!safePeerId || !/^\d+$/.test(safePeerId)) {
+        addSystemLobbyChatMessage("⚠ Для гостя ЛС недоступны.");
+        return;
+    }
+
+    const ownId = getOwnPublicChatId();
+    if (ownId && ownId === safePeerId) return;
+
+    ensurePmTab(safePeerId, label || `ID ${safePeerId}`);
+    currentChat = getPrivateScopeKey(safePeerId);
+    clearUnreadForCurrentScope();
+    renderChatTabs();
+    updateLobbyChatComposerVisibility();
+    saveChatUiState();
+    loadChatHistory(currentChat).then(() => {
+        syncPrivateTabFromScope(currentChat);
+        renderLobbyMessages();
+        renderChatTabs();
+    });
+}
+
+if(chatSend){
+    chatSend.addEventListener("click", () => sendMessage());
+}
+
+if(chatInput){
+    chatInput.addEventListener("focus", () => {
+        window.isTypingChat = true;
+    });
+
+    chatInput.addEventListener("blur", () => {
+        window.isTypingChat = false;
+    });
+
+    chatInput.addEventListener("keydown", function(e){
+        e.stopPropagation();
+        if(e.key === "Enter"){
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+}
+
+async function handleChatStateChange() {
+    if (!canUsePrivateChat()) {
+        resetPrivateChatState();
+    }
+
+    if (gameState === "BATTLE") {
+        currentChat = "battle";
+        clearUnreadForCurrentScope();
+        renderChatTabs();
+        updateLobbyChatComposerVisibility();
+        await loadChatHistory("battle");
+        renderBattleMessages();
+        return;
+    }
+
+    if (gameState === "OBSERVE") {
+        if (currentChat === "battle") clearUnreadForCurrentScope();
+        renderChatTabs();
+        updateLobbyChatComposerVisibility();
+        await loadChatHistory("battle");
+        renderBattleMessages();
+        return;
+    }
+
+    if (currentChat === "battle") currentChat = "global";
+    if (currentChat === 'clan' && !canUseClanChat()) currentChat = 'global';
+    clearUnreadForCurrentScope();
+    renderChatTabs();
+    updateLobbyChatComposerVisibility();
+    await loadChatHistory(currentChat);
+    renderLobbyMessages();
+}
+
+async function initRealtimeChat() {
+    if (!canUsePrivateChat()) {
+        resetPrivateChatState();
+    }
+
+    await deleteAllOwnPmHistory();
+    resetPrivateChatState();
+    restoreChatUiState();
+    chatUnread.global = 0;
+    chatUnread.clan = 0;
+    chatUnread.battle = 0;
+    startRealtimeChat();
+    renderChatTabs();
+    updateLobbyChatComposerVisibility();
+    await loadChatHistory("global");
+    if (canUseClanChat()) await loadChatHistory("clan");
+    if (currentChat !== 'battle') renderLobbyMessages();
+    saveChatUiState();
+}
+
+window.openPrivateChat = openPrivateChat;
+
+window.testChatNotify = function(scope = 'global'){
+    if(scope === 'battle'){
+        incrementUnread('battle');
+    }else if(String(scope).startsWith('pm:')){
+        incrementUnread(scope);
+    }else{
+        incrementUnread('global');
+    }
+    renderChatTabs();
+};
+
+window.addEventListener("load", () => {
+    setTimeout(() => {
+        initRealtimeChat();
+    }, 250);
+});
+
+window.addEventListener('beforeunload', saveChatUiState);
+
+// ================= NOTIFICATION SYSTEM =================
+
+// Функция получения сообщения (имитация входящего)
+function receiveMessage(chatType, author, text){
+
+    const now = new Date();
+    const time = now.getHours().toString().padStart(2,"0") + ":" +
+                 now.getMinutes().toString().padStart(2,"0");
+
+    chatData[chatType].push({
+        time: time,
+        author: author,
+        text: text
+    });
+
+    if(chatType !== currentChat){
+
+        if(chatType === "general"){
+            tabs[0].classList.add("notify");
+        } else {
+            tabs[1].classList.add("notify");
+        }
+
+    } else {
+        renderMessages();
+    }
+}
+
+
+
+
+// ===== EMOJI CLICK SYSTEM =====
+
+document.querySelectorAll(".emoji").forEach(e=>{
+  e.addEventListener("click", ()=>{
+    const input = document.getElementById("chat-input");
+    input.value += e.textContent;
+    input.focus();
+  });
+});
+
+
+// ===============================
+// PROFILE UI LOGIC
+// ===============================
+
+window.addEventListener("DOMContentLoaded", () => {
+
+const hangarBtn = document.getElementById("hangar-tab");
+const hangarWindow = document.getElementById("hangar-window");
+const closeHangar = document.getElementById("close-hangar");
+const hangarList = document.getElementById("hangar-list");
+
+function updateHangarUI() {
+  if(!hangarList) return;
+
+  hangarList.innerHTML = "";
+
+  if(player.ships.length === 0){
+    hangarList.innerHTML = "<p>У вас нет кораблей</p>";
+    return;
+  }
+
+  player.ships.forEach(ship => {
+    const div = document.createElement("div");
+    div.className = "ship-card";
+    div.innerHTML = `
+      <b>${ship.name}</b><br>
+      Уровень: ${ship.level}<br>
+      HP: ${ship.hp}<br>
+      Атака: ${ship.attack}<br>
+      Скорость: ${ship.speed}
+    `;
+    hangarList.appendChild(div);
+  });
+}
+
+if(hangarBtn && hangarWindow){
+  hangarBtn.addEventListener("click", () => {
+    updateHangarUI();
+    hangarWindow.classList.remove("hidden");
+    hangarWindow.style.cssText = "position:fixed;inset:0;top:0;left:0;width:100vw;height:100vh;display:flex;justify-content:center;align-items:center;z-index:21000;background:rgba(0,0,0,0.82);";
+  });
+}
+
+if(closeHangar && hangarWindow){
+  closeHangar.addEventListener("click", () => {
+    hangarWindow.classList.add("hidden");
+    hangarWindow.style.display='none';
+  });
+}
+
+const profileBtn = document.getElementById("profile-tab");
+const profileWindow = document.getElementById("profile-window");
+const closeProfile = document.getElementById("close-profile");
+const profileInfo = document.getElementById("profile-info");
+
+function updateProfileUI() {
+  if(!profileInfo) return;
+  profileInfo.innerHTML = `
+    <p>Ник: ${player.nickname}</p>
+    <p>Уровень: ${player.level}</p>
+    <p>Опыт: ${player.experience}</p>
+    <p>Кредиты: ${player.credits}</p>
+    <p>Кораблей: ${player.ships.length}</p>
+  `;
+}
+
+if(profileBtn && profileWindow){
+  profileBtn.addEventListener("click", () => {
+    updateProfileUI();
+    profileWindow.classList.remove("hidden");
+  });
+}
+
+if(closeProfile && profileWindow){
+  closeProfile.addEventListener("click", () => {
+    profileWindow.classList.add("hidden");
+  });
+}
+
+});
+
+
+
+
+// ================= MAP DROPDOWN =================
+
+const mapSelected = document.getElementById("map-selected");
+const mapDropdown = document.getElementById("map-dropdown");
+const mapPreview = document.getElementById("map-preview");
+const mapSelectedName = document.getElementById("map-selected-name");
+
+let selectedMap = null;
+
+// создаём список карт
+function initMapDropdown() {
+
+    if (!mapDropdown) return;
+
+    mapDropdown.innerHTML = "";
+
+    MAPS.forEach(map => {
+
+        const option = document.createElement("div");
+        option.className = "map-option";
+
+        option.innerHTML = `<span>${map.name}</span>`;
+
+        option.addEventListener("click", () => {
+
+            selectedMap = map;
+
+            mapPreview.src = map.img;
+            mapSelectedName.textContent = map.name;
+
+            mapDropdown.classList.add("hidden");
+
+        });
+
+        mapDropdown.appendChild(option);
+    });
+}
+
+// открытие списка
+if (mapSelected) {
+    mapSelected.addEventListener("click", () => {
+        mapDropdown.classList.toggle("hidden");
+    });
+}
+
+initMapDropdown();
+initCreateMatchLevels();
+if(!selectedMap && MAPS.length){
+    selectedMap = MAPS[0];
+    if(mapPreview) mapPreview.src = selectedMap.img;
+    if(mapSelectedName) mapSelectedName.textContent = selectedMap.name;
+}
+
+
+
+// ================= ROOM SYSTEM (FAKE SERVER) =================
+
+let rooms = {};
+
+function createRoom(mapName, password = null, title = null) {
+
+    const roomId = "room_" + Date.now();
+
+    rooms[roomId] = {
+        id: roomId,
+        map: mapName,
+        password: password,
+        title: title || `Карта ${mapName}`,
+        players: [],
+        state: "waiting"
+    };
+
+    // 👇 ДОБАВЛЯЕМ СОЗДАТЕЛЯ
+    const player = {
+        id: "player_" + Date.now(),
+        name: "Host",
+        resources: 0
+    };
+
+    rooms[roomId].players.push(player);
+
+
+    return roomId;
+}
+
+
+// ================= CREATE ROOM BUTTON =================
+
+const confirmCreateBtn = document.getElementById("confirm-create");
+
+if (false && confirmCreateBtn) {
+
+    confirmCreateBtn.addEventListener("click", () => {
+
+        if (!selectedMap) {
+            alert("Выберите карту!");
+            return;
+        }
+
+        const roomTitleInput = document.getElementById('room-title');
+        const roomTitle = roomTitleInput?.value?.trim() || `${selectedMap.name} Room`;
+        const roomId = createRoom(selectedMap.name, null, roomTitle);
+
+
+        // 👉 ЗАПОМИНАЕМ ТЕКУЩУЮ КОМНАТУ
+        currentRoom = rooms[roomId];
+
+        // Закрываем окно
+        if (createWindow) {
+            createWindow.classList.add("hidden");
+        }
+        const roomTitleInputEl = document.getElementById('room-title');
+        if(roomTitleInputEl) roomTitleInputEl.value = '';
+        addCreatedRoomToLobby(currentRoom);
+
+        // 👉 Сначала загружаем карту
+        enterMap(currentRoom.map);
+
+        // 👉 Потом меняем состояние
+        switchState("BATTLE");
+        spawnPlayer();
+
+    });
+
+}
+
+
+
+/* JOIN MAP BUTTON */
+
+const joinButton = document.getElementById("join-map-btn");
+
+if (false && joinButton) {
+
+    joinButton.onclick = () => {
+
+        if (!selectedMap) {
+            alert("Сначала выберите карту");
+            return;
+        }
+
+
+        loadPlanet(selectedMap);
+
+        // запуск игры
+        switchState("BATTLE");
+
+    };
+
+}
+
+
+
+
+/* LOAD PLANET BY MAP */
+
+function loadPlanet(map){
+
+    if(map === "Mercury"){
+        createPlanet(0xaaaaaa,2);
+    }
+
+    if(map === "Venus"){
+        createPlanet(0xffcc88,2.2);
+    }
+
+    if(map === "Earth"){
+        createPlanet(0x3399ff,2.3);
+    }
+
+    if(map === "Mars"){
+        createPlanet(0xff5533,2.1);
+    }
+
+    if(map === "Jupiter"){
+        createPlanet(0xffaa88,3.5);
+    }
+
+    if(map === "Saturn"){
+        createPlanet(0xffddaa,3);
+    }
+
+    if(map === "Uranus"){
+        createPlanet(0x66ffff,2.8);
+    }
+
+    if(map === "Neptune"){
+        createPlanet(0x3366ff,2.8);
+    }
+
+}
+
+
+
+// ================= ENTER MAP =================
+
+function enterMap(mapName) {
+    enterBattleMap(mapName);
+}
+
+function normalizeBattleMapName(mapName){
+    const raw = String(mapName || '').trim().toLowerCase();
+
+    if(raw.includes('sun') || raw.includes('солн')) return 'sun';
+    if(raw.includes('mercury') || raw.includes('меркур')) return 'mercury';
+    if(raw.includes('venus') || raw.includes('венер')) return 'venus';
+    if(raw.includes('earth') || raw.includes('земл')) return 'earth';
+    if(raw.includes('mars') || raw.includes('марс')) return 'mars';
+    if(raw.includes('jupiter') || raw.includes('юпит')) return 'jupiter';
+    if(raw.includes('saturn') || raw.includes('сатур')) return 'saturn';
+    if(raw.includes('uranus') || raw.includes('уран')) return 'uranus';
+    if(raw.includes('neptune') || raw.includes('нептун')) return 'neptune';
+
+    const mapNames = {
+        'sun':'sun','солнце':'sun',
+        'mercury':'mercury','меркурий':'mercury',
+        'venus':'venus','венера':'venus',
+        'earth':'earth','земля':'earth',
+        'mars':'mars','марс':'mars',
+        'jupiter':'jupiter','юпитер':'jupiter',
+        'saturn':'saturn','сатурн':'saturn',
+        'uranus':'uranus','уран':'uranus',
+        'neptune':'neptune','нептун':'neptune'
+    };
+    return mapNames[raw] || 'earth';
+}
+
+function getBattlePlanetConfig(mapKey){
+    const configs = {
+        sun:{ color:0xffc84a, size:86, light:0xffdd88 },
+        mercury:{ color:0xb7b7b7, size:52, light:0xffffff },
+        venus:{ color:0xe4b382, size:62, light:0xffe1b3 },
+        earth:{ color:0x3b7cff, size:68, light:0xd6edff },
+        mars:{ color:0xc1583a, size:58, light:0xffd2b6 },
+        jupiter:{ color:0xcda27f, size:96, light:0xfff0db },
+        saturn:{ color:0xd9c08a, size:88, light:0xffefcc },
+        uranus:{ color:0x86d8dd, size:74, light:0xe1ffff },
+        neptune:{ color:0x4469ff, size:74, light:0xdce6ff }
+    };
+    return configs[mapKey] || configs.earth;
+}
+
+function enterBattleMap(mapName){
+  // FIX: reset orbit leftovers
+  try {
+    if (window.selectedPlanet) {
+      if (window.selectedPlanet.mesh && window.selectedPlanet.mesh.parent) {
+        window.selectedPlanet.mesh.parent.remove(window.selectedPlanet.mesh);
+      }
+      if (window.selectedPlanet.resourceLabel && window.selectedPlanet.resourceLabel.parent) {
+        window.selectedPlanet.resourceLabel.parent.remove(window.selectedPlanet.resourceLabel);
+      }
+    }
+    window.selectedPlanet = null;
+  } catch(e){}
+
+    const mapKey = normalizeBattleMapName(mapName);
+    selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
+
+    clearBattleScene();
+    battleStats.playerKills = 0;
+    battleStats.playerDeaths = 0;
+
+    if(solarSystem && scene.children.includes(solarSystem)){
+        scene.remove(solarSystem);
+    }
+
+    const config = getBattlePlanetConfig(mapKey);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 1.25);
+    const point = new THREE.PointLight(config.light, 2.6, 250);
+    point.position.set(12, 9, 10);
+    battleObjects.push(ambient, point);
+    scene.add(ambient);
+    scene.add(point);
+
+    const planetGeometry = new THREE.SphereGeometry(config.size, 48, 48);
+    const planetMaterial = new THREE.MeshStandardMaterial({
+        color: config.color,
+        roughness: 0.9,
+        metalness: 0.05
+    });
+    battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
+    battleMapPlanet.position.set(0, -6, -320);
+    battleMapPlanet.userData.radius = config.size;
+    battleMapPlanet.userData.solidRadius = config.size + 10;
+    battleMapPlanet.userData.atmosphereRadius = config.size + 42;
+    battleMapPlanet.userData.nearSurfaceRadius = config.size + 14;
+    battleMapPlanet.userData.crashRadius = config.size + 10;
+    scene.add(battleMapPlanet);
+
+    if(mapKey === 'saturn'){
+        const ringGeo = new THREE.RingGeometry(config.size * 1.35, config.size * 2.0, 96);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.65 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2.45;
+        battleMapPlanet.add(ring);
+    }
+
+    spawnPointA = new THREE.Vector3(-150, -10, 120);
+    spawnPointB = new THREE.Vector3(150, 12, -140);
+
+    camera.position.set(0, 18, 70);
+    camera.lookAt(0, 0, 0);
+
+    createBattleObstacles(mapKey);
+    updateBattleScoreboard();
+}
+
+var remoteBattleShips = new Map();
+var liveBattleSyncTimer = null;
+var liveBattlePresencePushTimer = null;
+var liveBattlePresenceChannel = null;
+var liveBattlePresenceChannelName = '';
+
+function clearRemoteBattleShips(){
+    if(!(remoteBattleShips instanceof Map)){
+        remoteBattleShips = new Map();
+        return;
+    }
+    remoteBattleShips.forEach(entry => {
+        if(entry?.mesh) scene.remove(entry.mesh);
+        if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
+    });
+    remoteBattleShips.clear();
+}
+
+function stopLiveBattleSync(){
+    if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
+        clearInterval(liveBattleSyncTimer);
+        liveBattleSyncTimer = null;
+    }
+    if(typeof liveBattlePresencePushTimer !== 'undefined' && liveBattlePresencePushTimer){
+        clearInterval(liveBattlePresencePushTimer);
+        liveBattlePresencePushTimer = null;
+    }
+    if(liveBattlePresenceChannel && window.supabaseClient){
+        try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+    }
+    liveBattlePresenceChannel = null;
+    liveBattlePresenceChannelName = '';
+    clearRemoteBattleShips();
+}
+
+function createRemotePilotLabel(name, team = 'blue'){
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(5,10,18,0.78)';
+    ctx.fillRect(0, 18, canvas.width, 50);
+    ctx.strokeStyle = getRemoteShipLabelColor(team);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(3, 18, canvas.width - 6, 50);
+    ctx.font = 'bold 42px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f3fbff';
+    ctx.fillText(String(name || 'Pilot'), canvas.width / 2, 43);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false
+    });
+
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(9.2, 1.7, 1);
+    sprite.position.set(0, 3.4, 0);
+    sprite.renderOrder = 1000;
+    sprite.center.set(0.5, 0.0);
+    return sprite;
+}
+
+function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
+    const shipGroup = new THREE.Group();
+    shipGroup.rotation.order = 'YXZ';
+
+    const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.0, 1.2, 7, 10),
+        new THREE.MeshStandardMaterial({ color: getBattleShipColorHex(team), metalness: 0.45, roughness: 0.32 })
+    );
+    body.rotation.z = Math.PI / 2;
+    shipGroup.add(body);
+
+    const cockpit = new THREE.Mesh(
+        new THREE.SphereGeometry(0.85, 18, 18),
+        new THREE.MeshStandardMaterial({ color: 0x9bd6ff, emissive: 0x113355, metalness: 0.15, roughness: 0.2 })
+    );
+    cockpit.position.set(1.2, 0.25, 0);
+    shipGroup.add(cockpit);
+
+    const wingGeo = new THREE.BoxGeometry(0.25, 3.1, 1.3);
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x3b6ea8, metalness: 0.4, roughness: 0.45 });
+    const wingTop = new THREE.Mesh(wingGeo, wingMat);
+    wingTop.position.set(-0.35, 1.7, 0);
+    const wingBottom = wingTop.clone();
+    wingBottom.position.y = -1.7;
+    shipGroup.add(wingTop, wingBottom);
+
+    const engineMat = new THREE.MeshBasicMaterial({ color: 0xffc66b });
+    const engine1 = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 10), engineMat);
+    engine1.position.set(-3.2, 0.55, 0);
+    const engine2 = engine1.clone();
+    engine2.position.y = -0.55;
+    shipGroup.add(engine1, engine2);
+
+    const labelSprite = createRemotePilotLabel(name, team);
+    shipGroup.add(labelSprite);
+
+    const side = slotIndex % 2 === 0 ? 1 : -1;
+    const rank = Math.floor(slotIndex / 2);
+    shipGroup.position.set(side * (70 + rank * 28), 8 + ((slotIndex % 3) - 1) * 6, -40 - rank * 26);
+    shipGroup.lookAt(new THREE.Vector3(0, 0, 0));
+
+    const targetPosition = shipGroup.position.clone();
+    const targetQuaternion = shipGroup.quaternion.clone();
+
+    shipGroup.userData = {
+        remote: true,
+        pilotName: String(name || 'Pilot'),
+        orbitSeed: Math.random() * Math.PI * 2,
+        slotIndex,
+        hp: 100,
+        maxHp: 100,
+        team
+    };
+    scene.add(shipGroup);
+    return {
+        mesh: shipGroup,
+        labelSprite,
+        targetPosition,
+        targetQuaternion,
+        lastSeenAt: Date.now(),
+        nickname: String(name || 'Pilot'),
+        level: 1,
+        ping: 0,
+        playerId: '',
+        team
+    };
+}
+
+function getLiveBattleChannelName(){
+    const roomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return '';
+    return `cosmic-battle-room:${roomId}`;
+}
+
+function upsertRemoteBattlePresence(payload = {}){
+    const entryId = String(payload.playerId || payload.player_id || payload.id || '').trim();
+    const myId = String(authState?.playerId || player?.id || '').trim();
+    if(!entryId || (myId && entryId === myId)) return;
+
+    const nickname = String(payload.nickname || payload.name || 'Pilot').trim() || 'Pilot';
+    const level = Math.max(1, Number(payload.level || 1) || 1);
+    const ping = Math.max(0, Number(payload.ping || 0) || 0);
+    const team = String(payload.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+
+    let entry = remoteBattleShips.get(entryId);
+    if(!entry){
+        entry = createRemoteBattleShipMesh(nickname, remoteBattleShips.size, team);
+        remoteBattleShips.set(entryId, entry);
+    }
+
+    entry.playerId = entryId;
+    entry.nickname = nickname;
+    entry.level = level;
+    entry.ping = ping;
+    entry.team = team;
+    entry.lastSeenAt = Date.now();
+
+    if(entry.mesh?.userData){
+        entry.mesh.userData.pilotName = nickname;
+        entry.mesh.userData.team = team;
+    }
+
+    tryApplyRemoteShipTeamVisual(entry);
+
+    const x = Number(payload.x);
+    const y = Number(payload.y);
+    const z = Number(payload.z);
+    if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+        entry.targetPosition.set(x, y, z);
+    }
+
+    const qx = Number(payload.qx);
+    const qy = Number(payload.qy);
+    const qz = Number(payload.qz);
+    const qw = Number(payload.qw);
+    if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
+        entry.targetQuaternion.set(qx, qy, qz, qw);
+    }
+
+    updateBattleScoreboard?.();
+}
+
+function ensureLiveBattlePresenceChannel(){
+    if(!window.supabaseClient) return;
+    const channelName = getLiveBattleChannelName();
+    if(!channelName) return;
+    if(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName) return;
+
+    if(liveBattlePresenceChannel){
+        try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+        liveBattlePresenceChannel = null;
+    }
+
+    liveBattlePresenceChannelName = channelName;
+    liveBattlePresenceChannel = window.supabaseClient.channel(channelName, {
+        config: { broadcast: { self: false, ack: false } }
+    });
+
+    liveBattlePresenceChannel
+        .on('broadcast', { event: 'pilot-state' }, ({ payload }) => {
+            upsertRemoteBattlePresence(payload || {});
+        })
+        .subscribe();
+}
+
+async function broadcastSelfBattleState(){
+    if(gameState !== 'BATTLE' || !playerShip || !liveBattlePresenceChannel) return;
+    const playerId = String(authState?.playerId || player?.id || '').trim();
+    if(!playerId) return;
+
+    try{
+        const payload = {
+            type: 'broadcast',
+            event: 'pilot-state',
+            payload: {
+                playerId,
+                nickname: player?.nickname || 'Commander',
+                level: Number(player?.level || 1) || 1,
+                team: getBattleRoomPlayerTeam(playerId),
+                ping: Number(getBattlePingValue() || 0),
+                x: Number(playerShip.position.x || 0),
+                y: Number(playerShip.position.y || 0),
+                z: Number(playerShip.position.z || 0),
+                qx: Number(playerShip.quaternion.x || 0),
+                qy: Number(playerShip.quaternion.y || 0),
+                qz: Number(playerShip.quaternion.z || 0),
+                qw: Number(playerShip.quaternion.w || 1)
+            }
+        };
+        if(typeof liveBattlePresenceChannel.httpSend === 'function'){
+            await liveBattlePresenceChannel.httpSend(payload);
+        }else{
+            await liveBattlePresenceChannel.send(payload);
+        }
+    }catch(_){}
+}
+
+function getObservedRoomId(targetMap = ''){
+    const directRoomId = sanitizeOnlineRoomId(selectedLobbyMap?.id || selectedLobbyMap?.roomId || currentRoom?.id || currentRoom?.roomId || null);
+    if(directRoomId) return directRoomId;
+
+    const normalizedMap = normalizeBattleMapName(targetMap || selectedLobbyMap?.real || currentRoom?.map || 'earth');
+    const publicRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find((room) => {
+        const roomMap = normalizeBattleMapName(room?.real || room?.map || room?.rawRoom?.map_name || '');
+        return roomMap === normalizedMap && isPublicBattleRoom(room?.rawRoom || room);
+    });
+
+    return sanitizeOnlineRoomId(publicRoom?.id || publicRoom?.roomId || null);
+}
+
+function buildObserveRoomState(targetMap = ''){
+    const normalizedMap = normalizeBattleMapName(targetMap || selectedLobbyMap?.real || currentRoom?.map || 'earth');
+    const roomId = getObservedRoomId(normalizedMap);
+    return {
+        id: roomId || null,
+        roomId: roomId || null,
+        map: normalizedMap,
+        real: normalizedMap,
+        observer: true,
+        state: 'observe',
+        currentPlayers: [],
+        players: [],
+        title: selectedLobbyMap?.title || currentRoom?.title || normalizedMap
+    };
+}
+
+async function fetchCurrentRoomLivePlayers(){
+    if(!window.supabaseClient || !currentRoom?.id) return [];
+    const roomId = String(currentRoom.id || currentRoom.roomId || '').trim();
+    if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return [];
+
+    const { data, error } = await window.supabaseClient
+        .from('room_players')
+        .select('player_id,nickname,joined_at,team,level,ping,position,rotation,updated_at')
+        .eq('room_id', roomId)
+        .order('joined_at', { ascending: true });
+
+    if(error){
+                return [];
+    }
+
+    return (data || [])
+        .filter(item => isFreshRoomPlayerRow(item))
+        .map((item, index) => ({
+        player_id: item.player_id ? String(item.player_id) : `guest_${index}`,
+        nickname: item.nickname || `Pilot ${index + 1}`,
+        joined_at: item.joined_at || null,
+        team: item.team || getBattleRoomPlayerTeam(item.player_id ? String(item.player_id) : `guest_${index}`),
+        level: Number(item.level || 1) || 1,
+        ping: Number(item.ping || 0) || 0,
+        position: item.position || null,
+        rotation: item.rotation || null,
+        updated_at: item.updated_at || item.joined_at || null
+    }));
+}
+
+async function syncLiveBattlePlayers(){
+    if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+
+    if(gameState === 'BATTLE' && playerShip){
+        ensureSelfRoomPlayerState();
+    }
+
+    const livePlayers = await fetchCurrentRoomLivePlayers();
+    const myId = getSelfBattlePlayerId();
+
+    const activeIds = new Set();
+    const visiblePlayers = [];
+
+    livePlayers.forEach(entry => {
+        const entryId = entry?.player_id ? String(entry.player_id) : '';
+        const isMe = !!(entryId && myId && entryId === myId);
+        const team = String(entry?.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+        const displayName = String(entry?.nickname || 'Pilot').trim() || 'Pilot';
+
+        if(entryId) activeIds.add(entryId);
+
+        if(isMe){
+            return;
+        }
+        if(!entryId) return;
+
+        let remoteState = remoteBattleShips.get(entryId);
+        if(!remoteState){
+            remoteState = createRemoteBattleShipMesh(displayName, remoteBattleShips.size, team);
+            remoteBattleShips.set(entryId, remoteState);
+        }
+
+        remoteState.nickname = displayName;
+        remoteState.level = Number(entry?.level || remoteState.level || 1) || 1;
+        remoteState.ping = Number(entry?.ping || remoteState.ping || 0) || 0;
+        remoteState.team = team;
+        remoteState.lastSeenAt = Date.now();
+
+        if(remoteState.mesh?.userData){
+            remoteState.mesh.userData.team = team;
+            remoteState.mesh.userData.pilotName = displayName;
+        }
+        tryApplyRemoteShipTeamVisual(remoteState);
+
+        const pos = entry?.position || {};
+        const x = Number(pos?.x);
+        const y = Number(pos?.y);
+        const z = Number(pos?.z);
+        if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+            remoteState.targetPosition.set(x, y, z);
+            if(remoteState.mesh && !remoteState.mesh.userData.hasInitialSync){
+                remoteState.mesh.position.copy(remoteState.targetPosition);
+                remoteState.mesh.userData.hasInitialSync = true;
+            }
+        }
+
+        const rot = entry?.rotation || {};
+        const qx = Number(rot?.x);
+        const qy = Number(rot?.y);
+        const qz = Number(rot?.z);
+        const qw = Number(rot?.w);
+        if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
+            remoteState.targetQuaternion.set(qx, qy, qz, qw);
+            if(remoteState.mesh && !remoteState.mesh.userData.hasInitialQuatSync){
+                remoteState.mesh.quaternion.copy(remoteState.targetQuaternion);
+                remoteState.mesh.userData.hasInitialQuatSync = true;
+            }
+        }
+
+        visiblePlayers.push({
+            nickname: displayName,
+            clan: team === 'red' ? 'RED' : 'BLUE',
+            level: Number(entry?.level || remoteState.level || 1) || 1,
+            deaths: Number(remoteState?.deaths || 0) || 0,
+            kills: Number(remoteState?.kills || 0) || 0,
+            id: entryId,
+            ping: Number(entry?.ping || remoteState?.ping || 0) || 0,
+            team
+        });
+    });
+
+    const expireBefore = Date.now() - 3500;
+    Array.from(remoteBattleShips.keys()).forEach(entryId => {
+        const item = remoteBattleShips.get(entryId);
+        const stale = !!item && Number(item.lastSeenAt || 0) < expireBefore;
+        if(!activeIds.has(String(entryId)) || stale){
+            removeRemoteBattleShipById(entryId);
+        }
+    });
+
+    const selfRow = gameState === 'OBSERVE'
+        ? null
+        : {
+            nickname: player?.nickname || 'Commander',
+            clan: getBattleRoomPlayerTeam(myId) === 'red' ? 'RED' : 'BLUE',
+            level: Number(player?.level || 1) || 1,
+            kills: Number(battleStats.playerKills || 0) || 0,
+            deaths: Number(battleStats.playerDeaths || 0) || 0,
+            id: myId,
+            ping: Number(getBattlePingValue() || 0) || 0,
+            team: getBattleRoomPlayerTeam(myId)
+        };
+
+    if(currentRoom){
+        const nextPlayers = [];
+        if(selfRow) nextPlayers.push(selfRow);
+        nextPlayers.push(...visiblePlayers);
+        currentRoom.currentPlayers = nextPlayers;
+        currentRoom.players = [...nextPlayers];
+    }
+
+    updateBattleScoreboard();
+}
+
+
+function removeRemoteBattleShipById(entryId){
+    const key = String(entryId || '').trim();
+    if(!key || !remoteBattleShips.has(key)) return;
+    const old = remoteBattleShips.get(key);
+    if(old?.mesh){
+        scene.remove(old.mesh);
+        old.mesh.traverse?.((child) => {
+            if(child?.geometry) child.geometry.dispose?.();
+            if(child?.material){
+                if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+                else child.material.dispose?.();
+            }
+        });
+    }
+    remoteBattleShips.delete(key);
+}
+
+function startLiveBattleSync(){
+    stopLiveBattleSync();
+    ensureLiveBattlePresenceChannel();
+    syncLiveBattlePlayers();
+    broadcastSelfBattleState();
+    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 250);
+    liveBattlePresencePushTimer = setInterval(() => {
+        broadcastSelfBattleState();
+    }, 90);
+}
+
+function animateRemoteBattleShips(){
+    if(!remoteBattleShips.size) return;
+    remoteBattleShips.forEach((entry) => {
+        const mesh = entry?.mesh;
+        if(!mesh) return;
+
+        if(entry.targetPosition){
+            mesh.position.lerp(entry.targetPosition, 0.16);
+        }
+        if(entry.targetQuaternion){
+            mesh.quaternion.slerp(entry.targetQuaternion, 0.18);
+        }
+
+        if(entry.labelSprite){
+            entry.labelSprite.position.set(0, 3.4, 0);
+        }
+    });
+}
+
+function createEnemyBot(){
+    if(enemyBot){
+        scene.remove(enemyBot);
+        enemyBot = null;
+    }
+    updateEnemyHud();
+    updateBattleScoreboard();
+}
+
+function updateEnemyHud(){
+    const hud = document.getElementById('enemy-hud');
+    const name = document.getElementById('enemy-name');
+    const hpBar = document.getElementById('enemy-hp-bar');
+    const hpText = document.getElementById('enemy-hp-text');
+    if(!hud || !name || !hpBar || !hpText) return;
+
+    if(!enemyBot){
+        hud.style.display = 'none';
+        return;
+    }
+
+    hud.style.display = 'block';
+    const hp = Math.max(0, enemyBot.userData.hp);
+    const maxHp = Math.max(1, enemyBot.userData.maxHp);
+    const percent = (hp / maxHp) * 100;
+    name.textContent = enemyBot.userData.name || 'BOT DRONE';
+    hpBar.style.width = percent + '%';
+    hpText.textContent = hp + ' / ' + maxHp;
+}
+
+function fireBotLaser(){
+    if(!enemyBot || !playerShip) return;
+    const laserGeometry = new THREE.BoxGeometry(0.14, 0.14, 2.0);
+    const laserMaterial = new THREE.MeshBasicMaterial({ color: 0x55d7ff });
+    const toPlayer = playerShip.position.clone().sub(enemyBot.position).normalize();
+
+    [-0.7, 0.7].forEach(offsetX => {
+        const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
+        const localOffset = new THREE.Vector3(offsetX, 0, -1.8).applyQuaternion(enemyBot.quaternion);
+        laserMesh.position.copy(enemyBot.position.clone().add(localOffset));
+        laserMesh.lookAt(enemyBot.position.clone().add(toPlayer));
+        scene.add(laserMesh);
+        enemyLasers.push({
+            mesh: laserMesh,
+            velocity: toPlayer.clone().multiplyScalar(1.9),
+            life: 100,
+            damage: 8
+        });
+    });
+}
+
+function updateBattleScoreboard(){
+    const body = document.getElementById('battle-scoreboard-body');
+    if(!body) return;
+
+    const myId = getSelfBattlePlayerId();
+    const selfTeam = getBattleRoomPlayerTeam(myId);
+    const selfRow = (gameState === 'OBSERVE') ? null : {
+        nickname: player?.nickname || 'Commander',
+        clan: '',
+        level: Number(player?.level || 1) || 1,
+        kills: Number(battleStats.playerKills || 0) || 0,
+        deaths: Number(battleStats.playerDeaths || 0) || 0,
+        id: myId,
+        ping: Number(getBattlePingValue() || 0) || 0,
+        team: selfTeam
+    };
+
+    const roomPlayers = Array.isArray(currentRoom?.currentPlayers) && currentRoom.currentPlayers.length
+        ? currentRoom.currentPlayers
+        : (Array.isArray(currentRoom?.players) ? currentRoom.players : []);
+
+    const rows = [];
+    if(selfRow) rows.push(selfRow);
+
+    roomPlayers.forEach((entry) => {
+        const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
+        const safeName = String(entry?.nickname || entry?.name || entry || '').trim();
+        const isYou = (!!entryId && !!myId && entryId === myId) || safeName === (player?.nickname || 'Commander');
+        if(isYou) return;
+
+        const team = String(entry?.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+        const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
+        rows.push({
+            nickname: remoteState?.nickname || safeName || 'Pilot',
+            clan: '',
+            level: Number(entry?.level || remoteState?.level || 1) || 1,
+            kills: Number(entry?.kills || 0) || 0,
+            deaths: Number(entry?.deaths || 0) || 0,
+            id: entryId,
+            ping: Number(entry?.ping || remoteState?.ping || 0) || 0,
+            team
+        });
+    });
+
+    if(gameState === 'OBSERVE' && !rows.length){
+      body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span><span>—</span></div>';
+      return;
+    }
+
+    body.innerHTML = rows.map((entry) => {
+      const safeName = String(entry?.nickname || 'Pilot');
+      const entryId = String(entry?.id || '').trim();
+      const isYou = !!(myId && entryId && myId === entryId) || safeName === (player?.nickname || 'Commander');
+      const team = String(entry?.team || (isYou ? selfTeam : getBattleRoomPlayerTeam(entryId))).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+      const kills = Math.max(0, Number(isYou ? battleStats.playerKills : entry?.kills) || 0);
+      const deaths = Math.max(0, Number(isYou ? battleStats.playerDeaths : entry?.deaths) || 0);
+      const levelValue = Math.max(1, Number(isYou ? player?.level : entry?.level) || 1);
+      const publicId = isYou ? (myId || '—') : (entryId || '—');
+      const pingValueRaw = Number(isYou ? getBattlePingValue() : entry?.ping || 0);
+      const pingValue = Number.isFinite(pingValueRaw) && pingValueRaw > 0 ? Math.round(pingValueRaw) : '—';
+      const nickColor = team === 'red' ? '#ff8f8f' : '#8fd8ff';
+      return `
+      <div class="battle-scoreboard-row ${team === 'red' ? 'enemy' : 'player'}">
+        <span></span>
+        <span title="${safeName}" style="color:${nickColor};font-weight:700;">${safeName}</span>
+        <span>${kills}</span>
+        <span>${deaths}</span>
+        <span class="battle-level-cell"><span class="battle-level-icon">★</span>${levelValue}</span>
+        <span>${publicId}</span>
+        <span>${pingValue}</span>
+      </div>`;
+    }).join('');
+}
+
+// ================= SPAWN PLAYER =================
+
+function spawnPlayer() {
+
+    if (playerShip) {
+        scene.remove(playerShip);
+        playerShip = null;
+    }
+
+    shipVelocity.set(0, 0, 0);
+    activeLasers.forEach(laser => scene.remove(laser.mesh));
+    activeLasers = [];
+
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+
+    const shipGroup = createHangarShipMesh(currentBattleShipStats.ship || getSelectedShipItem() || { art:'classic' });
+    shipGroup.rotation.order = 'YXZ';
+    shipGroup.scale.multiplyScalar(0.52);
+
+    const selfTeam = getBattleRoomPlayerTeam(getSelfBattlePlayerId());
     const spawn = selfTeam === 'red' ? spawnPointB.clone() : spawnPointA.clone();
     const lookTarget = selfTeam === 'red' ? spawnPointA.clone() : spawnPointB.clone();
+    const hullColor = getBattleShipColorHex(selfTeam);
 
+    shipGroup.traverse?.((child) => {
+        if(child?.isMesh && child.material){
+            if(child.material.color){
+                try{ child.material.color.lerp(new THREE.Color(hullColor), 0.35); }catch(_){ }
+            }
+            if(child.material.emissive && child.material.emissive.isColor){
+                try{ child.material.emissive = new THREE.Color(hullColor).multiplyScalar(0.08); }catch(_){ }
+            }
+        }
+    });
+
+    playerShip = shipGroup;
     playerShip.position.copy(spawn);
     playerShip.visible = true;
     playerShip.lookAt(lookTarget);
+    playerShip.userData = {
+        hp: currentBattleShipStats.hp,
+        weapon: currentBattleShipStats.ship?.weapon || 'laser',
+        speed: currentBattleShipStats.maxSpeed,
+        modules: currentBattleShipStats.installedModules
+    };
 
     playerControl.yaw = playerShip.rotation.y;
     playerControl.pitch = 0;
     playerControl.roll = 0;
 
+    playerMaxHp = currentBattleShipStats.hp;
+    playerHp = playerMaxHp;
+    battleWeapon.damage = currentBattleShipStats.weaponDamage;
+    battleWeapon.clipSize = currentBattleShipStats.clipSize;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
+    battleWeapon.reloadTime = currentBattleShipStats.reloadTime;
     battleWeapon.isReloading = false;
     battleWeapon.reloadEndsAt = 0;
-    playerHp = playerMaxHp;
+
     scene.add(playerShip);
     camera.lookAt(playerShip.position);
     updateBattlePlayerHud();
@@ -7032,6 +10404,178 @@ function getAllHangarModules(){
     }
 }
 
+function getModuleById(moduleId){
+    const safeId = String(moduleId || '').trim();
+    return getAllHangarModules().find(item => String(item?.id || '').trim() === safeId) || null;
+}
+
+function ensureModuleOwnershipDefaults(){
+    try{
+        if(!player || typeof player !== 'object') return;
+        const allModules = getAllHangarModules();
+        if(!Array.isArray(player.ownedModuleIds)) player.ownedModuleIds = [];
+        if(!player.ownedModuleIds.length && allModules.length){
+            player.ownedModuleIds = allModules.map(item => item.id);
+        }
+        player.ownedModuleIds = Array.from(new Set(
+            player.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean)
+        ));
+        if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object'){
+            player.activeModulesByShip = {};
+        }
+    }catch(_){ }
+}
+
+function isOwnedModule(moduleId){
+    ensureModuleOwnershipDefaults();
+    const safeId = String(moduleId || '').trim();
+    return !!safeId && Array.isArray(player?.ownedModuleIds) && player.ownedModuleIds.includes(safeId);
+}
+
+function getOwnedHangarModules(){
+    ensureModuleOwnershipDefaults();
+    const modules = getOwnedHangarModules();
+    if(!modules.length) return [];
+    const owned = modules.filter(item => isOwnedModule(item.id));
+    return owned.length ? owned : modules;
+}
+
+function getInstalledModulesForShip(shipId){
+    ensureModuleOwnershipDefaults();
+    const safeShipId = String(shipId || player?.selectedShipId || '').trim();
+    const raw = safeShipId ? player?.activeModulesByShip?.[safeShipId] : null;
+    if(!raw || typeof raw !== 'object') return [];
+    return Object.values(raw).map(moduleId => getModuleById(moduleId)).filter(Boolean);
+}
+
+function getInstalledModuleForType(shipId, typeId){
+    const safeShipId = String(shipId || player?.selectedShipId || '').trim();
+    const safeTypeId = String(typeId || '').trim();
+    if(!safeShipId || !safeTypeId) return null;
+    return getModuleById(player?.activeModulesByShip?.[safeShipId]?.[safeTypeId] || '');
+}
+
+function toggleShipModule(moduleId, shipId){
+    ensureModuleOwnershipDefaults();
+    const safeShipId = String(shipId || player?.selectedShipId || '').trim();
+    const module = getModuleById(moduleId);
+    if(!safeShipId || !module || !isOwnedModule(module.id)) return false;
+    const typeId = String(module.typeId || module.classId || '').trim();
+    if(!typeId) return false;
+    if(!player.activeModulesByShip[safeShipId] || typeof player.activeModulesByShip[safeShipId] !== 'object'){
+        player.activeModulesByShip[safeShipId] = {};
+    }
+    const current = String(player.activeModulesByShip[safeShipId][typeId] || '').trim();
+    if(current === module.id){
+        delete player.activeModulesByShip[safeShipId][typeId];
+    }else{
+        player.activeModulesByShip[safeShipId][typeId] = module.id;
+    }
+    try{ saveGame?.(); }catch(_){ }
+    return true;
+}
+
+function getShipStatNumber(ship, label, fallback){
+    const stats = Array.isArray(ship?.stats) ? ship.stats : [];
+    const found = stats.find(([key]) => String(key || '').trim().toLowerCase() === String(label || '').trim().toLowerCase());
+    if(!found) return Number(fallback || 0) || 0;
+    const raw = String(found[1] || '').replace(',', '.');
+    const match = raw.match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : (Number(fallback || 0) || 0);
+}
+
+function getSelectedShipItem(){
+    const ships = getOwnedHangarShips();
+    return ships.find(item => String(item?.id || '') === String(player?.selectedShipId || '')) || ships[0] || null;
+}
+
+function computeShipBattleStats(shipId){
+    const safeShipId = String(shipId || player?.selectedShipId || '').trim();
+    const ship = getShopShipById(safeShipId) || getSelectedShipItem();
+    const installedModules = getInstalledModulesForShip(safeShipId);
+
+    const stats = {
+        ship,
+        installedModules,
+        speed: getShipStatNumber(ship, 'Скорость', 6.5),
+        armor: getShipStatNumber(ship, 'Броня', 6.0),
+        damage: getShipStatNumber(ship, 'Урон', 6.2),
+        energy: getShipStatNumber(ship, 'Энергия', 6.5),
+        maxSpeed: 4.2,
+        forwardAcceleration: 0.14,
+        backwardAcceleration: 0.07,
+        strafeAcceleration: 0.045,
+        damping: 0.985,
+        hp: 100,
+        weaponDamage: 12,
+        clipSize: 50,
+        reloadTime: 1800,
+        laserVelocity: 3.2,
+        laserScale: 1.0,
+        moduleSummary: []
+    };
+
+    const speedFactor = THREE.MathUtils.clamp(stats.speed / 7.0, 0.72, 1.55);
+    const armorFactor = THREE.MathUtils.clamp(stats.armor / 6.0, 0.72, 1.7);
+    const damageFactor = THREE.MathUtils.clamp(stats.damage / 6.0, 0.72, 1.7);
+    const energyFactor = THREE.MathUtils.clamp(stats.energy / 7.0, 0.72, 1.9);
+
+    stats.maxSpeed = 3.5 + speedFactor * 0.95;
+    stats.forwardAcceleration = 0.095 + speedFactor * 0.034;
+    stats.backwardAcceleration = 0.048 + speedFactor * 0.018;
+    stats.strafeAcceleration = 0.028 + speedFactor * 0.013;
+    stats.damping = 0.979 + Math.min(0.012, speedFactor * 0.0032);
+    stats.hp = Math.round(78 + armorFactor * 21);
+    stats.weaponDamage = Math.round(7 + damageFactor * 1.7);
+    stats.clipSize = Math.round(32 + energyFactor * 4.2);
+    stats.reloadTime = Math.max(900, Math.round(2100 - energyFactor * 140));
+    stats.laserVelocity = 2.7 + energyFactor * 0.1;
+
+    installedModules.forEach(module => {
+        const typeId = String(module?.typeId || module?.classId || '').trim();
+        if(typeId === 'engine'){
+            stats.maxSpeed *= 1.12;
+            stats.forwardAcceleration *= 1.15;
+            stats.strafeAcceleration *= 1.12;
+            stats.moduleSummary.push('+скорость');
+        }else if(typeId === 'defense'){
+            stats.hp *= 1.18;
+            stats.damping += 0.002;
+            stats.moduleSummary.push('+броня');
+        }else if(typeId === 'reactor'){
+            stats.clipSize += 8;
+            stats.reloadTime *= 0.82;
+            stats.laserVelocity += 0.28;
+            stats.moduleSummary.push('+энергия');
+        }else if(typeId === 'targeting'){
+            stats.laserVelocity += 0.55;
+            stats.laserScale += 0.22;
+            stats.weaponDamage += 1;
+            stats.moduleSummary.push('+точность');
+        }else if(typeId === 'weapon'){
+            stats.weaponDamage *= 1.14;
+            stats.laserScale += 0.1;
+            stats.moduleSummary.push('+урон');
+        }
+    });
+
+    stats.maxSpeed = Number(stats.maxSpeed.toFixed(2));
+    stats.forwardAcceleration = Number(stats.forwardAcceleration.toFixed(3));
+    stats.backwardAcceleration = Number(stats.backwardAcceleration.toFixed(3));
+    stats.strafeAcceleration = Number(stats.strafeAcceleration.toFixed(3));
+    stats.damping = Number(Math.min(0.994, stats.damping).toFixed(3));
+    stats.hp = Math.max(80, Math.round(stats.hp));
+    stats.weaponDamage = Math.max(8, Math.round(stats.weaponDamage));
+    stats.clipSize = Math.max(24, Math.round(stats.clipSize));
+    stats.reloadTime = Math.max(850, Math.round(stats.reloadTime));
+    stats.laserVelocity = Number(stats.laserVelocity.toFixed(2));
+    stats.laserScale = Number(stats.laserScale.toFixed(2));
+
+    return stats;
+}
+
+let currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+
 function getOwnedHangarShips(){
     if(Array.isArray(player?.ownedShipIds) && player.ownedShipIds.length && typeof getShopShipById === 'function'){
         const owned = player.ownedShipIds
@@ -7064,7 +10608,7 @@ function getOwnedHangarShips(){
 
 function ensureHangarIndexes(){
     const ships = getOwnedHangarShips();
-    const modules = getAllHangarModules();
+    const modules = getOwnedHangarModules();
     if(hangarState.shipIndex >= ships.length) hangarState.shipIndex = Math.max(0, ships.length - 1);
     if(hangarState.moduleIndex >= modules.length) hangarState.moduleIndex = Math.max(0, modules.length - 1);
     if(hangarState.shipIndex < 0) hangarState.shipIndex = 0;
@@ -7110,61 +10654,138 @@ function createHangarShipMesh(item){
 
     const group = new THREE.Group();
     const hullColor = new THREE.Color(accent);
-    const metal = new THREE.MeshStandardMaterial({ color:hullColor, metalness:0.72, roughness:0.32 });
+    const metal = new THREE.MeshStandardMaterial({ color:hullColor, metalness:0.74, roughness:0.3 });
+    const darkMetal = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent).multiplyScalar(0.55), metalness:0.78, roughness:0.45 });
     const lightMetal = new THREE.MeshStandardMaterial({ color:0xdbeeff, metalness:0.35, roughness:0.24 });
     const glowMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(neon) });
     const engineMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(engine) });
 
-    const body = new THREE.Mesh(new THREE.ConeGeometry(1.15, 5.2, 8), metal);
-    body.rotation.x = -Math.PI / 2;
-    group.add(body);
+    const addEnginePair = (x=0.65, y=-0.05, z=2.9, sizeX=0.26, sizeY=0.28, sizeZ=1.0) => {
+        const engineL = new THREE.Mesh(new THREE.BoxGeometry(sizeX, sizeY, sizeZ), engineMat);
+        engineL.position.set(-x, y, z);
+        const engineR = engineL.clone();
+        engineR.position.x = x;
+        group.add(engineL, engineR);
+    };
 
-    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 18), lightMetal);
-    cockpit.position.set(0, 0.4, -0.55);
-    group.add(cockpit);
+    if(art === 'vector'){
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.18, 5.6, 8), metal);
+        body.rotation.x = -Math.PI / 2;
+        group.add(body);
 
-    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 2.7), lightMetal);
-    spine.position.set(0, 0.18, 0.55);
-    group.add(spine);
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.82, 1.95, 8), lightMetal);
+        nose.rotation.x = -Math.PI / 2;
+        nose.position.z = -3.62;
+        group.add(nose);
 
-    const wingMat = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent), metalness:0.64, roughness:0.38 });
-    if(['classic','arrow','dart','lancer','stinger','razor'].includes(art)){
-        const wing = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.16, 1.05), wingMat);
+        const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.16, 2.45), darkMetal);
+        wingL.position.set(-1.55, -0.12, 0.2);
+        wingL.rotation.z = -0.26;
+        const wingR = wingL.clone();
+        wingR.position.x = 1.55;
+        wingR.rotation.z = 0.26;
+        group.add(wingL, wingR);
+
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24, 4.9), glowMat);
+        rail.position.set(0, 0.28, -0.15);
+        group.add(rail);
+        addEnginePair(0.78, -0.04, 3.15, 0.3, 0.28, 1.1);
+    }else if(art === 'halo'){
+        const body = new THREE.Mesh(new THREE.OctahedronGeometry(1.55, 0), metal);
+        body.scale.set(1.25, 0.7, 2.45);
+        group.add(body);
+
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.72, 18, 18), glowMat);
+        core.position.y = 0.2;
+        group.add(core);
+
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.12, 18, 54), new THREE.MeshBasicMaterial({ color:new THREE.Color(accent) }));
+        ring.rotation.x = Math.PI / 2;
+        ring.rotation.z = 0.42;
+        group.add(ring);
+
+        const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.64, 2.8, 8), darkMetal);
+        tail.rotation.x = -Math.PI / 2;
+        tail.position.z = 2.1;
+        group.add(tail);
+        addEnginePair(0.58, 0.02, 3.35, 0.22, 0.22, 1.05);
+    }else if(art === 'helios'){
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.22, 5.4, 6), metal);
+        body.rotation.x = -Math.PI / 2;
+        group.add(body);
+
+        const prism = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.72, 2.4), lightMetal);
+        prism.position.set(0, 0.18, -0.65);
+        prism.rotation.z = 0.22;
+        group.add(prism);
+
+        const solarL = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.08, 1.35), darkMetal);
+        solarL.position.set(-2.15, 0.0, 0.42);
+        solarL.rotation.z = -0.12;
+        const solarR = solarL.clone();
+        solarR.position.x = 2.15;
+        solarR.rotation.z = 0.12;
+        group.add(solarL, solarR);
+
+        const glowStripL = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.04, 0.14), glowMat);
+        glowStripL.position.copy(solarL.position).add(new THREE.Vector3(0, 0.05, 0));
+        const glowStripR = glowStripL.clone();
+        glowStripR.position.copy(solarR.position).add(new THREE.Vector3(0, 0.05, 0));
+        group.add(glowStripL, glowStripR);
+        addEnginePair(0.72, -0.04, 3.05, 0.28, 0.24, 1.0);
+    }else if(art === 'citadel'){
+        const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.92, 4.7), metal);
+        group.add(body);
+
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.78, 1.8), lightMetal);
+        tower.position.set(0, 0.68, -0.35);
+        group.add(tower);
+
+        const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.2, 2.1), darkMetal);
+        wingL.position.set(-1.95, -0.08, 0.45);
+        const wingR = wingL.clone();
+        wingR.position.x = 1.95;
+        group.add(wingL, wingR);
+
+        const shieldArc = new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.16, 18, 44, Math.PI), glowMat);
+        shieldArc.position.set(0, 0.25, -1.95);
+        shieldArc.rotation.z = Math.PI;
+        group.add(shieldArc);
+        addEnginePair(0.95, -0.06, 2.95, 0.34, 0.28, 1.15);
+    }else{
+        const body = new THREE.Mesh(new THREE.ConeGeometry(1.15, 5.2, 8), metal);
+        body.rotation.x = -Math.PI / 2;
+        group.add(body);
+
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 18), lightMetal);
+        cockpit.position.set(0, 0.4, -0.55);
+        group.add(cockpit);
+
+        const spine = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 2.7), lightMetal);
+        spine.position.set(0, 0.18, 0.55);
+        group.add(spine);
+
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.16, 1.05), darkMetal);
         wing.position.set(0, -0.05, 0.25);
         group.add(wing);
-        const finL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 1.3), wingMat);
+        const finL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 1.3), darkMetal);
         finL.position.set(-1.48, 0.22, 0.55);
         const finR = finL.clone();
         finR.position.x = 1.48;
         group.add(finL, finR);
-    } else {
-        const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.2, 1.25), wingMat);
-        wingL.position.set(-1.15, -0.02, 0.32);
-        const wingR = wingL.clone();
-        wingR.position.x = 1.15;
-        group.add(wingL, wingR);
-        const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 2.1, 16), lightMetal);
-        shield.rotation.z = Math.PI / 2;
-        shield.position.set(0, 0.2, 0.95);
-        group.add(shield);
+        addEnginePair(0.48, -0.02, 2.8, 0.24, 0.24, 0.9);
     }
 
     const noseGlow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), glowMat);
-    noseGlow.position.set(0, 0.12, -2.75);
+    noseGlow.position.set(0, 0.12, -3.15);
     group.add(noseGlow);
-
-    const engineL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.9), engineMat);
-    engineL.position.set(-0.48, -0.02, 2.52);
-    const engineR = engineL.clone();
-    engineR.position.x = 0.48;
-    group.add(engineL, engineR);
 
     const glowTrail = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.38, 1.15, 14), engineMat);
     glowTrail.rotation.x = Math.PI / 2;
-    glowTrail.position.set(0, 0, 3.05);
+    glowTrail.position.set(0, 0, 3.55);
     group.add(glowTrail);
 
-    group.scale.setScalar(1.34);
+    group.scale.setScalar(1.28);
     return group;
 }
 
@@ -7175,31 +10796,52 @@ function createHangarModuleMesh(item){
 
     const group = new THREE.Group();
     const shell = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent), metalness:0.58, roughness:0.34 });
+    const darkShell = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent).multiplyScalar(0.62), metalness:0.72, roughness:0.42 });
     const glow = new THREE.MeshBasicMaterial({ color:new THREE.Color(neon) });
 
     if(art.includes('shield')){
-        const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), shell);
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.14, 18, 44), glow);
-        ring.rotation.x = Math.PI / 2;
-        group.add(core, ring);
-    } else if(art.includes('reactor') || art.includes('plasma')){
-        const core = new THREE.Mesh(new THREE.SphereGeometry(0.86, 18, 18), glow);
-        const shellRing = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.18, 16, 40), shell);
-        shellRing.rotation.x = Math.PI / 2;
-        group.add(core, shellRing);
-    } else if(art.includes('matrix') || art.includes('phase')){
-        const cube = new THREE.Mesh(new THREE.BoxGeometry(1.55, 1.55, 1.55), shell);
-        const core = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 16), glow);
-        group.add(cube, core);
+        const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.8, 0), shell);
+        const ringA = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.12, 18, 44), glow);
+        ringA.rotation.x = Math.PI / 2;
+        const ringB = ringA.clone();
+        ringB.rotation.y = Math.PI / 2;
+        const braces = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.2, 0.16), darkShell);
+        const braces2 = braces.clone(); braces2.rotation.z = Math.PI / 2;
+        group.add(core, ringA, ringB, braces, braces2);
+    } else if(art.includes('reactor')){
+        const shellOuter = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 1.8, 18, 1, true), shell);
+        shellOuter.rotation.z = Math.PI / 2;
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.52, 16, 16), glow);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.16, 16, 38), darkShell);
+        ring.rotation.y = Math.PI / 2;
+        group.add(shellOuter, core, ring);
+    } else if(art.includes('matrix')){
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.35, 1.35), shell);
+        cube.rotation.set(0.4, 0.6, 0.2);
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 16), glow);
+        const frame = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.08, 12, 28), darkShell);
+        frame.rotation.x = Math.PI / 2;
+        const frame2 = frame.clone(); frame2.rotation.y = Math.PI / 2;
+        group.add(cube, core, frame, frame2);
+    } else if(art.includes('plasma')){
+        const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.8, 2.2, 14), shell);
+        pod.rotation.z = Math.PI / 2;
+        const fins = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.6, 0.5), darkShell);
+        const fins2 = fins.clone(); fins2.rotation.z = Math.PI / 2;
+        const plasma = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.32, 1.65, 14), glow);
+        plasma.rotation.z = Math.PI / 2;
+        group.add(pod, fins, fins2, plasma);
     } else {
         const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.9, 2.0, 16), shell);
         pod.rotation.z = Math.PI / 2;
         const glowStrip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.3, 0.14), glow);
         glowStrip.position.set(0, 0, 0.78);
-        group.add(pod, glowStrip);
+        const brace = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.08, 16, 28), darkShell);
+        brace.rotation.y = Math.PI / 2;
+        group.add(pod, glowStrip, brace);
     }
 
-    group.scale.setScalar(1.22);
+    group.scale.setScalar(1.28);
     return group;
 }
 
@@ -7232,7 +10874,7 @@ function updateHangarHeaderNumbers(){
 
 function updateHangarButtons(){
     const ships = getOwnedHangarShips();
-    const modules = getAllHangarModules();
+    const modules = getOwnedHangarModules();
 
     const leftBtn = document.getElementById('hangar-ship-left');
     const rightBtn = document.getElementById('hangar-ship-right');
@@ -7260,7 +10902,7 @@ function updateHangarButtons(){
 
 function fillHangarText(){
     const ships = getOwnedHangarShips();
-    const modules = getAllHangarModules();
+    const modules = getOwnedHangarModules();
     const ship = ships[hangarState.shipIndex] || null;
     const module = modules[hangarState.moduleIndex] || null;
     hangarState.shipItem = ship;
@@ -7271,6 +10913,10 @@ function fillHangarText(){
         if(el) el.textContent = value || '—';
     };
 
+    const battleStatsView = computeShipBattleStats(ship?.id || player?.selectedShipId || '');
+    const installedModules = getInstalledModulesForShip(ship?.id || player?.selectedShipId || '');
+    const moduleInstalled = !!(ship && module && getInstalledModuleForType(ship.id, module.typeId));
+
     setText('hangar-ship-tier', ship?.tier || '—');
     setText('hangar-ship-name', ship?.name || 'Нет кораблей');
     setText('hangar-ship-subtitle', ship?.subtitle || 'Покупай корабли в магазине, они появятся здесь');
@@ -7280,13 +10926,29 @@ function fillHangarText(){
 
     setText('hangar-module-name', module?.name || 'Нет модулей');
     setText('hangar-module-tier', module?.tier || '—');
-    setText('hangar-module-type', module?.typeId ? `Тип: ${module.typeId}` : '—');
+    setText('hangar-module-type', module?.badge ? `${module.badge}${moduleInstalled ? ' • установлен' : ''}` : '—');
     setText('hangar-module-desc', module?.description || 'Модули из магазина будут видны здесь и доступны для просмотра.');
+
+    const moduleBtn = document.getElementById('hangar-module-action');
+    if(moduleBtn){
+        moduleBtn.disabled = !ship || !module;
+        moduleBtn.textContent = moduleInstalled ? 'Снять модуль' : 'Установить модуль';
+        moduleBtn.classList.toggle('equipped', moduleInstalled);
+        moduleBtn.classList.toggle('locked', !ship || !module);
+    }
 
     const statsWrap = document.getElementById('hangar-ship-stats');
     if(statsWrap){
-        const stats = Array.isArray(ship?.stats) ? ship.stats : [];
-        statsWrap.innerHTML = stats.slice(0, 6).map(([key, value]) => `
+        const extraModules = installedModules.length ? installedModules.map(item => item.name).join(', ') : 'Нет';
+        const stats = [
+            ['Скорость', battleStatsView.maxSpeed.toFixed(2)],
+            ['Броня', battleStatsView.hp],
+            ['Урон', battleStatsView.weaponDamage],
+            ['Энергия', battleStatsView.clipSize],
+            ['Перезарядка', `${(battleStatsView.reloadTime / 1000).toFixed(1)}с`],
+            ['Модули', extraModules]
+        ];
+        statsWrap.innerHTML = stats.map(([key, value]) => `
             <div class="hangar-stat-box">
               <div class="hangar-stat-label">${key}</div>
               <div class="hangar-stat-value">${value}</div>
@@ -7311,13 +10973,13 @@ function rebuildHangarSceneObjects(){
 
     if(currentShip){
         const shipMesh = createHangarShipMesh(currentShip);
-        shipMesh.position.set(0, 2.3, 0);
+        shipMesh.position.set(0, 3.35, 0.1);
         hangarState.shipPivot.add(shipMesh);
     }
 
     if(currentModule){
         const moduleMesh = createHangarModuleMesh(currentModule);
-        moduleMesh.position.set(-6.8, 3.2, 0.25);
+        moduleMesh.position.set(-6.9, 3.9, 0.25);
         hangarState.modulePivot.add(moduleMesh);
     }
 
@@ -7336,7 +10998,7 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
-        hangarState.camera.position.set(0, 5.2, 20);
+        hangarState.camera.position.set(0, 6.5, 18.5);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -7442,9 +11104,21 @@ function bindHangarControls(){
     });
 
     bindOnce('hangar-module-down', () => {
-        const modules = getAllHangarModules();
+        const modules = getOwnedHangarModules();
         hangarState.moduleIndex = Math.min(Math.max(0, modules.length - 1), hangarState.moduleIndex + 1);
         rebuildHangarSceneObjects();
+    });
+
+    bindOnce('hangar-module-action', () => {
+        const ships = getOwnedHangarShips();
+        const modules = getOwnedHangarModules();
+        const currentShip = ships[hangarState.shipIndex];
+        const currentModule = modules[hangarState.moduleIndex];
+        if(!currentShip || !currentModule) return;
+        if(toggleShipModule(currentModule.id, currentShip.id)){
+            currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || currentShip.id);
+            fillHangarText();
+        }
     });
 
     bindOnce('hangar-ship-action', () => {
@@ -8725,18 +12399,49 @@ function isOwnedShip(itemOrId){
     return !!shipId && player.ownedShipIds.includes(shipId);
 }
 
+function buyModuleFromShop(moduleId){
+    ensureModuleOwnershipDefaults();
+    const module = getModuleById(moduleId);
+    if(!module) return false;
+
+    if(!isOwnedModule(module.id)){
+        const modulePrice = Math.max(0, Number(module.price || 0) || 0);
+        const coins = Number(playerResources.coins || player.credits || 0) || 0;
+        if(coins < modulePrice){
+            alert(`Недостаточно монет для покупки модуля: нужно ${modulePrice}.`);
+            return false;
+        }
+        playerResources.coins = coins - modulePrice;
+        player.credits = playerResources.coins;
+        player.ownedModuleIds.push(module.id);
+        player.ownedModuleIds = Array.from(new Set(player.ownedModuleIds));
+    }
+
+    toggleShipModule(module.id, player.selectedShipId || '');
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    updatePremiumAccountInfo?.();
+    updateHUD?.();
+    updateUI?.();
+    saveGame?.();
+    renderShopScreen?.();
+    renderHangarCosmic?.();
+    return true;
+}
+
 function refreshOwnedShipsInventoryFull(){
     ensureShopOwnershipDefaults();
+    ensureModuleOwnershipDefaults();
     const ids = Array.isArray(player.ownedShipIds) ? player.ownedShipIds : ['scout_1'];
     player.ships = ids.map(id => {
         const item = getShopShipById(id);
+        const stats = computeShipBattleStats(id);
         return {
             id,
             name: item?.name || id,
             level: Math.max(1, Number(player.level || 1) || 1),
-            hp: 100,
-            attack: 10,
-            speed: 5
+            hp: stats.hp,
+            attack: stats.weaponDamage,
+            speed: stats.maxSpeed
         };
     });
 }
@@ -8746,6 +12451,7 @@ function equipOwnedShip(shipId){
     const safeId = String(shipId || '').trim();
     if(!safeId || !isOwnedShip(safeId)) return false;
     player.selectedShipId = safeId;
+    currentBattleShipStats = computeShipBattleStats(safeId);
     refreshOwnedShipsInventory?.();
     saveGame?.();
     renderShopScreen?.();
@@ -9085,9 +12791,11 @@ function renderShopCatalog(){
     wrap.querySelectorAll('.shop-buy-btn').forEach(btn => {
         btn.addEventListener('click', (event) => {
             event.stopPropagation();
-            const shipId = btn.dataset.shopBuy || '';
-            if(!shipId) return;
-            buyShipFromShop(shipId);
+            const itemId = btn.dataset.shopBuy || '';
+            if(!itemId) return;
+            const item = (shopState.view === 'modules' ? getModuleById(itemId) : getShopShipById(itemId));
+            if(item?.type === 'module') buyModuleFromShop(itemId);
+            else buyShipFromShop(itemId);
         });
     });
 }
