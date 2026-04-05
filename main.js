@@ -8248,8 +8248,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
-        hangarState.camera.position.set(0.55, 0.7, 11.2);
-        hangarState.camera.lookAt(1.15, -0.92, 0.92);
+        hangarState.camera.position.set(0.2, 0.42, 11.4);
+        hangarState.camera.lookAt(0.7, -1.55, 0.86);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8274,8 +8274,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(1.1, -1.62, 1.05);
-        hangarState.platform.scale.set(0.205, 0.205, 0.205);
+        hangarState.platform.position.set(0.42, -2.32, 1.0);
+        hangarState.platform.scale.set(0.188, 0.188, 0.188);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
         hangarState.scene.add(hangarState.platform);
@@ -8332,13 +8332,16 @@ function ensureHangarRenderer(){
         if(hangarState.platform){
             hangarState.platform.rotation.y += 0.0021;
         }
+        const neonHue = (time * 0.055) % 1;
+        const ringColor = new THREE.Color().setHSL(neonHue, 0.95, isViewedShipSelected ? 0.72 : 0.66);
+        const glowColor = new THREE.Color().setHSL((neonHue + 0.08) % 1, 1.0, isViewedShipSelected ? 0.56 : 0.5);
         if(hangarState.platformRing?.material){
-            hangarState.platformRing.material.opacity = isViewedShipSelected ? 1 : 0.74;
-            hangarState.platformRing.material.color.set(isViewedShipSelected ? 0x8bffb1 : 0x78d9ff);
+            hangarState.platformRing.material.opacity = isViewedShipSelected ? 1 : 0.82;
+            hangarState.platformRing.material.color.copy(ringColor);
         }
         if(hangarState.platformGlowDisc?.material){
-            hangarState.platformGlowDisc.material.opacity = isViewedShipSelected ? 0.3 : 0.18;
-            hangarState.platformGlowDisc.material.color.set(isViewedShipSelected ? 0x58ff95 : 0x55bfff);
+            hangarState.platformGlowDisc.material.opacity = isViewedShipSelected ? 0.36 : 0.24;
+            hangarState.platformGlowDisc.material.color.copy(glowColor);
         }
 
         const transitionElapsed = now - hangarState.transitionStartedAt;
@@ -8361,8 +8364,8 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.y = hangarState.shipYaw;
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
-            hangarState.shipPivot.position.x = 1.55 + transitionOffset * 0.9;
-            hangarState.shipPivot.position.y = -0.18 + Math.sin(time * 1.25) * 0.012;
+            hangarState.shipPivot.position.x = 1.48 + transitionOffset * 0.9;
+            hangarState.shipPivot.position.y = -0.12 + Math.sin(time * 1.25) * 0.012;
             hangarState.shipPivot.position.z = 0.52;
         }
         if(hangarState.modulePivot){
