@@ -8246,8 +8246,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
-        hangarState.camera.position.set(0, 2.72, 11.2);
-        hangarState.camera.lookAt(0, 0.98, 0.08);
+        hangarState.camera.position.set(0, 1.02, 10.6);
+        hangarState.camera.lookAt(0, -0.18, 0.16);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8272,8 +8272,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0, -0.84, 0.18);
-        hangarState.platform.scale.set(0.18, 0.18, 0.18);
+        hangarState.platform.position.set(0, -1.12, 0.38);
+        hangarState.platform.scale.set(0.34, 0.34, 0.34);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
         hangarState.scene.add(hangarState.platform);
@@ -8357,11 +8357,11 @@ function ensureHangarRenderer(){
 
         if(hangarState.shipPivot){
             hangarState.shipPivot.rotation.y = hangarState.shipYaw;
-            hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.012;
-            hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.008;
+            hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
+            hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
             hangarState.shipPivot.position.x = transitionOffset;
-            hangarState.shipPivot.position.y = 0.56 + Math.sin(time * 1.25) * 0.038;
-            hangarState.shipPivot.position.z = 0.12;
+            hangarState.shipPivot.position.y = -0.38 + Math.sin(time * 1.25) * 0.028;
+            hangarState.shipPivot.position.z = 0.16;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.012;
@@ -8370,7 +8370,7 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.camera){
-            hangarState.camera.lookAt(0, 0.98, 0.08);
+            hangarState.camera.lookAt(0, -0.18, 0.16);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
