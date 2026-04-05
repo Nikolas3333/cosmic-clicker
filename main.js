@@ -6068,6 +6068,7 @@ var liveBattlePresenceChannel = null;
 var liveBattlePresenceChannelName = '';
 var battleHitPollTimer = null;
 var battleHitCursorId = 0;
+var battleHitSessionStartedAt = 0;
 
 function clearRemoteBattleShips(){
     if(!(remoteBattleShips instanceof Map)){
@@ -6095,6 +6096,7 @@ function stopLiveBattleSync(){
         battleHitPollTimer = null;
     }
     battleHitCursorId = 0;
+    battleHitSessionStartedAt = 0;
     if(liveBattlePresenceChannel && window.supabaseClient){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
     }
@@ -6361,6 +6363,35 @@ async function broadcastBattleKill(attackerId, attackerName, victimId, victimNam
     });
 }
 
+async function initializeBattleHitCursor(){
+    if(!window.supabaseClient) return;
+    const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
+    battleHitSessionStartedAt = Date.now();
+    if(!self.playerId || !roomId){
+        battleHitCursorId = 0;
+        return;
+    }
+
+    try{
+        const { data, error } = await window.supabaseClient
+            .from('battle_hits')
+            .select('id,created_at')
+            .eq('room_id', roomId)
+            .eq('target_id', self.playerId)
+            .order('id', { ascending: false })
+            .limit(1);
+
+        if(!error && Array.isArray(data) && data.length){
+            battleHitCursorId = Number(data[0]?.id || 0) || 0;
+        }else{
+            battleHitCursorId = 0;
+        }
+    }catch(_){
+        battleHitCursorId = 0;
+    }
+}
+
 async function pollIncomingBattleHits(){
     if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || !window.supabaseClient) return;
     const self = getBattleSelfIdentity();
@@ -6386,6 +6417,14 @@ async function pollIncomingBattleHits(){
         for(const row of data){
             const hitRowId = Number(row?.id || 0) || 0;
             if(hitRowId > battleHitCursorId) battleHitCursorId = hitRowId;
+
+            const createdAtMs = row?.created_at ? new Date(row.created_at).getTime() : 0;
+            if(Number.isFinite(battleHitSessionStartedAt) && battleHitSessionStartedAt > 0 && Number.isFinite(createdAtMs) && createdAtMs > 0){
+                if(createdAtMs < (battleHitSessionStartedAt - 150)){
+                    continue;
+                }
+            }
+
             applyIncomingBattleHit({
                 hitId: `db:${hitRowId}`,
                 attackerId: String(row?.attacker_id || '').trim(),
@@ -6716,9 +6755,10 @@ function removeRemoteBattleShipById(entryId){
     remoteBattleShips.delete(key);
 }
 
-function startLiveBattleSync(){
+async function startLiveBattleSync(){
     stopLiveBattleSync();
     ensureLiveBattlePresenceChannel();
+    await initializeBattleHitCursor();
     syncLiveBattlePlayers();
     broadcastSelfBattleState();
     pollIncomingBattleHits();
