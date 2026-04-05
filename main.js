@@ -7950,8 +7950,6 @@ function fillHangarText(){
 }
 
 function rebuildHangarSceneObjects(){
-    const __V65_HANGAR_CENTER_FIX = true;
-
     if(!hangarState.scene || !hangarState.shipPivot || !hangarState.modulePivot) return;
 
     while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
@@ -8048,7 +8046,7 @@ function ensureHangarRenderer(){
         if(hangarState.platform) hangarState.platform.rotation.y += 0.006;
         if(hangarState.shipPivot){
             hangarState.shipPivot.rotation.y += 0.012;
-            hangarState.shipPivot.position.y = 1.25 + Math.sin(time * 1.2) * 0.14;
+            hangarState.shipPivot.position.y = Math.sin(time * 1.2) * 0.18;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.016;
