@@ -4207,6 +4207,23 @@ shop-main-head{
   top:-12px !important;
 }
 
+
+/* ===== V75 HANGAR FAST PREVIEW ===== */
+#hangar-window #hangar-3d-stage{
+  background:
+    radial-gradient(circle at 62% 34%, rgba(120,210,255,0.07), transparent 22%),
+    radial-gradient(circle at 58% 82%, rgba(70,130,255,0.06), transparent 26%);
+}
+
+#hangar-window #hangar-3d-stage::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(90deg, transparent 0%, rgba(120,220,255,0.05) 50%, transparent 100%);
+  opacity:0.55;
+}
+
 </style>
 </head>
 
