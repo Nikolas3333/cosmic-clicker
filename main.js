@@ -96,6 +96,7 @@ let battleKillCombo = 0;
 let battleLastKillAt = 0;
 const BATTLE_COMBO_WINDOW_MS = 1000;
 const battleProcessedHitIds = new Set();
+const BATTLE_KILL_ACK_DAMAGE = -1;
 let playerControl = { yaw:0, pitch:0, roll:0 };
 let lobbyBgTimer = null;
 
@@ -6277,6 +6278,30 @@ function getBattleSelfIdentity(){
     };
 }
 
+function resolveBattlePlayerNameById(playerId, fallback = 'Pilot'){
+    const safeId = String(playerId || '').trim();
+    if(!safeId) return String(fallback || 'Pilot').trim() || 'Pilot';
+
+    if(safeId === String(authState?.playerId || player?.id || '').trim()){
+        return String(player?.nickname || fallback || 'Pilot').trim() || 'Pilot';
+    }
+
+    const remote = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
+    const remoteName = String(remote?.nickname || remote?.mesh?.userData?.pilotName || '').trim();
+    if(remoteName) return remoteName;
+
+    const roomPlayers = Array.isArray(currentRoom?.currentPlayers) ? currentRoom.currentPlayers : (Array.isArray(currentRoom?.players) ? currentRoom.players : []);
+    for(const row of roomPlayers){
+        const rowId = String(row?.id || row?.player_id || row?.public_id || '').trim();
+        if(rowId && rowId === safeId){
+            const rowName = String(row?.nickname || row?.name || '').trim();
+            if(rowName) return rowName;
+        }
+    }
+
+    return String(fallback || 'Pilot').trim() || 'Pilot';
+}
+
 function awardBattleKillRewards(victimName = ''){
     const now = Date.now();
     if(now - battleLastKillAt <= BATTLE_COMBO_WINDOW_MS){
@@ -6353,6 +6378,29 @@ async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
     return insertBattleHitRecord(targetPlayerId, damage, victimName);
 }
 
+async function insertBattleKillAckRecord(targetPlayerId, victimName = ''){
+    if(!window.supabaseClient) return false;
+    const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
+    const targetId = String(targetPlayerId || '').trim();
+    if(!self.playerId || !roomId || !targetId) return false;
+
+    try{
+        const { error } = await window.supabaseClient
+            .from('battle_hits')
+            .insert({
+                room_id: roomId,
+                attacker_id: self.playerId,
+                target_id: targetId,
+                damage: BATTLE_KILL_ACK_DAMAGE
+            });
+        if(error) return false;
+        return true;
+    }catch(_){
+        return false;
+    }
+}
+
 async function broadcastBattleKill(attackerId, attackerName, victimId, victimName){
     return sendBattlePresenceEvent('pilot-kill', {
         attackerId: String(attackerId || '').trim(),
@@ -6425,12 +6473,29 @@ async function pollIncomingBattleHits(){
                 }
             }
 
+            const attackerId = String(row?.attacker_id || '').trim();
+            const targetPlayerId = String(row?.target_id || '').trim();
+            const damageValue = Number(row?.damage || 0) || 0;
+            const attackerName = resolveBattlePlayerNameById(attackerId, 'Pilot');
+
+            if(damageValue <= BATTLE_KILL_ACK_DAMAGE){
+                handleIncomingBattleKill({
+                    hitId: `db:${hitRowId}`,
+                    attackerId: targetPlayerId,
+                    attackerName: resolveBattlePlayerNameById(targetPlayerId, 'Commander'),
+                    victimId: attackerId,
+                    victimName: attackerName,
+                    source: 'db-ack'
+                });
+                continue;
+            }
+
             applyIncomingBattleHit({
                 hitId: `db:${hitRowId}`,
-                attackerId: String(row?.attacker_id || '').trim(),
-                attackerName: 'Pilot',
-                targetPlayerId: String(row?.target_id || '').trim(),
-                damage: Number(row?.damage || 0) || 0
+                attackerId,
+                attackerName,
+                targetPlayerId,
+                damage: damageValue
             });
         }
     }catch(_){}
@@ -6473,14 +6538,26 @@ function applyIncomingBattleHit(payload = {}){
     pushKillFeed(`${attackerName} уничтожил ${player?.nickname || 'Commander'}`, 'kill');
     updateBattleScoreboard?.();
     scheduleBattleRespawn(2000);
-    broadcastBattleKill(attackerId, attackerName, self.playerId, player?.nickname || 'Commander');
+    if(attackerId){
+        insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander');
+    }
 }
 
 function handleIncomingBattleKill(payload = {}){
+    const killHitId = String(payload?.hitId || '').trim();
+    if(killHitId){
+        if(battleProcessedHitIds.has(killHitId)) return;
+        battleProcessedHitIds.add(killHitId);
+        if(battleProcessedHitIds.size > 120){
+            const firstKey = battleProcessedHitIds.values().next().value;
+            if(firstKey) battleProcessedHitIds.delete(firstKey);
+        }
+    }
+
     const attackerId = String(payload?.attackerId || '').trim();
     const victimId = String(payload?.victimId || '').trim();
-    const victimName = String(payload?.victimName || 'Pilot').trim() || 'Pilot';
-    const attackerName = String(payload?.attackerName || 'Pilot').trim() || 'Pilot';
+    const victimName = String(payload?.victimName || resolveBattlePlayerNameById(victimId, 'Pilot')).trim() || 'Pilot';
+    const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
     const self = getBattleSelfIdentity();
 
     const isSelfAttacker = !!(attackerId && self.playerId && attackerId === self.playerId);
