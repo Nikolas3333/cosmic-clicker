@@ -800,6 +800,31 @@ function pushKillFeed(text, type='kill'){
     setTimeout(() => item.remove(), type === 'chat' ? 9000 : 7000);
 }
 
+function showBattleFloatingReward(expValue = 0, coinValue = 0, worldPosition = null){
+    if(gameState !== 'BATTLE') return;
+    if(!camera || !worldPosition || typeof worldPosition.clone !== 'function') return;
+
+    const expAmount = Math.max(0, Number(expValue || 0) || 0);
+    const coinAmount = Math.max(0, Number(coinValue || 0) || 0);
+    if(!expAmount && !coinAmount) return;
+
+    const anchor = worldPosition.clone();
+    anchor.y += 2.6;
+    const projected = anchor.project(camera);
+    if(projected.z < -1 || projected.z > 1) return;
+
+    const node = document.createElement('div');
+    node.className = 'battle-floating-reward';
+    node.innerHTML = `${expAmount ? `<span class="reward-chip exp">EXP</span>` : ''}${coinAmount ? `<span class="reward-chip coin">🪙</span>` : ''}`;
+    node.style.left = `${(projected.x * 0.5 + 0.5) * window.innerWidth}px`;
+    node.style.top = `${(-projected.y * 0.5 + 0.5) * window.innerHeight}px`;
+    document.body.appendChild(node);
+
+    requestAnimationFrame(() => node.classList.add('show'));
+    setTimeout(() => node.classList.add('fade'), 1100);
+    setTimeout(() => node.remove(), 2100);
+}
+
 function pushBattleChatMessage(author, text){
     const log = document.getElementById('battle-chat-log');
     if(log){
@@ -6312,6 +6337,7 @@ function awardBattleKillRewards(victimName = ''){
     battleLastKillAt = now;
 
     const rewardValue = Math.max(1, Math.min(10, Number(battleKillCombo || 1) || 1));
+    const killerName = String(getDisplayPlayerTag?.() || player?.nickname || 'Commander').trim() || 'Commander';
     player.experience = Math.max(0, Number(player.experience || 0) + rewardValue);
     player.credits = Math.max(0, Number(player.credits || 0) + rewardValue);
     if(typeof playerResources === 'object' && playerResources){
@@ -6319,11 +6345,16 @@ function awardBattleKillRewards(victimName = ''){
     }
 
     if(rewardValue >= 2){
-        pushKillFeed(`🔥 КОМБО x${rewardValue} • ${victimName || 'цель'} • +${rewardValue} опыта +${rewardValue} монета`, 'kill');
+        pushKillFeed(`${killerName} уничтожил ${victimName || 'цель'} • комбо x${rewardValue}`, 'kill');
     }else{
-        pushKillFeed(`⚔️ УНИЧТОЖЕН ${victimName || 'противник'} • +1 опыт +1 монета`, 'kill');
+        pushKillFeed(`${killerName} уничтожил ${victimName || 'противник'}`, 'kill');
     }
 
+    try{
+        if(playerShip?.position){
+            showBattleFloatingReward(rewardValue, rewardValue, playerShip.position);
+        }
+    }catch(_){}
     try{ updateHUD?.(); }catch(_){}
     try{ updateUI?.(); }catch(_){}
     try{ updateBattleScoreboard?.(); }catch(_){}
