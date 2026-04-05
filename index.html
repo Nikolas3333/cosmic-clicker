@@ -4294,6 +4294,81 @@ shop-main-head{
   display: none !important;
 }
 
+
+/* ===== V77 HANGAR CLASSES + LAYOUT ===== */
+.hangar-close-btn{
+  left:50% !important;
+  right:auto !important;
+  top:10px !important;
+  transform:translateX(-50%) !important;
+  width:54px !important;
+  height:54px !important;
+  font-size:22px !important;
+  border-radius:18px !important;
+  background:rgba(120,40,40,0.28) !important;
+  border:1px solid rgba(255,120,120,0.30) !important;
+  box-shadow:0 0 16px rgba(255,80,80,0.16) !important;
+}
+
+.hangar-topbar{
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:space-between !important;
+  gap:18px !important;
+  padding:22px 22px 0 !important;
+  padding-top:22px !important;
+}
+
+.hangar-title-wrap{
+  max-width:420px !important;
+}
+
+.hangar-class-filter{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  max-width:760px !important;
+  margin-left:auto !important;
+  padding-top:2px !important;
+}
+
+.hangar-class-chip{
+  border:none !important;
+  cursor:pointer !important;
+  padding:10px 14px !important;
+  border-radius:999px !important;
+  color:#dff8ff !important;
+  background:rgba(255,255,255,0.06) !important;
+  border:1px solid rgba(120,220,255,0.18) !important;
+  box-shadow:0 0 10px rgba(0,170,255,0.08) !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+}
+
+.hangar-class-chip.active{
+  background:linear-gradient(180deg, rgba(34,113,160,0.95), rgba(15,49,86,0.98)) !important;
+  color:#ffffff !important;
+  box-shadow:0 0 18px rgba(0,170,255,0.18) !important;
+}
+
+.hangar-layout{
+  padding-top:10px !important;
+}
+
+#hangar-window .hangar-stage{
+  min-height:590px !important;
+  height:590px !important;
+}
+
+#hangar-window #hangar-3d-stage{
+  top:-60px !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  padding-top:14px !important;
+}
+
 </style>
 </head>
 
@@ -4757,7 +4832,14 @@ shop-main-head{
         <h2>Ангар</h2>
         <div class="hangar-subtitle">Корабли на вращающейся платформе и модули слева в отдельном 3D-отсеке.</div>
       </div>
-
+      <div class="hangar-class-filter" id="hangar-class-filter">
+        <button class="hangar-class-chip active" data-hangar-class="all" type="button">Все</button>
+        <button class="hangar-class-chip" data-hangar-class="fighters" type="button">Истребители</button>
+        <button class="hangar-class-chip" data-hangar-class="tanks" type="button">Танки</button>
+        <button class="hangar-class-chip" data-hangar-class="assault" type="button">Штурмовики</button>
+        <button class="hangar-class-chip" data-hangar-class="technology" type="button">Технологии</button>
+        <button class="hangar-class-chip" data-hangar-class="universal" type="button">Универсалы</button>
+      </div>
     </div>
 
     <div class="hangar-layout">
