@@ -8032,8 +8032,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
-        hangarState.camera.position.set(0, 2.9, 12.2);
-        hangarState.camera.lookAt(0, 0.78, 0);
+        hangarState.camera.position.set(0, 3.55, 11.7);
+        hangarState.camera.lookAt(0, 1.26, 0);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8058,8 +8058,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0, -1.22, 0);
-        hangarState.platform.scale.set(0.34, 0.34, 0.34);
+        hangarState.platform.position.set(0, -1.05, 0);
+        hangarState.platform.scale.set(0.28, 0.28, 0.28);
         hangarState.scene.add(hangarState.platform);
 
         hangarState.shipPivot = new THREE.Group();
@@ -8094,7 +8094,7 @@ function ensureHangarRenderer(){
         if(hangarState.shipPivot){
             hangarState.shipPivot.rotation.y += 0.012;
             hangarState.shipPivot.position.x = 0;
-            hangarState.shipPivot.position.y = -0.08 + Math.sin(time * 1.2) * 0.035;
+            hangarState.shipPivot.position.y = 0.34 + Math.sin(time * 1.2) * 0.028;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.016;
@@ -8103,7 +8103,7 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.camera){
-            hangarState.camera.lookAt(0, 0.78, 0);
+            hangarState.camera.lookAt(0, 1.26, 0);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
