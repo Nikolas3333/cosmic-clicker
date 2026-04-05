@@ -92,6 +92,9 @@ const botShotCooldown = 900;
 let playerHp = 100;
 let playerMaxHp = 100;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
+let battleKillCombo = 0;
+let battleLastKillAt = 0;
+const BATTLE_COMBO_WINDOW_MS = 1000;
 let playerControl = { yaw:0, pitch:0, roll:0 };
 let lobbyBgTimer = null;
 
@@ -326,6 +329,8 @@ function resetPlayerProgress(){
     battleStats.playerDeaths = 0;
     battleStats.botKills = 0;
     battleStats.botDeaths = 0;
+    battleKillCombo = 0;
+    battleLastKillAt = 0;
     playerHp = playerMaxHp;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
     battleWeapon.isReloading = false;
@@ -1106,6 +1111,8 @@ function clearBattleScene(){
     playerControl.yaw = 0;
     playerControl.pitch = 0;
     playerControl.roll = 0;
+    battleKillCombo = 0;
+    battleLastKillAt = 0;
     battleObserverMode = false;
     observerCameraYaw = 0;
     observerCameraPitch = -0.2;
@@ -3085,11 +3092,27 @@ if (gameState === "BATTLE" && playerShip) {
                 enemyBot = null;
                 battleStats.playerKills += 1;
                 battleStats.botDeaths += 1;
-                pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${enemyBot?.userData?.name || 'Drone_x1'}`);
+                pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${enemyBot?.userData?.name || 'Drone_x1'}`, 'kill');
                 updateEnemyHud();
                 updateBattleScoreboard();
                 // live PvP: bot respawn отключен
             }
+            continue;
+        }
+
+        let hitRemoteShip = false;
+        remoteBattleShips.forEach((entry, entryId) => {
+            if(hitRemoteShip || !entry?.mesh) return;
+            const targetMesh = entry.mesh;
+            const hitRadius = Number(targetMesh.userData?.hitRadius || 2.6) || 2.6;
+            if(laser.mesh.position.distanceTo(targetMesh.position) <= hitRadius){
+                hitRemoteShip = true;
+                broadcastBattleHit(entryId, laser.damage, entry?.nickname || targetMesh.userData?.pilotName || 'Pilot');
+                scene.remove(laser.mesh);
+                activeLasers.splice(i, 1);
+            }
+        });
+        if(hitRemoteShip){
             continue;
         }
 
@@ -6134,6 +6157,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         slotIndex,
         hp: 100,
         maxHp: 100,
+        hitRadius: 2.6,
         team
     };
     scene.add(shipGroup);
@@ -6147,6 +6171,8 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         level: 1,
         ping: 0,
         playerId: '',
+        kills: 0,
+        deaths: 0,
         team
     };
 }
@@ -6177,6 +6203,8 @@ function upsertRemoteBattlePresence(payload = {}){
     entry.nickname = nickname;
     entry.level = level;
     entry.ping = ping;
+    entry.kills = Math.max(0, Number(payload.kills || entry.kills || 0) || 0);
+    entry.deaths = Math.max(0, Number(payload.deaths || entry.deaths || 0) || 0);
     entry.team = team;
     entry.lastSeenAt = Date.now();
 
@@ -6205,6 +6233,135 @@ function upsertRemoteBattlePresence(payload = {}){
     updateBattleScoreboard?.();
 }
 
+function getBattleSelfIdentity(){
+    return {
+        playerId: String(authState?.playerId || player?.id || '').trim(),
+        nickname: String(player?.nickname || 'Commander').trim() || 'Commander'
+    };
+}
+
+function awardBattleKillRewards(victimName = ''){
+    const now = Date.now();
+    if(now - battleLastKillAt <= BATTLE_COMBO_WINDOW_MS){
+        battleKillCombo = Math.min(10, Math.max(1, Number(battleKillCombo || 0) + 1));
+    }else{
+        battleKillCombo = 1;
+    }
+    battleLastKillAt = now;
+
+    const rewardValue = Math.max(1, Math.min(10, Number(battleKillCombo || 1) || 1));
+    player.experience = Math.max(0, Number(player.experience || 0) + rewardValue);
+    player.credits = Math.max(0, Number(player.credits || 0) + rewardValue);
+    if(typeof playerResources === 'object' && playerResources){
+        playerResources.coins = Math.max(0, Number(playerResources.coins || 0) + rewardValue);
+    }
+
+    if(rewardValue >= 2){
+        pushKillFeed(`🔥 КОМБО x${rewardValue} • ${victimName || 'цель'} • +${rewardValue} опыта +${rewardValue} монета`, 'kill');
+    }else{
+        pushKillFeed(`⚔️ УНИЧТОЖЕН ${victimName || 'противник'} • +1 опыт +1 монета`, 'kill');
+    }
+
+    try{ updateHUD?.(); }catch(_){}
+    try{ updateUI?.(); }catch(_){}
+    try{ updateBattleScoreboard?.(); }catch(_){}
+    try{ saveGame?.(); }catch(_){}
+}
+
+async function sendBattlePresenceEvent(eventName, payload = {}){
+    if(!liveBattlePresenceChannel || !eventName) return false;
+    try{
+        const packet = { type:'broadcast', event:eventName, payload };
+        if(typeof liveBattlePresenceChannel.httpSend === 'function'){
+            await liveBattlePresenceChannel.httpSend(packet);
+        }else{
+            await liveBattlePresenceChannel.send(packet);
+        }
+        return true;
+    }catch(_){
+        return false;
+    }
+}
+
+async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
+    const self = getBattleSelfIdentity();
+    const targetId = String(targetPlayerId || '').trim();
+    if(!self.playerId || !targetId || !damage) return false;
+    return sendBattlePresenceEvent('pilot-hit', {
+        attackerId: self.playerId,
+        attackerName: self.nickname,
+        targetPlayerId: targetId,
+        targetName: String(victimName || '').trim(),
+        damage: Number(damage || 0) || 0,
+        at: Date.now()
+    });
+}
+
+async function broadcastBattleKill(attackerId, attackerName, victimId, victimName){
+    return sendBattlePresenceEvent('pilot-kill', {
+        attackerId: String(attackerId || '').trim(),
+        attackerName: String(attackerName || '').trim() || 'Commander',
+        victimId: String(victimId || '').trim(),
+        victimName: String(victimName || '').trim() || 'Pilot',
+        at: Date.now()
+    });
+}
+
+function applyIncomingBattleHit(payload = {}){
+    if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || isBattleRespawning() || battleShipCrash) return;
+    const self = getBattleSelfIdentity();
+    const targetId = String(payload?.targetPlayerId || '').trim();
+    if(!self.playerId || !targetId || self.playerId !== targetId) return;
+
+    const damageValue = Math.max(0, Number(payload?.damage || 0) || 0);
+    if(!damageValue) return;
+
+    playerHp = Math.max(0, Number(playerHp || 0) - damageValue);
+    updateBattlePlayerHud?.();
+    updateBattlePlayerWorldHp?.();
+
+    if(playerHp > 0) return;
+
+    const attackerId = String(payload?.attackerId || '').trim();
+    const attackerName = String(payload?.attackerName || 'Pilot').trim() || 'Pilot';
+    playerHp = 0;
+    battleStats.playerDeaths += 1;
+    battleKillCombo = 0;
+    battleLastKillAt = 0;
+    if(playerShip){
+        spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
+    }
+    pushKillFeed(`${attackerName} уничтожил ${player?.nickname || 'Commander'}`, 'kill');
+    updateBattleScoreboard?.();
+    scheduleBattleRespawn(2000);
+    broadcastBattleKill(attackerId, attackerName, self.playerId, player?.nickname || 'Commander');
+}
+
+function handleIncomingBattleKill(payload = {}){
+    const attackerId = String(payload?.attackerId || '').trim();
+    const victimId = String(payload?.victimId || '').trim();
+    const victimName = String(payload?.victimName || 'Pilot').trim() || 'Pilot';
+    const attackerName = String(payload?.attackerName || 'Pilot').trim() || 'Pilot';
+    const self = getBattleSelfIdentity();
+
+    const isSelfAttacker = !!(attackerId && self.playerId && attackerId === self.playerId);
+    if(isSelfAttacker){
+        battleStats.playerKills += 1;
+        awardBattleKillRewards(victimName);
+    }
+
+    const victimRemote = victimId ? remoteBattleShips.get(victimId) : null;
+    if(victimRemote?.mesh){
+        spawnShipDebris(victimRemote.mesh.position.clone(), 0xff7755);
+        removeRemoteBattleShipById(victimId);
+    }
+
+    updateBattleScoreboard?.();
+    if(attackerName && victimName && !isSelfAttacker){
+        pushKillFeed(`${attackerName} уничтожил ${victimName}`, 'kill');
+    }
+}
+
 function ensureLiveBattlePresenceChannel(){
     if(!window.supabaseClient) return;
     const channelName = getLiveBattleChannelName();
@@ -6225,6 +6382,12 @@ function ensureLiveBattlePresenceChannel(){
         .on('broadcast', { event: 'pilot-state' }, ({ payload }) => {
             upsertRemoteBattlePresence(payload || {});
         })
+        .on('broadcast', { event: 'pilot-hit' }, ({ payload }) => {
+            applyIncomingBattleHit(payload || {});
+        })
+        .on('broadcast', { event: 'pilot-kill' }, ({ payload }) => {
+            handleIncomingBattleKill(payload || {});
+        })
         .subscribe();
 }
 
@@ -6243,6 +6406,8 @@ async function broadcastSelfBattleState(){
                 level: Number(player?.level || 1) || 1,
                 team: getBattleRoomPlayerTeam(playerId),
                 ping: Number(getBattlePingValue() || 0),
+                kills: Number(battleStats.playerKills || 0) || 0,
+                deaths: Number(battleStats.playerDeaths || 0) || 0,
                 x: Number(playerShip.position.x || 0),
                 y: Number(playerShip.position.y || 0),
                 z: Number(playerShip.position.z || 0),
