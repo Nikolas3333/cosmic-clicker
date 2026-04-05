@@ -4369,6 +4369,109 @@ shop-main-head{
   padding-top:14px !important;
 }
 
+
+/* ===== V78 HANGAR FINAL UI + PLATFORM FIX ===== */
+.hangar-close-btn{
+  top:14px !important;
+  z-index:60 !important;
+}
+
+.hangar-topbar{
+  position:relative !important;
+  z-index:40 !important;
+  padding:18px 22px 6px !important;
+  gap:22px !important;
+}
+
+.hangar-class-filter{
+  position:relative !important;
+  z-index:55 !important;
+  pointer-events:auto !important;
+  padding:4px !important;
+  border-radius:18px !important;
+  background:rgba(8,20,40,0.62) !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:0 0 18px rgba(0,140,255,0.10) !important;
+  backdrop-filter:blur(8px) !important;
+}
+
+.hangar-class-chip{
+  position:relative !important;
+  z-index:56 !important;
+  pointer-events:auto !important;
+  user-select:none !important;
+  min-height:46px !important;
+  padding:11px 16px !important;
+  transition:
+    transform .18s ease,
+    background .24s ease,
+    box-shadow .24s ease,
+    border-color .24s ease,
+    color .24s ease !important;
+}
+
+.hangar-class-chip:hover{
+  transform:translateY(-1px) scale(1.02) !important;
+  background:rgba(55,110,170,0.42) !important;
+  border-color:rgba(140,230,255,0.34) !important;
+  box-shadow:0 0 16px rgba(0,170,255,0.16) !important;
+}
+
+.hangar-class-chip:active{
+  transform:translateY(0) scale(0.985) !important;
+}
+
+.hangar-class-chip.active{
+  background:linear-gradient(180deg, rgba(49,130,190,0.96), rgba(21,70,118,0.98)) !important;
+  box-shadow:
+    0 0 20px rgba(0,170,255,0.18),
+    inset 0 0 10px rgba(255,255,255,0.06) !important;
+}
+
+.hangar-layout{
+  padding-top:8px !important;
+}
+
+#hangar-window .hangar-stage{
+  min-height:590px !important;
+  height:590px !important;
+}
+
+#hangar-window #hangar-3d-stage{
+  top:-20px !important;
+  z-index:10 !important;
+  pointer-events:none !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  z-index:20 !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  z-index:45 !important;
+}
+
+#hangar-window .hangar-arrow.horizontal button,
+#hangar-window .hangar-arrow.horizontal,
+#hangar-window .hangar-arrow{
+  pointer-events:auto !important;
+}
+
+#hangar-window .hangar-stage::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:36px;
+  width:310px;
+  height:64px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(110,220,255,0.16) 0%, rgba(110,220,255,0.06) 42%, rgba(110,220,255,0) 72%);
+  filter:blur(10px);
+  pointer-events:none;
+  z-index:2;
+}
+
 </style>
 </head>
 
