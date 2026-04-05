@@ -4487,6 +4487,19 @@ shop-main-head{
   pointer-events:none !important;
 }
 
+
+/* ===== V81 HANGAR REAL FIX ===== */
+#hangar-window .hangar-stage.empty-class::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 66% 56%, rgba(83,216,255,0.07), transparent 16%),
+    radial-gradient(circle at 66% 56%, rgba(83,216,255,0.035), transparent 28%);
+  z-index:1;
+}
+
 </style>
 </head>
 
