@@ -4583,6 +4583,51 @@ shop-main-head{
   color:#bcecff !important;
 }
 
+
+.battle-floating-reward{
+  position:fixed;
+  transform:translate(-50%, 0) scale(0.92);
+  display:flex;
+  gap:10px;
+  align-items:center;
+  pointer-events:none;
+  z-index:60000;
+  opacity:0;
+  transition:transform 0.55s ease, opacity 0.55s ease;
+}
+.battle-floating-reward.show{
+  opacity:1;
+  transform:translate(-50%, -10px) scale(1);
+}
+.battle-floating-reward.fade{
+  opacity:0;
+  transform:translate(-50%, -44px) scale(1.04);
+}
+.battle-floating-reward .reward-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:46px;
+  height:30px;
+  padding:0 10px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:0.04em;
+  box-shadow:0 0 16px rgba(0,0,0,0.28);
+  border:1px solid rgba(255,255,255,0.18);
+}
+.battle-floating-reward .reward-chip.exp{
+  color:#b9f7ff;
+  background:linear-gradient(180deg, rgba(28,90,170,0.95), rgba(9,39,90,0.95));
+  text-shadow:0 0 10px rgba(111,241,255,0.45);
+}
+.battle-floating-reward .reward-chip.coin{
+  color:#fff3b0;
+  background:linear-gradient(180deg, rgba(150,106,18,0.96), rgba(93,57,8,0.96));
+  text-shadow:0 0 10px rgba(255,214,90,0.5);
+}
+
 </style>
 </head>
 
