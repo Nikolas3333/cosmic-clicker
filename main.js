@@ -7588,6 +7588,44 @@ function ensureHangarIndexes(){
     updateHangarFilterButtons();
 }
 
+function createHangarBeamTexture(){
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    if(!ctx) return new THREE.CanvasTexture(canvas);
+
+    const gradient = ctx.createLinearGradient(0, canvas.height, 0, 0);
+    gradient.addColorStop(0.00, 'rgba(255,255,255,0.00)');
+    gradient.addColorStop(0.10, 'rgba(255,255,255,0.14)');
+    gradient.addColorStop(0.36, 'rgba(255,255,255,0.42)');
+    gradient.addColorStop(0.68, 'rgba(255,255,255,0.18)');
+    gradient.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const sideFade = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.72, 10, canvas.width * 0.5, canvas.height * 0.6, canvas.width * 0.5);
+    sideFade.addColorStop(0.00, 'rgba(255,255,255,0.95)');
+    sideFade.addColorStop(0.24, 'rgba(255,255,255,0.60)');
+    sideFade.addColorStop(0.54, 'rgba(255,255,255,0.16)');
+    sideFade.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = sideFade;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const baseGlow = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.86, 2, canvas.width * 0.5, canvas.height * 0.86, canvas.width * 0.42);
+    baseGlow.addColorStop(0.00, 'rgba(255,255,255,0.95)');
+    baseGlow.addColorStop(0.42, 'rgba(255,255,255,0.32)');
+    baseGlow.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+    ctx.fillStyle = baseGlow;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+}
+
 function createHangarPlatform(){
     const group = new THREE.Group();
 
@@ -7612,37 +7650,52 @@ function createHangarPlatform(){
     glowDisc.position.y = 0.5;
     group.add(glowDisc);
 
+    const beamTexture = createHangarBeamTexture();
     const beamGroup = new THREE.Group();
-    const beamPositions = [
-        [0, 0.64, 0],
-        [-1.25, 0.64, -0.28],
-        [1.25, 0.64, -0.28],
-        [-0.92, 0.64, 1.05],
-        [0.92, 0.64, 1.05]
+    const beamConfigs = [
+        { x: 0.0, z: 0.15, sx: 3.6, sy: 8.4, opacity: 0.40 },
+        { x: -0.56, z: 0.35, sx: 2.3, sy: 6.6, opacity: 0.24 },
+        { x: 0.56, z: 0.35, sx: 2.3, sy: 6.6, opacity: 0.24 }
     ];
-    const beams = beamPositions.map(([x,y,z], idx) => {
-        const beam = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.1, idx === 0 ? 0.9 : 0.62, idx === 0 ? 9.5 : 7.8, 18, 1, true),
-            new THREE.MeshBasicMaterial({
-                color:0x7efcff,
-                transparent:true,
-                opacity: idx === 0 ? 0.24 : 0.17,
-                depthWrite:false,
-                blending:THREE.AdditiveBlending,
-                side:THREE.DoubleSide
-            })
-        );
-        beam.position.set(x,y + (idx === 0 ? 3.0 : 2.45),z);
-        beam.rotation.z = idx === 0 ? 0 : ((idx % 2 === 0 ? -0.12 : 0.12));
-        beam.rotation.x = idx === 0 ? 0 : ((idx < 3 ? -0.06 : 0.08));
+
+    const beams = beamConfigs.map((cfg, idx) => {
+        const material = new THREE.SpriteMaterial({
+            map: beamTexture,
+            color: idx === 0 ? 0x7feaff : 0x8ad7ff,
+            transparent: true,
+            opacity: cfg.opacity,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const beam = new THREE.Sprite(material);
+        beam.center.set(0.5, 0.0);
+        beam.position.set(cfg.x, 0.56, cfg.z);
+        beam.scale.set(cfg.sx, cfg.sy, 1);
+        beam.renderOrder = 20;
         beamGroup.add(beam);
         return beam;
     });
+
+    const baseHalo = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: beamTexture,
+        color: 0x7feaff,
+        transparent: true,
+        opacity: 0.18,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+    }));
+    baseHalo.center.set(0.5, 0.5);
+    baseHalo.position.set(0, 0.58, 0.2);
+    baseHalo.scale.set(6.8, 2.2, 1);
+    baseHalo.renderOrder = 19;
+    beamGroup.add(baseHalo);
+
     group.add(beamGroup);
 
     group.userData.ring = ring;
     group.userData.glowDisc = glowDisc;
     group.userData.beams = beams;
+    group.userData.baseHalo = baseHalo;
     return group;
 }
 
@@ -8379,11 +8432,20 @@ function ensureHangarRenderer(){
             hangarState.platformBeams.forEach((beam, idx) => {
                 const mat = beam?.material;
                 if(!mat) return;
-                const hue = (time * 0.08 + idx * 0.07) % 1;
-                mat.color.setHSL(hue, 0.9, 0.62);
-                mat.opacity = (idx === 0 ? 0.24 : 0.15) + Math.sin(time * 2.2 + idx * 1.35) * 0.03;
-                beam.scale.y = 1 + Math.sin(time * 1.7 + idx * 0.6) * 0.04;
+                const hue = 0.50 + Math.sin(time * 0.8 + idx * 0.9) * 0.035;
+                mat.color.setHSL(hue, 0.88, idx === 0 ? 0.72 : 0.68);
+                mat.opacity = (idx === 0 ? 0.34 : 0.20) + Math.sin(time * 1.9 + idx * 1.1) * 0.03;
+                const pulse = 1 + Math.sin(time * 1.35 + idx * 0.8) * 0.04;
+                beam.scale.x = (idx === 0 ? 3.6 : 2.3) * pulse;
+                beam.scale.y = (idx === 0 ? 8.4 : 6.6) * (1 + Math.sin(time * 1.15 + idx * 0.7) * 0.03);
             });
+        }
+        if(hangarState.platform?.userData?.baseHalo?.material){
+            const halo = hangarState.platform.userData.baseHalo;
+            halo.material.color.setHSL(0.53 + Math.sin(time * 0.7) * 0.02, 0.95, 0.7);
+            halo.material.opacity = 0.14 + Math.sin(time * 1.5) * 0.025;
+            halo.scale.x = 6.8 + Math.sin(time * 1.1) * 0.3;
+            halo.scale.y = 2.2 + Math.cos(time * 1.3) * 0.12;
         }
 
         const transitionElapsed = now - hangarState.transitionStartedAt;
