@@ -6066,8 +6066,8 @@ var liveBattleSyncTimer = null;
 var liveBattlePresencePushTimer = null;
 var liveBattlePresenceChannel = null;
 var liveBattlePresenceChannelName = '';
-var liveBattleHitPollTimer = null;
-var liveBattleHitCursorIso = '';
+var battleHitPollTimer = null;
+var battleHitCursorId = 0;
 
 function clearRemoteBattleShips(){
     if(!(remoteBattleShips instanceof Map)){
@@ -6090,16 +6090,16 @@ function stopLiveBattleSync(){
         clearInterval(liveBattlePresencePushTimer);
         liveBattlePresencePushTimer = null;
     }
-    if(typeof liveBattleHitPollTimer !== 'undefined' && liveBattleHitPollTimer){
-        clearInterval(liveBattleHitPollTimer);
-        liveBattleHitPollTimer = null;
+    if(typeof battleHitPollTimer !== 'undefined' && battleHitPollTimer){
+        clearInterval(battleHitPollTimer);
+        battleHitPollTimer = null;
     }
+    battleHitCursorId = 0;
     if(liveBattlePresenceChannel && window.supabaseClient){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
     }
     liveBattlePresenceChannel = null;
     liveBattlePresenceChannelName = '';
-    liveBattleHitCursorIso = '';
     clearRemoteBattleShips();
 }
 
@@ -6318,33 +6318,37 @@ async function sendBattlePresenceEvent(eventName, payload = {}){
     }
 }
 
-async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
+function getBattleHitsRoomId(){
+    const rawRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    return sanitizeOnlineRoomId(rawRoomId);
+}
+
+async function insertBattleHitRecord(targetPlayerId, damage, victimName = ''){
+    if(!window.supabaseClient) return false;
     const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
     const targetId = String(targetPlayerId || '').trim();
     const damageValue = Math.max(0, Number(damage || 0) || 0);
-    const roomId = String(getBattleRoomIdSafe() || '').trim();
-    if(!self.playerId || !targetId || !damageValue || !roomId || !window.supabaseClient) return false;
-    const issuedAt = Date.now();
-    const hitPayload = {
-        room_id: roomId,
-        attacker_id: self.playerId,
-        target_id: targetId,
-        damage: damageValue
-    };
+    if(!self.playerId || !roomId || !targetId || !damageValue) return false;
 
     try{
-        await window.supabaseClient.from('battle_hits').insert(hitPayload);
-    }catch(_){}
+        const { error } = await window.supabaseClient
+            .from('battle_hits')
+            .insert({
+                room_id: roomId,
+                attacker_id: self.playerId,
+                target_id: targetId,
+                damage: damageValue
+            });
+        if(error) return false;
+        return true;
+    }catch(_){
+        return false;
+    }
+}
 
-    return sendBattlePresenceEvent('pilot-hit', {
-        hitId: `${self.playerId}:${targetId}:${issuedAt}:${Math.random().toString(36).slice(2,8)}`,
-        attackerId: self.playerId,
-        attackerName: self.nickname,
-        targetPlayerId: targetId,
-        targetName: String(victimName || '').trim(),
-        damage: damageValue,
-        at: issuedAt
-    });
+async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
+    return insertBattleHitRecord(targetPlayerId, damage, victimName);
 }
 
 async function broadcastBattleKill(attackerId, attackerName, victimId, victimName){
@@ -6355,6 +6359,42 @@ async function broadcastBattleKill(attackerId, attackerName, victimId, victimNam
         victimName: String(victimName || '').trim() || 'Pilot',
         at: Date.now()
     });
+}
+
+async function pollIncomingBattleHits(){
+    if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || !window.supabaseClient) return;
+    const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
+    if(!self.playerId || !roomId) return;
+
+    try{
+        let query = window.supabaseClient
+            .from('battle_hits')
+            .select('id,attacker_id,target_id,damage,created_at')
+            .eq('room_id', roomId)
+            .eq('target_id', self.playerId)
+            .order('id', { ascending: true })
+            .limit(50);
+
+        if(Number.isFinite(battleHitCursorId) && battleHitCursorId > 0){
+            query = query.gt('id', battleHitCursorId);
+        }
+
+        const { data, error } = await query;
+        if(error || !Array.isArray(data) || !data.length) return;
+
+        for(const row of data){
+            const hitRowId = Number(row?.id || 0) || 0;
+            if(hitRowId > battleHitCursorId) battleHitCursorId = hitRowId;
+            applyIncomingBattleHit({
+                hitId: `db:${hitRowId}`,
+                attackerId: String(row?.attacker_id || '').trim(),
+                attackerName: 'Pilot',
+                targetPlayerId: String(row?.target_id || '').trim(),
+                damage: Number(row?.damage || 0) || 0
+            });
+        }
+    }catch(_){}
 }
 
 function applyIncomingBattleHit(payload = {}){
@@ -6420,44 +6460,6 @@ function handleIncomingBattleKill(payload = {}){
     if(attackerName && victimName && !isSelfAttacker){
         pushKillFeed(`${attackerName} уничтожил ${victimName}`, 'kill');
     }
-}
-
-async function pollIncomingBattleHits(){
-    if(gameState !== 'BATTLE' || battleObserverMode || !window.supabaseClient) return;
-    const self = getBattleSelfIdentity();
-    const roomId = String(getBattleRoomIdSafe() || '').trim();
-    if(!self.playerId || !roomId) return;
-
-    try{
-        let query = window.supabaseClient
-            .from('battle_hits')
-            .select('id, attacker_id, target_id, damage, created_at')
-            .eq('room_id', roomId)
-            .eq('target_id', self.playerId)
-            .order('created_at', { ascending: true })
-            .limit(50);
-
-        if(liveBattleHitCursorIso){
-            query = query.gt('created_at', liveBattleHitCursorIso);
-        }
-
-        const { data, error } = await query;
-        if(error || !Array.isArray(data) || !data.length) return;
-
-        data.forEach(row => {
-            applyIncomingBattleHit({
-                hitId: String(row.id || '').trim(),
-                attackerId: String(row.attacker_id || '').trim(),
-                targetPlayerId: String(row.target_id || '').trim(),
-                damage: Number(row.damage || 0) || 0
-            });
-        });
-
-        const lastRow = data[data.length - 1];
-        if(lastRow?.created_at){
-            liveBattleHitCursorIso = String(lastRow.created_at);
-        }
-    }catch(_){}
 }
 
 function ensureLiveBattlePresenceChannel(){
@@ -6719,10 +6721,14 @@ function startLiveBattleSync(){
     ensureLiveBattlePresenceChannel();
     syncLiveBattlePlayers();
     broadcastSelfBattleState();
+    pollIncomingBattleHits();
     liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 250);
     liveBattlePresencePushTimer = setInterval(() => {
         broadcastSelfBattleState();
     }, 90);
+    battleHitPollTimer = setInterval(() => {
+        pollIncomingBattleHits();
+    }, 120);
 }
 
 function animateRemoteBattleShips(){
