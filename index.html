@@ -3658,105 +3658,71 @@ shop-main-head{
 }
 
 
-/* ===== V66 HARD FIX ===== */
-#hangar-window .hangar-stage{
-  height:720px !important;
+
+/* ===== V71 HANGAR CLEAN FIX ===== */
+#hangar-window .hangar-layout{
+  grid-template-columns:320px minmax(0, 1fr) !important;
+  gap:18px !important;
 }
 
-#hangar-window .hangar-stage-overlay{
-  justify-content:flex-start !important;
-}
-
-#hangar-window .hangar-stats-grid{
-  margin-top:20px !important;
-}
-
-#hangar-window .hangar-footer-row{
-  position:absolute !important;
-  bottom:20px !important;
-  left:50%;
-  transform:translateX(-50%);
-}
-
-
-/* ===== V67 HANGAR STABLE FIX ===== */
 #hangar-window .hangar-module-side{
-  position:relative;
-  padding-top:86px;
-  padding-bottom:86px;
+  width:320px !important;
+  max-width:320px !important;
+  min-width:320px !important;
+  position:relative !important;
+  padding:84px 20px 90px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
 }
 
-#hangar-window .hangar-module-view{
-  width:100%;
-  height:100%;
-  justify-content:center;
+#hangar-window .hangar-module-side > *{
+  max-width:100% !important;
+  box-sizing:border-box !important;
 }
 
 #hangar-window #hangar-module-up,
 #hangar-window #hangar-module-down{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  z-index:8;
+  position:absolute !important;
+  left:50% !important;
+  transform:translateX(-50%) !important;
+  z-index:10 !important;
   margin:0 !important;
 }
 
-#hangar-window #hangar-module-up{
-  top:24px;
+#hangar-window #hangar-module-up{ top:28px !important; }
+#hangar-window #hangar-module-down{ bottom:28px !important; }
+
+#hangar-window .hangar-module-side .hangar-card,
+#hangar-window .hangar-module-side .hangar-main-btn{
+  width:100% !important;
+  max-width:100% !important;
 }
 
-#hangar-window #hangar-module-down{
-  bottom:24px;
+#hangar-window .hangar-module-side .hangar-muted,
+#hangar-window .hangar-module-side p,
+#hangar-window .hangar-module-side h3{
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+  text-align:center !important;
 }
 
 #hangar-window .hangar-stage-wrap{
-  align-items:stretch;
+  grid-template-columns:68px minmax(0, 1fr) 68px !important;
+  gap:14px !important;
+  align-items:stretch !important;
 }
 
 #hangar-window .hangar-stage{
-  height:auto !important;
+  position:relative !important;
   min-height:640px !important;
-}
-
-#hangar-window .hangar-stage-overlay{
-  display:grid !important;
-  grid-template-rows:auto auto 1fr auto;
-  align-content:start;
-  justify-content:stretch;
-  padding:26px 28px 22px !important;
-}
-
-#hangar-window .hangar-ship-card{
-  align-self:start;
-  max-width:540px;
-}
-
-#hangar-window .hangar-stats-grid{
-  margin-top:22px !important;
-  width:min(560px, 100%);
-  align-self:start;
-}
-
-#hangar-window .hangar-footer-row{
-  position:static !important;
-  transform:none !important;
-  left:auto !important;
-  bottom:auto !important;
-  width:min(560px, 100%);
-  align-self:start;
-  margin-top:18px;
-}
-
-
-/* ===== V69 HANGAR FINAL BALANCE ===== */
-#hangar-window .hangar-stage{
-  min-height: 660px !important;
-  height: 660px !important;
+  height:640px !important;
+  overflow:hidden !important;
 }
 
 #hangar-window .hangar-3d-stage{
   position:absolute !important;
   inset:0 !important;
+  overflow:hidden !important;
   z-index:1 !important;
 }
 
@@ -3767,107 +3733,38 @@ shop-main-head{
   pointer-events:none !important;
   display:flex !important;
   flex-direction:column !important;
-  justify-content:space-between !important;
-  padding:26px 28px !important;
+  align-items:flex-start !important;
+  justify-content:flex-start !important;
+  padding:30px 26px 24px !important;
+  box-sizing:border-box !important;
+  overflow:hidden !important;
 }
 
 #hangar-window .hangar-ship-card,
 #hangar-window .hangar-stats-grid,
 #hangar-window .hangar-footer-row{
-  position:relative;
-  z-index:4;
   pointer-events:auto !important;
-  width:min(520px, 100%) !important;
-}
-
-#hangar-window .hangar-footer-row{
-  position:relative !important;
-  left:auto !important;
-  bottom:auto !important;
-  transform:none !important;
-  margin-top:14px !important;
-}
-
-#hangar-window .hangar-stats-grid{
-  margin-top:auto !important;
-  margin-bottom:0 !important;
-}
-
-#hangar-window .hangar-module-side{
-  position:relative !important;
-  padding-top:78px !important;
-  padding-bottom:78px !important;
-}
-
-#hangar-window #hangar-module-up,
-#hangar-window #hangar-module-down{
-  position:absolute !important;
-  left:50% !important;
-  transform:translateX(-50%) !important;
-  z-index:7 !important;
-}
-
-#hangar-window #hangar-module-up{ top:28px !important; }
-#hangar-window #hangar-module-down{ bottom:28px !important; }
-
-
-/* ===== V70 HANGAR BOUNDS FIX ===== */
-#hangar-window .hangar-module-side,
-#hangar-window .hangar-stage,
-#hangar-window .hangar-3d-stage,
-#hangar-window .hangar-stage-overlay{
-  overflow:hidden !important;
-}
-
-#hangar-window .hangar-stage-overlay{
-  padding:26px 22px 20px !important;
-}
-
-#hangar-window .hangar-ship-card,
-#hangar-window .hangar-stats-grid,
-#hangar-window .hangar-footer-row{
-  width:min(460px, calc(100% - 14px)) !important;
-  max-width:460px !important;
-}
-
-#hangar-window .hangar-ship-card{
-  margin-left:0 !important;
-}
-
-#hangar-window .hangar-stats-grid{
-  grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
-  gap:12px !important;
-}
-
-#hangar-window .hangar-module-side .hangar-card{
-  width:100% !important;
-  max-width:100% !important;
-  overflow:hidden !important;
-}
-
-#hangar-window .hangar-module-side .hangar-card,
-#hangar-window .hangar-module-side .hangar-card *{
+  width:min(420px, calc(100% - 10px)) !important;
+  max-width:420px !important;
   box-sizing:border-box !important;
 }
 
-#hangar-window .hangar-module-side .hangar-card h3,
-#hangar-window .hangar-module-side .hangar-card p,
-#hangar-window .hangar-module-side .hangar-card .hangar-muted,
-#hangar-window .hangar-module-side .hangar-card .hangar-card-subtitle{
-  max-width:100% !important;
+#hangar-window .hangar-stats-grid{
+  margin-top:28px !important;
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:12px !important;
+}
+
+#hangar-window .hangar-footer-row{
+  margin-top:14px !important;
+}
+
+#hangar-window .hangar-ship-card *,
+#hangar-window .hangar-stats-grid *,
+#hangar-window .hangar-footer-row *{
   overflow-wrap:anywhere !important;
   word-break:break-word !important;
-  text-align:center !important;
-}
-
-#hangar-window .hangar-module-view{
-  margin:0 auto !important;
-  max-width:310px !important;
-}
-
-#hangar-window .hangar-main-btn{
-  width:100% !important;
-  max-width:100% !important;
 }
 
 #hangar-window .hangar-arrow.horizontal{
