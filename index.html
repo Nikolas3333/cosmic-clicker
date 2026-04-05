@@ -4472,6 +4472,21 @@ shop-main-head{
   z-index:2;
 }
 
+
+/* ===== V79 CLICK FIX ===== */
+.hangar-class-filter{
+  pointer-events:auto !important;
+  z-index:100 !important;
+}
+.hangar-class-chip{
+  pointer-events:auto !important;
+  z-index:101 !important;
+  cursor:pointer !important;
+}
+#hangar-3d-stage{
+  pointer-events:none !important;
+}
+
 </style>
 </head>
 
@@ -5037,5 +5052,14 @@ console.log('🔥 Supabase подключен и готов к работе');
 <script type="module" src="main.js"></script>
 
 
+<script>
+// ===== V79 FIX ACTIVE CLASS =====
+document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.hangar-class-chip').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
 </body>
 </html>
