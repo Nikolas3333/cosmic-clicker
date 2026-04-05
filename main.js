@@ -7176,7 +7176,7 @@ function isOwnedModule(moduleId){
 
 function getOwnedHangarModules(){
     ensureModuleOwnershipDefaults();
-    const modules = getOwnedHangarModules();
+    const modules = getAllHangarModules();
     if(!modules.length) return [];
     const owned = modules.filter(item => isOwnedModule(item.id));
     return owned.length ? owned : modules;
