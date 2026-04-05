@@ -7950,6 +7950,93 @@ function fillHangarText(){
 }
 
 
+
+const hangarShipMeshCache = new Map();
+let hangarBuildToken = 0;
+
+function createHangarLoadingPlaceholder(){
+    const group = new THREE.Group();
+
+    const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.42, 1.4, 5, 12),
+        new THREE.MeshStandardMaterial({
+            color: 0x27476d,
+            emissive: 0x113355,
+            emissiveIntensity: 0.85,
+            metalness: 0.35,
+            roughness: 0.55,
+            transparent: true,
+            opacity: 0.95
+        })
+    );
+    body.rotation.z = Math.PI * 0.5;
+    group.add(body);
+
+    const wingLeft = new THREE.Mesh(
+        new THREE.BoxGeometry(1.15, 0.05, 0.46),
+        new THREE.MeshStandardMaterial({ color: 0x6fdcff, emissive: 0x49c8ff, emissiveIntensity: 0.8 })
+    );
+    wingLeft.position.set(-0.05, -0.10, -0.42);
+    wingLeft.rotation.z = -0.16;
+    group.add(wingLeft);
+
+    const wingRight = wingLeft.clone();
+    wingRight.position.z = 0.42;
+    wingRight.rotation.z = 0.16;
+    group.add(wingRight);
+
+    group.userData.isHangarPlaceholder = true
+    return group;
+}
+
+function cloneObject3DDeepSafe(object3d){
+    try{
+        const cloned = object3d.clone(true);
+        cloned.traverse((node) => {
+            if(node.isMesh){
+                if(node.geometry) node.geometry = node.geometry.clone();
+                if(Array.isArray(node.material)){
+                    node.material = node.material.map(mat => mat?.clone ? mat.clone() : mat);
+                }else if(node.material?.clone){
+                    node.material = node.material.clone();
+                }
+            }
+        });
+        return cloned;
+    }catch(_){
+        return object3d?.clone ? object3d.clone(true) : object3d;
+    }
+}
+
+function queueHangarShipBuild(currentShip){
+    if(!currentShip || !hangarState.shipPivot) return;
+    const buildToken = ++hangarBuildToken;
+    const shipId = String(currentShip.id || '').trim();
+
+    const cached = hangarShipMeshCache.get(shipId);
+    if(cached){
+        while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+        const readyMesh = cloneObject3DDeepSafe(cached);
+        readyMesh.position.set(0, 0.38, 0);
+        hangarState.shipPivot.add(readyMesh);
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
+        try{
+            const rawShipMesh = createHangarShipMesh(currentShip);
+            const shipMesh = normalizeHangarShipMesh(rawShipMesh);
+            hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
+
+            if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
+            while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+            shipMesh.position.set(0, 0.38, 0);
+            hangarState.shipPivot.add(shipMesh);
+        }catch(_){}
+    });
+}
+
 function normalizeHangarShipMesh(shipMesh){
     try{
         if(!shipMesh) return shipMesh;
@@ -7996,6 +8083,8 @@ function normalizeHangarShipMesh(shipMesh){
 function rebuildHangarSceneObjects(){
     if(!hangarState.scene || !hangarState.shipPivot || !hangarState.modulePivot) return;
 
+    hangarBuildToken += 1;
+
     while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
     while(hangarState.modulePivot.children.length) hangarState.modulePivot.remove(hangarState.modulePivot.children[0]);
 
@@ -8005,10 +8094,10 @@ function rebuildHangarSceneObjects(){
     const currentModule = modules[hangarState.moduleIndex];
 
     if(currentShip){
-        const rawShipMesh = createHangarShipMesh(currentShip);
-        const shipMesh = normalizeHangarShipMesh(rawShipMesh);
-        shipMesh.position.set(0, 0.38, 0);
-        hangarState.shipPivot.add(shipMesh);
+        const placeholder = createHangarLoadingPlaceholder();
+        placeholder.position.set(0, 0.38, 0);
+        hangarState.shipPivot.add(placeholder);
+        queueHangarShipBuild(currentShip);
     }
 
     if(currentModule){
@@ -8064,6 +8153,23 @@ function ensureHangarRenderer(){
 
         hangarState.shipPivot = new THREE.Group();
         hangarState.modulePivot = new THREE.Group();
+        requestAnimationFrame(() => {
+            try{
+                const shipsToWarm = getOwnedHangarShips().slice(0, 6);
+                shipsToWarm.forEach((ship, index) => {
+                    setTimeout(() => {
+                        try{
+                            const shipId = String(ship?.id || '').trim();
+                            if(!shipId || hangarShipMeshCache.has(shipId)) return;
+                            const raw = createHangarShipMesh(ship);
+                            const normalized = normalizeHangarShipMesh(raw);
+                            hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(normalized));
+                        }catch(_){}
+                    }, 40 * index);
+                });
+            }catch(_){}
+        });
+
         hangarState.scene.add(hangarState.shipPivot, hangarState.modulePivot);
     }
 
