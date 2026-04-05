@@ -3678,6 +3678,75 @@ shop-main-head{
   transform:translateX(-50%);
 }
 
+
+/* ===== V67 HANGAR STABLE FIX ===== */
+#hangar-window .hangar-module-side{
+  position:relative;
+  padding-top:86px;
+  padding-bottom:86px;
+}
+
+#hangar-window .hangar-module-view{
+  width:100%;
+  height:100%;
+  justify-content:center;
+}
+
+#hangar-window #hangar-module-up,
+#hangar-window #hangar-module-down{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:8;
+  margin:0 !important;
+}
+
+#hangar-window #hangar-module-up{
+  top:24px;
+}
+
+#hangar-window #hangar-module-down{
+  bottom:24px;
+}
+
+#hangar-window .hangar-stage-wrap{
+  align-items:stretch;
+}
+
+#hangar-window .hangar-stage{
+  height:auto !important;
+  min-height:640px !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  display:grid !important;
+  grid-template-rows:auto auto 1fr auto;
+  align-content:start;
+  justify-content:stretch;
+  padding:26px 28px 22px !important;
+}
+
+#hangar-window .hangar-ship-card{
+  align-self:start;
+  max-width:540px;
+}
+
+#hangar-window .hangar-stats-grid{
+  margin-top:22px !important;
+  width:min(560px, 100%);
+  align-self:start;
+}
+
+#hangar-window .hangar-footer-row{
+  position:static !important;
+  transform:none !important;
+  left:auto !important;
+  bottom:auto !important;
+  width:min(560px, 100%);
+  align-self:start;
+  margin-top:18px;
+}
+
 </style>
 </head>
 
