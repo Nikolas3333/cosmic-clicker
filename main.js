@@ -8174,7 +8174,7 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0, 0.38, 0);
+        hangarState.platform.position.set(0, 0.9, 0);
         hangarState.platform.scale.set(0.28, 0.28, 0.28);
         hangarState.scene.add(hangarState.platform);
 
@@ -8227,7 +8227,7 @@ function ensureHangarRenderer(){
         if(hangarState.shipPivot){
             hangarState.shipPivot.rotation.y += 0.012;
             hangarState.shipPivot.position.x = 0;
-            hangarState.shipPivot.position.y = 0.92 + Math.sin(time * 1.2) * 0.018;
+            hangarState.shipPivot.position.y = 0.92 + Math.sin(time * 1.2) * 0.012;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.016;
