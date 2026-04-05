@@ -3025,12 +3025,12 @@ if (gameState === "BATTLE" && playerShip) {
     } else if(!isBattleRespawning()) {
     if(firing) tryFireLaser();
 
-    const yawStep = 0.0021 * gameSettings.mouseSensitivity;
-    const pitchStep = 0.0017 * gameSettings.mouseSensitivity;
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    const yawStep = Number(currentBattleShipStats.turnYaw || 0.0021) * gameSettings.mouseSensitivity;
+    const pitchStep = Number(currentBattleShipStats.turnPitch || 0.0017) * gameSettings.mouseSensitivity;
     const invertFactor = gameSettings.invertY ? -1 : 1;
     const maxPitch = Math.PI / 3.1;
-    const maxRoll = 0.72;
-    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    const maxRoll = Number(currentBattleShipStats.rollLimit || 0.72);
     const forwardAcceleration = Number(currentBattleShipStats.forwardAcceleration || 0.14);
     const backwardAcceleration = Number(currentBattleShipStats.backwardAcceleration || 0.07);
     const strafeAcceleration = Number(currentBattleShipStats.strafeAcceleration || 0.045);
@@ -3195,7 +3195,9 @@ function playEffectSound(sound){
 
 function tryFireLaser(){
     const now = Date.now();
-    if(!playerShip || battleShipCrash || battleWeapon.isReloading || isBattlePlanetCaptureActive() || now - lastLaserShotAt < laserCooldown) return;
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    const fireCooldown = Number(currentBattleShipStats?.fireCooldown || laserCooldown) || laserCooldown;
+    if(!playerShip || battleShipCrash || battleWeapon.isReloading || isBattlePlanetCaptureActive() || now - lastLaserShotAt < fireCooldown) return;
     if(battleWeapon.ammoInClip <= 0){
         startBattleReload();
         return;
@@ -3204,26 +3206,81 @@ function tryFireLaser(){
     lastLaserShotAt = now;
     battleWeapon.ammoInClip = Math.max(0, battleWeapon.ammoInClip - 1);
 
-    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
-    const laserScale = Number(currentBattleShipStats?.laserScale || 1) || 1;
-    const laserVelocity = Number(currentBattleShipStats?.laserVelocity || 3.2) || 3.2;
-    const laserGeometry = new THREE.BoxGeometry(0.14 * laserScale, 0.14 * laserScale, 2.2);
-    const laserMaterial = new THREE.MeshBasicMaterial({ color: 0xff3355 });
+    const projectileWidth = Number(currentBattleShipStats?.projectileWidth || 0.14) || 0.14;
+    const projectileLength = Number(currentBattleShipStats?.projectileLength || 2.2) || 2.2;
+    const projectileScale = Number(currentBattleShipStats?.laserScale || 1) || 1;
+    const projectileVelocity = Number(currentBattleShipStats?.laserVelocity || 3.2) || 3.2;
+    const projectileLife = Number(currentBattleShipStats?.projectileLife || 100) || 100;
+    const projectileOffset = Number(currentBattleShipStats?.projectileOffset || 0) || 0;
+    const spread = Number(currentBattleShipStats?.spread || 0) || 0;
+    const burstCount = Math.max(1, Number(currentBattleShipStats?.burstCount || 1) || 1);
+    const weaponType = String(currentBattleShipStats?.weaponType || currentBattleShipStats?.ship?.weapon || 'laser').toLowerCase();
+    const color = new THREE.Color(currentBattleShipStats?.projectileColor || '#ff3355');
+    const coreColor = new THREE.Color(currentBattleShipStats?.projectileCoreColor || '#ffffff');
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
 
-    [-1.1, 1.1].forEach(offsetX => {
-        const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
+    const spawnProjectile = (offsetX = 0, spreadOffset = 0) => {
+        const projectileGroup = new THREE.Group();
+
+        let shell;
+        if(weaponType === 'missile'){
+            shell = new THREE.Mesh(
+                new THREE.CylinderGeometry(projectileWidth * 0.35, projectileWidth * 0.7, projectileLength, 10),
+                new THREE.MeshBasicMaterial({ color })
+            );
+            shell.rotation.x = Math.PI / 2;
+            const tip = new THREE.Mesh(
+                new THREE.ConeGeometry(projectileWidth * 0.7, projectileWidth * 1.1, 10),
+                new THREE.MeshBasicMaterial({ color: coreColor })
+            );
+            tip.rotation.x = -Math.PI / 2;
+            tip.position.z = -projectileLength * 0.55;
+            const flame = new THREE.Mesh(
+                new THREE.CylinderGeometry(projectileWidth * 0.18, projectileWidth * 0.45, projectileLength * 0.45, 8),
+                new THREE.MeshBasicMaterial({ color: '#ffdd88' })
+            );
+            flame.rotation.x = Math.PI / 2;
+            flame.position.z = projectileLength * 0.55;
+            projectileGroup.add(shell, tip, flame);
+        }else{
+            shell = new THREE.Mesh(
+                new THREE.BoxGeometry(projectileWidth * projectileScale, projectileWidth * projectileScale, projectileLength),
+                new THREE.MeshBasicMaterial({ color })
+            );
+            const core = new THREE.Mesh(
+                new THREE.BoxGeometry(projectileWidth * 0.45 * projectileScale, projectileWidth * 0.45 * projectileScale, projectileLength * 0.72),
+                new THREE.MeshBasicMaterial({ color: coreColor })
+            );
+            projectileGroup.add(shell, core);
+        }
+
+        const localDirection = new THREE.Vector3(spreadOffset, 0, -1).normalize().applyQuaternion(playerShip.quaternion);
         const localOffset = new THREE.Vector3(offsetX, 0, -2.2).applyQuaternion(playerShip.quaternion);
-        laserMesh.position.copy(playerShip.position.clone().add(localOffset));
-        laserMesh.lookAt(playerShip.position.clone().add(forward));
-        scene.add(laserMesh);
+        projectileGroup.position.copy(playerShip.position.clone().add(localOffset));
+        projectileGroup.lookAt(projectileGroup.position.clone().add(localDirection));
+        scene.add(projectileGroup);
+
         activeLasers.push({
-            mesh: laserMesh,
-            velocity: forward.clone().multiplyScalar(laserVelocity),
-            life: 100,
-            damage: battleWeapon.damage
+            mesh: projectileGroup,
+            velocity: localDirection.clone().multiplyScalar(projectileVelocity),
+            life: projectileLife,
+            damage: battleWeapon.damage,
+            weaponType
         });
-    });
+    };
+
+    if(burstCount === 1){
+        spawnProjectile(0, 0);
+    }else if(burstCount === 2){
+        spawnProjectile(-projectileOffset, -spread);
+        spawnProjectile(projectileOffset, spread);
+    }else{
+        const midIndex = (burstCount - 1) / 2;
+        for(let i = 0; i < burstCount; i++){
+            const offsetIndex = i - midIndex;
+            spawnProjectile(offsetIndex * projectileOffset, offsetIndex * spread);
+        }
+    }
 
     if(battleWeapon.ammoInClip <= 0){
         startBattleReload();
@@ -6591,6 +6648,8 @@ function spawnPlayer() {
         hp: currentBattleShipStats.hp,
         weapon: currentBattleShipStats.ship?.weapon || 'laser',
         speed: currentBattleShipStats.maxSpeed,
+        handling: currentBattleShipStats.handlingLabel,
+        fireCooldown: currentBattleShipStats.fireCooldown,
         modules: currentBattleShipStats.installedModules
     };
 
@@ -7195,13 +7254,27 @@ function computeShipBattleStats(shipId){
         reloadTime: 1800,
         laserVelocity: 3.2,
         laserScale: 1.0,
+        fireCooldown: 95,
+        weaponType: String(ship?.weapon || 'laser').toLowerCase(),
+        projectileColor: '#ff3355',
+        projectileCoreColor: '#ffffff',
+        projectileLength: 2.2,
+        projectileWidth: 0.14,
+        projectileLife: 100,
+        burstCount: 2,
+        projectileOffset: 1.1,
+        spread: 0.0,
+        turnYaw: 0.0021,
+        turnPitch: 0.0017,
+        rollLimit: 0.72,
+        handlingLabel: 'Стандарт',
         moduleSummary: []
     };
 
-    const speedFactor = THREE.MathUtils.clamp(stats.speed / 7.0, 0.72, 1.55);
-    const armorFactor = THREE.MathUtils.clamp(stats.armor / 6.0, 0.72, 1.7);
-    const damageFactor = THREE.MathUtils.clamp(stats.damage / 6.0, 0.72, 1.7);
-    const energyFactor = THREE.MathUtils.clamp(stats.energy / 7.0, 0.72, 1.9);
+    const speedFactor = THREE.MathUtils.clamp(stats.speed / 7.0, 0.72, 1.62);
+    const armorFactor = THREE.MathUtils.clamp(stats.armor / 6.0, 0.72, 1.85);
+    const damageFactor = THREE.MathUtils.clamp(stats.damage / 6.0, 0.72, 1.9);
+    const energyFactor = THREE.MathUtils.clamp(stats.energy / 7.0, 0.72, 2.0);
 
     stats.maxSpeed = 3.5 + speedFactor * 0.95;
     stats.forwardAcceleration = 0.095 + speedFactor * 0.034;
@@ -7213,6 +7286,134 @@ function computeShipBattleStats(shipId){
     stats.clipSize = Math.round(32 + energyFactor * 4.2);
     stats.reloadTime = Math.max(900, Math.round(2100 - energyFactor * 140));
     stats.laserVelocity = 2.7 + energyFactor * 0.1;
+    stats.laserScale = Number((0.9 + damageFactor * 0.08).toFixed(2));
+
+    const shipClass = String(ship?.classId || '').toLowerCase();
+    if(shipClass === 'fighters'){
+        stats.turnYaw = 0.0027;
+        stats.turnPitch = 0.0021;
+        stats.rollLimit = 0.95;
+        stats.maxSpeed *= 1.08;
+        stats.forwardAcceleration *= 1.14;
+        stats.strafeAcceleration *= 1.16;
+        stats.hp *= 0.92;
+        stats.handlingLabel = 'Манёвренный';
+    }else if(shipClass === 'tanks'){
+        stats.turnYaw = 0.00145;
+        stats.turnPitch = 0.00115;
+        stats.rollLimit = 0.42;
+        stats.maxSpeed *= 0.88;
+        stats.forwardAcceleration *= 0.9;
+        stats.strafeAcceleration *= 0.82;
+        stats.hp *= 1.22;
+        stats.weaponDamage *= 1.08;
+        stats.handlingLabel = 'Тяжёлый';
+    }else if(shipClass === 'assault'){
+        stats.turnYaw = 0.00205;
+        stats.turnPitch = 0.00165;
+        stats.rollLimit = 0.78;
+        stats.weaponDamage *= 1.15;
+        stats.maxSpeed *= 0.98;
+        stats.handlingLabel = 'Штурмовой';
+    }else if(shipClass === 'technology'){
+        stats.turnYaw = 0.0022;
+        stats.turnPitch = 0.00185;
+        stats.rollLimit = 0.68;
+        stats.clipSize += 8;
+        stats.reloadTime *= 0.9;
+        stats.laserVelocity += 0.35;
+        stats.handlingLabel = 'Точный';
+    }else if(shipClass === 'universal'){
+        stats.turnYaw = 0.002;
+        stats.turnPitch = 0.00165;
+        stats.rollLimit = 0.72;
+        stats.handlingLabel = 'Универсал';
+    }
+
+    switch(stats.weaponType){
+        case 'pulse':
+            stats.projectileColor = '#57f8ff';
+            stats.projectileCoreColor = '#f3ffff';
+            stats.projectileLength = 1.7;
+            stats.projectileWidth = 0.11;
+            stats.projectileLife = 86;
+            stats.burstCount = 2;
+            stats.projectileOffset = 1.16;
+            stats.spread = 0.008;
+            stats.fireCooldown = 78;
+            stats.weaponDamage *= 0.94;
+            stats.laserVelocity += 0.45;
+            break;
+        case 'beam':
+            stats.projectileColor = '#7aa8ff';
+            stats.projectileCoreColor = '#ffffff';
+            stats.projectileLength = 3.4;
+            stats.projectileWidth = 0.09;
+            stats.projectileLife = 112;
+            stats.burstCount = 1;
+            stats.projectileOffset = 0.0;
+            stats.spread = 0.0;
+            stats.fireCooldown = 120;
+            stats.weaponDamage *= 1.12;
+            stats.laserVelocity += 0.72;
+            stats.laserScale += 0.12;
+            break;
+        case 'phase':
+            stats.projectileColor = '#b56dff';
+            stats.projectileCoreColor = '#ffe6ff';
+            stats.projectileLength = 2.8;
+            stats.projectileWidth = 0.16;
+            stats.projectileLife = 106;
+            stats.burstCount = 1;
+            stats.projectileOffset = 0.0;
+            stats.spread = 0.0;
+            stats.fireCooldown = 132;
+            stats.weaponDamage *= 1.24;
+            stats.laserVelocity += 0.38;
+            stats.laserScale += 0.2;
+            break;
+        case 'plasma':
+            stats.projectileColor = '#ff8c4d';
+            stats.projectileCoreColor = '#fff3dd';
+            stats.projectileLength = 2.3;
+            stats.projectileWidth = 0.2;
+            stats.projectileLife = 92;
+            stats.burstCount = 2;
+            stats.projectileOffset = 0.95;
+            stats.spread = 0.016;
+            stats.fireCooldown = 108;
+            stats.weaponDamage *= 1.2;
+            stats.laserVelocity -= 0.12;
+            stats.laserScale += 0.22;
+            break;
+        case 'missile':
+            stats.projectileColor = '#ffb15a';
+            stats.projectileCoreColor = '#fff2c8';
+            stats.projectileLength = 2.0;
+            stats.projectileWidth = 0.24;
+            stats.projectileLife = 124;
+            stats.burstCount = 1;
+            stats.projectileOffset = 0.0;
+            stats.spread = 0.0;
+            stats.fireCooldown = 168;
+            stats.weaponDamage *= 1.45;
+            stats.laserVelocity = Math.max(2.25, stats.laserVelocity - 0.35);
+            stats.laserScale += 0.34;
+            stats.clipSize = Math.max(12, Math.round(stats.clipSize * 0.6));
+            stats.reloadTime *= 1.08;
+            break;
+        default:
+            stats.projectileColor = '#ff3355';
+            stats.projectileCoreColor = '#ffffff';
+            stats.projectileLength = 2.2;
+            stats.projectileWidth = 0.14;
+            stats.projectileLife = 100;
+            stats.burstCount = 2;
+            stats.projectileOffset = 1.1;
+            stats.spread = 0.003;
+            stats.fireCooldown = 95;
+            break;
+    }
 
     installedModules.forEach(module => {
         const typeId = String(module?.typeId || module?.classId || '').trim();
@@ -7220,6 +7421,8 @@ function computeShipBattleStats(shipId){
             stats.maxSpeed *= 1.12;
             stats.forwardAcceleration *= 1.15;
             stats.strafeAcceleration *= 1.12;
+            stats.turnYaw *= 1.04;
+            stats.turnPitch *= 1.04;
             stats.moduleSummary.push('+скорость');
         }else if(typeId === 'defense'){
             stats.hp *= 1.18;
@@ -7234,10 +7437,12 @@ function computeShipBattleStats(shipId){
             stats.laserVelocity += 0.55;
             stats.laserScale += 0.22;
             stats.weaponDamage += 1;
+            stats.spread *= 0.6;
             stats.moduleSummary.push('+точность');
         }else if(typeId === 'weapon'){
             stats.weaponDamage *= 1.14;
             stats.laserScale += 0.1;
+            stats.fireCooldown *= 0.92;
             stats.moduleSummary.push('+урон');
         }
     });
@@ -7249,10 +7454,18 @@ function computeShipBattleStats(shipId){
     stats.damping = Number(Math.min(0.994, stats.damping).toFixed(3));
     stats.hp = Math.max(80, Math.round(stats.hp));
     stats.weaponDamage = Math.max(8, Math.round(stats.weaponDamage));
-    stats.clipSize = Math.max(24, Math.round(stats.clipSize));
-    stats.reloadTime = Math.max(850, Math.round(stats.reloadTime));
-    stats.laserVelocity = Number(stats.laserVelocity.toFixed(2));
-    stats.laserScale = Number(stats.laserScale.toFixed(2));
+    stats.clipSize = Math.max(8, Math.round(stats.clipSize));
+    stats.reloadTime = Math.max(650, Math.round(stats.reloadTime));
+    stats.laserVelocity = Number(Math.max(2.0, stats.laserVelocity).toFixed(2));
+    stats.laserScale = Number(Math.max(0.85, stats.laserScale).toFixed(2));
+    stats.fireCooldown = Math.max(60, Math.round(stats.fireCooldown));
+    stats.turnYaw = Number(stats.turnYaw.toFixed(4));
+    stats.turnPitch = Number(stats.turnPitch.toFixed(4));
+    stats.rollLimit = Number(stats.rollLimit.toFixed(2));
+    stats.projectileWidth = Number(stats.projectileWidth.toFixed(2));
+    stats.projectileLength = Number(stats.projectileLength.toFixed(2));
+    stats.projectileOffset = Number(stats.projectileOffset.toFixed(2));
+    stats.spread = Number(stats.spread.toFixed(3));
 
     return stats;
 }
@@ -7343,36 +7556,142 @@ function createHangarShipMesh(item){
     const glowMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(neon) });
     const engineMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(engine) });
 
-    const addEnginePair = (x=0.65, y=-0.05, z=2.9, sizeX=0.26, sizeY=0.28, sizeZ=1.0) => {
-        const engineL = new THREE.Mesh(new THREE.BoxGeometry(sizeX, sizeY, sizeZ), engineMat);
-        engineL.position.set(-x, y, z);
-        const engineR = engineL.clone();
-        engineR.position.x = x;
-        group.add(engineL, engineR);
+    const addEngine = (x, y, z, sx, sy, sz) => {
+        const part = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), engineMat);
+        part.position.set(x, y, z);
+        group.add(part);
+        return part;
+    };
+    const addSymPair = (meshFactory, x) => {
+        const left = meshFactory();
+        left.position.x = -Math.abs(x);
+        const right = meshFactory();
+        right.position.x = Math.abs(x);
+        group.add(left, right);
+        return [left, right];
     };
 
-    if(art === 'vector'){
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.18, 5.6, 8), metal);
+    if(art === 'arrow' || art === 'dart'){
+        const body = new THREE.Mesh(new THREE.ConeGeometry(1.0, art === 'dart' ? 5.9 : 5.4, 8), metal);
         body.rotation.x = -Math.PI / 2;
         group.add(body);
 
-        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.82, 1.95, 8), lightMetal);
+        const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.54, 18, 18), lightMetal);
+        cockpit.position.set(0, 0.34, -0.95);
+        group.add(cockpit);
+
+        const wingFactory = () => {
+            const wing = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.12, art === 'dart' ? 2.8 : 2.2), darkMetal);
+            wing.position.set(0, -0.08, 0.32);
+            return wing;
+        };
+        const [wingL, wingR] = addSymPair(wingFactory, 1.5);
+        wingL.rotation.z = -0.42;
+        wingR.rotation.z = 0.42;
+
+        const spine = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.3, 3.0), glowMat);
+        spine.position.set(0, 0.14, 0.2);
+        group.add(spine);
+
+        addEngine(-0.42, 0.0, 2.95, 0.2, 0.2, 0.95);
+        addEngine(0.42, 0.0, 2.95, 0.2, 0.2, 0.95);
+        if(art === 'dart'){
+            const noseFin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 1.1), glowMat);
+            noseFin.position.set(0, 0.35, -2.1);
+            group.add(noseFin);
+        }
+    }else if(art === 'stinger' || art === 'phantom' || art === 'razor'){
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.38, art === 'razor' ? 1.05 : 0.9, 6.0, 6), metal);
+        body.rotation.x = -Math.PI / 2;
+        group.add(body);
+
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(art === 'phantom' ? 0.62 : 0.78, 1.9, 6), lightMetal);
         nose.rotation.x = -Math.PI / 2;
-        nose.position.z = -3.62;
+        nose.position.z = -3.4;
         group.add(nose);
 
-        const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.16, 2.45), darkMetal);
-        wingL.position.set(-1.55, -0.12, 0.2);
-        wingL.rotation.z = -0.26;
-        const wingR = wingL.clone();
-        wingR.position.x = 1.55;
-        wingR.rotation.z = 0.26;
-        group.add(wingL, wingR);
+        const bladeFactory = () => {
+            const blade = new THREE.Mesh(new THREE.BoxGeometry(art === 'razor' ? 2.1 : 1.8, 0.08, 2.7), darkMetal);
+            blade.position.set(0, -0.06, 0.18);
+            return blade;
+        };
+        const [bladeL, bladeR] = addSymPair(bladeFactory, art === 'phantom' ? 1.22 : 1.42);
+        bladeL.rotation.z = art === 'phantom' ? -0.68 : -0.52;
+        bladeR.rotation.z = art === 'phantom' ? 0.68 : 0.52;
 
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24, 4.9), glowMat);
-        rail.position.set(0, 0.28, -0.15);
-        group.add(rail);
-        addEnginePair(0.78, -0.04, 3.15, 0.3, 0.28, 1.1);
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.9, 1.6), glowMat);
+        fin.position.set(0, 0.45, 0.68);
+        group.add(fin);
+
+        addEngine(-0.56, -0.02, 3.2, 0.2, 0.18, 1.0);
+        addEngine(0.56, -0.02, 3.2, 0.2, 0.18, 1.0);
+        if(art === 'razor'){
+            addEngine(0, -0.05, 3.45, 0.22, 0.22, 1.2);
+            const wingGlowL = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.03, 0.12), glowMat);
+            wingGlowL.position.set(-1.45, 0.02, 0.4);
+            const wingGlowR = wingGlowL.clone();
+            wingGlowR.position.x = 1.45;
+            group.add(wingGlowL, wingGlowR);
+        }
+    }else if(art === 'bulwark' || art === 'fortress' || art === 'citadel'){
+        const width = art === 'citadel' ? 2.8 : (art === 'fortress' ? 2.45 : 2.2);
+        const body = new THREE.Mesh(new THREE.BoxGeometry(width, 0.95, 4.8), metal);
+        group.add(body);
+
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.74, 2.0), lightMetal);
+        tower.position.set(0, 0.7, -0.2);
+        group.add(tower);
+
+        const sidePlateFactory = () => {
+            const plate = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.3, 2.4), darkMetal);
+            plate.position.set(0, -0.06, 0.35);
+            return plate;
+        };
+        const [plateL, plateR] = addSymPair(sidePlateFactory, width * 0.43);
+        plateL.rotation.z = -0.08;
+        plateR.rotation.z = 0.08;
+
+        const frontArc = new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.15, 16, 40, Math.PI), glowMat);
+        frontArc.position.set(0, 0.28, -2.05);
+        frontArc.rotation.z = Math.PI;
+        group.add(frontArc);
+
+        addEngine(-0.8, -0.06, 3.0, 0.32, 0.24, 1.1);
+        addEngine(0.8, -0.06, 3.0, 0.32, 0.24, 1.1);
+        if(art === 'citadel'){
+            addEngine(0, -0.08, 3.18, 0.35, 0.26, 1.22);
+        }
+    }else if(art === 'lancer' || art === 'destroyer'){
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55, art === 'destroyer' ? 1.2 : 0.95, 5.8, 7), metal);
+        body.rotation.x = -Math.PI / 2;
+        group.add(body);
+
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.46, art === 'destroyer' ? 2.0 : 1.5), lightMetal);
+        nose.position.set(0, 0.15, -2.15);
+        nose.rotation.y = art === 'destroyer' ? 0 : 0.1;
+        group.add(nose);
+
+        const assaultWingFactory = () => {
+            const wing = new THREE.Mesh(new THREE.BoxGeometry(art === 'destroyer' ? 1.8 : 1.35, 0.18, 2.6), darkMetal);
+            wing.position.set(0, -0.05, 0.45);
+            return wing;
+        };
+        const [wingL, wingR] = addSymPair(assaultWingFactory, art === 'destroyer' ? 1.9 : 1.55);
+        wingL.rotation.z = art === 'destroyer' ? -0.24 : -0.36;
+        wingR.rotation.z = art === 'destroyer' ? 0.24 : 0.36;
+
+        const missileRackL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.32, 1.2), glowMat);
+        missileRackL.position.set(-1.0, -0.2, -0.5);
+        const missileRackR = missileRackL.clone();
+        missileRackR.position.x = 1.0;
+        group.add(missileRackL, missileRackR);
+
+        addEngine(-0.72, -0.02, 3.1, 0.28, 0.22, 1.08);
+        addEngine(0.72, -0.02, 3.1, 0.28, 0.22, 1.08);
+        if(art === 'destroyer'){
+            addEngine(-1.18, -0.02, 2.84, 0.18, 0.18, 0.82);
+            addEngine(1.18, -0.02, 2.84, 0.18, 0.18, 0.82);
+        }
     }else if(art === 'halo'){
         const body = new THREE.Mesh(new THREE.OctahedronGeometry(1.55, 0), metal);
         body.scale.set(1.25, 0.7, 2.45);
@@ -7391,7 +7710,8 @@ function createHangarShipMesh(item){
         tail.rotation.x = -Math.PI / 2;
         tail.position.z = 2.1;
         group.add(tail);
-        addEnginePair(0.58, 0.02, 3.35, 0.22, 0.22, 1.05);
+        addEngine(-0.58, 0.02, 3.35, 0.22, 0.22, 1.05);
+        addEngine(0.58, 0.02, 3.35, 0.22, 0.22, 1.05);
     }else if(art === 'helios'){
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.22, 5.4, 6), metal);
         body.rotation.x = -Math.PI / 2;
@@ -7415,26 +7735,8 @@ function createHangarShipMesh(item){
         const glowStripR = glowStripL.clone();
         glowStripR.position.copy(solarR.position).add(new THREE.Vector3(0, 0.05, 0));
         group.add(glowStripL, glowStripR);
-        addEnginePair(0.72, -0.04, 3.05, 0.28, 0.24, 1.0);
-    }else if(art === 'citadel'){
-        const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.92, 4.7), metal);
-        group.add(body);
-
-        const tower = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.78, 1.8), lightMetal);
-        tower.position.set(0, 0.68, -0.35);
-        group.add(tower);
-
-        const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.2, 2.1), darkMetal);
-        wingL.position.set(-1.95, -0.08, 0.45);
-        const wingR = wingL.clone();
-        wingR.position.x = 1.95;
-        group.add(wingL, wingR);
-
-        const shieldArc = new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.16, 18, 44, Math.PI), glowMat);
-        shieldArc.position.set(0, 0.25, -1.95);
-        shieldArc.rotation.z = Math.PI;
-        group.add(shieldArc);
-        addEnginePair(0.95, -0.06, 2.95, 0.34, 0.28, 1.15);
+        addEngine(-0.72, -0.04, 3.05, 0.28, 0.24, 1.0);
+        addEngine(0.72, -0.04, 3.05, 0.28, 0.24, 1.0);
     }else{
         const body = new THREE.Mesh(new THREE.ConeGeometry(1.15, 5.2, 8), metal);
         body.rotation.x = -Math.PI / 2;
@@ -7456,7 +7758,8 @@ function createHangarShipMesh(item){
         const finR = finL.clone();
         finR.position.x = 1.48;
         group.add(finL, finR);
-        addEnginePair(0.48, -0.02, 2.8, 0.24, 0.24, 0.9);
+        addEngine(-0.48, -0.02, 2.8, 0.24, 0.24, 0.9);
+        addEngine(0.48, -0.02, 2.8, 0.24, 0.24, 0.9);
     }
 
     const noseGlow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), glowMat);
@@ -7623,11 +7926,14 @@ function fillHangarText(){
     const statsWrap = document.getElementById('hangar-ship-stats');
     if(statsWrap){
         const extraModules = installedModules.length ? installedModules.map(item => item.name).join(', ') : 'Нет';
+        const weaponLabel = String(ship?.stats?.find?.(row => String(row?.[0] || '').toLowerCase() === 'оружие')?.[1] || battleStatsView.weaponType || '—');
         const stats = [
             ['Скорость', battleStatsView.maxSpeed.toFixed(2)],
             ['Броня', battleStatsView.hp],
             ['Урон', battleStatsView.weaponDamage],
             ['Энергия', battleStatsView.clipSize],
+            ['Оружие', weaponLabel],
+            ['Управление', battleStatsView.handlingLabel],
             ['Перезарядка', `${(battleStatsView.reloadTime / 1000).toFixed(1)}с`],
             ['Модули', extraModules]
         ];
