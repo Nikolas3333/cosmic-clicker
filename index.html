@@ -3657,6 +3657,84 @@ shop-main-head{
   .hangar-arrow.horizontal{ height:64px; }
 }
 
+
+/* ===== V65 HANGAR VISIBILITY FIX ===== */
+#hangar-window .hangar-stage{
+  position: relative;
+  min-height: 640px;
+  height: 640px;
+  overflow: hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+#hangar-window .hangar-3d-stage{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+
+#hangar-window .hangar-stage-overlay{
+  position:absolute;
+  inset:0;
+  z-index:4;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  pointer-events:none;
+  padding:18px 18px 20px;
+  box-sizing:border-box;
+}
+
+#hangar-window .hangar-ship-card,
+#hangar-window .hangar-stats-grid,
+#hangar-window .hangar-footer-row{
+  pointer-events:auto;
+}
+
+#hangar-window .hangar-ship-card{
+  max-width:460px;
+  align-self:center;
+  margin-top:8px;
+}
+
+#hangar-window .hangar-stats-grid{
+  width:min(760px, calc(100% - 40px));
+  align-self:center;
+  margin-top:auto;
+  margin-bottom:14px;
+}
+
+#hangar-window .hangar-footer-row{
+  width:min(760px, calc(100% - 40px));
+  align-self:center;
+  margin-top:0;
+  margin-bottom:4px;
+  position:relative;
+  z-index:6;
+}
+
+#hangar-window #hangar-ship-action{
+  position:relative;
+  z-index:7;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  position:relative;
+  z-index:8;
+}
+
+#hangar-window .hangar-main-btn{
+  min-width:220px;
+}
+
+#hangar-window .hangar-position-label{
+  min-width:84px;
+  text-align:center;
+}
+
 </style>
 </head>
 
