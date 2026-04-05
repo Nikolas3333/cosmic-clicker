@@ -95,6 +95,7 @@ const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 let battleKillCombo = 0;
 let battleLastKillAt = 0;
 const BATTLE_COMBO_WINDOW_MS = 1000;
+const battleProcessedHitIds = new Set();
 let playerControl = { yaw:0, pitch:0, roll:0 };
 let lobbyBgTimer = null;
 
@@ -406,6 +407,22 @@ function startBattlePlanetCapture(){
         battlePlanetCapture.normal.set(0, 1, 0);
     }
     resetBattleInputState();
+}
+
+function distancePointToSegment(point, segmentStart, segmentEnd){
+    const ab = segmentEnd.clone().sub(segmentStart);
+    const abLenSq = ab.lengthSq();
+    if(abLenSq <= 0.000001) return point.distanceTo(segmentStart);
+    const t = THREE.MathUtils.clamp(point.clone().sub(segmentStart).dot(ab) / abLenSq, 0, 1);
+    const closest = segmentStart.clone().add(ab.multiplyScalar(t));
+    return point.distanceTo(closest);
+}
+
+function getRemoteShipHitDistance(entry, segmentStart, segmentEnd){
+    if(!entry?.mesh) return Infinity;
+    const targetCenter = entry.targetPosition?.clone?.() || entry.mesh.position.clone();
+    const radius = Math.max(2.8, Number(entry?.mesh?.userData?.hitRadius || entry?.hitRadius || 0) || 0, 2.8);
+    return distancePointToSegment(targetCenter, segmentStart, segmentEnd) - radius;
 }
 
 function updateBattlePlanetCapture(){
@@ -1113,6 +1130,7 @@ function clearBattleScene(){
     playerControl.roll = 0;
     battleKillCombo = 0;
     battleLastKillAt = 0;
+    battleProcessedHitIds.clear();
     battleObserverMode = false;
     observerCameraYaw = 0;
     observerCameraPitch = -0.2;
@@ -3078,6 +3096,7 @@ if (gameState === "BATTLE" && playerShip) {
 
     for (let i = activeLasers.length - 1; i >= 0; i--) {
         const laser = activeLasers[i];
+        const previousPosition = laser.mesh.position.clone();
         laser.mesh.position.add(laser.velocity);
         laser.life -= 1;
 
@@ -3100,18 +3119,26 @@ if (gameState === "BATTLE" && playerShip) {
             continue;
         }
 
+        const segmentEnd = laser.mesh.position.clone();
         let hitRemoteShip = false;
+        let bestRemoteId = '';
+        let bestRemoteEntry = null;
+        let bestRemoteDistance = Infinity;
         remoteBattleShips.forEach((entry, entryId) => {
-            if(hitRemoteShip || !entry?.mesh) return;
-            const targetMesh = entry.mesh;
-            const hitRadius = Number(targetMesh.userData?.hitRadius || 2.6) || 2.6;
-            if(laser.mesh.position.distanceTo(targetMesh.position) <= hitRadius){
-                hitRemoteShip = true;
-                broadcastBattleHit(entryId, laser.damage, entry?.nickname || targetMesh.userData?.pilotName || 'Pilot');
-                scene.remove(laser.mesh);
-                activeLasers.splice(i, 1);
+            if(!entry?.mesh) return;
+            const hitDistance = getRemoteShipHitDistance(entry, previousPosition, segmentEnd);
+            if(hitDistance <= 0 && hitDistance < bestRemoteDistance){
+                bestRemoteDistance = hitDistance;
+                bestRemoteId = String(entryId || '').trim();
+                bestRemoteEntry = entry;
             }
         });
+        if(bestRemoteId && bestRemoteEntry){
+            hitRemoteShip = true;
+            broadcastBattleHit(bestRemoteId, laser.damage, bestRemoteEntry?.nickname || bestRemoteEntry?.mesh?.userData?.pilotName || 'Pilot');
+            scene.remove(laser.mesh);
+            activeLasers.splice(i, 1);
+        }
         if(hitRemoteShip){
             continue;
         }
@@ -6178,7 +6205,8 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
 }
 
 function getLiveBattleChannelName(){
-    const roomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    const rawRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    const roomId = sanitizeOnlineRoomId(rawRoomId);
     if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return '';
     return `cosmic-battle-room:${roomId}`;
 }
@@ -6287,13 +6315,15 @@ async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
     const self = getBattleSelfIdentity();
     const targetId = String(targetPlayerId || '').trim();
     if(!self.playerId || !targetId || !damage) return false;
+    const issuedAt = Date.now();
     return sendBattlePresenceEvent('pilot-hit', {
+        hitId: `${self.playerId}:${targetId}:${issuedAt}:${Math.random().toString(36).slice(2,8)}`,
         attackerId: self.playerId,
         attackerName: self.nickname,
         targetPlayerId: targetId,
         targetName: String(victimName || '').trim(),
         damage: Number(damage || 0) || 0,
-        at: Date.now()
+        at: issuedAt
     });
 }
 
@@ -6312,6 +6342,16 @@ function applyIncomingBattleHit(payload = {}){
     const self = getBattleSelfIdentity();
     const targetId = String(payload?.targetPlayerId || '').trim();
     if(!self.playerId || !targetId || self.playerId !== targetId) return;
+
+    const hitId = String(payload?.hitId || '').trim();
+    if(hitId){
+        if(battleProcessedHitIds.has(hitId)) return;
+        battleProcessedHitIds.add(hitId);
+        if(battleProcessedHitIds.size > 120){
+            const firstKey = battleProcessedHitIds.values().next().value;
+            if(firstKey) battleProcessedHitIds.delete(firstKey);
+        }
+    }
 
     const damageValue = Math.max(0, Number(payload?.damage || 0) || 0);
     if(!damageValue) return;
@@ -6456,7 +6496,7 @@ function buildObserveRoomState(targetMap = ''){
 
 async function fetchCurrentRoomLivePlayers(){
     if(!window.supabaseClient || !currentRoom?.id) return [];
-    const roomId = String(currentRoom.id || currentRoom.roomId || '').trim();
+    const roomId = sanitizeOnlineRoomId(currentRoom.id || currentRoom.roomId || null);
     if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return [];
 
     const { data, error } = await window.supabaseClient
