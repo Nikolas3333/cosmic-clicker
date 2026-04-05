@@ -7176,7 +7176,7 @@ function isOwnedModule(moduleId){
 
 function getOwnedHangarModules(){
     ensureModuleOwnershipDefaults();
-    const modules = getAllHangarModules();
+    const modules = getOwnedHangarModules();
     if(!modules.length) return [];
     const owned = modules.filter(item => isOwnedModule(item.id));
     return owned.length ? owned : modules;
@@ -7949,6 +7949,50 @@ function fillHangarText(){
     updateHangarButtons();
 }
 
+
+function normalizeHangarShipMesh(shipMesh){
+    try{
+        if(!shipMesh) return shipMesh;
+
+        shipMesh.updateMatrixWorld(true);
+
+        const bounds = new THREE.Box3().setFromObject(shipMesh);
+        const size = bounds.getSize(new THREE.Vector3());
+        const center = bounds.getCenter(new THREE.Vector3());
+
+        const wrap = new THREE.Group();
+        wrap.add(shipMesh);
+
+        const maxWidth = 6.2;
+        const maxHeight = 4.8;
+        const maxDepth = 6.2;
+
+        const scaleX = size.x > 0 ? maxWidth / size.x : 1;
+        const scaleY = size.y > 0 ? maxHeight / size.y : 1;
+        const scaleZ = size.z > 0 ? maxDepth / size.z : 1;
+        const finalScale = Math.min(scaleX, scaleY, scaleZ, 1.28);
+
+        shipMesh.scale.multiplyScalar(finalScale);
+        shipMesh.updateMatrixWorld(true);
+
+        const normalizedBounds = new THREE.Box3().setFromObject(shipMesh);
+        const normalizedSize = normalizedBounds.getSize(new THREE.Vector3());
+        const normalizedCenter = normalizedBounds.getCenter(new THREE.Vector3());
+
+        shipMesh.position.x -= normalizedCenter.x;
+        shipMesh.position.z -= normalizedCenter.z;
+        shipMesh.position.y -= normalizedBounds.min.y;
+        shipMesh.position.y += 0.15;
+
+        wrap.userData.hangarHeight = normalizedSize.y || 0;
+        wrap.userData.hangarWidth = normalizedSize.x || 0;
+        wrap.userData.hangarDepth = normalizedSize.z || 0;
+        return wrap;
+    }catch(_){
+        return shipMesh;
+    }
+}
+
 function rebuildHangarSceneObjects(){
     if(!hangarState.scene || !hangarState.shipPivot || !hangarState.modulePivot) return;
 
@@ -7956,19 +8000,20 @@ function rebuildHangarSceneObjects(){
     while(hangarState.modulePivot.children.length) hangarState.modulePivot.remove(hangarState.modulePivot.children[0]);
 
     const ships = getOwnedHangarShips();
-    const modules = getAllHangarModules();
+    const modules = getOwnedHangarModules();
     const currentShip = ships[hangarState.shipIndex];
     const currentModule = modules[hangarState.moduleIndex];
 
     if(currentShip){
-        const shipMesh = createHangarShipMesh(currentShip);
-        shipMesh.position.set(0, 3.35, 0.1);
+        const rawShipMesh = createHangarShipMesh(currentShip);
+        const shipMesh = normalizeHangarShipMesh(rawShipMesh);
+        shipMesh.position.set(0, 1.65, 0);
         hangarState.shipPivot.add(shipMesh);
     }
 
     if(currentModule){
         const moduleMesh = createHangarModuleMesh(currentModule);
-        moduleMesh.position.set(-6.9, 3.9, 0.25);
+        moduleMesh.position.set(-6.9, 2.9, 0.25);
         hangarState.modulePivot.add(moduleMesh);
     }
 
@@ -7987,7 +8032,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
-        hangarState.camera.position.set(0, 6.5, 18.5);
+        hangarState.camera.position.set(0, 4.8, 12.8);
+        hangarState.camera.lookAt(0, 2.2, 0);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8046,12 +8092,12 @@ function ensureHangarRenderer(){
         if(hangarState.platform) hangarState.platform.rotation.y += 0.006;
         if(hangarState.shipPivot){
             hangarState.shipPivot.rotation.y += 0.012;
-            hangarState.shipPivot.position.y = Math.sin(time * 1.2) * 0.18;
+            hangarState.shipPivot.position.y = 0.35 + Math.sin(time * 1.2) * 0.12;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.016;
             hangarState.modulePivot.rotation.x = Math.sin(time * 0.8) * 0.16;
-            hangarState.modulePivot.position.y = Math.sin(time * 1.5) * 0.22;
+            hangarState.modulePivot.position.y = Math.sin(time * 1.5) * 0.12;
         }
 
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
