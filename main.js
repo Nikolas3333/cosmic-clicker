@@ -7133,6 +7133,7 @@ const hangarState = {
     platform: null,
     platformRing: null,
     platformGlowDisc: null,
+    platformBeams: [],
     shipPivot: null,
     modulePivot: null,
     frameId: 0,
@@ -7611,8 +7612,37 @@ function createHangarPlatform(){
     glowDisc.position.y = 0.5;
     group.add(glowDisc);
 
+    const beamGroup = new THREE.Group();
+    const beamPositions = [
+        [0, 0.64, 0],
+        [-1.25, 0.64, -0.28],
+        [1.25, 0.64, -0.28],
+        [-0.92, 0.64, 1.05],
+        [0.92, 0.64, 1.05]
+    ];
+    const beams = beamPositions.map(([x,y,z], idx) => {
+        const beam = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.1, idx === 0 ? 0.9 : 0.62, idx === 0 ? 9.5 : 7.8, 18, 1, true),
+            new THREE.MeshBasicMaterial({
+                color:0x7efcff,
+                transparent:true,
+                opacity: idx === 0 ? 0.24 : 0.17,
+                depthWrite:false,
+                blending:THREE.AdditiveBlending,
+                side:THREE.DoubleSide
+            })
+        );
+        beam.position.set(x,y + (idx === 0 ? 3.0 : 2.45),z);
+        beam.rotation.z = idx === 0 ? 0 : ((idx % 2 === 0 ? -0.12 : 0.12));
+        beam.rotation.x = idx === 0 ? 0 : ((idx < 3 ? -0.06 : 0.08));
+        beamGroup.add(beam);
+        return beam;
+    });
+    group.add(beamGroup);
+
     group.userData.ring = ring;
     group.userData.glowDisc = glowDisc;
+    group.userData.beams = beams;
     return group;
 }
 
@@ -7923,6 +7953,7 @@ function disposeHangarRenderer(){
     hangarState.platform = null;
     hangarState.shipPivot = null;
     hangarState.modulePivot = null;
+    hangarState.platformBeams = [];
 }
 
 function updateHangarHeaderNumbers(){
@@ -8278,6 +8309,7 @@ function ensureHangarRenderer(){
         hangarState.platform.scale.set(0.188, 0.188, 0.188);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
+        hangarState.platformBeams = hangarState.platform.userData?.beams || [];
         hangarState.scene.add(hangarState.platform);
 
         hangarState.shipPivot = new THREE.Group();
@@ -8340,8 +8372,18 @@ function ensureHangarRenderer(){
             hangarState.platformRing.material.color.copy(ringColor);
         }
         if(hangarState.platformGlowDisc?.material){
-            hangarState.platformGlowDisc.material.opacity = isViewedShipSelected ? 0.36 : 0.24;
+            hangarState.platformGlowDisc.material.opacity = isViewedShipSelected ? 0.30 : 0.2;
             hangarState.platformGlowDisc.material.color.copy(glowColor);
+        }
+        if(Array.isArray(hangarState.platformBeams)){
+            hangarState.platformBeams.forEach((beam, idx) => {
+                const mat = beam?.material;
+                if(!mat) return;
+                const hue = (time * 0.08 + idx * 0.07) % 1;
+                mat.color.setHSL(hue, 0.9, 0.62);
+                mat.opacity = (idx === 0 ? 0.24 : 0.15) + Math.sin(time * 2.2 + idx * 1.35) * 0.03;
+                beam.scale.y = 1 + Math.sin(time * 1.7 + idx * 0.6) * 0.04;
+            });
         }
 
         const transitionElapsed = now - hangarState.transitionStartedAt;
@@ -8364,9 +8406,9 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.y = hangarState.shipYaw;
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
-            hangarState.shipPivot.position.x = 1.48 + transitionOffset * 0.9;
-            hangarState.shipPivot.position.y = -0.12 + Math.sin(time * 1.25) * 0.012;
-            hangarState.shipPivot.position.z = 0.52;
+            hangarState.shipPivot.position.x = 0.58 + transitionOffset * 0.55;
+            hangarState.shipPivot.position.y = -1.08 + Math.sin(time * 1.18) * 0.01;
+            hangarState.shipPivot.position.z = 0.86;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.012;
