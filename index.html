@@ -3810,6 +3810,70 @@ shop-main-head{
 #hangar-window #hangar-module-up{ top:28px !important; }
 #hangar-window #hangar-module-down{ bottom:28px !important; }
 
+
+/* ===== V70 HANGAR BOUNDS FIX ===== */
+#hangar-window .hangar-module-side,
+#hangar-window .hangar-stage,
+#hangar-window .hangar-3d-stage,
+#hangar-window .hangar-stage-overlay{
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  padding:26px 22px 20px !important;
+}
+
+#hangar-window .hangar-ship-card,
+#hangar-window .hangar-stats-grid,
+#hangar-window .hangar-footer-row{
+  width:min(460px, calc(100% - 14px)) !important;
+  max-width:460px !important;
+}
+
+#hangar-window .hangar-ship-card{
+  margin-left:0 !important;
+}
+
+#hangar-window .hangar-stats-grid{
+  grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+  gap:12px !important;
+}
+
+#hangar-window .hangar-module-side .hangar-card{
+  width:100% !important;
+  max-width:100% !important;
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-module-side .hangar-card,
+#hangar-window .hangar-module-side .hangar-card *{
+  box-sizing:border-box !important;
+}
+
+#hangar-window .hangar-module-side .hangar-card h3,
+#hangar-window .hangar-module-side .hangar-card p,
+#hangar-window .hangar-module-side .hangar-card .hangar-muted,
+#hangar-window .hangar-module-side .hangar-card .hangar-card-subtitle{
+  max-width:100% !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+  text-align:center !important;
+}
+
+#hangar-window .hangar-module-view{
+  margin:0 auto !important;
+  max-width:310px !important;
+}
+
+#hangar-window .hangar-main-btn{
+  width:100% !important;
+  max-width:100% !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  z-index:8 !important;
+}
+
 </style>
 </head>
 
