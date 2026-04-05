@@ -8247,7 +8247,7 @@ function ensureHangarRenderer(){
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
         hangarState.camera.position.set(0, 1.02, 10.6);
-        hangarState.camera.lookAt(0, -0.18, 0.16);
+        hangarState.camera.lookAt(-0.22, -0.10, 0.34);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8272,8 +8272,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0, -1.12, 0.38);
-        hangarState.platform.scale.set(0.34, 0.34, 0.34);
+        hangarState.platform.position.set(-1.18, -0.82, 0.58);
+        hangarState.platform.scale.set(0.29, 0.29, 0.29);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
         hangarState.scene.add(hangarState.platform);
@@ -8360,8 +8360,8 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
             hangarState.shipPivot.position.x = transitionOffset;
-            hangarState.shipPivot.position.y = -0.38 + Math.sin(time * 1.25) * 0.028;
-            hangarState.shipPivot.position.z = 0.16;
+            hangarState.shipPivot.position.y = -0.50 + Math.sin(time * 1.25) * 0.018;
+            hangarState.shipPivot.position.z = 0.34;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.012;
@@ -8370,7 +8370,7 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.camera){
-            hangarState.camera.lookAt(0, -0.18, 0.16);
+            hangarState.camera.lookAt(-0.22, -0.10, 0.34);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
