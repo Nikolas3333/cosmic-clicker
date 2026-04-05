@@ -4500,6 +4500,89 @@ shop-main-head{
   z-index:1;
 }
 
+
+/* ===== V82 HANGAR UX POLISH ===== */
+#hangar-window .hangar-stage{
+  cursor:grab !important;
+}
+
+#hangar-window .hangar-stage.dragging{
+  cursor:grabbing !important;
+}
+
+#hangar-window .hangar-main-btn{
+  min-width:180px !important;
+  max-width:180px !important;
+  background:linear-gradient(180deg, #2d9e55, #196c37) !important;
+  box-shadow:0 0 22px rgba(72,255,142,0.18) !important;
+  transition:transform .18s ease, box-shadow .22s ease, filter .22s ease, background .22s ease !important;
+}
+
+#hangar-window .hangar-main-btn.ready:hover{
+  transform:translateY(-1px) scale(1.02) !important;
+  box-shadow:0 0 28px rgba(72,255,142,0.28) !important;
+}
+
+#hangar-window .hangar-main-btn.equipped{
+  background:linear-gradient(180deg, #708493, #4d5d69) !important;
+  box-shadow:0 0 18px rgba(190,220,255,0.12) !important;
+}
+
+#hangar-window .hangar-main-btn.locked{
+  background:linear-gradient(180deg, #6a4f24, #3f2d12) !important;
+  box-shadow:none !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  transition:transform .18s ease, box-shadow .22s ease, opacity .22s ease !important;
+}
+
+#hangar-window .hangar-arrow.horizontal:hover:not(:disabled){
+  transform:translateY(-50%) scale(1.05) !important;
+  box-shadow:0 0 22px rgba(90,210,255,0.24) !important;
+}
+
+#hangar-window .hangar-arrow:disabled{
+  opacity:0.42 !important;
+  filter:saturate(0.7) !important;
+}
+
+#hangar-window .hangar-stage.ship-loading .hangar-ship-card,
+#hangar-window .hangar-stage.ship-loading #hangar-ship-stats,
+#hangar-window .hangar-stage.ship-loading .hangar-footer-row{
+  opacity:0.72;
+}
+
+#hangar-window .hangar-stage.ship-loading::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:3;
+  background:
+    linear-gradient(110deg, rgba(255,255,255,0) 36%, rgba(125,220,255,0.12) 50%, rgba(255,255,255,0) 64%);
+  transform:translateX(-100%);
+  animation:hangarStageSweep 1.2s linear infinite;
+}
+
+@keyframes hangarStageSweep{
+  from{ transform:translateX(-100%); }
+  to{ transform:translateX(100%); }
+}
+
+#hangar-window .hangar-stage.empty-class .hangar-ship-card{
+  border-color:rgba(120,220,255,0.15) !important;
+  background:linear-gradient(180deg, rgba(7,18,34,0.9), rgba(5,11,22,0.84)) !important;
+}
+
+#hangar-window .hangar-stage.empty-class .hangar-ship-name{
+  color:#eaf9ff !important;
+}
+
+#hangar-window .hangar-stage.empty-class .hangar-ship-subtitle{
+  color:#bcecff !important;
+}
+
 </style>
 </head>
 
