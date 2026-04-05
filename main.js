@@ -8246,8 +8246,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
-        hangarState.camera.position.set(0, 1.02, 10.6);
-        hangarState.camera.lookAt(-0.22, -0.10, 0.34);
+        hangarState.camera.position.set(0.08, 0.96, 10.4);
+        hangarState.camera.lookAt(-0.06, -0.18, 0.36);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8272,8 +8272,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(-1.18, -0.82, 0.58);
-        hangarState.platform.scale.set(0.29, 0.29, 0.29);
+        hangarState.platform.position.set(-0.72, -0.60, 0.54);
+        hangarState.platform.scale.set(0.245, 0.245, 0.245);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
         hangarState.scene.add(hangarState.platform);
@@ -8360,8 +8360,8 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
             hangarState.shipPivot.position.x = transitionOffset;
-            hangarState.shipPivot.position.y = -0.50 + Math.sin(time * 1.25) * 0.018;
-            hangarState.shipPivot.position.z = 0.34;
+            hangarState.shipPivot.position.y = -0.56 + Math.sin(time * 1.25) * 0.014;
+            hangarState.shipPivot.position.z = 0.30;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.012;
@@ -8370,7 +8370,7 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.camera){
-            hangarState.camera.lookAt(-0.22, -0.10, 0.34);
+            hangarState.camera.lookAt(-0.06, -0.18, 0.36);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
@@ -8554,7 +8554,20 @@ function initExtraLobbyWindows(){
       const win = document.getElementById(winId);
       if(tab && win && !tab.dataset.boundExtra){
         tab.dataset.boundExtra = '1';
-        tab.addEventListener('click', () => { closeAll(); if(winId === 'hangar-window'){ renderer(true); } else { renderer(); } win.classList.remove('hidden'); if(winId === 'hangar-window'){ setTimeout(() => renderHangarCosmic?.(true), 0); } });
+        tab.addEventListener('click', () => {
+          closeAll();
+          win.classList.remove('hidden');
+          if(winId === 'hangar-window'){
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                try{ renderHangarCosmic?.(true); }catch(_){}
+                setTimeout(() => { try{ renderHangarCosmic?.(false); }catch(_){} }, 40);
+              });
+            });
+          } else {
+            renderer();
+          }
+        });
       }
     });
     [['close-profile','profile-window'],['close-hangar','hangar-window'],['close-clans','clans-window'],['close-leaders','leaders-window']].forEach(([btnId,winId]) => {
@@ -8570,7 +8583,6 @@ function initExtraLobbyWindows(){
 window.addEventListener('load', () => {
     initExtraLobbyWindows();
     renderProfileStats();
-    renderHangarCosmic(true);
     renderClansWindow();
     renderLeadersWindow();
 });
