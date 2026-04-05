@@ -7508,8 +7508,7 @@ function getOwnedHangarShips(){
     const allShips = getAllOwnedHangarShips();
     const filterId = String(hangarState?.shipFilter || 'all').trim();
     if(!filterId || filterId === 'all') return allShips;
-    const filtered = allShips.filter(item => String(item?.classId || '').trim() === filterId);
-    return filtered.length ? filtered : allShips;
+    return allShips.filter(item => String(item?.classId || '').trim() === filterId);
 }
 
 
@@ -7931,9 +7930,9 @@ function fillHangarText(){
     const moduleInstalled = !!(ship && module && getInstalledModuleForType(ship.id, module.typeId));
 
     setText('hangar-ship-tier', ship?.tier || '—');
-    setText('hangar-ship-name', ship?.name || 'Нет кораблей');
-    setText('hangar-ship-subtitle', ship?.subtitle || 'Покупай корабли в магазине, они появятся здесь');
-    setText('hangar-ship-desc', ship?.description || 'Открой магазин и пополни ангар новыми корпусами.');
+    setText('hangar-ship-name', ship?.name || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Нет кораблей этого класса' : 'Нет кораблей'));
+    setText('hangar-ship-subtitle', ship?.subtitle || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'В выбранном классе пока нет доступных кораблей' : 'Покупай корабли в магазине, они появятся здесь'));
+    setText('hangar-ship-desc', ship?.description || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Переключи класс выше или купи корабль этого класса в магазине.' : 'Открой магазин и пополни ангар новыми корпусами.'));
     setText('hangar-ship-price-coins', ship && typeof getShipCoinPrice === 'function' ? String(getShipCoinPrice(ship)) : '0');
     setText('hangar-ship-price-diamonds', ship && typeof getShipDiamondPrice === 'function' ? String(getShipDiamondPrice(ship)) : '0');
 
@@ -7980,6 +7979,33 @@ function fillHangarText(){
 
 const hangarShipMeshCache = new Map();
 let hangarBuildToken = 0;
+
+
+function createHangarNoShipPlaceholder(){
+    const group = new THREE.Group();
+
+    const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(1.28, 0.05, 16, 42),
+        new THREE.MeshBasicMaterial({ color:0x53d8ff, transparent:true, opacity:0.52 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+
+    const lineA = new THREE.Mesh(
+        new THREE.BoxGeometry(1.4, 0.035, 0.15),
+        new THREE.MeshBasicMaterial({ color:0x8ee7ff, transparent:true, opacity:0.34 })
+    );
+    lineA.position.y = 0.22;
+    group.add(lineA);
+
+    const lineB = lineA.clone();
+    lineB.scale.x = 0.7;
+    lineB.position.y = 0.02;
+    group.add(lineB);
+
+    group.position.set(-0.18, 0.98, 0);
+    return group;
+}
 
 function createHangarLoadingPlaceholder(){
     const group = new THREE.Group();
@@ -8125,6 +8151,8 @@ function rebuildHangarSceneObjects(){
         placeholder.position.set(0, 0.86, 0);
         hangarState.shipPivot.add(placeholder);
         queueHangarShipBuild(currentShip);
+    }else{
+        hangarState.shipPivot.add(createHangarNoShipPlaceholder());
     }
 
     if(currentModule){
@@ -8148,8 +8176,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
-        hangarState.camera.position.set(0, 3.9, 10.8);
-        hangarState.camera.lookAt(0, 1.55, 0);
+        hangarState.camera.position.set(-0.12, 3.82, 10.8);
+        hangarState.camera.lookAt(-0.18, 1.46, 0);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8174,7 +8202,7 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0, 0.9, 0);
+        hangarState.platform.position.set(-0.42, 0.72, 0);
         hangarState.platform.scale.set(0.28, 0.28, 0.28);
         hangarState.scene.add(hangarState.platform);
 
@@ -8226,8 +8254,8 @@ function ensureHangarRenderer(){
         if(hangarState.platform) hangarState.platform.rotation.y += 0.006;
         if(hangarState.shipPivot){
             hangarState.shipPivot.rotation.y += 0.012;
-            hangarState.shipPivot.position.x = 0;
-            hangarState.shipPivot.position.y = 0.92 + Math.sin(time * 1.2) * 0.012;
+            hangarState.shipPivot.position.x = -0.18;
+            hangarState.shipPivot.position.y = 0.90 + Math.sin(time * 1.2) * 0.012;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.016;
@@ -8236,7 +8264,7 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.camera){
-            hangarState.camera.lookAt(0, 1.55, 0);
+            hangarState.camera.lookAt(-0.18, 1.46, 0);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
@@ -8262,20 +8290,16 @@ function bindHangarControls(){
         btn.dataset.hangarBound = '1';
         btn.addEventListener('click', () => {
             hangarState.shipFilter = String(btn.dataset.hangarClass || 'all').trim() || 'all';
-            const ships = getOwnedHangarShips();
-            if(!ships.length){
-                hangarState.shipFilter = 'all';
-            }
             hangarState.shipIndex = 0;
             const filteredShips = getOwnedHangarShips();
             if(filteredShips.length){
                 const selectedIndex = filteredShips.findIndex(item => String(item?.id || '') === String(player?.selectedShipId || ''));
                 if(selectedIndex >= 0){
                     hangarState.shipIndex = selectedIndex;
-                }else{
-                    player.selectedShipId = filteredShips[0].id;
                 }
             }
+            updateHangarFilterButtons();
+            fillHangarText();
             rebuildHangarSceneObjects();
         });
     });
