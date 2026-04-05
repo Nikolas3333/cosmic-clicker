@@ -7963,14 +7963,14 @@ function normalizeHangarShipMesh(shipMesh){
         const wrap = new THREE.Group();
         wrap.add(shipMesh);
 
-        const maxWidth = 4.15;
-        const maxHeight = 2.7;
-        const maxDepth = 4.15;
+        const maxWidth = 3.6;
+        const maxHeight = 2.35;
+        const maxDepth = 3.6;
 
         const scaleX = size.x > 0 ? maxWidth / size.x : 1;
         const scaleY = size.y > 0 ? maxHeight / size.y : 1;
         const scaleZ = size.z > 0 ? maxDepth / size.z : 1;
-        const finalScale = Math.min(scaleX, scaleY, scaleZ, 0.78);
+        const finalScale = Math.min(scaleX, scaleY, scaleZ, 0.68);
 
         shipMesh.scale.multiplyScalar(finalScale);
         shipMesh.updateMatrixWorld(true);
@@ -7982,7 +7982,7 @@ function normalizeHangarShipMesh(shipMesh){
         shipMesh.position.x -= normalizedCenter.x;
         shipMesh.position.z -= normalizedCenter.z;
         shipMesh.position.y -= normalizedBounds.min.y;
-        shipMesh.position.y += 0.08;
+        shipMesh.position.y += 0.02;
 
         wrap.userData.hangarHeight = normalizedSize.y || 0;
         wrap.userData.hangarWidth = normalizedSize.x || 0;
@@ -8007,7 +8007,7 @@ function rebuildHangarSceneObjects(){
     if(currentShip){
         const rawShipMesh = createHangarShipMesh(currentShip);
         const shipMesh = normalizeHangarShipMesh(rawShipMesh);
-        shipMesh.position.set(0, 0.92, 0);
+        shipMesh.position.set(0, 0.72, 0);
         hangarState.shipPivot.add(shipMesh);
     }
 
@@ -8032,8 +8032,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
-        hangarState.camera.position.set(0.8, 4.45, 16.4);
-        hangarState.camera.lookAt(4.35, 1.45, 0);
+        hangarState.camera.position.set(0.2, 4.15, 17.8);
+        hangarState.camera.lookAt(4.6, 1.15, 0);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -8058,8 +8058,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(4.35, -1.78, 0);
-        hangarState.platform.scale.set(0.62, 0.62, 0.62);
+        hangarState.platform.position.set(4.6, -1.95, 0);
+        hangarState.platform.scale.set(0.48, 0.48, 0.48);
         hangarState.scene.add(hangarState.platform);
 
         hangarState.shipPivot = new THREE.Group();
@@ -8093,8 +8093,8 @@ function ensureHangarRenderer(){
         if(hangarState.platform) hangarState.platform.rotation.y += 0.006;
         if(hangarState.shipPivot){
             hangarState.shipPivot.rotation.y += 0.012;
-            hangarState.shipPivot.position.x = 4.35;
-            hangarState.shipPivot.position.y = 0.06 + Math.sin(time * 1.2) * 0.08;
+            hangarState.shipPivot.position.x = 4.6;
+            hangarState.shipPivot.position.y = -0.10 + Math.sin(time * 1.2) * 0.06;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.rotation.y -= 0.016;
@@ -8103,7 +8103,7 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.camera){
-            hangarState.camera.lookAt(4.35, 1.45, 0);
+            hangarState.camera.lookAt(4.6, 1.15, 0);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
