@@ -6594,8 +6594,6 @@ async function pollIncomingBattleHits(){
                 damage: damageValue
             });
         }
-    }catch(_){}
-}
     }catch(_){
     }finally{
         battleHitPollInFlight = false;
