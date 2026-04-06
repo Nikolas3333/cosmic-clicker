@@ -6561,19 +6561,47 @@ async function pollIncomingBattleHits(){
         for(const row of data){
             const hitRowId = Number(row?.id || 0) || 0;
             if(hitRowId > battleHitCursorId) battleHitCursorId = hitRowId;
+
+            const createdAtMs = row?.created_at ? new Date(row.created_at).getTime() : 0;
+            if(Number.isFinite(battleHitSessionStartedAt) && battleHitSessionStartedAt > 0 && Number.isFinite(createdAtMs) && createdAtMs > 0){
+                if(createdAtMs < (battleHitSessionStartedAt - 150)){
+                    continue;
+                }
+            }
+
+            const attackerId = String(row?.attacker_id || '').trim();
+            const targetPlayerId = String(row?.target_id || '').trim();
+            const damageValue = Number(row?.damage || 0) || 0;
+            const attackerName = resolveBattlePlayerNameById(attackerId, 'Pilot');
+
+            if(damageValue <= BATTLE_KILL_ACK_DAMAGE){
+                handleIncomingBattleKill({
+                    hitId: `db:${hitRowId}`,
+                    attackerId: targetPlayerId,
+                    attackerName: resolveBattlePlayerNameById(targetPlayerId, 'Commander'),
+                    victimId: attackerId,
+                    victimName: attackerName,
+                    source: 'db-ack'
+                });
+                continue;
+            }
+
             applyIncomingBattleHit({
-                hitId: hitRowId,
-                attackerId: String(row?.attacker_id || '').trim(),
-                targetId: String(row?.target_id || '').trim(),
-                damage: Number(row?.damage || 0) || 0,
-                createdAt: row?.created_at || null
+                hitId: `db:${hitRowId}`,
+                attackerId,
+                attackerName,
+                targetPlayerId,
+                damage: damageValue
             });
         }
+    }catch(_){}
+}
     }catch(_){
     }finally{
         battleHitPollInFlight = false;
     }
 }
+
 
 function applyIncomingBattleHit(payload = {}){
     if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || isBattleRespawning() || battleShipCrash) return;
