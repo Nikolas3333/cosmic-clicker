@@ -6639,7 +6639,18 @@ function applyIncomingBattleHit(payload = {}){
     updateBattleScoreboard?.();
     scheduleBattleRespawn(2000);
     if(attackerId){
-        insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander');
+        broadcastBattleKill(
+            attackerId,
+            attackerName,
+            self.playerId,
+            player?.nickname || 'Commander'
+        ).then((sent) => {
+            if(!sent){
+                insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander');
+            }
+        }).catch(() => {
+            insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander');
+        });
     }
 }
 
@@ -6666,7 +6677,15 @@ function handleIncomingBattleKill(payload = {}){
         awardBattleKillRewards(victimName);
     }
 
+    const attackerRemote = attackerId ? remoteBattleShips.get(attackerId) : null;
+    if(attackerRemote){
+        attackerRemote.kills = Math.max(0, Number(attackerRemote.kills || 0) + 1);
+    }
+
     const victimRemote = victimId ? remoteBattleShips.get(victimId) : null;
+    if(victimRemote){
+        victimRemote.deaths = Math.max(0, Number(victimRemote.deaths || 0) + 1);
+    }
     if(victimRemote?.mesh){
         spawnShipDebris(victimRemote.mesh.position.clone(), 0xff7755);
         removeRemoteBattleShipById(victimId);
