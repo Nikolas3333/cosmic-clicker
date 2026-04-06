@@ -750,8 +750,43 @@ function tryApplyRemoteShipTeamVisual(entry){
     });
 }
 
-function ensureSelfRoomPlayerState(){
-    if(!window.supabaseClient) return;
+function shouldWriteSelfRoomPlayerState(nextSnapshot = null, force = false){
+    if(force) return true;
+    if(!nextSnapshot) return false;
+
+    const now = Date.now();
+    if((now - Number(lastSelfRoomPlayerStateWriteAt || 0)) >= SELF_ROOM_PLAYER_STATE_WRITE_MS){
+        return true;
+    }
+
+    const prev = lastSelfRoomPlayerStateSnapshot;
+    if(!prev) return true;
+    if(String(prev.nickname || '') !== String(nextSnapshot.nickname || '')) return true;
+    if(String(prev.team || '') !== String(nextSnapshot.team || '')) return true;
+    if(Number(prev.level || 0) !== Number(nextSnapshot.level || 0)) return true;
+    if(Math.abs(Number(prev.ping || 0) - Number(nextSnapshot.ping || 0)) >= 18) return true;
+
+    const prevPos = prev.position || {};
+    const nextPos = nextSnapshot.position || {};
+    const dx = Number(nextPos.x || 0) - Number(prevPos.x || 0);
+    const dy = Number(nextPos.y || 0) - Number(prevPos.y || 0);
+    const dz = Number(nextPos.z || 0) - Number(prevPos.z || 0);
+    if(Math.hypot(dx, dy, dz) >= SELF_ROOM_PLAYER_POSITION_EPSILON) return true;
+
+    const prevRot = prev.rotation || {};
+    const nextRot = nextSnapshot.rotation || {};
+    if(
+        Math.abs(Number(nextRot.x || 0) - Number(prevRot.x || 0)) >= SELF_ROOM_PLAYER_ROTATION_EPSILON ||
+        Math.abs(Number(nextRot.y || 0) - Number(prevRot.y || 0)) >= SELF_ROOM_PLAYER_ROTATION_EPSILON ||
+        Math.abs(Number(nextRot.z || 0) - Number(prevRot.z || 0)) >= SELF_ROOM_PLAYER_ROTATION_EPSILON ||
+        Math.abs(Number(nextRot.w || 1) - Number(prevRot.w || 1)) >= SELF_ROOM_PLAYER_ROTATION_EPSILON
+    ) return true;
+
+    return false;
+}
+
+function ensureSelfRoomPlayerState(force = false){
+    if(!window.supabaseClient || selfRoomPlayerStateWriteInFlight) return;
     const roomId = getBattleRoomIdSafe();
     const playerId = getSelfBattlePlayerId();
     if(!roomId || !playerId || !playerShip) return;
@@ -778,12 +813,27 @@ function ensureSelfRoomPlayerState(){
         updated_at: new Date().toISOString()
     };
 
+    if(!shouldWriteSelfRoomPlayerState(payload, force)) return;
+
+    selfRoomPlayerStateWriteInFlight = true;
     window.supabaseClient
         .from('room_players')
         .upsert(payload, { onConflict: 'room_id,player_id' })
-        .then(() => {})
-        .catch((error) => {
-                    });
+        .then(() => {
+            lastSelfRoomPlayerStateWriteAt = Date.now();
+            lastSelfRoomPlayerStateSnapshot = {
+                nickname: payload.nickname,
+                team: payload.team,
+                level: payload.level,
+                ping: payload.ping,
+                position: { ...payload.position },
+                rotation: { ...payload.rotation }
+            };
+        })
+        .catch(() => {})
+        .finally(() => {
+            selfRoomPlayerStateWriteInFlight = false;
+        });
 }
 
 
@@ -1293,7 +1343,7 @@ if(gameState === "BATTLE"){
     } else {
         const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'block';
         spawnPlayer();
-        setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
+        setTimeout(() => { try{ ensureSelfRoomPlayerState(true); }catch(_){} }, 80);
         updateEnemyHud();
         updateBattleScoreboard();
         startLiveBattleSync();
@@ -6095,6 +6145,19 @@ var liveBattlePresenceChannelName = '';
 var battleHitPollTimer = null;
 var battleHitCursorId = 0;
 var battleHitSessionStartedAt = 0;
+var battleHitPollInFlight = false;
+var livePlayersFetchInFlight = false;
+var selfRoomPlayerStateWriteInFlight = false;
+var lastSelfRoomPlayerStateWriteAt = 0;
+var lastSelfRoomPlayerStateSnapshot = null;
+var lastLocalBattleShotAt = 0;
+const LIVE_BATTLE_PLAYERS_SYNC_MS = 1200;
+const LIVE_BATTLE_PRESENCE_PUSH_MS = 120;
+const BATTLE_HIT_POLL_IDLE_MS = 450;
+const BATTLE_HIT_POLL_COMBAT_MS = 180;
+const SELF_ROOM_PLAYER_STATE_WRITE_MS = 1000;
+const SELF_ROOM_PLAYER_POSITION_EPSILON = 1.35;
+const SELF_ROOM_PLAYER_ROTATION_EPSILON = 0.02;
 
 function clearRemoteBattleShips(){
     if(!(remoteBattleShips instanceof Map)){
@@ -6123,6 +6186,12 @@ function stopLiveBattleSync(){
     }
     battleHitCursorId = 0;
     battleHitSessionStartedAt = 0;
+    battleHitPollInFlight = false;
+    livePlayersFetchInFlight = false;
+    selfRoomPlayerStateWriteInFlight = false;
+    lastSelfRoomPlayerStateWriteAt = 0;
+    lastSelfRoomPlayerStateSnapshot = null;
+    lastLocalBattleShotAt = 0;
     if(liveBattlePresenceChannel && window.supabaseClient){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
     }
@@ -6382,6 +6451,7 @@ function getBattleHitsRoomId(){
 }
 
 async function insertBattleHitRecord(targetPlayerId, damage, victimName = ''){
+    lastLocalBattleShotAt = Date.now();
     if(!window.supabaseClient) return false;
     const self = getBattleSelfIdentity();
     const roomId = getBattleHitsRoomId();
@@ -6406,7 +6476,20 @@ async function insertBattleHitRecord(targetPlayerId, damage, victimName = ''){
 }
 
 async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
-    return insertBattleHitRecord(targetPlayerId, damage, victimName);
+    refreshBattleHitPollingMode();
+    const self = getBattleSelfIdentity();
+    const targetId = String(targetPlayerId || '').trim();
+    const damageValue = Math.max(0, Number(damage || 0) || 0);
+    if(self.playerId && targetId && damageValue){
+        sendBattlePresenceEvent('pilot-hit', {
+            hitId: `rt:${self.playerId}:${targetId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+            attackerId: self.playerId,
+            attackerName: self.nickname,
+            targetPlayerId: targetId,
+            damage: damageValue
+        });
+    }
+    return insertBattleHitRecord(targetId, damageValue, victimName);
 }
 
 async function insertBattleKillAckRecord(targetPlayerId, victimName = ''){
@@ -6472,19 +6555,22 @@ async function initializeBattleHitCursor(){
 }
 
 async function pollIncomingBattleHits(){
+    refreshBattleHitPollingMode();
+    if(battleHitPollInFlight) return;
     if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || !window.supabaseClient) return;
     const self = getBattleSelfIdentity();
     const roomId = getBattleHitsRoomId();
     if(!self.playerId || !roomId) return;
 
     try{
+        battleHitPollInFlight = true;
         let query = window.supabaseClient
             .from('battle_hits')
             .select('id,attacker_id,target_id,damage,created_at')
             .eq('room_id', roomId)
             .eq('target_id', self.playerId)
             .order('id', { ascending: true })
-            .limit(50);
+            .limit(25);
 
         if(Number.isFinite(battleHitCursorId) && battleHitCursorId > 0){
             query = query.gt('id', battleHitCursorId);
@@ -6530,6 +6616,9 @@ async function pollIncomingBattleHits(){
             });
         }
     }catch(_){}
+    finally{
+        battleHitPollInFlight = false;
+    }
 }
 
 function applyIncomingBattleHit(payload = {}){
@@ -6702,40 +6791,47 @@ function buildObserveRoomState(targetMap = ''){
 }
 
 async function fetchCurrentRoomLivePlayers(){
+    if(livePlayersFetchInFlight) return [];
     if(!window.supabaseClient || !currentRoom?.id) return [];
     const roomId = sanitizeOnlineRoomId(currentRoom.id || currentRoom.roomId || null);
     if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return [];
 
-    const { data, error } = await window.supabaseClient
-        .from('room_players')
-        .select('player_id,nickname,joined_at,team,level,ping,position,rotation,updated_at')
-        .eq('room_id', roomId)
-        .order('joined_at', { ascending: true });
+    livePlayersFetchInFlight = true;
+    try{
+        const { data, error } = await window.supabaseClient
+            .from('room_players')
+            .select('player_id,nickname,joined_at,team,level,ping,position,rotation,updated_at')
+            .eq('room_id', roomId)
+            .order('joined_at', { ascending: true });
 
-    if(error){
-                return [];
-    }
+        if(error){
+            return [];
+        }
 
-    return (data || [])
+        return (data || [])
         .filter(item => isFreshRoomPlayerRow(item))
         .map((item, index) => ({
-        player_id: item.player_id ? String(item.player_id) : `guest_${index}`,
-        nickname: item.nickname || `Pilot ${index + 1}`,
-        joined_at: item.joined_at || null,
-        team: item.team || getBattleRoomPlayerTeam(item.player_id ? String(item.player_id) : `guest_${index}`),
-        level: Number(item.level || 1) || 1,
-        ping: Number(item.ping || 0) || 0,
-        position: item.position || null,
-        rotation: item.rotation || null,
-        updated_at: item.updated_at || item.joined_at || null
-    }));
+            player_id: item.player_id ? String(item.player_id) : `guest_${index}`,
+            nickname: item.nickname || `Pilot ${index + 1}`,
+            joined_at: item.joined_at || null,
+            team: item.team || getBattleRoomPlayerTeam(item.player_id ? String(item.player_id) : `guest_${index}`),
+            level: Number(item.level || 1) || 1,
+            ping: Number(item.ping || 0) || 0,
+            position: item.position || null,
+            rotation: item.rotation || null,
+            updated_at: item.updated_at || item.joined_at || null
+        }));
+    }finally{
+        livePlayersFetchInFlight = false;
+    }
+
 }
 
 async function syncLiveBattlePlayers(){
     if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
     if(gameState === 'BATTLE' && playerShip){
-        ensureSelfRoomPlayerState();
+        ensureSelfRoomPlayerState(false);
     }
 
     const livePlayers = await fetchCurrentRoomLivePlayers();
@@ -6846,6 +6942,19 @@ async function syncLiveBattlePlayers(){
 }
 
 
+function refreshBattleHitPollingMode(){
+    if(!battleHitPollTimer) return;
+    const sinceLastLocalShot = Date.now() - Number(lastLocalBattleShotAt || 0);
+    const nextInterval = sinceLastLocalShot <= 1600 ? BATTLE_HIT_POLL_COMBAT_MS : BATTLE_HIT_POLL_IDLE_MS;
+    const currentInterval = Number(battleHitPollTimer.__intervalMs || 0);
+    if(currentInterval === nextInterval) return;
+    clearInterval(battleHitPollTimer);
+    battleHitPollTimer = setInterval(() => {
+        pollIncomingBattleHits();
+    }, nextInterval);
+    battleHitPollTimer.__intervalMs = nextInterval;
+}
+
 function removeRemoteBattleShipById(entryId){
     const key = String(entryId || '').trim();
     if(!key || !remoteBattleShips.has(key)) return;
@@ -6870,13 +6979,14 @@ async function startLiveBattleSync(){
     syncLiveBattlePlayers();
     broadcastSelfBattleState();
     pollIncomingBattleHits();
-    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, 250);
+    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, LIVE_BATTLE_PLAYERS_SYNC_MS);
     liveBattlePresencePushTimer = setInterval(() => {
         broadcastSelfBattleState();
-    }, 90);
+    }, LIVE_BATTLE_PRESENCE_PUSH_MS);
     battleHitPollTimer = setInterval(() => {
         pollIncomingBattleHits();
-    }, 120);
+    }, BATTLE_HIT_POLL_IDLE_MS);
+    battleHitPollTimer.__intervalMs = BATTLE_HIT_POLL_IDLE_MS;
 }
 
 function animateRemoteBattleShips(){
