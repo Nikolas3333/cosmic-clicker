@@ -6420,7 +6420,7 @@ function applyBattleScoreDelta(playerId, changes = {}){
 
     const lists = [];
     if(Array.isArray(currentRoom?.currentPlayers)) lists.push(currentRoom.currentPlayers);
-    if(Array.isArray(currentRoom?.players) && currentRoom.players is not currentRoom.currentPlayers) lists.push(currentRoom.players);
+    if(Array.isArray(currentRoom?.players) && currentRoom.players !== currentRoom.currentPlayers) lists.push(currentRoom.players);
 
     for(const list of lists){
         const row = list.find((entry) => {
