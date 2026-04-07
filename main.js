@@ -6627,30 +6627,26 @@ function applyIncomingBattleHit(payload = {}){
     if(playerHp > 0) return;
 
     const attackerId = String(payload?.attackerId || '').trim();
-    const attackerName = String(payload?.attackerName || 'Pilot').trim() || 'Pilot';
+    const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
     playerHp = 0;
     battleStats.playerDeaths += 1;
     battleKillCombo = 0;
     battleLastKillAt = 0;
+
+    const attackerRemote = attackerId ? remoteBattleShips.get(attackerId) : null;
+    if(attackerRemote){
+        attackerRemote.kills = Math.max(0, Number(attackerRemote.kills || 0) + 1);
+    }
+
     if(playerShip){
         spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
     }
     pushKillFeed(`${attackerName} уничтожил ${player?.nickname || 'Commander'}`, 'kill');
     updateBattleScoreboard?.();
     scheduleBattleRespawn(2000);
+
     if(attackerId){
-        broadcastBattleKill(
-            attackerId,
-            attackerName,
-            self.playerId,
-            player?.nickname || 'Commander'
-        ).then((sent) => {
-            if(!sent){
-                insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander');
-            }
-        }).catch(() => {
-            insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander');
-        });
+        insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander').catch(() => {});
     }
 }
 
@@ -6820,7 +6816,7 @@ function buildObserveRoomState(targetMap = ''){
 }
 
 async function fetchCurrentRoomLivePlayers(){
-    if(roomPlayersFetchInFlight) return [];
+    if(roomPlayersFetchInFlight) return null;
     if(!window.supabaseClient || !currentRoom?.id) return [];
     const roomId = sanitizeOnlineRoomId(currentRoom.id || currentRoom.roomId || null);
     if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return [];
@@ -6834,7 +6830,7 @@ async function fetchCurrentRoomLivePlayers(){
 
     if(error){
         roomPlayersFetchInFlight = false;
-        return [];
+        return null;
     }
 
     roomPlayersFetchInFlight = false;
@@ -6861,6 +6857,7 @@ async function syncLiveBattlePlayers(){
     }
 
     const livePlayers = await fetchCurrentRoomLivePlayers();
+    if(livePlayers === null) return;
     const myId = getSelfBattlePlayerId();
 
     const activeIds = new Set();
@@ -6934,7 +6931,7 @@ async function syncLiveBattlePlayers(){
         });
     });
 
-    const expireBefore = Date.now() - 3500;
+    const expireBefore = Date.now() - Math.max(ROOM_PLAYER_STALE_MS, 12000);
     Array.from(remoteBattleShips.keys()).forEach(entryId => {
         const item = remoteBattleShips.get(entryId);
         const stale = !!item && Number(item.lastSeenAt || 0) < expireBefore;
