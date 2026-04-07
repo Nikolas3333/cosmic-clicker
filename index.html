@@ -4137,6 +4137,58 @@ shop-main-head{
   font-size:12px !important;
 }
 
+
+.hangar-slot-tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+.hangar-slot-btn{
+  padding:7px 10px;
+  border-radius:10px;
+  border:1px solid rgba(126,252,255,0.32);
+  background:rgba(15,28,54,0.88);
+  color:#dff8ff;
+  cursor:pointer;
+  font-size:12px;
+}
+.hangar-slot-btn.active{
+  background:rgba(0,255,220,0.18);
+  box-shadow:0 0 14px rgba(0,255,220,0.18) inset;
+  color:#7efcff;
+}
+.hangar-side-actions{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+  flex-wrap:wrap;
+}
+.hangar-side-actions .hangar-module-action{
+  flex:1 1 100%;
+}
+#hangar-module-sell,
+#hangar-ship-sell{
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,160,120,0.28);
+  background:rgba(54,25,18,0.88);
+  color:#ffd7c8;
+  cursor:pointer;
+  font-weight:700;
+}
+#hangar-module-sell.locked,
+#hangar-ship-sell.locked{
+  opacity:0.55;
+  cursor:not-allowed;
+}
+.hangar-footer-actions{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
 #hangar-window .hangar-module-action{
   margin-top:10px !important;
 }
