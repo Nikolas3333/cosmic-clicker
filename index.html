@@ -4137,58 +4137,6 @@ shop-main-head{
   font-size:12px !important;
 }
 
-
-.hangar-slot-tabs{
-  display:flex;
-  gap:8px;
-  margin-bottom:10px;
-  justify-content:center;
-  flex-wrap:wrap;
-}
-.hangar-slot-btn{
-  padding:7px 10px;
-  border-radius:10px;
-  border:1px solid rgba(126,252,255,0.32);
-  background:rgba(15,28,54,0.88);
-  color:#dff8ff;
-  cursor:pointer;
-  font-size:12px;
-}
-.hangar-slot-btn.active{
-  background:rgba(0,255,220,0.18);
-  box-shadow:0 0 14px rgba(0,255,220,0.18) inset;
-  color:#7efcff;
-}
-.hangar-side-actions{
-  display:flex;
-  gap:8px;
-  margin-top:10px;
-  flex-wrap:wrap;
-}
-.hangar-side-actions .hangar-module-action{
-  flex:1 1 100%;
-}
-#hangar-module-sell,
-#hangar-ship-sell{
-  padding:10px 12px;
-  border-radius:12px;
-  border:1px solid rgba(255,160,120,0.28);
-  background:rgba(54,25,18,0.88);
-  color:#ffd7c8;
-  cursor:pointer;
-  font-weight:700;
-}
-#hangar-module-sell.locked,
-#hangar-ship-sell.locked{
-  opacity:0.55;
-  cursor:not-allowed;
-}
-.hangar-footer-actions{
-  display:flex;
-  gap:10px;
-  justify-content:center;
-  flex-wrap:wrap;
-}
 #hangar-window .hangar-module-action{
   margin-top:10px !important;
 }
@@ -4685,6 +4633,44 @@ shop-main-head{
   text-shadow:0 0 10px rgba(255,214,90,0.5);
 }
 
+
+.hangar-filter-stack{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.hangar-module-filter{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  justify-content:flex-end;
+}
+.hangar-module-chip{
+  cursor:pointer;
+  border:none;
+  border-radius:999px;
+  padding:8px 14px;
+  background:rgba(255,255,255,0.07);
+  color:#ccefff;
+  box-shadow:inset 0 0 0 1px rgba(126,247,255,0.18);
+}
+.hangar-module-chip.active{
+  background:linear-gradient(180deg, rgba(40,86,126,0.95), rgba(17,42,74,0.95));
+  color:#fff;
+  box-shadow:0 0 18px rgba(95,223,255,0.28), inset 0 0 0 1px rgba(126,247,255,0.42);
+}
+.hangar-module-actions,
+.hangar-footer-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+.hangar-module-sell,
+.hangar-sell-btn{
+  background:linear-gradient(180deg, rgba(98,48,42,0.95), rgba(58,20,18,0.95)) !important;
+}
+
 </style>
 </head>
 
@@ -5146,15 +5132,22 @@ shop-main-head{
       <div class="hangar-title-wrap">
         <div class="hangar-kicker">COSMIC DOCK</div>
         <h2>Ангар</h2>
-        <div class="hangar-subtitle">Корабли на вращающейся платформе и модули слева в отдельном 3D-отсеке.</div>
+        <div class="hangar-subtitle">Корпус, пушка, щит и ускоритель собираются прямо в ангаре. Оснастка визуально видна только здесь.</div>
       </div>
-      <div class="hangar-class-filter" id="hangar-class-filter">
-        <button class="hangar-class-chip active" data-hangar-class="all" type="button">Все</button>
-        <button class="hangar-class-chip" data-hangar-class="fighters" type="button">Истребители</button>
-        <button class="hangar-class-chip" data-hangar-class="tanks" type="button">Танки</button>
-        <button class="hangar-class-chip" data-hangar-class="assault" type="button">Штурмовики</button>
-        <button class="hangar-class-chip" data-hangar-class="technology" type="button">Технологии</button>
-        <button class="hangar-class-chip" data-hangar-class="universal" type="button">Универсалы</button>
+      <div class="hangar-filter-stack">
+        <div class="hangar-class-filter" id="hangar-class-filter">
+          <button class="hangar-class-chip active" data-hangar-class="all" type="button">Все</button>
+          <button class="hangar-class-chip" data-hangar-class="fighters" type="button">Истребители</button>
+          <button class="hangar-class-chip" data-hangar-class="tanks" type="button">Танки</button>
+          <button class="hangar-class-chip" data-hangar-class="assault" type="button">Штурмовики</button>
+          <button class="hangar-class-chip" data-hangar-class="technology" type="button">Маневренные</button>
+          <button class="hangar-class-chip" data-hangar-class="universal" type="button">Универсалы</button>
+        </div>
+        <div class="hangar-module-filter" id="hangar-module-filter">
+          <button class="hangar-module-chip active" data-hangar-module-type="weapon" type="button">Пушки</button>
+          <button class="hangar-module-chip" data-hangar-module-type="shield" type="button">Щиты</button>
+          <button class="hangar-module-chip" data-hangar-module-type="booster" type="button">Ускорители</button>
+        </div>
       </div>
     </div>
 
@@ -5169,7 +5162,10 @@ shop-main-head{
             <div id="hangar-module-tier" class="hangar-module-tier">—</div>
             <div id="hangar-module-type" class="hangar-module-type">—</div>
             <div id="hangar-module-desc" class="hangar-module-desc">—</div>
-            <button id="hangar-module-action" class="hangar-module-action" type="button">Установить модуль</button>
+            <div class="hangar-module-actions">
+              <button id="hangar-module-action" class="hangar-module-action" type="button">Установить</button>
+              <button id="hangar-module-sell" class="hangar-module-action hangar-module-sell" type="button">Продать</button>
+            </div>
           </div>
         </div>
         <button id="hangar-module-down" class="hangar-arrow vertical" type="button">▼</button>
@@ -5195,7 +5191,10 @@ shop-main-head{
 
             <div class="hangar-footer-row">
               <div id="hangar-ship-position" class="hangar-position-label">1 / 1</div>
-              <button id="hangar-ship-action" class="hangar-main-btn" type="button">Активный корпус</button>
+              <div class="hangar-footer-actions">
+                <button id="hangar-ship-action" class="hangar-main-btn" type="button">Оснастить корпус</button>
+                <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать корпус</button>
+              </div>
             </div>
           </div>
         </div>
