@@ -3438,6 +3438,7 @@ function updateBattleRespawnState(){
     }
     battlePendingRespawnAt = 0;
     playerHp = playerMaxHp;
+    markBattlePilotAlive(getSelfBattlePlayerId());
     spawnPlayer();
     updateBattlePlayerHud();
 }
@@ -6151,6 +6152,52 @@ const ROOM_PLAYER_ROTATION_EPSILON = 0.018;
 const BATTLE_PRESENCE_FORCE_INTERVAL_MS = 220;
 const BATTLE_PRESENCE_POSITION_EPSILON = 0.12;
 const BATTLE_PRESENCE_ROTATION_EPSILON = 0.012;
+var battleScoreState = new Map();
+var battlePilotDeathState = new Map();
+var battleRecentKillEvents = new Map();
+
+function getBattleScoreSnapshot(playerId){
+    const key = String(playerId || '').trim();
+    if(!key) return { kills:0, deaths:0 };
+    const current = battleScoreState.get(key) || { kills:0, deaths:0 };
+    return {
+        kills: Math.max(0, Number(current.kills || 0) || 0),
+        deaths: Math.max(0, Number(current.deaths || 0) || 0)
+    };
+}
+
+function markBattlePilotAlive(playerId){
+    const key = String(playerId || '').trim();
+    if(!key) return;
+    battlePilotDeathState.set(key, false);
+}
+
+function markBattlePilotDead(playerId){
+    const key = String(playerId || '').trim();
+    if(!key) return;
+    battlePilotDeathState.set(key, true);
+}
+
+function isBattlePilotMarkedDead(playerId){
+    const key = String(playerId || '').trim();
+    if(!key) return false;
+    return battlePilotDeathState.get(key) === true;
+}
+
+function shouldIgnoreDuplicateBattleKill(attackerId, victimId, windowMs = 3500){
+    const safeAttacker = String(attackerId || '').trim();
+    const safeVictim = String(victimId || '').trim();
+    if(!safeAttacker || !safeVictim) return false;
+    const now = Date.now();
+    const key = `${safeAttacker}=>${safeVictim}`;
+    const lastAt = Number(battleRecentKillEvents.get(key) || 0) || 0;
+    battleRecentKillEvents.set(key, now);
+    if(battleRecentKillEvents.size > 150){
+        const firstKey = battleRecentKillEvents.keys().next().value;
+        if(firstKey) battleRecentKillEvents.delete(firstKey);
+    }
+    return lastAt > 0 && (now - lastAt) < windowMs
+}
 
 function clearRemoteBattleShips(){
     if(!(remoteBattleShips instanceof Map)){
@@ -6186,6 +6233,9 @@ function stopLiveBattleSync(){
     lastSelfRoomPlayerStateSentAt = 0;
     lastBattlePresencePayload = '';
     lastBattlePresenceSentAt = 0;
+    battleScoreState = new Map();
+    battlePilotDeathState = new Map();
+    battleRecentKillEvents = new Map();
     if(liveBattlePresenceChannel && window.supabaseClient){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
     }
@@ -6296,8 +6346,8 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         level: 1,
         ping: 0,
         playerId: '',
-        kills: 0,
-        deaths: 0,
+        kills: Number(scoreSnapshot.kills || 0) || 0,
+        deaths: Number(scoreSnapshot.deaths || 0) || 0,
         team
     };
 }
@@ -6326,11 +6376,12 @@ function upsertRemoteBattlePresence(payload = {}){
     }
 
     entry.playerId = entryId;
+    const scoreSnapshot = getBattleScoreSnapshot(entryId);
     entry.nickname = nickname;
     entry.level = level;
     entry.ping = ping;
-    entry.kills = Math.max(0, Number(payload.kills || entry.kills || 0) || 0);
-    entry.deaths = Math.max(0, Number(payload.deaths || entry.deaths || 0) || 0);
+    entry.kills = Math.max(0, Number(payload.kills || scoreSnapshot.kills || entry.kills || 0) || 0);
+    entry.deaths = Math.max(0, Number(payload.deaths || scoreSnapshot.deaths || entry.deaths || 0) || 0);
     entry.team = team;
     entry.lastSeenAt = Date.now();
 
@@ -6396,26 +6447,23 @@ function applyBattleScoreDelta(playerId, changes = {}){
 
     const killsDelta = Number(changes?.killsDelta || 0) || 0;
     const deathsDelta = Number(changes?.deathsDelta || 0) || 0;
+    const snapshot = getBattleScoreSnapshot(safeId);
+    const nextKills = Math.max(0, snapshot.kills + killsDelta);
+    const nextDeaths = Math.max(0, snapshot.deaths + deathsDelta);
+    battleScoreState.set(safeId, { kills: nextKills, deaths: nextDeaths });
+
     const selfId = getSelfBattlePlayerId();
     const isSelf = !!(selfId && safeId === selfId);
 
     if(isSelf){
-        if(killsDelta){
-            battleStats.playerKills = Math.max(0, Number(battleStats.playerKills || 0) + killsDelta);
-        }
-        if(deathsDelta){
-            battleStats.playerDeaths = Math.max(0, Number(battleStats.playerDeaths || 0) + deathsDelta);
-        }
+        battleStats.playerKills = nextKills;
+        battleStats.playerDeaths = nextDeaths;
     }
 
     const remoteEntry = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
     if(remoteEntry){
-        if(killsDelta){
-            remoteEntry.kills = Math.max(0, Number(remoteEntry.kills || 0) + killsDelta);
-        }
-        if(deathsDelta){
-            remoteEntry.deaths = Math.max(0, Number(remoteEntry.deaths || 0) + deathsDelta);
-        }
+        remoteEntry.kills = nextKills;
+        remoteEntry.deaths = nextDeaths;
     }
 
     const lists = [];
@@ -6428,12 +6476,8 @@ function applyBattleScoreDelta(playerId, changes = {}){
             return !!entryId && entryId === safeId;
         });
         if(!row) continue;
-        if(killsDelta){
-            row.kills = Math.max(0, Number(row.kills || 0) + killsDelta);
-        }
-        if(deathsDelta){
-            row.deaths = Math.max(0, Number(row.deaths || 0) + deathsDelta);
-        }
+        row.kills = nextKills;
+        row.deaths = nextDeaths;
     }
 }
 
@@ -6653,7 +6697,7 @@ function applyIncomingBattleHit(payload = {}){
     const self = getBattleSelfIdentity();
     const targetId = String(payload?.targetPlayerId || '').trim();
     if(!self.playerId || !targetId || self.playerId !== targetId) return;
-    if(Number(playerHp || 0) <= 0) return;
+    if(Number(playerHp || 0) <= 0 || isBattlePilotMarkedDead(self.playerId)) return;
 
     const hitId = String(payload?.hitId || '').trim();
     if(hitId){
@@ -6677,6 +6721,7 @@ function applyIncomingBattleHit(payload = {}){
     const attackerId = String(payload?.attackerId || '').trim();
     const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
     playerHp = 0;
+    markBattlePilotDead(self.playerId);
     battleKillCombo = 0;
     battleLastKillAt = 0;
 
@@ -6714,11 +6759,14 @@ function handleIncomingBattleKill(payload = {}){
     const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
     const self = getBattleSelfIdentity();
 
+    if(shouldIgnoreDuplicateBattleKill(attackerId, victimId)) return;
+
     const isSelfAttacker = !!(attackerId && self.playerId && attackerId === self.playerId);
     if(attackerId){
         applyBattleScoreDelta(attackerId, { killsDelta: 1 });
     }
     if(victimId){
+        markBattlePilotDead(victimId);
         applyBattleScoreDelta(victimId, { deathsDelta: 1 });
     }
     if(isSelfAttacker){
@@ -6913,7 +6961,7 @@ async function syncLiveBattlePlayers(){
         const team = String(entry?.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
         const displayName = String(entry?.nickname || 'Pilot').trim() || 'Pilot';
 
-        if(entryId) activeIds.add(entryId);
+        if(entryId){ activeIds.add(entryId); markBattlePilotAlive(entryId); }
 
         if(isMe){
             return;
@@ -6926,11 +6974,14 @@ async function syncLiveBattlePlayers(){
             remoteBattleShips.set(entryId, remoteState);
         }
 
+        const scoreSnapshot = getBattleScoreSnapshot(entryId);
         remoteState.nickname = displayName;
         remoteState.level = Number(entry?.level || remoteState.level || 1) || 1;
         remoteState.ping = Number(entry?.ping || remoteState.ping || 0) || 0;
         remoteState.team = team;
         remoteState.lastSeenAt = Date.now();
+        remoteState.kills = Math.max(0, Number(scoreSnapshot.kills || remoteState.kills || 0) || 0);
+        remoteState.deaths = Math.max(0, Number(scoreSnapshot.deaths || remoteState.deaths || 0) || 0);
 
         if(remoteState.mesh?.userData){
             remoteState.mesh.userData.team = team;
@@ -7240,6 +7291,7 @@ function spawnPlayer() {
 
     playerMaxHp = currentBattleShipStats.hp;
     playerHp = playerMaxHp;
+    markBattlePilotAlive(getSelfBattlePlayerId());
     battleWeapon.damage = currentBattleShipStats.weaponDamage;
     battleWeapon.clipSize = currentBattleShipStats.clipSize;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
