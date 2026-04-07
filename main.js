@@ -7903,6 +7903,7 @@ function renderProfileStats(){
 const hangarState = {
     shipIndex: 0,
     moduleIndex: 0,
+    moduleType: 'weapon',
     shipFilter: 'all',
     renderer: null,
     scene: null,
@@ -7981,6 +7982,21 @@ function getOwnedHangarModules(){
     if(!modules.length) return [];
     const owned = modules.filter(item => isOwnedModule(item.id));
     return owned.length ? owned : modules;
+}
+
+function getCurrentHangarModuleType(){
+    const safeType = String(hangarState?.moduleType || 'weapon').trim();
+    return ['weapon','shield','booster'].includes(safeType) ? safeType : 'weapon';
+}
+
+function getOwnedHangarModulesByType(typeId){
+    const safeType = String(typeId || getCurrentHangarModuleType()).trim();
+    return getOwnedHangarModules().filter(item => String(item?.typeId || item?.classId || '').trim() === safeType);
+}
+
+function setHangarModuleType(typeId){
+    hangarState.moduleType = ['weapon','shield','booster'].includes(String(typeId || '').trim()) ? String(typeId).trim() : 'weapon';
+    hangarState.moduleIndex = 0;
 }
 
 function getInstalledModulesForShip(shipId){
@@ -8357,7 +8373,7 @@ function updateHangarFilterButtons(){
 
 function ensureHangarIndexes(){
     const ships = getOwnedHangarShips();
-    const modules = getOwnedHangarModules();
+    const modules = getOwnedHangarModulesByType();
     if(hangarState.shipIndex >= ships.length) hangarState.shipIndex = Math.max(0, ships.length - 1);
     if(hangarState.moduleIndex >= modules.length) hangarState.moduleIndex = Math.max(0, modules.length - 1);
     if(hangarState.shipIndex < 0) hangarState.shipIndex = 0;
@@ -8795,7 +8811,7 @@ function updateHangarHeaderNumbers(){
 
 function updateHangarButtons(){
     const ships = getOwnedHangarShips();
-    const modules = getOwnedHangarModules();
+    const modules = getOwnedHangarModulesByType();
 
     const leftBtn = document.getElementById('hangar-ship-left');
     const rightBtn = document.getElementById('hangar-ship-right');
@@ -8832,7 +8848,7 @@ function hideHangarShipPriceRow(){
 function fillHangarText(){
     hideHangarShipPriceRow();
     const ships = getOwnedHangarShips();
-    const modules = getOwnedHangarModules();
+    const modules = getOwnedHangarModulesByType();
     const ship = ships[hangarState.shipIndex] || null;
     const module = modules[hangarState.moduleIndex] || null;
     hangarState.shipItem = ship;
@@ -8873,16 +8889,49 @@ function fillHangarText(){
         moduleBtn.classList.toggle('locked', !ship || !module);
     }
 
+    const moduleSellBtn = document.getElementById('hangar-module-sell');
+    if(moduleSellBtn){
+        const sellPrice = module ? getSellPriceForModule(module) : 0;
+        const canSell = !!module && canSellModule(module.id);
+        moduleSellBtn.disabled = !canSell;
+        moduleSellBtn.textContent = canSell ? `Продать за ${sellPrice} 🪙` : 'Продажа недоступна';
+        moduleSellBtn.classList.toggle('locked', !canSell);
+    }
+
+    const shipSellBtn = document.getElementById('hangar-ship-sell');
+    if(shipSellBtn){
+        const sellPrice = ship ? getSellPriceForShip(ship) : 0;
+        const canSell = !!ship && canSellShip(ship.id);
+        shipSellBtn.disabled = !canSell;
+        shipSellBtn.textContent = canSell ? `Продать корпус за ${sellPrice} 🪙` : 'Базовый корпус не продаётся';
+        shipSellBtn.classList.toggle('locked', !canSell);
+    }
+
+    document.querySelectorAll('[data-hangar-slot]').forEach(btn => {
+        const slotId = String(btn.dataset.hangarSlot || '').trim();
+        btn.classList.toggle('active', slotId === getCurrentHangarModuleType());
+        if(ship){
+            const equipped = getInstalledModuleForType(ship.id, slotId);
+            btn.setAttribute('data-equipped-name', equipped?.name || '');
+            btn.title = equipped ? `${btn.textContent?.trim() || ''}: ${equipped.name}` : (btn.textContent?.trim() || '');
+        }
+    });
+
     const statsWrap = document.getElementById('hangar-ship-stats');
     if(statsWrap){
         const extraModules = installedModules.length ? installedModules.map(item => item.name).join(', ') : 'Нет';
+        const equippedWeaponName = getInstalledModuleForType(ship?.id || player?.selectedShipId || '', 'weapon')?.name || 'Нет';
+        const equippedShieldName = getInstalledModuleForType(ship?.id || player?.selectedShipId || '', 'shield')?.name || 'Нет';
+        const equippedBoosterName = getInstalledModuleForType(ship?.id || player?.selectedShipId || '', 'booster')?.name || 'Нет';
         const weaponLabel = String(ship?.stats?.find?.(row => String(row?.[0] || '').toLowerCase() === 'оружие')?.[1] || battleStatsView.weaponType || '—');
         const stats = [
             ['Скорость', battleStatsView.maxSpeed.toFixed(2)],
             ['Броня', battleStatsView.hp],
             ['Урон', battleStatsView.weaponDamage],
             ['Энергия', battleStatsView.clipSize],
-            ['Оружие', weaponLabel],
+            ['Оружие', `${weaponLabel} · ${equippedWeaponName}`],
+            ['Щит', equippedShieldName],
+            ['Ускоритель', equippedBoosterName],
             ['Управление', battleStatsView.handlingLabel],
             ['Перезарядка', `${(battleStatsView.reloadTime / 1000).toFixed(1)}с`],
             ['Модули', extraModules]
@@ -8900,6 +8949,148 @@ function fillHangarText(){
 }
 
 
+
+
+function getSellPriceForShip(ship){
+    return Math.max(0, Math.floor((Number(getShipCoinPrice?.(ship) || 0) || 0) * 0.5));
+}
+
+function getSellPriceForModule(module){
+    return Math.max(0, Math.floor((Number(module?.price || 0) || 0) * 0.5));
+}
+
+function canSellShip(shipId){
+    const safeId = String(shipId || '').trim();
+    if(!safeId || safeId === 'scout_1') return false;
+    const owned = Array.isArray(player?.ownedShipIds) ? player.ownedShipIds.filter(Boolean) : [];
+    return owned.includes(safeId) && owned.length > 1;
+}
+
+function canSellModule(moduleId){
+    const safeId = String(moduleId || '').trim();
+    if(!safeId) return false;
+    const protectedIds = ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'];
+    if(protectedIds.includes(safeId)) return false;
+    return Array.isArray(player?.ownedModuleIds) && player.ownedModuleIds.includes(safeId);
+}
+
+function sellOwnedShip(shipId){
+    const ship = getShopShipById(shipId);
+    if(!ship || !canSellShip(ship.id)) return false;
+    const sellPrice = getSellPriceForShip(ship);
+    playerResources.coins = Number(playerResources.coins || player.credits || 0) + sellPrice;
+    player.credits = playerResources.coins;
+    player.ownedShipIds = (player.ownedShipIds || []).filter(id => String(id || '').trim() !== ship.id);
+    if(player.selectedShipId === ship.id){
+        player.selectedShipId = player.ownedShipIds[0] || 'scout_1';
+    }
+    if(player.activeModulesByShip && typeof player.activeModulesByShip === 'object'){
+        delete player.activeModulesByShip[ship.id];
+    }
+    refreshOwnedShipsInventory?.();
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    saveGame?.();
+    renderShopScreen?.();
+    renderHangarCosmic?.();
+    updatePremiumAccountInfo?.();
+    return true;
+}
+
+function sellOwnedModule(moduleId){
+    const module = getModuleById(moduleId);
+    if(!module || !canSellModule(module.id)) return false;
+    const sellPrice = getSellPriceForModule(module);
+    playerResources.coins = Number(playerResources.coins || player.credits || 0) + sellPrice;
+    player.credits = playerResources.coins;
+    player.ownedModuleIds = (player.ownedModuleIds || []).filter(id => String(id || '').trim() !== module.id);
+    if(player.activeModulesByShip && typeof player.activeModulesByShip === 'object'){
+        Object.keys(player.activeModulesByShip).forEach(shipId => {
+            const slots = player.activeModulesByShip[shipId];
+            if(!slots || typeof slots !== 'object') return;
+            Object.keys(slots).forEach(slotKey => {
+                if(String(slots[slotKey] || '').trim() === module.id){
+                    delete slots[slotKey];
+                }
+            });
+        });
+    }
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    saveGame?.();
+    renderShopScreen?.();
+    renderHangarCosmic?.();
+    updatePremiumAccountInfo?.();
+    return true;
+}
+
+function createHangarEquipmentVisuals(shipId, shipItem){
+    const wrap = new THREE.Group();
+    const equippedWeapon = getInstalledModuleForType(shipId, 'weapon');
+    const equippedShield = getInstalledModuleForType(shipId, 'shield');
+    const equippedBooster = getInstalledModuleForType(shipId, 'booster');
+    const neon = new THREE.Color(shipItem?.neon || '#7efcff');
+    const accent = new THREE.Color(shipItem?.accent || '#7a8cff');
+
+    if(equippedWeapon){
+        const weaponKind = String(equippedWeapon.weaponKind || '').toLowerCase();
+        const barrelColor = weaponKind === 'plasma' ? 0xffb347 : weaponKind === 'phase' ? 0x9b7bff : weaponKind === 'pulse' ? 0x57f8ff : 0xff5a6b;
+        const barrelMat = new THREE.MeshStandardMaterial({ color: barrelColor, metalness:0.45, roughness:0.26, emissive: barrelColor, emissiveIntensity:0.35 });
+        const addCannon = (x) => {
+            const cannon = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.10, 1.45, 12), barrelMat);
+            body.rotation.x = Math.PI/2;
+            body.position.set(x, 0.05, -1.9);
+            cannon.add(body);
+            const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), new THREE.MeshBasicMaterial({ color: barrelColor }));
+            muzzle.position.set(x, 0.05, -2.62);
+            cannon.add(muzzle);
+            return cannon;
+        };
+        wrap.add(addCannon(-0.55), addCannon(0.55));
+    }
+
+    if(equippedShield){
+        const shieldColor = new THREE.Color(equippedShield.neon || '#7efcff');
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(1.9, 0.05, 16, 60),
+            new THREE.MeshBasicMaterial({ color: shieldColor, transparent:true, opacity:0.55 })
+        );
+        ring.rotation.x = Math.PI/2;
+        ring.position.set(0, 0.18, 0.0);
+        wrap.add(ring);
+        const shell = new THREE.Mesh(
+            new THREE.SphereGeometry(1.65, 20, 20),
+            new THREE.MeshBasicMaterial({ color: shieldColor, transparent:true, opacity:0.08, wireframe:true })
+        );
+        shell.scale.set(1.0, 0.48, 1.36);
+        shell.position.y = 0.18;
+        wrap.add(shell);
+    }
+
+    if(equippedBooster){
+        const boostColor = new THREE.Color(equippedBooster.neon || shipItem?.engine || '#63d1ff');
+        const glowMat = new THREE.MeshBasicMaterial({ color: boostColor });
+        const addThruster = (x) => {
+            const thruster = new THREE.Group();
+            const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.14,0.44,12), new THREE.MeshStandardMaterial({ color: accent.clone().multiplyScalar(0.9), metalness:0.6, roughness:0.35 }));
+            housing.rotation.x = Math.PI/2;
+            housing.position.set(x, 0.0, 1.7);
+            const flame = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.10,0.8,12), glowMat);
+            flame.rotation.x = Math.PI/2;
+            flame.position.set(x, 0.0, 2.2);
+            thruster.add(housing, flame);
+            return thruster;
+        };
+        wrap.add(addThruster(-0.52), addThruster(0.52));
+    }
+
+    const idTag = new THREE.Mesh(
+        new THREE.BoxGeometry(0.72, 0.04, 0.14),
+        new THREE.MeshBasicMaterial({ color: neon, transparent:true, opacity:0.35 })
+    );
+    idTag.position.set(0, 0.42, 0.7);
+    wrap.add(idTag);
+    return wrap;
+}
 
 const hangarShipMeshCache = new Map();
 let hangarBuildToken = 0;
@@ -8997,6 +9188,8 @@ function queueHangarShipBuild(currentShip){
     if(cached){
         while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
         const readyMesh = cloneObject3DDeepSafe(cached);
+        const visuals = createHangarEquipmentVisuals(shipId, currentShip);
+        if(visuals) readyMesh.add(visuals);
         readyMesh.position.set(0, 0, 0);
         hangarState.shipPivot.add(readyMesh);
         hangarState.isShipLoading = false;
@@ -9013,8 +9206,12 @@ function queueHangarShipBuild(currentShip){
 
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+            const visuals = createHangarEquipmentVisuals(shipId, currentShip);
+            if(visuals) shipMesh.add(visuals);
             shipMesh.position.set(0, 0, 0);
             hangarState.shipPivot.add(shipMesh);
+            hangarState.isShipLoading = false;
+            fillHangarText();
         }catch(_){}
     });
 }
@@ -9072,7 +9269,7 @@ function rebuildHangarSceneObjects(){
     while(hangarState.modulePivot.children.length) hangarState.modulePivot.remove(hangarState.modulePivot.children[0]);
 
     const ships = getOwnedHangarShips();
-    const modules = getOwnedHangarModules();
+    const modules = getOwnedHangarModulesByType();
     const currentShip = ships[hangarState.shipIndex];
     const currentModule = modules[hangarState.moduleIndex];
 
@@ -9356,20 +9553,39 @@ function bindHangarControls(){
     });
 
     bindOnce('hangar-module-down', () => {
-        const modules = getOwnedHangarModules();
+        const modules = getOwnedHangarModulesByType();
         hangarState.moduleIndex = Math.min(Math.max(0, modules.length - 1), hangarState.moduleIndex + 1);
         rebuildHangarSceneObjects();
     });
 
+    document.querySelectorAll('[data-hangar-slot]').forEach(btn => {
+        if(btn.dataset.hangarBound) return;
+        btn.dataset.hangarBound = '1';
+        btn.addEventListener('click', () => {
+            setHangarModuleType(btn.dataset.hangarSlot || 'weapon');
+            rebuildHangarSceneObjects();
+        });
+    });
+
     bindOnce('hangar-module-action', () => {
         const ships = getOwnedHangarShips();
-        const modules = getOwnedHangarModules();
+        const modules = getOwnedHangarModulesByType();
         const currentShip = ships[hangarState.shipIndex];
         const currentModule = modules[hangarState.moduleIndex];
         if(!currentShip || !currentModule) return;
         if(toggleShipModule(currentModule.id, currentShip.id)){
             currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || currentShip.id);
-            fillHangarText();
+            rebuildHangarSceneObjects();
+        }
+    });
+
+    bindOnce('hangar-module-sell', () => {
+        const modules = getOwnedHangarModulesByType();
+        const currentModule = modules[hangarState.moduleIndex];
+        if(!currentModule) return;
+        if(sellOwnedModule(currentModule.id)){
+            hangarState.moduleIndex = 0;
+            rebuildHangarSceneObjects();
         }
     });
 
@@ -9384,6 +9600,16 @@ function bindHangarControls(){
             try{ saveGame?.(); }catch(_){}
         }
         fillHangarText();
+    });
+
+    bindOnce('hangar-ship-sell', () => {
+        const ships = getOwnedHangarShips();
+        const current = ships[hangarState.shipIndex];
+        if(!current) return;
+        if(sellOwnedShip(current.id)){
+            hangarState.shipIndex = Math.max(0, hangarState.shipIndex - 1);
+            rebuildHangarSceneObjects();
+        }
     });
 
     bindOnce('close-hangar', () => {
