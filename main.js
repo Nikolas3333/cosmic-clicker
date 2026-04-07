@@ -3162,6 +3162,7 @@ if (gameState === "BATTLE" && playerShip) {
 
     for (let i = activeLasers.length - 1; i >= 0; i--) {
         const laser = activeLasers[i];
+        updateProjectileVisual(laser);
         const previousPosition = laser.mesh.position.clone();
         laser.mesh.position.add(laser.velocity);
         laser.life -= 1;
@@ -3217,6 +3218,7 @@ if (gameState === "BATTLE" && playerShip) {
 
     for (let i = enemyLasers.length - 1; i >= 0; i--) {
         const laser = enemyLasers[i];
+        updateProjectileVisual(laser);
         laser.mesh.position.add(laser.velocity);
         laser.life -= 1;
 
@@ -3309,6 +3311,205 @@ function playEffectSound(sound){
     sound.play();
 }
 
+
+function createProjectileVisual(weaponType, options = {}){
+    const group = new THREE.Group();
+    const color = new THREE.Color(options.color || '#ff3355');
+    const coreColor = new THREE.Color(options.coreColor || '#ffffff');
+    const width = Number(options.width || 0.14) || 0.14;
+    const length = Number(options.length || 2.2) || 2.2;
+    const scale = Number(options.scale || 1) || 1;
+
+    const addGlowShell = (sx, sy, sz, glowColor, opacity = 0.28) => {
+        const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 10, 10),
+            new THREE.MeshBasicMaterial({ color: glowColor, transparent:true, opacity, depthWrite:false })
+        );
+        glow.scale.set(sx, sy, sz);
+        group.add(glow);
+        return glow;
+    };
+
+    if(weaponType === 'missile'){
+        const body = new THREE.Mesh(
+            new THREE.CylinderGeometry(width * 0.34, width * 0.62, length * 0.98, 10),
+            new THREE.MeshBasicMaterial({ color })
+        );
+        body.rotation.x = Math.PI / 2;
+        const tip = new THREE.Mesh(
+            new THREE.ConeGeometry(width * 0.62, length * 0.34, 10),
+            new THREE.MeshBasicMaterial({ color: coreColor })
+        );
+        tip.rotation.x = -Math.PI / 2;
+        tip.position.z = -length * 0.64;
+        const flame = new THREE.Mesh(
+            new THREE.ConeGeometry(width * 0.34, length * 0.48, 8),
+            new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent:true, opacity:0.95 })
+        );
+        flame.rotation.x = Math.PI / 2;
+        flame.position.z = length * 0.62;
+        const finOffsets = [[0, width * 0.36], [0, -width * 0.36], [width * 0.36, 0], [-width * 0.36, 0]];
+        finOffsets.forEach(([x, y]) => {
+            const fin = new THREE.Mesh(
+                new THREE.BoxGeometry(width * 0.14, width * 0.7, length * 0.26),
+                new THREE.MeshBasicMaterial({ color: coreColor })
+            );
+            fin.position.set(x, y, length * 0.22);
+            group.add(fin);
+        });
+        group.add(body, tip, flame);
+        addGlowShell(width * 2.1, width * 1.3, length * 0.95, color, 0.22);
+        group.userData.visualType = 'missile';
+        group.userData.flame = flame;
+    }else if(weaponType === 'plasma'){
+        const orb = new THREE.Mesh(
+            new THREE.SphereGeometry(width * 1.18 * scale, 12, 12),
+            new THREE.MeshBasicMaterial({ color })
+        );
+        const core = new THREE.Mesh(
+            new THREE.SphereGeometry(width * 0.62 * scale, 10, 10),
+            new THREE.MeshBasicMaterial({ color: coreColor })
+        );
+        const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(width * 1.3 * scale, width * 0.16 * scale, 8, 18),
+            new THREE.MeshBasicMaterial({ color: '#ffd59c', transparent:true, opacity:0.7 })
+        );
+        ring.rotation.y = Math.PI / 2;
+        group.add(orb, core, ring);
+        addGlowShell(width * 3.1, width * 2.0, width * 3.1, '#ffb380', 0.3);
+        group.userData.visualType = 'plasma';
+        group.userData.ring = ring;
+    }else if(weaponType === 'phase'){
+        const shard = new THREE.Mesh(
+            new THREE.OctahedronGeometry(width * 1.15 * scale, 0),
+            new THREE.MeshBasicMaterial({ color })
+        );
+        shard.scale.z = length * 0.42;
+        const core = new THREE.Mesh(
+            new THREE.OctahedronGeometry(width * 0.48 * scale, 0),
+            new THREE.MeshBasicMaterial({ color: coreColor })
+        );
+        core.scale.z = length * 0.22;
+        const ringA = new THREE.Mesh(
+            new THREE.TorusGeometry(width * 1.08 * scale, width * 0.1 * scale, 6, 16),
+            new THREE.MeshBasicMaterial({ color:'#f4c9ff', transparent:true, opacity:0.78 })
+        );
+        ringA.rotation.x = Math.PI / 2;
+        const ringB = ringA.clone();
+        ringB.rotation.y = Math.PI / 2;
+        group.add(shard, core, ringA, ringB);
+        addGlowShell(width * 2.6, width * 1.6, length * 0.88, '#d39cff', 0.26);
+        group.userData.visualType = 'phase';
+        group.userData.ringA = ringA;
+        group.userData.ringB = ringB;
+    }else if(weaponType === 'beam'){
+        const body = new THREE.Mesh(
+            new THREE.CylinderGeometry(width * 0.22 * scale, width * 0.42 * scale, length * 1.38, 10),
+            new THREE.MeshBasicMaterial({ color })
+        );
+        body.rotation.x = Math.PI / 2;
+        const core = new THREE.Mesh(
+            new THREE.CylinderGeometry(width * 0.08 * scale, width * 0.17 * scale, length * 1.28, 8),
+            new THREE.MeshBasicMaterial({ color: coreColor })
+        );
+        core.rotation.x = Math.PI / 2;
+        const halo = new THREE.Mesh(
+            new THREE.CylinderGeometry(width * 0.42 * scale, width * 0.42 * scale, length * 1.08, 10),
+            new THREE.MeshBasicMaterial({ color:'#b9d0ff', transparent:true, opacity:0.18, depthWrite:false })
+        );
+        halo.rotation.x = Math.PI / 2;
+        group.add(halo, body, core);
+        group.userData.visualType = 'beam';
+        group.userData.halo = halo;
+    }else if(weaponType === 'pulse'){
+        const bolt = new THREE.Mesh(
+            new THREE.CylinderGeometry(width * 0.28 * scale, width * 0.46 * scale, length * 0.96, 10),
+            new THREE.MeshBasicMaterial({ color })
+        );
+        bolt.rotation.x = Math.PI / 2;
+        const core = new THREE.Mesh(
+            new THREE.CylinderGeometry(width * 0.1 * scale, width * 0.2 * scale, length * 0.74, 8),
+            new THREE.MeshBasicMaterial({ color: coreColor })
+        );
+        core.rotation.x = Math.PI / 2;
+        const sideA = new THREE.Mesh(
+            new THREE.TorusGeometry(width * 0.72 * scale, width * 0.08 * scale, 6, 16),
+            new THREE.MeshBasicMaterial({ color:'#b6fcff', transparent:true, opacity:0.65 })
+        );
+        sideA.rotation.y = Math.PI / 2;
+        sideA.position.z = -length * 0.12;
+        const sideB = sideA.clone();
+        sideB.position.z = length * 0.14;
+        group.add(bolt, core, sideA, sideB);
+        addGlowShell(width * 2.5, width * 1.15, length * 0.72, '#8fffff', 0.24);
+        group.userData.visualType = 'pulse';
+        group.userData.sideA = sideA;
+        group.userData.sideB = sideB;
+    }else{
+        const shell = new THREE.Mesh(
+            new THREE.BoxGeometry(width * scale, width * scale, length),
+            new THREE.MeshBasicMaterial({ color })
+        );
+        const core = new THREE.Mesh(
+            new THREE.BoxGeometry(width * 0.45 * scale, width * 0.45 * scale, length * 0.72),
+            new THREE.MeshBasicMaterial({ color: coreColor })
+        );
+        const halo = new THREE.Mesh(
+            new THREE.BoxGeometry(width * 1.8 * scale, width * 1.8 * scale, length * 0.9),
+            new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.14, depthWrite:false })
+        );
+        group.add(halo, shell, core);
+        group.userData.visualType = 'laser';
+        group.userData.halo = halo;
+    }
+
+    return group;
+}
+
+function updateProjectileVisual(laser){
+    const mesh = laser?.mesh;
+    if(!mesh) return;
+    const visualType = String(mesh.userData?.visualType || laser?.weaponType || 'laser');
+    const lifeRatio = THREE.MathUtils.clamp((Number(laser?.life || 0) || 0) / Math.max(1, Number(laser?.maxLife || laser?.life || 1) || 1), 0, 1);
+    const pulse = 0.8 + Math.sin(Date.now() * 0.03) * 0.18;
+
+    if(mesh.userData.flame){
+        const flame = mesh.userData.flame;
+        flame.scale.setScalar(0.88 + Math.sin(Date.now() * 0.06) * 0.18);
+        flame.material.opacity = 0.72 + Math.sin(Date.now() * 0.08) * 0.18;
+    }
+    if(mesh.userData.ring){
+        mesh.userData.ring.rotation.z += 0.22;
+        mesh.scale.setScalar(0.96 + (1 - lifeRatio) * 0.12 + (pulse - 0.8) * 0.2);
+    }
+    if(mesh.userData.ringA){
+        mesh.userData.ringA.rotation.z += 0.18;
+    }
+    if(mesh.userData.ringB){
+        mesh.userData.ringB.rotation.x += 0.16;
+    }
+    if(mesh.userData.sideA){
+        mesh.userData.sideA.rotation.z += 0.22;
+    }
+    if(mesh.userData.sideB){
+        mesh.userData.sideB.rotation.z -= 0.18;
+    }
+    if(mesh.userData.halo?.material){
+        mesh.userData.halo.material.opacity = Math.max(0.08, 0.18 + (pulse - 0.8) * 0.18) * (0.55 + lifeRatio * 0.45);
+    }
+
+    if(visualType === 'beam'){
+        mesh.scale.z = 1 + (pulse - 0.8) * 0.18;
+    }else if(visualType === 'phase'){
+        mesh.rotation.z += 0.14;
+    }else if(visualType === 'plasma'){
+        mesh.rotation.y += 0.12;
+    }else if(visualType === 'pulse'){
+        mesh.rotation.z += 0.08;
+    }
+}
+
+
 function tryFireLaser(){
     const now = Date.now();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
@@ -3336,39 +3537,13 @@ function tryFireLaser(){
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
 
     const spawnProjectile = (offsetX = 0, spreadOffset = 0) => {
-        const projectileGroup = new THREE.Group();
-
-        let shell;
-        if(weaponType === 'missile'){
-            shell = new THREE.Mesh(
-                new THREE.CylinderGeometry(projectileWidth * 0.35, projectileWidth * 0.7, projectileLength, 10),
-                new THREE.MeshBasicMaterial({ color })
-            );
-            shell.rotation.x = Math.PI / 2;
-            const tip = new THREE.Mesh(
-                new THREE.ConeGeometry(projectileWidth * 0.7, projectileWidth * 1.1, 10),
-                new THREE.MeshBasicMaterial({ color: coreColor })
-            );
-            tip.rotation.x = -Math.PI / 2;
-            tip.position.z = -projectileLength * 0.55;
-            const flame = new THREE.Mesh(
-                new THREE.CylinderGeometry(projectileWidth * 0.18, projectileWidth * 0.45, projectileLength * 0.45, 8),
-                new THREE.MeshBasicMaterial({ color: '#ffdd88' })
-            );
-            flame.rotation.x = Math.PI / 2;
-            flame.position.z = projectileLength * 0.55;
-            projectileGroup.add(shell, tip, flame);
-        }else{
-            shell = new THREE.Mesh(
-                new THREE.BoxGeometry(projectileWidth * projectileScale, projectileWidth * projectileScale, projectileLength),
-                new THREE.MeshBasicMaterial({ color })
-            );
-            const core = new THREE.Mesh(
-                new THREE.BoxGeometry(projectileWidth * 0.45 * projectileScale, projectileWidth * 0.45 * projectileScale, projectileLength * 0.72),
-                new THREE.MeshBasicMaterial({ color: coreColor })
-            );
-            projectileGroup.add(shell, core);
-        }
+        const projectileGroup = createProjectileVisual(weaponType, {
+            color,
+            coreColor,
+            width: projectileWidth,
+            length: projectileLength,
+            scale: projectileScale
+        });
 
         const localDirection = new THREE.Vector3(spreadOffset, 0, -1).normalize().applyQuaternion(playerShip.quaternion);
         const localOffset = new THREE.Vector3(offsetX, 0, -2.2).applyQuaternion(playerShip.quaternion);
@@ -3380,6 +3555,7 @@ function tryFireLaser(){
             mesh: projectileGroup,
             velocity: localDirection.clone().multiplyScalar(projectileVelocity),
             life: projectileLife,
+            maxLife: projectileLife,
             damage: battleWeapon.damage,
             weaponType
         });
@@ -3445,18 +3621,21 @@ function updateBattleRespawnState(){
 function updateBattlePlayerWorldHp(){
     const wrap = document.getElementById('battle-player-world-hp');
     const fill = document.getElementById('battle-player-world-hp-fill');
+    const text = document.getElementById('battle-player-world-hp-text');
     if(!wrap || !fill) return;
     const visible = gameState === 'BATTLE' && !battleObserverMode;
     wrap.classList.toggle('hidden', !visible);
     if(!visible) return;
     const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
     fill.style.width = hpPercent + '%';
+    if(text) text.textContent = `${Math.round(playerHp)} / ${playerMaxHp}`;
 }
 
 function updateBattlePlayerHud(){
     const hud = document.getElementById('battle-player-hud');
     const hpFill = document.getElementById('battle-player-hp-fill');
     const hpText = document.getElementById('battle-player-hp-text');
+    const hpInlineText = document.getElementById('battle-player-hp-inline-text');
     const ammoText = document.getElementById('battle-ammo-text');
     const damageText = document.getElementById('battle-damage-text');
     const reloadText = document.getElementById('battle-reload-text');
@@ -3467,6 +3646,7 @@ function updateBattlePlayerHud(){
     const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
     hpFill.style.width = hpPercent + '%';
     hpText.textContent = `HP: ${Math.round(playerHp)} / ${playerMaxHp}`;
+    if(hpInlineText) hpInlineText.textContent = `${Math.round(playerHp)} / ${playerMaxHp}`;
     ammoText.textContent = `Боеприпасы: ${battleWeapon.ammoInClip} / ${battleWeapon.clipSize} | запас ${formatAmmoReserve()}`;
     damageText.textContent = `Урон: ${battleWeapon.damage}`;
     if(isBattleRespawning()){
@@ -7084,6 +7264,7 @@ function updateEnemyHud(){
     const name = document.getElementById('enemy-name');
     const hpBar = document.getElementById('enemy-hp-bar');
     const hpText = document.getElementById('enemy-hp-text');
+    const hpInlineText = document.getElementById('enemy-hp-inline-text');
     if(!hud || !name || !hpBar || !hpText) return;
 
     if(!enemyBot){
@@ -7098,16 +7279,21 @@ function updateEnemyHud(){
     name.textContent = enemyBot.userData.name || 'BOT DRONE';
     hpBar.style.width = percent + '%';
     hpText.textContent = hp + ' / ' + maxHp;
+    if(hpInlineText) hpInlineText.textContent = hp + ' / ' + maxHp;
 }
 
 function fireBotLaser(){
     if(!enemyBot || !playerShip) return;
-    const laserGeometry = new THREE.BoxGeometry(0.14, 0.14, 2.0);
-    const laserMaterial = new THREE.MeshBasicMaterial({ color: 0x55d7ff });
     const toPlayer = playerShip.position.clone().sub(enemyBot.position).normalize();
 
     [-0.7, 0.7].forEach(offsetX => {
-        const laserMesh = new THREE.Mesh(laserGeometry, laserMaterial);
+        const laserMesh = createProjectileVisual('pulse', {
+            color: '#55d7ff',
+            coreColor: '#ffffff',
+            width: 0.13,
+            length: 1.9,
+            scale: 1.05
+        });
         const localOffset = new THREE.Vector3(offsetX, 0, -1.8).applyQuaternion(enemyBot.quaternion);
         laserMesh.position.copy(enemyBot.position.clone().add(localOffset));
         laserMesh.lookAt(enemyBot.position.clone().add(toPlayer));
@@ -7116,7 +7302,9 @@ function fireBotLaser(){
             mesh: laserMesh,
             velocity: toPlayer.clone().multiplyScalar(1.9),
             life: 100,
-            damage: 8
+            maxLife: 100,
+            damage: 8,
+            weaponType: 'pulse'
         });
     });
 }
