@@ -6390,6 +6390,53 @@ function resolveBattlePlayerNameById(playerId, fallback = 'Pilot'){
     return String(fallback || 'Pilot').trim() || 'Pilot';
 }
 
+function applyBattleScoreDelta(playerId, changes = {}){
+    const safeId = String(playerId || '').trim();
+    if(!safeId) return;
+
+    const killsDelta = Number(changes?.killsDelta || 0) || 0;
+    const deathsDelta = Number(changes?.deathsDelta || 0) || 0;
+    const selfId = getSelfBattlePlayerId();
+    const isSelf = !!(selfId && safeId === selfId);
+
+    if(isSelf){
+        if(killsDelta){
+            battleStats.playerKills = Math.max(0, Number(battleStats.playerKills || 0) + killsDelta);
+        }
+        if(deathsDelta){
+            battleStats.playerDeaths = Math.max(0, Number(battleStats.playerDeaths || 0) + deathsDelta);
+        }
+    }
+
+    const remoteEntry = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
+    if(remoteEntry){
+        if(killsDelta){
+            remoteEntry.kills = Math.max(0, Number(remoteEntry.kills || 0) + killsDelta);
+        }
+        if(deathsDelta){
+            remoteEntry.deaths = Math.max(0, Number(remoteEntry.deaths || 0) + deathsDelta);
+        }
+    }
+
+    const lists = [];
+    if(Array.isArray(currentRoom?.currentPlayers)) lists.push(currentRoom.currentPlayers);
+    if(Array.isArray(currentRoom?.players) && currentRoom.players is not currentRoom.currentPlayers) lists.push(currentRoom.players);
+
+    for(const list of lists){
+        const row = list.find((entry) => {
+            const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
+            return !!entryId && entryId === safeId;
+        });
+        if(!row) continue;
+        if(killsDelta){
+            row.kills = Math.max(0, Number(row.kills || 0) + killsDelta);
+        }
+        if(deathsDelta){
+            row.deaths = Math.max(0, Number(row.deaths || 0) + deathsDelta);
+        }
+    }
+}
+
 function awardBattleKillRewards(victimName = ''){
     const now = Date.now();
     if(now - battleLastKillAt <= BATTLE_COMBO_WINDOW_MS){
@@ -6606,6 +6653,7 @@ function applyIncomingBattleHit(payload = {}){
     const self = getBattleSelfIdentity();
     const targetId = String(payload?.targetPlayerId || '').trim();
     if(!self.playerId || !targetId || self.playerId !== targetId) return;
+    if(Number(playerHp || 0) <= 0) return;
 
     const hitId = String(payload?.hitId || '').trim();
     if(hitId){
@@ -6629,13 +6677,12 @@ function applyIncomingBattleHit(payload = {}){
     const attackerId = String(payload?.attackerId || '').trim();
     const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
     playerHp = 0;
-    battleStats.playerDeaths += 1;
     battleKillCombo = 0;
     battleLastKillAt = 0;
 
-    const attackerRemote = attackerId ? remoteBattleShips.get(attackerId) : null;
-    if(attackerRemote){
-        attackerRemote.kills = Math.max(0, Number(attackerRemote.kills || 0) + 1);
+    applyBattleScoreDelta(self.playerId, { deathsDelta: 1 });
+    if(attackerId){
+        applyBattleScoreDelta(attackerId, { killsDelta: 1 });
     }
 
     if(playerShip){
@@ -6668,20 +6715,17 @@ function handleIncomingBattleKill(payload = {}){
     const self = getBattleSelfIdentity();
 
     const isSelfAttacker = !!(attackerId && self.playerId && attackerId === self.playerId);
+    if(attackerId){
+        applyBattleScoreDelta(attackerId, { killsDelta: 1 });
+    }
+    if(victimId){
+        applyBattleScoreDelta(victimId, { deathsDelta: 1 });
+    }
     if(isSelfAttacker){
-        battleStats.playerKills += 1;
         awardBattleKillRewards(victimName);
     }
 
-    const attackerRemote = attackerId ? remoteBattleShips.get(attackerId) : null;
-    if(attackerRemote){
-        attackerRemote.kills = Math.max(0, Number(attackerRemote.kills || 0) + 1);
-    }
-
     const victimRemote = victimId ? remoteBattleShips.get(victimId) : null;
-    if(victimRemote){
-        victimRemote.deaths = Math.max(0, Number(victimRemote.deaths || 0) + 1);
-    }
     if(victimRemote?.mesh){
         spawnShipDebris(victimRemote.mesh.position.clone(), 0xff7755);
         removeRemoteBattleShipById(victimId);
@@ -7103,11 +7147,11 @@ function updateBattleScoreboard(){
         rows.push({
             nickname: remoteState?.nickname || safeName || 'Pilot',
             clan: '',
-            level: Number(entry?.level || remoteState?.level || 1) || 1,
-            kills: Number(entry?.kills || 0) || 0,
-            deaths: Number(entry?.deaths || 0) || 0,
+            level: Number(remoteState?.level || entry?.level || 1) || 1,
+            kills: Number(remoteState?.kills || entry?.kills || 0) || 0,
+            deaths: Number(remoteState?.deaths || entry?.deaths || 0) || 0,
             id: entryId,
-            ping: Number(entry?.ping || remoteState?.ping || 0) || 0,
+            ping: Number(remoteState?.ping || entry?.ping || 0) || 0,
             team
         });
     });
