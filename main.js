@@ -16,15 +16,15 @@ let player = {
   ships: [],
   ownedShipIds: ['scout_1'],
   selectedShipId: 'scout_1',
-  ownedModuleIds: [],
-  activeModulesByShip: {},
+  ownedModuleIds: ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'],
+  activeModulesByShip: { scout_1: { weapon: 'weapon_laser_s1', shield: 'shield_micro_s1', booster: 'booster_ion_s1' } },
   staff_role: 'player'
 };
 
 // 🔥 ТЕСТОВЫЙ КОРАБЛЬ (можешь потом удалить)
 player.ships.push({
   id: 1,
-  name: "Scout",
+  name: "Базовый корпус",
   level: 1,
   hp: 100,
   attack: 10,
@@ -7946,17 +7946,26 @@ function getModuleById(moduleId){
 function ensureModuleOwnershipDefaults(){
     try{
         if(!player || typeof player !== 'object') return;
-        const allModules = getAllHangarModules();
+        const starterModuleIds = ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'];
         if(!Array.isArray(player.ownedModuleIds)) player.ownedModuleIds = [];
-        if(!player.ownedModuleIds.length && allModules.length){
-            player.ownedModuleIds = allModules.map(item => item.id);
+        if(!player.ownedModuleIds.length){
+            player.ownedModuleIds = [...starterModuleIds];
         }
         player.ownedModuleIds = Array.from(new Set(
             player.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean)
         ));
+        starterModuleIds.forEach(id => {
+            if(!player.ownedModuleIds.includes(id)) player.ownedModuleIds.unshift(id);
+        });
         if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object'){
             player.activeModulesByShip = {};
         }
+        if(!player.activeModulesByShip['scout_1'] || typeof player.activeModulesByShip['scout_1'] !== 'object'){
+            player.activeModulesByShip['scout_1'] = {};
+        }
+        if(!player.activeModulesByShip['scout_1'].weapon) player.activeModulesByShip['scout_1'].weapon = 'weapon_laser_s1';
+        if(!player.activeModulesByShip['scout_1'].shield) player.activeModulesByShip['scout_1'].shield = 'shield_micro_s1';
+        if(!player.activeModulesByShip['scout_1'].booster) player.activeModulesByShip['scout_1'].booster = 'booster_ion_s1';
     }catch(_){ }
 }
 
@@ -8209,33 +8218,24 @@ function computeShipBattleStats(shipId){
 
     installedModules.forEach(module => {
         const typeId = String(module?.typeId || module?.classId || '').trim();
-        if(typeId === 'engine'){
-            stats.maxSpeed *= 1.12;
-            stats.forwardAcceleration *= 1.15;
-            stats.strafeAcceleration *= 1.12;
-            stats.turnYaw *= 1.04;
-            stats.turnPitch *= 1.04;
-            stats.moduleSummary.push('+скорость');
-        }else if(typeId === 'defense'){
-            stats.hp *= 1.18;
-            stats.damping += 0.002;
-            stats.moduleSummary.push('+броня');
-        }else if(typeId === 'reactor'){
-            stats.clipSize += 8;
-            stats.reloadTime *= 0.82;
-            stats.laserVelocity += 0.28;
-            stats.moduleSummary.push('+энергия');
-        }else if(typeId === 'targeting'){
-            stats.laserVelocity += 0.55;
-            stats.laserScale += 0.22;
-            stats.weaponDamage += 1;
-            stats.spread *= 0.6;
-            stats.moduleSummary.push('+точность');
+        if(typeId === 'booster' || typeId === 'engine'){
+            stats.maxSpeed *= Number(module?.speedMult || 1.12);
+            stats.forwardAcceleration *= Number(module?.accelMult || 1.12);
+            stats.strafeAcceleration *= Number(module?.accelMult || 1.08);
+            stats.turnYaw *= Number(module?.turnMult || 1.04);
+            stats.turnPitch *= Number(module?.turnMult || 1.04);
+            stats.moduleSummary.push('+ускоритель');
+        }else if(typeId === 'shield' || typeId === 'defense'){
+            stats.hp *= Number(module?.hpMult || 1.18);
+            stats.damping += Number(module?.dampingBonus || 0.002);
+            stats.moduleSummary.push('+щит');
         }else if(typeId === 'weapon'){
-            stats.weaponDamage *= 1.14;
-            stats.laserScale += 0.1;
-            stats.fireCooldown *= 0.92;
-            stats.moduleSummary.push('+урон');
+            const weaponKind = String(module?.weaponKind || '').trim().toLowerCase();
+            if(weaponKind) stats.weaponType = weaponKind;
+            stats.weaponDamage *= Number(module?.damageMult || 1.14);
+            stats.fireCooldown *= Number(module?.cooldownMult || 0.92);
+            stats.laserScale += Number(module?.projectileScaleBonus || 0.1);
+            stats.moduleSummary.push(module?.name ? module.name : '+пушка');
         }
     });
 
@@ -8854,9 +8854,9 @@ function fillHangarText(){
     const moduleInstalled = !!(ship && module && getInstalledModuleForType(ship.id, module.typeId));
 
     setText('hangar-ship-tier', ship?.tier || '—');
-    setText('hangar-ship-name', ship?.name || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Нет кораблей этого класса' : 'Нет кораблей'));
-    setText('hangar-ship-subtitle', ship?.subtitle || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'В выбранном классе пока нет доступных корпусов' : 'Покупай корабли в магазине, они появятся здесь'));
-    setText('hangar-ship-desc', ship?.description || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Смени класс выше или купи корабль этого класса в магазине.' : 'Открой магазин и пополни ангар новыми корпусами.'));
+    setText('hangar-ship-name', ship?.name || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Нет корпусов этого типа' : 'Нет корпусов'));
+    setText('hangar-ship-subtitle', ship?.subtitle || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'В выбранном типе пока нет доступных корпусов' : 'Покупай корпуса в магазине, они появятся здесь'));
+    setText('hangar-ship-desc', ship?.description || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Смени тип выше или купи корпус этой ветки в магазине.' : 'Открой магазин и пополни ангар новыми корпусами.'));
     setText('hangar-ship-price-coins', ship && typeof getShipCoinPrice === 'function' ? String(getShipCoinPrice(ship)) : '0');
     setText('hangar-ship-price-diamonds', ship && typeof getShipDiamondPrice === 'function' ? String(getShipDiamondPrice(ship)) : '0');
 
@@ -10566,77 +10566,71 @@ function limitBattleArea(){
 /* ===== V82 SHOP CLASSES ===== */
 const SHOP_DATA = {
     types: [
-        { id:'fighters', name:'Истребители', subtitle:'Скорость и перехват', badge:'Истребитель' },
-        { id:'tanks', name:'Танки', subtitle:'Броня и давление', badge:'Тяжёлый корпус' },
-        { id:'assault', name:'Штурмовики', subtitle:'Ракеты и тяжёлый урон', badge:'Штурмовик' },
-        { id:'technology', name:'Технологии', subtitle:'Энергия и спецэффекты', badge:'Технологический класс' },
-        { id:'universal', name:'Универсалы', subtitle:'Баланс всех систем', badge:'Универсал' }
+        { id:'fighters', name:'Скоростные', subtitle:'Лёгкие корпуса для разгона', badge:'Скоростной корпус' },
+        { id:'tanks', name:'Бронированные', subtitle:'Толстый металл и живучесть', badge:'Бронированный корпус' },
+        { id:'assault', name:'Штурмовые', subtitle:'Давление и высокий урон', badge:'Штурмовой корпус' },
+        { id:'technology', name:'Маневренные', subtitle:'Поворотливые геометрии корпуса', badge:'Маневренный корпус' },
+        { id:'universal', name:'Универсальные', subtitle:'Баланс всех систем', badge:'Универсальный корпус' }
     ],
     shipsByType: {
         fighters: [
-            { id:'scout_1', type:'ship', classId:'fighters', tier:'Старый корпус', name:'Скаут-1', subtitle:'Старый перехватчик', badge:'Истребители', price:900, description:'Базовый старый корпус для быстрых вылетов. Узкий силуэт, простая броня, яркие носовые неоны и лёгкие лазерные пушки.', stats:[['Скорость','9.2'],['Броня','3.2'],['Урон','4.8'],['Энергия','5.4'],['Оружие','Лазеры']], art:'arrow', neon:'#76f7ff', engine:'#59c7ff', weapon:'laser', accent:'#7a8cff' },
-            { id:'scout_2', type:'ship', classId:'fighters', tier:'Усиленный корпус', name:'Скаут-2', subtitle:'Форсажная версия', badge:'Истребители', price:1350, description:'Обновлённая версия старой платформы: ярче контуры, мощнее сопла, лучше стабилизация и более чистый лазерный след.', stats:[['Скорость','9.6'],['Броня','3.8'],['Урон','5.5'],['Энергия','5.9'],['Оружие','Импульсный лазер']], art:'dart', neon:'#86fff2', engine:'#65d2ff', weapon:'laser', accent:'#57a8ff' },
-            { id:'stinger', type:'ship', classId:'fighters', tier:'Новая серия', name:'Стингер', subtitle:'Клинок перехвата', badge:'Истребители', price:1880, description:'Уже современный и более острый корпус. Пара боковых пушек даёт плотный импульсный огонь, а неоновые жилы подчёркивают скорость.', stats:[['Скорость','9.8'],['Броня','4.2'],['Урон','6.3'],['Энергия','6.4'],['Оружие','Двойной импульс']], art:'stinger', neon:'#7efcff', engine:'#4ab8ff', weapon:'pulse', accent:'#ffd86a' },
-            { id:'phantom', type:'ship', classId:'fighters', tier:'Современный stealth', name:'Фантом', subtitle:'Стелс-перехватчик', badge:'Истребители', price:2640, description:'Тонкий скрытный корпус с фиолетово-голубыми неонами. Задние двигатели горят коротким резким факелом, вооружение — тонкие лучевые лазеры.', stats:[['Скорость','10.0'],['Броня','4.7'],['Урон','7.3'],['Энергия','7.4'],['Оружие','Лучевой лазер']], art:'phantom', neon:'#95f1ff', engine:'#8b6cff', weapon:'beam', accent:'#9f6bff' },
-            { id:'phantom_x', type:'ship', classId:'fighters', tier:'Топ версия', name:'Фантом-X', subtitle:'Пиковая модель ветки', badge:'Истребители', price:3520, description:'Новая элитная модификация с яркими неоновыми линиями по всему корпусу, усиленными двигателями и плазменным лучом высокой плотности.', stats:[['Скорость','10.4'],['Броня','5.1'],['Урон','8.2'],['Энергия','8.6'],['Оружие','Плазменный луч']], art:'razor', neon:'#7cfbff', engine:'#a36cff', weapon:'plasma', accent:'#ffe07d' }
+            { id:'scout_1', type:'ship', classId:'fighters', tier:'Базовый корпус', name:'Корпус С-01', subtitle:'Стартовый скоростной корпус', badge:'Скоростные', price:900, description:'Самый простой и лёгкий корпус. Быстро разгоняется, но держит мало урона. Идеален как стартовая база для первых сборок.', stats:[['Скорость','9.2'],['Броня','3.2'],['Манёвр','7.4'],['Энергия','5.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'arrow', neon:'#76f7ff', engine:'#59c7ff', weapon:'laser', accent:'#7a8cff' },
+            { id:'scout_2', type:'ship', classId:'fighters', tier:'Усиленный корпус', name:'Корпус С-02', subtitle:'Разогнанная версия', badge:'Скоростные', price:1350, description:'Тот же быстрый силуэт, но с лучшей развесовкой. Даёт ещё больше скорости и отзывчивости на разворотах.', stats:[['Скорость','9.7'],['Броня','3.8'],['Манёвр','7.8'],['Энергия','5.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'dart', neon:'#86fff2', engine:'#65d2ff', weapon:'laser', accent:'#57a8ff' },
+            { id:'stinger', type:'ship', classId:'fighters', tier:'Продвинутый корпус', name:'Корпус С-03', subtitle:'Перехват высокого класса', badge:'Скоростные', price:1880, description:'Более узкий и острый корпус, рассчитанный на охоту и быстрый врыв. Хорошо сочетается с импульсными пушками.', stats:[['Скорость','9.9'],['Броня','4.2'],['Манёвр','8.1'],['Энергия','6.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'stinger', neon:'#7efcff', engine:'#4ab8ff', weapon:'pulse', accent:'#ffd86a' },
+            { id:'phantom', type:'ship', classId:'fighters', tier:'Элитный корпус', name:'Корпус С-04', subtitle:'Лёгкий пустой каркас', badge:'Скоростные', price:2640, description:'Очень лёгкий корпус с минимальным профилем. Максимально раскрывается с дальнобойными пушками и дорогими ускорителями.', stats:[['Скорость','10.2'],['Броня','4.7'],['Манёвр','8.3'],['Энергия','7.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'phantom', neon:'#95f1ff', engine:'#8b6cff', weapon:'beam', accent:'#9f6bff' }
         ],
         tanks: [
-            { id:'bastion_0', type:'ship', classId:'tanks', tier:'Старый корпус', name:'Бастион-0', subtitle:'Старый тяжёлый щит', badge:'Танки', price:980, description:'Старая тяжёлая платформа с широким корпусом и медленными, но мощными двигателями. Лобовые пушки стреляют плотным синим лазером.', stats:[['Скорость','4.2'],['Броня','8.4'],['Урон','5.6'],['Энергия','5.0'],['Оружие','Тяжёлый лазер']], art:'bulwark', neon:'#7fe7ff', engine:'#4aa8ff', weapon:'laser', accent:'#56c9ff' },
-            { id:'bastion_1', type:'ship', classId:'tanks', tier:'Усиленный корпус', name:'Бастион-1', subtitle:'Лобовой подавитель', badge:'Танки', price:1480, description:'Усиленная версия с более яркой защитной подсветкой и массивным центральным орудием. Хорошо держит фронт и постоянно светится по краям.', stats:[['Скорость','4.6'],['Броня','9.0'],['Урон','6.3'],['Энергия','5.5'],['Оружие','Осадный лазер']], art:'bulwark', neon:'#85f2ff', engine:'#5cb6ff', weapon:'beam', accent:'#7aa7ff' },
-            { id:'goliath', type:'ship', classId:'tanks', tier:'Новая серия', name:'Голиаф', subtitle:'Тяжёлый молот', badge:'Танки', price:2280, description:'Новая тяжёлая рама с боковыми бронеплитами, угловыми неонами и плазменным залпом из центральной башни.', stats:[['Скорость','4.8'],['Броня','9.6'],['Урон','7.1'],['Энергия','6.1'],['Оружие','Плазменный залп']], art:'fortress', neon:'#8bf9ff', engine:'#4fc0ff', weapon:'plasma', accent:'#ffd06c' },
-            { id:'titan', type:'ship', classId:'tanks', tier:'Современный тяжёлый', name:'Титан', subtitle:'Фронтовой бастион', badge:'Танки', price:3180, description:'Плотный корпус с яркими броневыми рёбрами, крупными реакторами и медленным тяжёлым лучевым выстрелом.', stats:[['Скорость','5.1'],['Броня','10.0'],['Урон','7.8'],['Энергия','6.6'],['Оружие','Тяжёлый луч']], art:'fortress', neon:'#9dfcff', engine:'#7ab6ff', weapon:'beam', accent:'#7ad7ff' },
-            { id:'titan_mk2', type:'ship', classId:'tanks', tier:'Топ версия', name:'Титан-МК2', subtitle:'Броневой доминатор', badge:'Танки', price:4180, description:'Топовая версия ветки: насыщенные неоны, тройной задний выхлоп и тяжёлое фазовое орудие для продавливания линии боя.', stats:[['Скорость','5.4'],['Броня','10.6'],['Урон','8.7'],['Энергия','7.2'],['Оружие','Фазовый заряд']], art:'citadel', neon:'#8ff8ff', engine:'#95c0ff', weapon:'phase', accent:'#9c83ff' }
+            { id:'bastion_0', type:'ship', classId:'tanks', tier:'Базовый корпус', name:'Корпус Б-01', subtitle:'Старый броневой блок', badge:'Бронированные', price:980, description:'Тяжёлый корпус с большой лобовой плитой. Медленный, зато очень живучий и хорошо держит линию.', stats:[['Скорость','4.3'],['Броня','8.5'],['Манёвр','3.2'],['Энергия','5.0'],['Слоты','Пушка / Щит / Ускоритель']], art:'bulwark', neon:'#7fe7ff', engine:'#4aa8ff', weapon:'laser', accent:'#56c9ff' },
+            { id:'bastion_1', type:'ship', classId:'tanks', tier:'Усиленный корпус', name:'Корпус Б-02', subtitle:'Лобовой танк', badge:'Бронированные', price:1480, description:'Укреплённая версия с усиленной центральной секцией. Лучше переносит фокус и подходит под тяжёлые пушки.', stats:[['Скорость','4.7'],['Броня','9.1'],['Манёвр','3.5'],['Энергия','5.5'],['Слоты','Пушка / Щит / Ускоритель']], art:'bulwark', neon:'#85f2ff', engine:'#5cb6ff', weapon:'beam', accent:'#7aa7ff' },
+            { id:'goliath', type:'ship', classId:'tanks', tier:'Продвинутый корпус', name:'Корпус Б-03', subtitle:'Широкая бронерама', badge:'Бронированные', price:2280, description:'Массивный каркас под плотные сборки. Отличный выбор для высокого ХП и мощных энергощитов.', stats:[['Скорость','4.9'],['Броня','9.7'],['Манёвр','3.7'],['Энергия','6.1'],['Слоты','Пушка / Щит / Ускоритель']], art:'fortress', neon:'#8bf9ff', engine:'#4fc0ff', weapon:'plasma', accent:'#ffd06c' },
+            { id:'titan', type:'ship', classId:'tanks', tier:'Элитный корпус', name:'Корпус Б-04', subtitle:'Передвижная крепость', badge:'Бронированные', price:3180, description:'Очень тяжёлый корпус для танк-сборок. Теряет скорость, но выигрывает в броне и общем запасе прочности.', stats:[['Скорость','5.1'],['Броня','10.1'],['Манёвр','3.9'],['Энергия','6.6'],['Слоты','Пушка / Щит / Ускоритель']], art:'citadel', neon:'#9dfcff', engine:'#7ab6ff', weapon:'phase', accent:'#7ad7ff' }
         ],
         assault: [
-            { id:'raider', type:'ship', classId:'assault', tier:'Старый корпус', name:'Рейдер', subtitle:'Старый штурмовой клинок', badge:'Штурмовики', price:950, description:'Старый штурмовой корпус с агрессивным носом и яркими оранжево-голубыми прожилками. Вооружён коротким лазерным залпом.', stats:[['Скорость','7.0'],['Броня','5.4'],['Урон','6.8'],['Энергия','5.2'],['Оружие','Штурмовой лазер']], art:'lancer', neon:'#76f2ff', engine:'#4bc4ff', weapon:'laser', accent:'#ffba63' },
-            { id:'raider_mk2', type:'ship', classId:'assault', tier:'Усиленный корпус', name:'Рейдер-МК2', subtitle:'Ракетная версия', badge:'Штурмовики', price:1460, description:'Новая секция под ракетные пилоны и мощнее сопла. Неоны идут по крыльям, а нос несёт импульсно-ракетный пакет.', stats:[['Скорость','7.3'],['Броня','5.9'],['Урон','7.6'],['Энергия','5.7'],['Оружие','Ракеты + импульс']], art:'lancer', neon:'#82fdff', engine:'#63d1ff', weapon:'missile', accent:'#ffd76a' },
-            { id:'blitz', type:'ship', classId:'assault', tier:'Новая серия', name:'Блиц', subtitle:'Быстрый штурм', badge:'Штурмовики', price:2140, description:'Скоростной штурмовик со стреловидным корпусом, красочными боковыми неонами и парой плазменных ускорителей.', stats:[['Скорость','7.9'],['Броня','6.3'],['Урон','8.2'],['Энергия','6.4'],['Оружие','Плазменные болты']], art:'stinger', neon:'#7efbff', engine:'#5ed6ff', weapon:'plasma', accent:'#ff9e61' },
-            { id:'destroyer', type:'ship', classId:'assault', tier:'Современный штурм', name:'Разрушитель', subtitle:'Тяжёлый атакующий корпус', badge:'Штурмовики', price:3020, description:'Корпус с широкой носовой частью и двойным задним факелом. Пушки стреляют плотными ракетно-плазменными залпами.', stats:[['Скорость','7.2'],['Броня','7.2'],['Урон','9.0'],['Энергия','6.9'],['Оружие','Ракеты + плазма']], art:'destroyer', neon:'#89f9ff', engine:'#ff9e66', weapon:'missile', accent:'#ff7f66' },
-            { id:'destroyer_x', type:'ship', classId:'assault', tier:'Топ версия', name:'Разрушитель-X', subtitle:'Топовый дамагер', badge:'Штурмовики', price:3950, description:'Элитный штурмовик с мерцающими неонами по крыльям, перегретыми кормовыми двигателями и тяжёлым алым плазменным выбросом.', stats:[['Скорость','7.5'],['Броня','7.7'],['Урон','9.8'],['Энергия','7.5'],['Оружие','Алый плазмо-залп']], art:'destroyer', neon:'#9ffbff', engine:'#ff8b63', weapon:'plasma', accent:'#ff6a6a' }
+            { id:'raider', type:'ship', classId:'assault', tier:'Базовый корпус', name:'Корпус Ш-01', subtitle:'Простой штурмовой каркас', badge:'Штурмовые', price:950, description:'Средний корпус с хорошим уроном и нормальной бронёй. Лёгкий вход в штурмовой стиль игры.', stats:[['Скорость','7.0'],['Броня','5.4'],['Манёвр','5.8'],['Энергия','5.2'],['Слоты','Пушка / Щит / Ускоритель']], art:'lancer', neon:'#76f2ff', engine:'#4bc4ff', weapon:'laser', accent:'#ffba63' },
+            { id:'raider_mk2', type:'ship', classId:'assault', tier:'Усиленный корпус', name:'Корпус Ш-02', subtitle:'Боевая версия', badge:'Штурмовые', price:1460, description:'Усиленные крепления под тяжёлое вооружение. Нормально держит удар и не превращается в кирпич.', stats:[['Скорость','7.3'],['Броня','5.9'],['Манёвр','6.1'],['Энергия','5.7'],['Слоты','Пушка / Щит / Ускоритель']], art:'lancer', neon:'#82fdff', engine:'#63d1ff', weapon:'missile', accent:'#ffd76a' },
+            { id:'blitz', type:'ship', classId:'assault', tier:'Продвинутый корпус', name:'Корпус Ш-03', subtitle:'Ударный клин', badge:'Штурмовые', price:2140, description:'Штурмовой корпус с агрессивным профилем. Хорошо сочетается с плазмой и ракетными пушками.', stats:[['Скорость','7.9'],['Броня','6.3'],['Манёвр','6.4'],['Энергия','6.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'stinger', neon:'#7efbff', engine:'#5ed6ff', weapon:'plasma', accent:'#ff9e61' },
+            { id:'destroyer', type:'ship', classId:'assault', tier:'Элитный корпус', name:'Корпус Ш-04', subtitle:'Платформа давления', badge:'Штурмовые', price:3020, description:'Тяжёлый штурмовой корпус для сборок с мощной передней линией. Сам просит поставить в него что-то злое.', stats:[['Скорость','7.2'],['Броня','7.2'],['Манёвр','6.0'],['Энергия','6.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'destroyer', neon:'#89f9ff', engine:'#ff9e66', weapon:'missile', accent:'#ff7f66' }
         ],
         technology: [
-            { id:'echo', type:'ship', classId:'technology', tier:'Старый корпус', name:'Эхо', subtitle:'Старый энергокорабль', badge:'Технологии', price:1020, description:'Старый исследовательский корпус с мягкими бирюзовыми неонами и кольцевой энергетикой вокруг центрального ядра.', stats:[['Скорость','6.0'],['Броня','4.8'],['Урон','5.7'],['Энергия','8.1'],['Оружие','Энерголучи']], art:'halo', neon:'#81fdff', engine:'#6fd8ff', weapon:'beam', accent:'#84a6ff' },
-            { id:'echo_2', type:'ship', classId:'technology', tier:'Усиленный корпус', name:'Эхо-2', subtitle:'Улучшенное ядро', badge:'Технологии', price:1580, description:'Модернизированная старая платформа с более ярким центральным ядром и фазовым свечением на крыльях.', stats:[['Скорость','6.3'],['Броня','5.0'],['Урон','6.2'],['Энергия','8.8'],['Оружие','Фазовый луч']], art:'halo', neon:'#95ffff', engine:'#6bc4ff', weapon:'phase', accent:'#9d7cff' },
-            { id:'nova', type:'ship', classId:'technology', tier:'Новая серия', name:'Нова', subtitle:'Энергетический фрегат', badge:'Технологии', price:2360, description:'Новый корпус с энергетическими арками, яркими неоновыми кольцами и чистым дальним лучом.', stats:[['Скорость','6.8'],['Броня','5.4'],['Урон','7.1'],['Энергия','9.4'],['Оружие','Квантовый луч']], art:'halo', neon:'#8efbff', engine:'#7dc6ff', weapon:'beam', accent:'#fff184' },
-            { id:'helios', type:'ship', classId:'technology', tier:'Современный tech', name:'Гелиос', subtitle:'Солнечная батарея боя', badge:'Технологии', price:3280, description:'Светящийся современный корпус с золотыми прожилками, реактором в центре и стабилизированным плазменным импульсом.', stats:[['Скорость','7.0'],['Броня','5.9'],['Урон','7.8'],['Энергия','10.0'],['Оружие','Солнечная плазма']], art:'helios', neon:'#92ffff', engine:'#8bc8ff', weapon:'plasma', accent:'#ffd96d' },
-            { id:'helios_prime', type:'ship', classId:'technology', tier:'Топ версия', name:'Гелиос-Прайм', subtitle:'Пиковая энергомодель', badge:'Технологии', price:4320, description:'Топовый технологический корабль с самыми яркими неонами, пульсирующими орбитальными кольцами и фазовым орудием высокой плотности.', stats:[['Скорость','7.4'],['Броня','6.2'],['Урон','8.5'],['Энергия','10.8'],['Оружие','Фазовая арка']], art:'helios', neon:'#a6ffff', engine:'#93d2ff', weapon:'phase', accent:'#ffd86b' }
+            { id:'echo', type:'ship', classId:'technology', tier:'Базовый корпус', name:'Корпус М-01', subtitle:'Маневренная рамка', badge:'Маневренные', price:1020, description:'Лёгкий тех-корпус с мягким поворотом и хорошим управлением. Удобен для игры от позиции и циркуляции.', stats:[['Скорость','6.1'],['Броня','4.8'],['Манёвр','8.4'],['Энергия','8.1'],['Слоты','Пушка / Щит / Ускоритель']], art:'halo', neon:'#81fdff', engine:'#6fd8ff', weapon:'beam', accent:'#84a6ff' },
+            { id:'echo_2', type:'ship', classId:'technology', tier:'Усиленный корпус', name:'Корпус М-02', subtitle:'Точный маневровик', badge:'Маневренные', price:1580, description:'Даёт ещё более плавный разворот и лучший контроль траектории. Подходит тем, кто любит вертеться и жить.', stats:[['Скорость','6.3'],['Броня','5.0'],['Манёвр','8.8'],['Энергия','8.8'],['Слоты','Пушка / Щит / Ускоритель']], art:'halo', neon:'#95ffff', engine:'#6bc4ff', weapon:'phase', accent:'#9d7cff' },
+            { id:'nova', type:'ship', classId:'technology', tier:'Продвинутый корпус', name:'Корпус М-03', subtitle:'Высокая управляемость', badge:'Маневренные', price:2360, description:'Продвинутый маневренный каркас. Быстро меняет угол атаки и помогает раскрыть точные пушки.', stats:[['Скорость','6.8'],['Броня','5.4'],['Манёвр','9.2'],['Энергия','9.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'halo', neon:'#8efbff', engine:'#7dc6ff', weapon:'beam', accent:'#fff184' },
+            { id:'helios', type:'ship', classId:'technology', tier:'Элитный корпус', name:'Корпус М-04', subtitle:'Пилотажная рама', badge:'Маневренные', price:3220, description:'Топовый маневренный корпус. Не самый крепкий, но отлично чувствуется в ближнем и среднем темпе боя.', stats:[['Скорость','7.1'],['Броня','5.8'],['Манёвр','9.6'],['Энергия','9.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'razor', neon:'#a0fdff', engine:'#7ec8ff', weapon:'phase', accent:'#ffd86a' }
         ],
         universal: [
-            { id:'pioneer', type:'ship', classId:'universal', tier:'Старый корпус', name:'Пионер', subtitle:'Старый универсал', badge:'Универсалы', price:880, description:'Классический корпус ранней серии: аккуратные синие неоны, пара компактных двигателей и простой лазерный комплект.', stats:[['Скорость','7.0'],['Броня','5.8'],['Урон','5.9'],['Энергия','6.2'],['Оружие','Лазеры']], art:'classic', neon:'#79f4ff', engine:'#62c8ff', weapon:'laser', accent:'#6ba4ff' },
-            { id:'pioneer_2', type:'ship', classId:'universal', tier:'Усиленный корпус', name:'Пионер-2', subtitle:'Сбалансированный апгрейд', badge:'Универсалы', price:1320, description:'Улучшенная версия старой платформы с ярче светящимися линиями и более уверенным импульсным вооружением.', stats:[['Скорость','7.3'],['Броня','6.2'],['Урон','6.4'],['Энергия','6.8'],['Оружие','Импульсные пушки']], art:'classic', neon:'#88fbff', engine:'#6ed3ff', weapon:'pulse', accent:'#7ad7ff' },
-            { id:'vector', type:'ship', classId:'universal', tier:'Новая серия', name:'Вектор', subtitle:'Баланс во всём', badge:'Универсалы', price:1980, description:'Современный сбалансированный корпус с равномерным неоновым контуром и точным центральным лучом.', stats:[['Скорость','7.8'],['Броня','6.8'],['Урон','7.0'],['Энергия','7.2'],['Оружие','Точный луч']], art:'vector', neon:'#86ffff', engine:'#74d6ff', weapon:'beam', accent:'#8a8fff' },
-            { id:'vector_plus', type:'ship', classId:'universal', tier:'Современный плюс', name:'Вектор-Плюс', subtitle:'Усиленная баланс-модель', badge:'Универсалы', price:2780, description:'Прокачанная версия с более густым свечением крыльев, улучшенными соплами и плазменным импульсом средней дальности.', stats:[['Скорость','8.1'],['Броня','7.1'],['Урон','7.6'],['Энергия','7.8'],['Оружие','Плазменный импульс']], art:'vector', neon:'#92ffff', engine:'#82d9ff', weapon:'plasma', accent:'#ffd470' },
-            { id:'vector_elite', type:'ship', classId:'universal', tier:'Топ версия', name:'Вектор-Элит', subtitle:'Элитный баланс-класс', badge:'Универсалы', price:3660, description:'Топовый универсал с яркими голубыми неонами, насыщенным свечением двигателей и фазовым многоцелевым орудием.', stats:[['Скорость','8.5'],['Броня','7.5'],['Урон','8.1'],['Энергия','8.5'],['Оружие','Фазовый импульс']], art:'vector', neon:'#9dfdff', engine:'#8edfff', weapon:'phase', accent:'#9b7cff' }
+            { id:'atlas', type:'ship', classId:'universal', tier:'Базовый корпус', name:'Корпус U-01', subtitle:'Сбалансированная база', badge:'Универсальные', price:1100, description:'Нормальный корпус без перекоса в крайности. Подходит, если хочешь сам строить характер машины через пушки и модули.', stats:[['Скорость','6.6'],['Броня','6.2'],['Манёвр','6.4'],['Энергия','6.6'],['Слоты','Пушка / Щит / Ускоритель']], art:'dart', neon:'#8ffcff', engine:'#72c9ff', weapon:'laser', accent:'#88c1ff' },
+            { id:'atlas_mk2', type:'ship', classId:'universal', tier:'Усиленный корпус', name:'Корпус U-02', subtitle:'Уверенный баланс', badge:'Универсальные', price:1720, description:'Чуть крепче, чуть быстрее и комфортнее в разных сценариях. Хорошо заходит как рабочая универсальная платформа.', stats:[['Скорость','6.9'],['Броня','6.5'],['Манёвр','6.7'],['Энергия','6.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'arrow', neon:'#97ffff', engine:'#79cfff', weapon:'pulse', accent:'#b0a2ff' },
+            { id:'vanguard', type:'ship', classId:'universal', tier:'Продвинутый корпус', name:'Корпус U-03', subtitle:'Гибкий универсал', badge:'Универсальные', price:2480, description:'Продвинутая платформа, которая спокойно переваривает почти любую сборку. Хороший кандидат на основной корпус.', stats:[['Скорость','7.2'],['Броня','6.9'],['Манёвр','7.0'],['Энергия','7.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'stinger', neon:'#9afcff', engine:'#84d2ff', weapon:'beam', accent:'#ffd98a' },
+            { id:'vanguard_x', type:'ship', classId:'universal', tier:'Элитный корпус', name:'Корпус U-04', subtitle:'Сборка без слабых мест', badge:'Универсальные', price:3360, description:'Дорогой, но очень удобный корпус без явных провалов. Можно сделать и живучий билд, и скоростной, и дамажный.', stats:[['Скорость','7.5'],['Броня','7.2'],['Манёвр','7.3'],['Энергия','7.8'],['Слоты','Пушка / Щит / Ускоритель']], art:'phantom', neon:'#abffff', engine:'#90d8ff', weapon:'phase', accent:'#ffe07d' }
         ]
     },
-
     moduleTypes: [
-        { id:'engine', name:'Двигатели', subtitle:'Скорость и манёвр' },
-        { id:'defense', name:'Защита', subtitle:'Броня и щиты' },
-        { id:'reactor', name:'Реакторы', subtitle:'Энергия и перегрузка' },
-        { id:'targeting', name:'Наведение', subtitle:'Точность и контроль' },
-        { id:'weapon', name:'Оружейные', subtitle:'Усиление урона' }
+        { id:'weapon', name:'Пушки', subtitle:'Тип снаряда и урон' },
+        { id:'shield', name:'Энергощиты', subtitle:'Выживание и запас HP' },
+        { id:'booster', name:'Ускорители', subtitle:'Скорость и рывок' }
     ],
     modulesByType: {
-        engine: [
-            { id:'speed_core', type:'module', classId:'engine', tier:'Редкий', name:'Модуль скорости', subtitle:'Ускорители маршевых двигателей', badge:'Двигатели', price:350, description:'Увеличивает максимальную скорость и разгон корабля. Полезен для лёгких и средних истребителей.', stats:[['Бонус','+12% скорость'],['Слот','Двигатель'],['Редкость','Редкий'],['Вес','Лёгкий']], art:'speed' }
-        ],
-        defense: [
-            { id:'shield_lattice', type:'module', classId:'defense', tier:'Редкий', name:'Модуль защиты', subtitle:'Щитовая решётка', badge:'Защита', price:420, description:'Усиливает лобовую и боковую защиту корпуса, снижая урон от прямых попаданий.', stats:[['Бонус','+18% броня'],['Слот','Защита'],['Редкость','Редкий'],['Вес','Средний']], art:'shield' }
-        ],
-        reactor: [
-            { id:'reactor_overdrive', type:'module', classId:'reactor', tier:'Эпический', name:'Реактор Overdrive', subtitle:'Пиковая энергия', badge:'Реакторы', price:560, description:'Ускоряет перезарядку энергии оружия и даёт кораблю стабильность в затяжной дуэли.', stats:[['Бонус','+20% энергия'],['Слот','Реактор'],['Редкость','Эпический'],['Вес','Средний']], art:'reactor' }
-        ],
-        targeting: [
-            { id:'target_matrix', type:'module', classId:'targeting', tier:'Эпический', name:'Прицельная матрица', subtitle:'Контроль огня', badge:'Наведение', price:610, description:'Стабилизирует вооружение, повышает точность и уменьшает разброс лазерных батарей.', stats:[['Бонус','+16% точность'],['Слот','Наведение'],['Редкость','Эпический'],['Вес','Лёгкий']], art:'matrix' }
-        ],
         weapon: [
-            { id:'plasma_capacitor', type:'module', classId:'weapon', tier:'Эпический', name:'Плазменный конденсатор', subtitle:'Усилитель урона', badge:'Оружие', price:740, description:'Даёт более мощный импульс орудиям. Рекомендуется для штурмовых и снайперских конфигураций.', stats:[['Бонус','+14% урон'],['Слот','Оружие'],['Редкость','Эпический'],['Вес','Средний']], art:'plasma' }
+            { id:'weapon_laser_s1', type:'module', classId:'weapon', tier:'Базовая', name:'Лазерная пушка S1', subtitle:'Ровный красный лазер', badge:'Пушки', price:260, description:'Базовая лазерная батарея. Универсальное оружие без перекосов — хороший старт для любого корпуса.', stats:[['Урон','Стабильный'],['Темп','Средний'],['Тип','Лазер'],['Слот','Пушка']], art:'matrix', weaponKind:'laser', damageMult:1.0, cooldownMult:1.0, projectileScaleBonus:0.0 },
+            { id:'weapon_pulse_m2', type:'module', classId:'weapon', tier:'Редкая', name:'Импульсная пушка M2', subtitle:'Двойной темп', badge:'Пушки', price:420, description:'Импульсное орудие с более частыми снарядами. Хорошо заходит на скоростных и маневренных корпусах.', stats:[['Урон','Ниже'],['Темп','Высокий'],['Тип','Импульс'],['Слот','Пушка']], art:'plasma', weaponKind:'pulse', damageMult:0.96, cooldownMult:0.82, projectileScaleBonus:0.06 },
+            { id:'weapon_beam_x3', type:'module', classId:'weapon', tier:'Эпическая', name:'Лучевая пушка X3', subtitle:'Дальний пробой', badge:'Пушки', price:620, description:'Точный длинный луч с хорошей скоростью полёта. Отличен для спокойной игры и подстрела на дистанции.', stats:[['Урон','Выше'],['Темп','Ниже'],['Тип','Луч'],['Слот','Пушка']], art:'phase', weaponKind:'beam', damageMult:1.14, cooldownMult:1.1, projectileScaleBonus:0.12 },
+            { id:'weapon_plasma_r4', type:'module', classId:'weapon', tier:'Легендарная', name:'Плазменная пушка R4', subtitle:'Тяжёлый выстрел', badge:'Пушки', price:860, description:'Плотный плазменный заряд. Медленнее и тяжелее, но ощущается сочнее и бьёт больнее.', stats:[['Урон','Высокий'],['Темп','Ниже'],['Тип','Плазма'],['Слот','Пушка']], art:'plasma', weaponKind:'plasma', damageMult:1.22, cooldownMult:1.08, projectileScaleBonus:0.18 }
+        ],
+        shield: [
+            { id:'shield_micro_s1', type:'module', classId:'shield', tier:'Базовый', name:'Микрощит S1', subtitle:'Стартовая защита', badge:'Энергощиты', price:240, description:'Самый простой энергощит. Даёт небольшой прирост HP и помогает пережить первые размены.', stats:[['HP','+12%'],['Поглощение','Низкое'],['Тип','Щит'],['Слот','Защита']], art:'shield', hpMult:1.12, dampingBonus:0.001 },
+            { id:'shield_field_m2', type:'module', classId:'shield', tier:'Редкий', name:'Полевой щит M2', subtitle:'Уплотнение контура', badge:'Энергощиты', price:390, description:'Более плотный энергоконтур. Корпус получает заметно больше живучести без сильной потери динамики.', stats:[['HP','+18%'],['Поглощение','Среднее'],['Тип','Щит'],['Слот','Защита']], art:'shield', hpMult:1.18, dampingBonus:0.002 },
+            { id:'shield_bulwark_x', type:'module', classId:'shield', tier:'Эпический', name:'Щит Bulwark-X', subtitle:'Толстый фронт', badge:'Энергощиты', price:610, description:'Тяжёлый энергощит с большим бонусом к HP. Особенно хорош для бронированных корпусов и штурма.', stats:[['HP','+26%'],['Поглощение','Высокое'],['Тип','Щит'],['Слот','Защита']], art:'phase', hpMult:1.26, dampingBonus:0.003 },
+            { id:'shield_singularity', type:'module', classId:'shield', tier:'Легендарный', name:'Щит Singularity', subtitle:'Максимум выживания', badge:'Энергощиты', price:880, description:'Самый мощный из доступных щитов. Очень заметно повышает прочность и удерживает инерцию под огнём.', stats:[['HP','+34%'],['Поглощение','Очень высокое'],['Тип','Щит'],['Слот','Защита']], art:'reactor', hpMult:1.34, dampingBonus:0.004 }
+        ],
+        booster: [
+            { id:'booster_ion_s1', type:'module', classId:'booster', tier:'Базовый', name:'Ионный ускоритель S1', subtitle:'Стартовый разгон', badge:'Ускорители', price:240, description:'Простой ускоритель для базового корпуса. Добавляет скорости и делает отклик приятнее.', stats:[['Скорость','+10%'],['Разгон','+8%'],['Тип','Ускоритель'],['Слот','Двигатель']], art:'speed', speedMult:1.1, accelMult:1.08, turnMult:1.03 },
+            { id:'booster_vector_m2', type:'module', classId:'booster', tier:'Редкий', name:'Векторный ускоритель M2', subtitle:'Живой разворот', badge:'Ускорители', price:410, description:'Добавляет заметную динамику и помогает быстрее менять направление. Хороший выбор почти под все корпуса.', stats:[['Скорость','+14%'],['Разгон','+12%'],['Тип','Ускоритель'],['Слот','Двигатель']], art:'speed', speedMult:1.14, accelMult:1.12, turnMult:1.05 },
+            { id:'booster_afterburn_x', type:'module', classId:'booster', tier:'Эпический', name:'Afterburn-X', subtitle:'Форсажная катушка', badge:'Ускорители', price:640, description:'Мощный ускоритель для скоростных и маневренных корпусов. Даёт очень бодрый разгон и хороший крен.', stats:[['Скорость','+18%'],['Разгон','+16%'],['Тип','Ускоритель'],['Слот','Двигатель']], art:'plasma', speedMult:1.18, accelMult:1.16, turnMult:1.07 },
+            { id:'booster_void_rush', type:'module', classId:'booster', tier:'Легендарный', name:'Void Rush', subtitle:'Пиковый форсаж', badge:'Ускорители', price:920, description:'Максимальный ускоритель для топовых сборок. Очень сильно поднимает темп движения и живость корпуса.', stats:[['Скорость','+22%'],['Разгон','+20%'],['Тип','Ускоритель'],['Слот','Двигатель']], art:'phase', speedMult:1.22, accelMult:1.2, turnMult:1.08 }
         ]
     }
 };
 try{ window.__cosmicShopData = SHOP_DATA; }catch(_){}
-
 
 
 function getAllShopShipsLegacy(){
@@ -10687,7 +10681,7 @@ function buyModuleFromShop(moduleId){
         player.ownedModuleIds = Array.from(new Set(player.ownedModuleIds));
     }
 
-    toggleShipModule(module.id, player.selectedShipId || '');
+    toggleShipModule(module.id, player.selectedShipId || 'scout_1');
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     updatePremiumAccountInfo?.();
     updateHUD?.();
@@ -10724,7 +10718,10 @@ function equipOwnedShip(shipId){
     currentBattleShipStats = computeShipBattleStats(safeId);
     refreshOwnedShipsInventory?.();
     saveGame?.();
+    const nextShips = getCurrentShopShips();
+    shopState.selectedId = nextShips[0]?.id || '';
     renderShopScreen?.();
+    renderHangarCosmic?.();
     return true;
 }
 
@@ -10755,12 +10752,23 @@ function buyShipFromShop(shipId){
     player.ownedShipIds.push(ship.id);
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds));
     player.selectedShipId = ship.id;
+    if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object') player.activeModulesByShip = {};
+    if(!player.activeModulesByShip[ship.id] || typeof player.activeModulesByShip[ship.id] !== 'object') player.activeModulesByShip[ship.id] = {};
+    const defaultWeapon = player.ownedModuleIds.find(id => getModuleById(id)?.classId === 'weapon') || '';
+    const defaultShield = player.ownedModuleIds.find(id => getModuleById(id)?.classId === 'shield') || '';
+    const defaultBooster = player.ownedModuleIds.find(id => getModuleById(id)?.classId === 'booster') || '';
+    if(defaultWeapon && !player.activeModulesByShip[ship.id].weapon) player.activeModulesByShip[ship.id].weapon = defaultWeapon;
+    if(defaultShield && !player.activeModulesByShip[ship.id].shield) player.activeModulesByShip[ship.id].shield = defaultShield;
+    if(defaultBooster && !player.activeModulesByShip[ship.id].booster) player.activeModulesByShip[ship.id].booster = defaultBooster;
     refreshOwnedShipsInventory?.();
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
     saveGame?.();
+    const nextShips = getCurrentShopShips();
+    shopState.selectedId = nextShips[0]?.id || '';
     renderShopScreen?.();
+    renderHangarCosmic?.();
     return true;
 }
 
@@ -10768,14 +10776,15 @@ const shopState = {
     open:false,
     view:'ships',
     shipType:'fighters',
-    moduleType:'engine',
+    moduleType:'weapon',
     selectedId:'scout_1'
 };
 ensureShopOwnershipDefaults();
 refreshOwnedShipsInventory();
 
 function getCurrentShopShips(){
-    return SHOP_DATA.shipsByType[shopState.shipType] || [];
+    const list = SHOP_DATA.shipsByType[shopState.shipType] || [];
+    return list.filter(item => !isOwnedShip(item.id));
 }
 
 function getCurrentShopModules(){
@@ -10877,23 +10886,34 @@ function renderShopMainSwitch(){
     const wrap = document.getElementById('shop-main-switch');
     const shop = document.getElementById('shop-screen');
     if(!wrap) return;
+    const activeMainView = shopState.view === 'ships'
+        ? 'ships'
+        : (shopState.moduleType === 'weapon' ? 'weapons' : 'modules');
     wrap.innerHTML = `
-        <button type="button" class="shop-switch-btn ${shopState.view === 'modules' ? '' : 'active'}" data-shop-view="ships">Корабли</button>
-        <button type="button" class="shop-switch-btn ${shopState.view === 'modules' ? 'active' : ''}" data-shop-view="modules">Модули</button>
+        <button type="button" class="shop-switch-btn ${activeMainView === 'ships' ? 'active' : ''}" data-shop-view="ships">Корпуса</button>
+        <button type="button" class="shop-switch-btn ${activeMainView === 'weapons' ? 'active' : ''}" data-shop-view="weapons">Пушки</button>
+        <button type="button" class="shop-switch-btn ${activeMainView === 'modules' ? 'active' : ''}" data-shop-view="modules">Модули</button>
     `;
     wrap.querySelectorAll('[data-shop-view]').forEach(btn => {
         btn.addEventListener('click', () => {
-            const nextView = btn.dataset.shopView === 'modules' ? 'modules' : 'ships';
-            if(shopState.view === nextView) return;
-            shopState.view = nextView;
-            const nextList = nextView === 'modules' ? getCurrentShopModules() : getCurrentShopShips();
+            const nextView = String(btn.dataset.shopView || 'ships');
+            if(nextView === 'ships'){
+                shopState.view = 'ships';
+            }else if(nextView === 'weapons'){
+                shopState.view = 'modules';
+                shopState.moduleType = 'weapon';
+            }else{
+                shopState.view = 'modules';
+                if(shopState.moduleType === 'weapon') shopState.moduleType = 'shield';
+            }
+            const nextList = shopState.view === 'ships' ? getCurrentShopShips() : getCurrentShopModules();
             shopState.selectedId = nextList[0]?.id || '';
             renderShopScreen();
         });
     });
     if(shop){
-        shop.classList.toggle('shop-ships-only', shopState.view !== 'modules');
-        shop.classList.toggle('shop-modules-only', shopState.view === 'modules');
+        shop.classList.toggle('shop-ships-only', shopState.view === 'ships');
+        shop.classList.toggle('shop-modules-only', shopState.view !== 'ships');
     }
 }
 
@@ -10905,7 +10925,7 @@ function renderShopTypeTabs(){
     const moduleLabel = document.getElementById('shop-module-type-label');
     if(!wrap) return;
 
-    if(typeLabel) typeLabel.textContent = 'Классы кораблей';
+    if(typeLabel) typeLabel.textContent = 'Типы корпусов';
     wrap.innerHTML = SHOP_DATA.types.map(type => `
         <button type="button" class="shop-type-tab ${shopState.view === 'ships' && shopState.shipType === type.id ? 'active' : ''}" data-shop-type="${type.id}">
             <span class="shop-type-name">${type.name}</span>
@@ -10913,7 +10933,7 @@ function renderShopTypeTabs(){
         </button>
     `).join('');
 
-    if(moduleLabel) moduleLabel.textContent = 'Классы модулей';
+    if(moduleLabel) moduleLabel.textContent = 'Оборудование';
     if(moduleWrap){
         moduleWrap.innerHTML = SHOP_DATA.moduleTypes.map(type => `
             <button type="button" class="shop-type-tab ${shopState.view === 'modules' && shopState.moduleType === type.id ? 'active' : ''}" data-shop-module-type="${type.id}">
@@ -10936,7 +10956,7 @@ function renderShopTypeTabs(){
     moduleWrap?.querySelectorAll('.shop-type-tab').forEach(btn => {
         btn.addEventListener('click', () => {
             shopState.view = 'modules';
-            shopState.moduleType = btn.dataset.shopModuleType || 'engine';
+            shopState.moduleType = btn.dataset.shopModuleType || 'weapon';
             const nextList = getCurrentShopModules();
             shopState.selectedId = nextList[0]?.id || '';
             renderShopScreen();
@@ -10975,14 +10995,14 @@ function getShopCurrentTitle(){
     if(shopState.view === 'modules'){
         const activeModuleType = SHOP_DATA.moduleTypes.find(type => type.id === shopState.moduleType) || SHOP_DATA.moduleTypes[0];
         return {
-            title:(activeModuleType?.name || 'МОДУЛИ').toUpperCase(),
-            subtitle:''
+            title:(activeModuleType?.name || 'ОБОРУДОВАНИЕ').toUpperCase(),
+            subtitle:'Покупай детали отдельно и ставь их на активный корпус'
         };
     }
     const activeType = SHOP_DATA.types.find(type => type.id === shopState.shipType) || SHOP_DATA.types[0];
     return {
-        title:(activeType?.name || 'КОРАБЛИ').toUpperCase(),
-        subtitle:''
+        title:(activeType?.name || 'КОРПУСА').toUpperCase(),
+        subtitle:'Собери машину из корпуса, пушки, щита и ускорителя'
     };
 }
 
@@ -11001,22 +11021,23 @@ function renderShopCatalog(){
     const list = shopState.view === 'modules' ? getCurrentShopModules() : getCurrentShopShips();
 
     if(!list.length){
-        wrap.innerHTML = '<div class="shop-empty">Тут пока пусто.</div>';
+        wrap.innerHTML = shopState.view === 'ships' ? '<div class="shop-empty">Все корпуса этого типа уже куплены.</div>' : '<div class="shop-empty">Тут пока пусто.</div>';
         return;
     }
 
     wrap.innerHTML = list.map((item, index) => {
         const selected = shopState.selectedId === item.id;
         const cols = splitItemStats(item);
-        const owned = item.type === 'ship' ? isOwnedShip(item.id) : false;
+        const owned = item.type === 'ship' ? isOwnedShip(item.id) : isOwnedModule(item.id);
         const coinPrice = item.type === 'ship' ? getShipCoinPrice(item) : Number(item.price || 0);
         const diamondPrice = item.type === 'ship' ? getShipDiamondPrice(item) : 0;
         const priceLine = item.type === 'ship'
             ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${coinPrice}</span><span class="shop-price-chip"><span class="shop-coin">💎</span>${diamondPrice}</span></div>`
             : (item.price ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${item.price}</span></div>` : '');
+        const moduleInstalled = item.type === 'module' && !!getInstalledModuleForType(player?.selectedShipId || '', item.classId || '');
         const buyText = item.type === 'module'
-            ? 'Установить'
-            : (owned ? ((player.selectedShipId === item.id) ? 'Выбран' : 'Выбрать') : 'Купить');
+            ? (owned ? (moduleInstalled && getInstalledModuleForType(player?.selectedShipId || '', item.classId || '')?.id === item.id ? 'Снять' : 'Оснастить') : 'Купить')
+            : 'Купить корпус';
 
         return `
           <div class="shop-row ${selected ? 'selected' : ''} ${item.type}" data-shop-row="${item.id}">
@@ -11035,15 +11056,15 @@ function renderShopCatalog(){
               ${priceLine}
             </div>
             <div class="shop-stats-col">
-              <div class="shop-col-title">${item.type === 'ship' ? 'Характеристики' : 'Параметры'}</div>
+              <div class="shop-col-title">${item.type === 'ship' ? 'Характеристики корпуса' : 'Параметры'}</div>
               ${(cols.left || []).map(([k,v]) => `<div class="shop-stat"><strong>${k}:</strong> ${v}</div>`).join('')}
             </div>
             <div class="shop-stats-col">
-              <div class="shop-col-title">${item.type === 'ship' ? 'Системы и оружие' : 'Слоты и класс'}</div>
+              <div class="shop-col-title">${item.type === 'ship' ? 'Слоты и база' : 'Слот и класс'}</div>
               ${(cols.right || []).map(([k,v]) => `<div class="shop-stat"><strong>${k}:</strong> ${v}</div>`).join('')}
             </div>
             <div class="shop-buy-wrap">
-              <div class="shop-type-badge">${item.tier}</div>
+              <div class="shop-type-badge">${owned ? 'Куплено • ' : ''}${item.tier}</div>
               <button type="button" class="shop-buy-btn" data-shop-buy="${item.id}">${buyText}</button>
             </div>
           </div>
@@ -11091,7 +11112,7 @@ function setShopMode(open){
     if(note) note.style.display = open ? 'none' : 'block';
     content.style.display = open ? 'none' : 'block';
     buttons.style.display = open ? 'none' : 'flex';
-    if(!open){ shopState.view = 'ships'; }
+    if(!open){ shopState.view = 'ships'; shopState.moduleType = 'weapon'; }
     try{ updateLobbyTabStyles?.(); }catch(_){ }
     if(open) renderShopScreen();
 }
@@ -11099,6 +11120,7 @@ function setShopMode(open){
 function openShopView(){
     if(gameState !== 'LOBBY') switchState('LOBBY');
     shopState.view = 'ships';
+    shopState.selectedId = getCurrentShopShips()[0]?.id || '';
     setTimeout(() => {
         setShopMode(true);
         try{ updateLobbyTabStyles?.(); }catch(_){}
