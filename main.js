@@ -6432,35 +6432,6 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     const shipGroup = new THREE.Group();
     shipGroup.rotation.order = 'YXZ';
 
-    const body = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.0, 1.2, 7, 10),
-        new THREE.MeshStandardMaterial({ color: getBattleShipColorHex(team), metalness: 0.45, roughness: 0.32 })
-    );
-    body.rotation.z = Math.PI / 2;
-    shipGroup.add(body);
-
-    const cockpit = new THREE.Mesh(
-        new THREE.SphereGeometry(0.85, 18, 18),
-        new THREE.MeshStandardMaterial({ color: 0x9bd6ff, emissive: 0x113355, metalness: 0.15, roughness: 0.2 })
-    );
-    cockpit.position.set(1.2, 0.25, 0);
-    shipGroup.add(cockpit);
-
-    const wingGeo = new THREE.BoxGeometry(0.25, 3.1, 1.3);
-    const wingMat = new THREE.MeshStandardMaterial({ color: 0x3b6ea8, metalness: 0.4, roughness: 0.45 });
-    const wingTop = new THREE.Mesh(wingGeo, wingMat);
-    wingTop.position.set(-0.35, 1.7, 0);
-    const wingBottom = wingTop.clone();
-    wingBottom.position.y = -1.7;
-    shipGroup.add(wingTop, wingBottom);
-
-    const engineMat = new THREE.MeshBasicMaterial({ color: 0xffc66b });
-    const engine1 = new THREE.Mesh(new THREE.SphereGeometry(0.23, 10, 10), engineMat);
-    engine1.position.set(-3.2, 0.55, 0);
-    const engine2 = engine1.clone();
-    engine2.position.y = -0.55;
-    shipGroup.add(engine1, engine2);
-
     const labelSprite = createRemotePilotLabel(name, team);
     shipGroup.add(labelSprite);
 
@@ -6482,6 +6453,10 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         hitRadius: 2.6,
         team
     };
+
+    const battleShipItem = getSelectedShipItem() || getShopShipById('scout_1') || { id:'scout_1', modelPath:'ships/Spaceship.glb' };
+    mountBattleShipVisual(shipGroup, battleShipItem, team);
+
     scene.add(shipGroup);
     return {
         mesh: shipGroup,
@@ -7403,26 +7378,14 @@ function spawnPlayer() {
 
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
 
-    const shipGroup = createHangarShipMesh(currentBattleShipStats.ship || getSelectedShipItem() || { art:'classic' });
+    const shipGroup = new THREE.Group();
     shipGroup.rotation.order = 'YXZ';
-    shipGroup.scale.multiplyScalar(0.52);
 
     const selfTeam = getBattleRoomPlayerTeam(getSelfBattlePlayerId());
+    mountBattleShipVisual(shipGroup, currentBattleShipStats.ship || getSelectedShipItem() || { id:'scout_1', modelPath:'ships/Spaceship.glb' }, selfTeam);
+
     const spawn = selfTeam === 'red' ? spawnPointB.clone() : spawnPointA.clone();
     const lookTarget = selfTeam === 'red' ? spawnPointA.clone() : spawnPointB.clone();
-    const hullColor = getBattleShipColorHex(selfTeam);
-
-    shipGroup.traverse?.((child) => {
-        if(child?.isMesh && child.material){
-            if(child.material.color){
-                try{ child.material.color.lerp(new THREE.Color(hullColor), 0.35); }catch(_){ }
-            }
-            if(child.material.emissive && child.material.emissive.isColor){
-                try{ child.material.emissive = new THREE.Color(hullColor).multiplyScalar(0.08); }catch(_){ }
-            }
-        }
-    });
-
     playerShip = shipGroup;
     playerShip.position.copy(spawn);
     playerShip.visible = true;
@@ -9168,6 +9131,75 @@ function buildHangarShipMeshAsync(item){
     return Promise.resolve(normalizeHangarShipMesh(createHangarShipMesh(item)));
 }
 
+function buildBattleShipVisualAsync(item, team = 'blue'){
+    const safeShipId = String(item?.id || '').trim();
+    const externalPath = String(item?.modelPath || '').trim();
+    const tint = new THREE.Color(getBattleShipColorHex(team));
+
+    const applyBattleVisualTweaks = (root) => {
+        if(!root) return root;
+        root.rotation.order = 'YXZ';
+        root.rotation.y = Math.PI;
+        root.traverse?.((child) => {
+            if(child?.isMesh){
+                child.castShadow = true;
+                child.receiveShadow = true;
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach((mat) => {
+                    if(!mat) return;
+                    if(mat.color?.isColor){
+                        try{ mat.color.lerp(tint, 0.22); }catch(_){ }
+                    }
+                    if(mat.emissive?.isColor){
+                        try{ mat.emissive.copy(tint).multiplyScalar(0.06); }catch(_){ }
+                    }
+                    if('metalness' in mat && Number(mat.metalness || 0) < 0.42) mat.metalness = 0.42;
+                    if('roughness' in mat && Number(mat.roughness || 0) > 0.7) mat.roughness = 0.7;
+                });
+            }
+        });
+        return root;
+    };
+
+    if(safeShipId === 'scout_1' && externalPath){
+        return loadExternalHangarShipModel(externalPath)
+            .then((raw) => {
+                const normalized = normalizeHangarShipMesh(raw);
+                if(normalized?.scale?.multiplyScalar){
+                    normalized.scale.multiplyScalar(1.9);
+                }
+                return applyBattleVisualTweaks(normalized);
+            })
+            .catch(() => {
+                const fallback = createHangarShipMesh(item);
+                fallback.scale.multiplyScalar(0.52);
+                return applyBattleVisualTweaks(fallback);
+            });
+    }
+
+    const procedural = createHangarShipMesh(item);
+    procedural.scale.multiplyScalar(0.52);
+    return Promise.resolve(applyBattleVisualTweaks(procedural));
+}
+
+function mountBattleShipVisual(targetGroup, item, team = 'blue'){
+    if(!targetGroup) return Promise.resolve(null);
+    const loadToken = Date.now() + Math.random();
+    targetGroup.userData = targetGroup.userData || {};
+    targetGroup.userData.visualLoadToken = loadToken;
+    while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
+    return buildBattleShipVisualAsync(item, team)
+        .then((visual) => {
+            if(!visual || targetGroup.userData?.visualLoadToken !== loadToken) return null;
+            while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
+            visual.position.set(0, 0, 0);
+            targetGroup.add(visual);
+            targetGroup.userData.hitRadius = Math.max(2.6, Number(visual?.userData?.hangarWidth || 0), Number(visual?.userData?.hangarDepth || 0), 2.6);
+            return visual;
+        })
+        .catch(() => null);
+}
+
 
 function createHangarNoShipPlaceholder(){
     const group = new THREE.Group();
@@ -9407,7 +9439,7 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0.42, -2.32, 1.0);
+        hangarState.platform.position.set(0.42, -2.08, 1.0);
         hangarState.platform.scale.set(0.188, 0.188, 0.188);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
@@ -9518,7 +9550,7 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
             hangarState.shipPivot.position.x = 0.58 + transitionOffset * 0.55;
-            hangarState.shipPivot.position.y = -1.08 + Math.sin(time * 1.18) * 0.01;
+            hangarState.shipPivot.position.y = -0.84 + Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.position.z = 0.86;
         }
         if(hangarState.modulePivot){
