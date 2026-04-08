@@ -7391,6 +7391,7 @@ function spawnPlayer() {
     playerShip.visible = true;
     playerShip.lookAt(lookTarget);
     playerShip.userData = {
+        ...(playerShip.userData || {}),
         hp: currentBattleShipStats.hp,
         weapon: currentBattleShipStats.ship?.weapon || 'laser',
         speed: currentBattleShipStats.maxSpeed,
@@ -9189,13 +9190,10 @@ function mountBattleShipVisual(targetGroup, item, team = 'blue'){
     targetGroup.userData.visualLoadToken = loadToken;
     while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
 
-    const immediateFallback = createHangarShipMesh(item);
-    immediateFallback.scale.multiplyScalar(0.52);
-    immediateFallback.rotation.order = 'YXZ';
-    immediateFallback.rotation.y = Math.PI;
+    const immediateFallback = createHangarLoadingPlaceholder();
     immediateFallback.position.set(0, 0, 0);
     targetGroup.add(immediateFallback);
-    targetGroup.userData.hitRadius = Math.max(2.6, Number(immediateFallback?.userData?.hangarWidth || 0), Number(immediateFallback?.userData?.hangarDepth || 0), 2.6);
+    targetGroup.userData.hitRadius = Math.max(2.6, Number(item?.hitRadius || 0) || 0, 2.6);
 
     return buildBattleShipVisualAsync(item, team)
         .then((visual) => {
