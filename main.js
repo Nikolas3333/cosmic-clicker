@@ -1,4 +1,5 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
 
 
@@ -24,7 +25,7 @@ let player = {
 // 🔥 ТЕСТОВЫЙ КОРАБЛЬ (можешь потом удалить)
 player.ships.push({
   id: 1,
-  name: "Базовый корпус",
+  name: "Cargo Drone",
   level: 1,
   hp: 100,
   attack: 10,
@@ -195,18 +196,22 @@ function closeShopView(){
 function ensureShopOwnershipDefaults(){
     try{
         if(!player || typeof player !== 'object') return;
-        if(!Array.isArray(player.ownedShipIds) || !player.ownedShipIds.length){
-            player.ownedShipIds = ['scout_1'];
+        const onlyHullId = 'scout_1';
+        player.ownedShipIds = [onlyHullId];
+        player.selectedShipId = onlyHullId;
+        if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object'){
+            player.activeModulesByShip = {};
         }
-        player.ownedShipIds = Array.from(new Set(
-            player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
-        ));
-        if(!player.ownedShipIds.includes('scout_1')){
-            player.ownedShipIds.unshift('scout_1');
-        }
-        if(!player.selectedShipId || !player.ownedShipIds.includes(player.selectedShipId)){
-            player.selectedShipId = player.ownedShipIds[0] || 'scout_1';
-        }
+        const currentSetup = player.activeModulesByShip[onlyHullId] && typeof player.activeModulesByShip[onlyHullId] === 'object'
+            ? player.activeModulesByShip[onlyHullId]
+            : {};
+        player.activeModulesByShip = {
+            [onlyHullId]: {
+                weapon: String(currentSetup.weapon || 'weapon_laser_s1').trim() || 'weapon_laser_s1',
+                shield: String(currentSetup.shield || 'shield_micro_s1').trim() || 'shield_micro_s1',
+                booster: String(currentSetup.booster || 'booster_ion_s1').trim() || 'booster_ion_s1'
+            }
+        };
     }catch(_){}
 }
 
@@ -9103,7 +9108,65 @@ function fillHangarText(){
 
 
 const hangarShipMeshCache = new Map();
+const hangarShipMeshPromiseCache = new Map();
+const hangarShipModelSourceCache = new Map();
 let hangarBuildToken = 0;
+
+function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
+    const safePath = String(modelPath || 'ships/Spaceship.glb').trim() || 'ships/Spaceship.glb';
+    if(hangarShipModelSourceCache.has(safePath)){
+        return Promise.resolve(cloneObject3DDeepSafe(hangarShipModelSourceCache.get(safePath)));
+    }
+    if(hangarShipMeshPromiseCache.has(`src:${safePath}`)){
+        return hangarShipMeshPromiseCache.get(`src:${safePath}`).then(model => cloneObject3DDeepSafe(model));
+    }
+
+    const loader = new GLTFLoader();
+    const promise = new Promise((resolve, reject) => {
+        loader.load(
+            safePath,
+            (gltf) => {
+                try{
+                    const model = gltf?.scene || null;
+                    if(!model) throw new Error('GLB scene is empty');
+                    model.rotation.y = Math.PI;
+                    model.traverse((child) => {
+                        if(child?.isMesh){
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if(child.material){
+                                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                                materials.forEach((mat) => {
+                                    if(mat && 'metalness' in mat && mat.metalness < 0.45) mat.metalness = 0.45;
+                                    if(mat && 'roughness' in mat && mat.roughness > 0.62) mat.roughness = 0.62;
+                                })
+                            }
+                        }
+                    });
+                    hangarShipModelSourceCache.set(safePath, cloneObject3DDeepSafe(model));
+                    resolve(cloneObject3DDeepSafe(model));
+                }catch(err){
+                    reject(err);
+                }
+            },
+            undefined,
+            (error) => reject(error || new Error('Failed to load GLB'))
+        );
+    });
+    hangarShipMeshPromiseCache.set(`src:${safePath}`, promise);
+    return promise.then(model => cloneObject3DDeepSafe(model));
+}
+
+function buildHangarShipMeshAsync(item){
+    const safeShipId = String(item?.id || '').trim();
+    const externalPath = String(item?.modelPath || '').trim();
+    if(safeShipId === 'scout_1' && externalPath){
+        return loadExternalHangarShipModel(externalPath)
+            .then(raw => normalizeHangarShipMesh(raw))
+            .catch(() => normalizeHangarShipMesh(createHangarShipMesh(item)));
+    }
+    return Promise.resolve(normalizeHangarShipMesh(createHangarShipMesh(item)));
+}
 
 
 function createHangarNoShipPlaceholder(){
@@ -9205,19 +9268,27 @@ function queueHangarShipBuild(currentShip){
         return;
     }
 
-    requestAnimationFrame(() => {
-        if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
-        try{
-            const rawShipMesh = createHangarShipMesh(currentShip);
-            const shipMesh = normalizeHangarShipMesh(rawShipMesh);
+    buildHangarShipMeshAsync(currentShip)
+        .then((shipMesh) => {
+            if(!shipMesh) return;
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
-
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
             shipMesh.position.set(0, 0, 0);
             hangarState.shipPivot.add(shipMesh);
-        }catch(_){}
-    });
+        })
+        .catch(() => {
+            if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
+            while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+            const fallback = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
+            fallback.position.set(0,0,0);
+            hangarState.shipPivot.add(fallback);
+        })
+        .finally(() => {
+            if(buildToken !== hangarBuildToken) return;
+            hangarState.isShipLoading = false;
+            fillHangarText();
+        });
 }
 
 function normalizeHangarShipMesh(shipMesh){
@@ -9353,9 +9424,9 @@ function ensureHangarRenderer(){
                         try{
                             const shipId = String(ship?.id || '').trim();
                             if(!shipId || hangarShipMeshCache.has(shipId)) return;
-                            const raw = createHangarShipMesh(ship);
-                            const normalized = normalizeHangarShipMesh(raw);
-                            hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(normalized));
+                            buildHangarShipMeshAsync(ship).then((normalized) => {
+                                if(normalized) hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(normalized));
+                            }).catch(() => {});
                         }catch(_){}
                     }, 40 * index);
                 });
@@ -10804,43 +10875,16 @@ function limitBattleArea(){
 /* ===== V82 SHOP CLASSES ===== */
 const SHOP_DATA = {
     types: [
-        { id:'fighters', name:'Скоростные', subtitle:'Лёгкие корпуса для разгона', badge:'Скоростной корпус' },
-        { id:'tanks', name:'Бронированные', subtitle:'Толстый металл и живучесть', badge:'Бронированный корпус' },
-        { id:'assault', name:'Штурмовые', subtitle:'Давление и высокий урон', badge:'Штурмовой корпус' },
-        { id:'technology', name:'Маневренные', subtitle:'Поворотливые геометрии корпуса', badge:'Маневренный корпус' },
-        { id:'universal', name:'Универсальные', subtitle:'Баланс всех систем', badge:'Универсальный корпус' }
+        { id:'fighters', name:'Cargo Drone', subtitle:'Единственный активный корпус', badge:'Основной корпус' }
     ],
     shipsByType: {
         fighters: [
-            { id:'scout_1', type:'ship', classId:'fighters', tier:'Базовый корпус', name:'Корпус С-01', subtitle:'Стартовый скоростной корпус', badge:'Скоростные', price:900, description:'Самый простой и лёгкий корпус. Быстро разгоняется, но держит мало урона. Идеален как стартовая база для первых сборок.', stats:[['Скорость','9.2'],['Броня','3.2'],['Манёвр','7.4'],['Энергия','5.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'arrow', neon:'#76f7ff', engine:'#59c7ff', weapon:'laser', accent:'#7a8cff' },
-            { id:'scout_2', type:'ship', classId:'fighters', tier:'Усиленный корпус', name:'Корпус С-02', subtitle:'Разогнанная версия', badge:'Скоростные', price:1350, description:'Тот же быстрый силуэт, но с лучшей развесовкой. Даёт ещё больше скорости и отзывчивости на разворотах.', stats:[['Скорость','9.7'],['Броня','3.8'],['Манёвр','7.8'],['Энергия','5.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'dart', neon:'#86fff2', engine:'#65d2ff', weapon:'laser', accent:'#57a8ff' },
-            { id:'stinger', type:'ship', classId:'fighters', tier:'Продвинутый корпус', name:'Корпус С-03', subtitle:'Перехват высокого класса', badge:'Скоростные', price:1880, description:'Более узкий и острый корпус, рассчитанный на охоту и быстрый врыв. Хорошо сочетается с импульсными пушками.', stats:[['Скорость','9.9'],['Броня','4.2'],['Манёвр','8.1'],['Энергия','6.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'stinger', neon:'#7efcff', engine:'#4ab8ff', weapon:'pulse', accent:'#ffd86a' },
-            { id:'phantom', type:'ship', classId:'fighters', tier:'Элитный корпус', name:'Корпус С-04', subtitle:'Лёгкий пустой каркас', badge:'Скоростные', price:2640, description:'Очень лёгкий корпус с минимальным профилем. Максимально раскрывается с дальнобойными пушками и дорогими ускорителями.', stats:[['Скорость','10.2'],['Броня','4.7'],['Манёвр','8.3'],['Энергия','7.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'phantom', neon:'#95f1ff', engine:'#8b6cff', weapon:'beam', accent:'#9f6bff' }
+            { id:'scout_1', type:'ship', classId:'fighters', tier:'Основной корпус', name:'Cargo Drone', subtitle:'3D модель из ships/Spaceship.glb', badge:'Основной корпус', price:0, description:'Единственный доступный корпус проекта. Использует загруженную 3D модель Spaceship.glb и остаётся в ангаре всегда.', stats:[['Скорость','9.2'],['Броня','3.2'],['Манёвр','7.4'],['Энергия','5.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'external_glb', modelPath:'ships/Spaceship.glb', neon:'#76f7ff', engine:'#59c7ff', weapon:'laser', accent:'#7a8cff' }
         ],
-        tanks: [
-            { id:'bastion_0', type:'ship', classId:'tanks', tier:'Базовый корпус', name:'Корпус Б-01', subtitle:'Старый броневой блок', badge:'Бронированные', price:980, description:'Тяжёлый корпус с большой лобовой плитой. Медленный, зато очень живучий и хорошо держит линию.', stats:[['Скорость','4.3'],['Броня','8.5'],['Манёвр','3.2'],['Энергия','5.0'],['Слоты','Пушка / Щит / Ускоритель']], art:'bulwark', neon:'#7fe7ff', engine:'#4aa8ff', weapon:'laser', accent:'#56c9ff' },
-            { id:'bastion_1', type:'ship', classId:'tanks', tier:'Усиленный корпус', name:'Корпус Б-02', subtitle:'Лобовой танк', badge:'Бронированные', price:1480, description:'Укреплённая версия с усиленной центральной секцией. Лучше переносит фокус и подходит под тяжёлые пушки.', stats:[['Скорость','4.7'],['Броня','9.1'],['Манёвр','3.5'],['Энергия','5.5'],['Слоты','Пушка / Щит / Ускоритель']], art:'bulwark', neon:'#85f2ff', engine:'#5cb6ff', weapon:'beam', accent:'#7aa7ff' },
-            { id:'goliath', type:'ship', classId:'tanks', tier:'Продвинутый корпус', name:'Корпус Б-03', subtitle:'Широкая бронерама', badge:'Бронированные', price:2280, description:'Массивный каркас под плотные сборки. Отличный выбор для высокого ХП и мощных энергощитов.', stats:[['Скорость','4.9'],['Броня','9.7'],['Манёвр','3.7'],['Энергия','6.1'],['Слоты','Пушка / Щит / Ускоритель']], art:'fortress', neon:'#8bf9ff', engine:'#4fc0ff', weapon:'plasma', accent:'#ffd06c' },
-            { id:'titan', type:'ship', classId:'tanks', tier:'Элитный корпус', name:'Корпус Б-04', subtitle:'Передвижная крепость', badge:'Бронированные', price:3180, description:'Очень тяжёлый корпус для танк-сборок. Теряет скорость, но выигрывает в броне и общем запасе прочности.', stats:[['Скорость','5.1'],['Броня','10.1'],['Манёвр','3.9'],['Энергия','6.6'],['Слоты','Пушка / Щит / Ускоритель']], art:'citadel', neon:'#9dfcff', engine:'#7ab6ff', weapon:'phase', accent:'#7ad7ff' }
-        ],
-        assault: [
-            { id:'raider', type:'ship', classId:'assault', tier:'Базовый корпус', name:'Корпус Ш-01', subtitle:'Простой штурмовой каркас', badge:'Штурмовые', price:950, description:'Средний корпус с хорошим уроном и нормальной бронёй. Лёгкий вход в штурмовой стиль игры.', stats:[['Скорость','7.0'],['Броня','5.4'],['Манёвр','5.8'],['Энергия','5.2'],['Слоты','Пушка / Щит / Ускоритель']], art:'lancer', neon:'#76f2ff', engine:'#4bc4ff', weapon:'laser', accent:'#ffba63' },
-            { id:'raider_mk2', type:'ship', classId:'assault', tier:'Усиленный корпус', name:'Корпус Ш-02', subtitle:'Боевая версия', badge:'Штурмовые', price:1460, description:'Усиленные крепления под тяжёлое вооружение. Нормально держит удар и не превращается в кирпич.', stats:[['Скорость','7.3'],['Броня','5.9'],['Манёвр','6.1'],['Энергия','5.7'],['Слоты','Пушка / Щит / Ускоритель']], art:'lancer', neon:'#82fdff', engine:'#63d1ff', weapon:'missile', accent:'#ffd76a' },
-            { id:'blitz', type:'ship', classId:'assault', tier:'Продвинутый корпус', name:'Корпус Ш-03', subtitle:'Ударный клин', badge:'Штурмовые', price:2140, description:'Штурмовой корпус с агрессивным профилем. Хорошо сочетается с плазмой и ракетными пушками.', stats:[['Скорость','7.9'],['Броня','6.3'],['Манёвр','6.4'],['Энергия','6.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'stinger', neon:'#7efbff', engine:'#5ed6ff', weapon:'plasma', accent:'#ff9e61' },
-            { id:'destroyer', type:'ship', classId:'assault', tier:'Элитный корпус', name:'Корпус Ш-04', subtitle:'Платформа давления', badge:'Штурмовые', price:3020, description:'Тяжёлый штурмовой корпус для сборок с мощной передней линией. Сам просит поставить в него что-то злое.', stats:[['Скорость','7.2'],['Броня','7.2'],['Манёвр','6.0'],['Энергия','6.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'destroyer', neon:'#89f9ff', engine:'#ff9e66', weapon:'missile', accent:'#ff7f66' }
-        ],
-        technology: [
-            { id:'echo', type:'ship', classId:'technology', tier:'Базовый корпус', name:'Корпус М-01', subtitle:'Маневренная рамка', badge:'Маневренные', price:1020, description:'Лёгкий тех-корпус с мягким поворотом и хорошим управлением. Удобен для игры от позиции и циркуляции.', stats:[['Скорость','6.1'],['Броня','4.8'],['Манёвр','8.4'],['Энергия','8.1'],['Слоты','Пушка / Щит / Ускоритель']], art:'halo', neon:'#81fdff', engine:'#6fd8ff', weapon:'beam', accent:'#84a6ff' },
-            { id:'echo_2', type:'ship', classId:'technology', tier:'Усиленный корпус', name:'Корпус М-02', subtitle:'Точный маневровик', badge:'Маневренные', price:1580, description:'Даёт ещё более плавный разворот и лучший контроль траектории. Подходит тем, кто любит вертеться и жить.', stats:[['Скорость','6.3'],['Броня','5.0'],['Манёвр','8.8'],['Энергия','8.8'],['Слоты','Пушка / Щит / Ускоритель']], art:'halo', neon:'#95ffff', engine:'#6bc4ff', weapon:'phase', accent:'#9d7cff' },
-            { id:'nova', type:'ship', classId:'technology', tier:'Продвинутый корпус', name:'Корпус М-03', subtitle:'Высокая управляемость', badge:'Маневренные', price:2360, description:'Продвинутый маневренный каркас. Быстро меняет угол атаки и помогает раскрыть точные пушки.', stats:[['Скорость','6.8'],['Броня','5.4'],['Манёвр','9.2'],['Энергия','9.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'halo', neon:'#8efbff', engine:'#7dc6ff', weapon:'beam', accent:'#fff184' },
-            { id:'helios', type:'ship', classId:'technology', tier:'Элитный корпус', name:'Корпус М-04', subtitle:'Пилотажная рама', badge:'Маневренные', price:3220, description:'Топовый маневренный корпус. Не самый крепкий, но отлично чувствуется в ближнем и среднем темпе боя.', stats:[['Скорость','7.1'],['Броня','5.8'],['Манёвр','9.6'],['Энергия','9.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'razor', neon:'#a0fdff', engine:'#7ec8ff', weapon:'phase', accent:'#ffd86a' }
-        ],
-        universal: [
-            { id:'atlas', type:'ship', classId:'universal', tier:'Базовый корпус', name:'Корпус U-01', subtitle:'Сбалансированная база', badge:'Универсальные', price:1100, description:'Нормальный корпус без перекоса в крайности. Подходит, если хочешь сам строить характер машины через пушки и модули.', stats:[['Скорость','6.6'],['Броня','6.2'],['Манёвр','6.4'],['Энергия','6.6'],['Слоты','Пушка / Щит / Ускоритель']], art:'dart', neon:'#8ffcff', engine:'#72c9ff', weapon:'laser', accent:'#88c1ff' },
-            { id:'atlas_mk2', type:'ship', classId:'universal', tier:'Усиленный корпус', name:'Корпус U-02', subtitle:'Уверенный баланс', badge:'Универсальные', price:1720, description:'Чуть крепче, чуть быстрее и комфортнее в разных сценариях. Хорошо заходит как рабочая универсальная платформа.', stats:[['Скорость','6.9'],['Броня','6.5'],['Манёвр','6.7'],['Энергия','6.9'],['Слоты','Пушка / Щит / Ускоритель']], art:'arrow', neon:'#97ffff', engine:'#79cfff', weapon:'pulse', accent:'#b0a2ff' },
-            { id:'vanguard', type:'ship', classId:'universal', tier:'Продвинутый корпус', name:'Корпус U-03', subtitle:'Гибкий универсал', badge:'Универсальные', price:2480, description:'Продвинутая платформа, которая спокойно переваривает почти любую сборку. Хороший кандидат на основной корпус.', stats:[['Скорость','7.2'],['Броня','6.9'],['Манёвр','7.0'],['Энергия','7.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'stinger', neon:'#9afcff', engine:'#84d2ff', weapon:'beam', accent:'#ffd98a' },
-            { id:'vanguard_x', type:'ship', classId:'universal', tier:'Элитный корпус', name:'Корпус U-04', subtitle:'Сборка без слабых мест', badge:'Универсальные', price:3360, description:'Дорогой, но очень удобный корпус без явных провалов. Можно сделать и живучий билд, и скоростной, и дамажный.', stats:[['Скорость','7.5'],['Броня','7.2'],['Манёвр','7.3'],['Энергия','7.8'],['Слоты','Пушка / Щит / Ускоритель']], art:'phantom', neon:'#abffff', engine:'#90d8ff', weapon:'phase', accent:'#ffe07d' }
-        ]
+        tanks: [],
+        assault: [],
+        technology: [],
+        universal: []
     },
     moduleTypes: [
         { id:'weapon', name:'Пушки', subtitle:'Тип снаряда и урон' },
