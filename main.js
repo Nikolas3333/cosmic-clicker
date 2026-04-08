@@ -9166,7 +9166,7 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
             .then((raw) => {
                 const normalized = normalizeHangarShipMesh(raw);
                 if(normalized?.scale?.multiplyScalar){
-                    normalized.scale.multiplyScalar(1.9);
+                    normalized.scale.multiplyScalar(2.35);
                 }
                 return applyBattleVisualTweaks(normalized);
             })
@@ -9188,6 +9188,15 @@ function mountBattleShipVisual(targetGroup, item, team = 'blue'){
     targetGroup.userData = targetGroup.userData || {};
     targetGroup.userData.visualLoadToken = loadToken;
     while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
+
+    const immediateFallback = createHangarShipMesh(item);
+    immediateFallback.scale.multiplyScalar(0.52);
+    immediateFallback.rotation.order = 'YXZ';
+    immediateFallback.rotation.y = Math.PI;
+    immediateFallback.position.set(0, 0, 0);
+    targetGroup.add(immediateFallback);
+    targetGroup.userData.hitRadius = Math.max(2.6, Number(immediateFallback?.userData?.hangarWidth || 0), Number(immediateFallback?.userData?.hangarDepth || 0), 2.6);
+
     return buildBattleShipVisualAsync(item, team)
         .then((visual) => {
             if(!visual || targetGroup.userData?.visualLoadToken !== loadToken) return null;
@@ -9197,7 +9206,7 @@ function mountBattleShipVisual(targetGroup, item, team = 'blue'){
             targetGroup.userData.hitRadius = Math.max(2.6, Number(visual?.userData?.hangarWidth || 0), Number(visual?.userData?.hangarDepth || 0), 2.6);
             return visual;
         })
-        .catch(() => null);
+        .catch(() => immediateFallback);
 }
 
 
@@ -9439,7 +9448,7 @@ function ensureHangarRenderer(){
         hangarState.scene.add(stars);
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0.42, -2.08, 1.0);
+        hangarState.platform.position.set(0.42, -1.82, 1.0);
         hangarState.platform.scale.set(0.188, 0.188, 0.188);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
@@ -9550,7 +9559,7 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
             hangarState.shipPivot.position.x = 0.58 + transitionOffset * 0.55;
-            hangarState.shipPivot.position.y = -0.84 + Math.sin(time * 1.18) * 0.01;
+            hangarState.shipPivot.position.y = -0.54 + Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.position.z = 0.86;
         }
         if(hangarState.modulePivot){
