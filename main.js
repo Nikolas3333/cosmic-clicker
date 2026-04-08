@@ -119,6 +119,8 @@ let battlePlanetVisualScale = 1;
 let battleShipCrash = null;
 let battlePendingRespawnAt = 0;
 let battlePlanetCapture = null;
+let battleEnergyPool = 0;
+let battleEnergyCapacity = 60;
 
 const authState = {
     mode: 'guest',
@@ -1276,6 +1278,7 @@ function clearBattleScene(){
     battleShipCrash = null;
     battlePendingRespawnAt = 0;
     battlePlanetCapture = null;
+    battleEnergyPool = 0;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
     battleWeapon.isReloading = false;
     battleWeapon.reloadEndsAt = 0;
@@ -1396,6 +1399,9 @@ if(gameState === "BATTLE"){
     const targetMap = currentRoom?.real || selectedLobbyMap?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
     battleObserverMode = false;
     enterBattleMap(targetMap);
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
+    battleEnergyCapacity = Math.max(20, Number(currentBattleShipStats?.energyCapacity || 60) || 60);
+    battleEnergyPool = Math.min(Math.max(0, Number(playerResources?.solar_energy || 0) || 0), battleEnergyCapacity);
     initBattleChat();
     if(battleObserverMode){
         setupObserverBattle(targetMap);
@@ -3199,26 +3205,32 @@ if (gameState === "BATTLE" && playerShip) {
     let damping = Number(currentBattleShipStats.damping || 0.98);
     let maxSpeed = Number(currentBattleShipStats.maxSpeed || 2.4);
     const hasMoveInput = !!(keys.w || keys.s || keys.a || keys.d);
-    const currentSolarEnergy = Math.max(0, Number(playerResources?.solar_energy || 0) || 0);
-    const boostActive = !!(keys.shift && hasMoveInput && currentSolarEnergy > 0.02);
+    if(!Number.isFinite(battleEnergyCapacity) || battleEnergyCapacity <= 0){
+        battleEnergyCapacity = Math.max(20, Number(currentBattleShipStats?.energyCapacity || 60) || 60);
+    }
+    if(!Number.isFinite(battleEnergyPool) || battleEnergyPool < 0){
+        battleEnergyPool = Math.min(Math.max(0, Number(playerResources?.solar_energy || 0) || 0), battleEnergyCapacity);
+    }
+    const boostDrain = 0.0045;
+    const boostActive = !!(keys.shift && hasMoveInput && battleEnergyPool > boostDrain);
     if(boostActive){
-        const boostFactor = 1.22;
-        forwardAcceleration *= boostFactor;
-        backwardAcceleration *= 1.16;
-        strafeAcceleration *= 1.14;
-        maxSpeed *= 1.18;
-        damping = Math.min(0.988, damping + 0.002);
-        playerResources.solar_energy = Math.max(0, currentSolarEnergy - 0.018);
+        forwardAcceleration *= 1.62;
+        backwardAcceleration *= 1.34;
+        strafeAcceleration *= 1.22;
+        maxSpeed *= 1.42;
+        damping = Math.min(0.992, damping + 0.004);
+        battleEnergyPool = Math.max(0, battleEnergyPool - boostDrain);
+        playerResources.solar_energy = Math.max(0, Number(playerResources?.solar_energy || 0) - boostDrain);
     }
 
-    playerControl.yaw -= mouseDeltaX * yawStep;
-    playerControl.pitch += mouseDeltaY * pitchStep * invertFactor;
+    playerControl.yaw -= mouseDeltaX * yawStep * 0.62;
+    playerControl.pitch += mouseDeltaY * pitchStep * invertFactor * 0.62;
     playerControl.pitch = THREE.MathUtils.clamp(playerControl.pitch, -maxPitch, maxPitch);
 
-    let targetRoll = THREE.MathUtils.clamp(-mouseDeltaX * 0.006, -maxRoll, maxRoll);
-    if (keys.a) targetRoll = Math.min(maxRoll, targetRoll + 0.18);
-    if (keys.d) targetRoll = Math.max(-maxRoll, targetRoll - 0.18);
-    playerControl.roll += (targetRoll - playerControl.roll) * 0.1;
+    let targetRoll = THREE.MathUtils.clamp(-mouseDeltaX * 0.0034, -maxRoll, maxRoll);
+    if (keys.a) targetRoll = Math.min(maxRoll, targetRoll + 0.11);
+    if (keys.d) targetRoll = Math.max(-maxRoll, targetRoll - 0.11);
+    playerControl.roll += (targetRoll - playerControl.roll) * 0.06;
 
     playerShip.rotation.order = 'YXZ';
     playerShip.rotation.y = playerControl.yaw;
@@ -3739,10 +3751,14 @@ function updateBattlePlayerHud(){
     if(hpInlineText) hpInlineText.textContent = `${Math.round(playerHp)} / ${playerMaxHp}`;
     ammoText.textContent = `Боеприпасы: ${battleWeapon.ammoInClip} / ${battleWeapon.clipSize} | запас ${formatAmmoReserve()}`;
     damageText.textContent = `Урон: ${battleWeapon.damage}`;
-    const currentEnergy = Math.max(0, Number(playerResources?.solar_energy || 0) || 0);
-    const energyCap = Math.max(20, Number(currentBattleShipStats?.energyCapacity || 120) || 120);
-    const energyPercent = THREE.MathUtils.clamp((currentEnergy / energyCap) * 100, 0, 100);
-    energyFill.style.width = `${energyPercent}%`;
+    const energyCap = Math.max(20, Number(currentBattleShipStats?.energyCapacity || battleEnergyCapacity || 60) || 60);
+    battleEnergyCapacity = energyCap;
+    if(!Number.isFinite(battleEnergyPool) || battleEnergyPool < 0){
+        battleEnergyPool = Math.min(Math.max(0, Number(playerResources?.solar_energy || 0) || 0), energyCap);
+    }
+    const currentEnergy = THREE.MathUtils.clamp(battleEnergyPool, 0, energyCap);
+    energyFill.style.display = 'none';
+    energyFill.style.width = '0%';
     energyText.textContent = `Энергия: ⚡ ${currentEnergy.toFixed(1)} / ${energyCap}`;
     if(isBattleRespawning()){
         const remain = Math.max(0, battlePendingRespawnAt - Date.now());
