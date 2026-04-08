@@ -3188,25 +3188,37 @@ if (gameState === "BATTLE" && playerShip) {
     if(firing) tryFireLaser();
 
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
-    const yawStep = Number(currentBattleShipStats.turnYaw || 0.0021) * gameSettings.mouseSensitivity;
-    const pitchStep = Number(currentBattleShipStats.turnPitch || 0.0017) * gameSettings.mouseSensitivity;
+    const yawStep = Number(currentBattleShipStats.turnYaw || 0.00135) * gameSettings.mouseSensitivity;
+    const pitchStep = Number(currentBattleShipStats.turnPitch || 0.0011) * gameSettings.mouseSensitivity;
     const invertFactor = gameSettings.invertY ? -1 : 1;
     const maxPitch = Math.PI / 3.1;
-    const maxRoll = Number(currentBattleShipStats.rollLimit || 0.72);
-    const forwardAcceleration = Number(currentBattleShipStats.forwardAcceleration || 0.14);
-    const backwardAcceleration = Number(currentBattleShipStats.backwardAcceleration || 0.07);
-    const strafeAcceleration = Number(currentBattleShipStats.strafeAcceleration || 0.045);
-    const damping = Number(currentBattleShipStats.damping || 0.985);
-    const maxSpeed = Number(currentBattleShipStats.maxSpeed || 4.2);
+    const maxRoll = Number(currentBattleShipStats.rollLimit || 0.58);
+    let forwardAcceleration = Number(currentBattleShipStats.forwardAcceleration || 0.09);
+    let backwardAcceleration = Number(currentBattleShipStats.backwardAcceleration || 0.045);
+    let strafeAcceleration = Number(currentBattleShipStats.strafeAcceleration || 0.028);
+    let damping = Number(currentBattleShipStats.damping || 0.98);
+    let maxSpeed = Number(currentBattleShipStats.maxSpeed || 2.4);
+    const hasMoveInput = !!(keys.w || keys.s || keys.a || keys.d);
+    const currentSolarEnergy = Math.max(0, Number(playerResources?.solar_energy || 0) || 0);
+    const boostActive = !!(keys.shift && hasMoveInput && currentSolarEnergy > 0.02);
+    if(boostActive){
+        const boostFactor = 1.22;
+        forwardAcceleration *= boostFactor;
+        backwardAcceleration *= 1.16;
+        strafeAcceleration *= 1.14;
+        maxSpeed *= 1.18;
+        damping = Math.min(0.988, damping + 0.002);
+        playerResources.solar_energy = Math.max(0, currentSolarEnergy - 0.018);
+    }
 
     playerControl.yaw -= mouseDeltaX * yawStep;
     playerControl.pitch += mouseDeltaY * pitchStep * invertFactor;
     playerControl.pitch = THREE.MathUtils.clamp(playerControl.pitch, -maxPitch, maxPitch);
 
-    let targetRoll = THREE.MathUtils.clamp(-mouseDeltaX * 0.01, -maxRoll, maxRoll);
-    if (keys.a) targetRoll = Math.min(maxRoll, targetRoll + 0.28);
-    if (keys.d) targetRoll = Math.max(-maxRoll, targetRoll - 0.28);
-    playerControl.roll += (targetRoll - playerControl.roll) * 0.16;
+    let targetRoll = THREE.MathUtils.clamp(-mouseDeltaX * 0.006, -maxRoll, maxRoll);
+    if (keys.a) targetRoll = Math.min(maxRoll, targetRoll + 0.18);
+    if (keys.d) targetRoll = Math.max(-maxRoll, targetRoll - 0.18);
+    playerControl.roll += (targetRoll - playerControl.roll) * 0.1;
 
     playerShip.rotation.order = 'YXZ';
     playerShip.rotation.y = playerControl.yaw;
@@ -3710,8 +3722,10 @@ function updateBattlePlayerHud(){
     const hpInlineText = document.getElementById('battle-player-hp-inline-text');
     const ammoText = document.getElementById('battle-ammo-text');
     const damageText = document.getElementById('battle-damage-text');
+    const energyText = document.getElementById('battle-energy-text');
+    const energyFill = document.getElementById('battle-energy-fill');
     const reloadText = document.getElementById('battle-reload-text');
-    if(!hud || !hpFill || !hpText || !ammoText || !damageText || !reloadText) return;
+    if(!hud || !hpFill || !hpText || !ammoText || !damageText || !reloadText || !energyText || !energyFill) return;
     const visible = gameState === 'BATTLE' && !battleObserverMode;
     hud.style.display = visible ? 'block' : 'none';
     if(!visible) return;
@@ -3725,6 +3739,11 @@ function updateBattlePlayerHud(){
     if(hpInlineText) hpInlineText.textContent = `${Math.round(playerHp)} / ${playerMaxHp}`;
     ammoText.textContent = `Боеприпасы: ${battleWeapon.ammoInClip} / ${battleWeapon.clipSize} | запас ${formatAmmoReserve()}`;
     damageText.textContent = `Урон: ${battleWeapon.damage}`;
+    const currentEnergy = Math.max(0, Number(playerResources?.solar_energy || 0) || 0);
+    const energyCap = Math.max(20, Number(currentBattleShipStats?.energyCapacity || 120) || 120);
+    const energyPercent = THREE.MathUtils.clamp((currentEnergy / energyCap) * 100, 0, 100);
+    energyFill.style.width = `${energyPercent}%`;
+    energyText.textContent = `Энергия: ⚡ ${currentEnergy.toFixed(1)} / ${energyCap}`;
     if(isBattleRespawning()){
         const remain = Math.max(0, battlePendingRespawnAt - Date.now());
         reloadText.textContent = `Респавн через ${(remain / 1000).toFixed(1)}с`;
@@ -8201,11 +8220,11 @@ function computeShipBattleStats(shipId){
         armor: getShipStatNumber(ship, 'Броня', 6.0),
         damage: getShipStatNumber(ship, 'Урон', 6.2),
         energy: getShipStatNumber(ship, 'Энергия', 6.5),
-        maxSpeed: 4.2,
-        forwardAcceleration: 0.14,
-        backwardAcceleration: 0.07,
-        strafeAcceleration: 0.045,
-        damping: 0.985,
+        maxSpeed: 2.4,
+        forwardAcceleration: 0.09,
+        backwardAcceleration: 0.045,
+        strafeAcceleration: 0.028,
+        damping: 0.98,
         hp: 100,
         weaponDamage: 12,
         clipSize: 50,
@@ -8222,9 +8241,9 @@ function computeShipBattleStats(shipId){
         burstCount: 2,
         projectileOffset: 1.1,
         spread: 0.0,
-        turnYaw: 0.0021,
-        turnPitch: 0.0017,
-        rollLimit: 0.72,
+        turnYaw: 0.00135,
+        turnPitch: 0.0011,
+        rollLimit: 0.58,
         handlingLabel: 'Стандарт',
         moduleSummary: []
     };
@@ -8234,30 +8253,31 @@ function computeShipBattleStats(shipId){
     const damageFactor = THREE.MathUtils.clamp(stats.damage / 6.0, 0.72, 1.9);
     const energyFactor = THREE.MathUtils.clamp(stats.energy / 7.0, 0.72, 2.0);
 
-    stats.maxSpeed = 2.2 + speedFactor * 0.45;
-    stats.forwardAcceleration = 0.06 + speedFactor * 0.018;
-    stats.backwardAcceleration = 0.032 + speedFactor * 0.009;
-    stats.strafeAcceleration = 0.02 + speedFactor * 0.007;
-    stats.damping = 0.974 + Math.min(0.01, speedFactor * 0.0024);
+    stats.maxSpeed = 1.65 + speedFactor * 0.28;
+    stats.forwardAcceleration = 0.04 + speedFactor * 0.012;
+    stats.backwardAcceleration = 0.022 + speedFactor * 0.006;
+    stats.strafeAcceleration = 0.014 + speedFactor * 0.0045;
+    stats.damping = 0.968 + Math.min(0.009, speedFactor * 0.0021);
     stats.hp = Math.round(78 + armorFactor * 21);
     stats.weaponDamage = Math.round(7 + damageFactor * 1.7);
     stats.clipSize = Math.round(32 + energyFactor * 4.2);
     stats.reloadTime = Math.max(900, Math.round(2100 - energyFactor * 140));
     stats.laserVelocity = 2.7 + energyFactor * 0.1;
     stats.laserScale = Number((0.9 + damageFactor * 0.08).toFixed(2));
+    stats.energyCapacity = Math.max(60, Math.round(energyFactor * 18));
 
     const shipClass = String(ship?.classId || '').toLowerCase();
     if(shipClass === 'fighters'){
-        stats.turnYaw = 0.0027;
-        stats.turnPitch = 0.0021;
-        stats.rollLimit = 0.95;
-        stats.maxSpeed *= 1.08;
-        stats.forwardAcceleration *= 1.14;
-        stats.strafeAcceleration *= 1.16;
+        stats.turnYaw = 0.0018;
+        stats.turnPitch = 0.00145;
+        stats.rollLimit = 0.72;
+        stats.maxSpeed *= 1.06;
+        stats.forwardAcceleration *= 1.08;
+        stats.strafeAcceleration *= 1.1;
         stats.hp *= 0.92;
         stats.handlingLabel = 'Манёвренный';
     }else if(shipClass === 'tanks'){
-        stats.turnYaw = 0.00145;
+        stats.turnYaw = 0.00095;
         stats.turnPitch = 0.00115;
         stats.rollLimit = 0.42;
         stats.maxSpeed *= 0.88;
