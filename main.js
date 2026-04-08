@@ -818,17 +818,83 @@ function ensureSelfRoomPlayerState(){
     }
 
     roomPlayerStateUpsertInFlight = true;
-    window.supabaseClient
-        .from('room_players')
-        .upsert(payload, { onConflict: 'room_id,player_id' })
-        .then(() => {
+
+    (async () => {
+        try{
+            const updatePayload = {
+                nickname: payload.nickname,
+                team: payload.team,
+                level: payload.level,
+                ping: payload.ping,
+                position: payload.position,
+                rotation: payload.rotation,
+                updated_at: payload.updated_at
+            };
+
+            let updateQuery = window.supabaseClient
+                .from('room_players')
+                .update(updatePayload)
+                .eq('room_id', roomId)
+                .eq('player_id', playerId)
+                .select('id')
+                .limit(1);
+
+            if(selfRoomPlayerRowId){
+                updateQuery = window.supabaseClient
+                    .from('room_players')
+                    .update(updatePayload)
+                    .eq('id', selfRoomPlayerRowId)
+                    .select('id')
+                    .limit(1);
+            }
+
+            const { data: updatedRows, error: updateError } = await updateQuery;
+
+            let activeRowId = selfRoomPlayerRowId;
+            if(Array.isArray(updatedRows) && updatedRows[0]?.id){
+                activeRowId = String(updatedRows[0].id);
+                selfRoomPlayerRowId = activeRowId;
+            }
+
+            const noUpdatedRows = !Array.isArray(updatedRows) || updatedRows.length <= 0;
+            if(updateError || noUpdatedRows){
+                const insertPayload = {
+                    id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+                        ? globalThis.crypto.randomUUID()
+                        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    room_id: roomId,
+                    player_id: playerId,
+                    nickname: payload.nickname,
+                    joined_at: payload.updated_at,
+                    updated_at: payload.updated_at,
+                    team: payload.team,
+                    level: payload.level,
+                    ping: payload.ping,
+                    position: payload.position,
+                    rotation: payload.rotation
+                };
+
+                const { data: insertedRows, error: insertError } = await window.supabaseClient
+                    .from('room_players')
+                    .insert([insertPayload])
+                    .select('id')
+                    .limit(1);
+
+                if(insertError){
+                    return;
+                }
+                if(Array.isArray(insertedRows) && insertedRows[0]?.id){
+                    selfRoomPlayerRowId = String(insertedRows[0].id);
+                }
+            }
+
             lastSelfRoomPlayerStatePayload = JSON.stringify(payload);
             lastSelfRoomPlayerStateSentAt = now;
-        })
-        .catch(() => {})
-        .finally(() => {
+        }catch(_){
+        }finally{
             roomPlayerStateUpsertInFlight = false;
-        });
+        }
+    })();
 }
 
 
@@ -6328,6 +6394,7 @@ var battleHitSessionStartedAt = 0;
 var roomPlayerStateUpsertInFlight = false;
 var roomPlayersFetchInFlight = false;
 var battleHitPollInFlight = false;
+var selfRoomPlayerRowId = '';
 var lastSelfRoomPlayerStatePayload = '';
 var lastSelfRoomPlayerStateSentAt = 0;
 var lastBattlePresencePayload = '';
@@ -6383,6 +6450,7 @@ function stopLiveBattleSync(){
     roomPlayerStateUpsertInFlight = false;
     roomPlayersFetchInFlight = false;
     battleHitPollInFlight = false;
+    selfRoomPlayerRowId = '';
     lastSelfRoomPlayerStatePayload = '';
     lastSelfRoomPlayerStateSentAt = 0;
     lastBattlePresencePayload = '';
@@ -8328,6 +8396,13 @@ function computeShipBattleStats(shipId){
         }
     });
 
+    stats.maxSpeed *= 0.76;
+    stats.forwardAcceleration *= 0.72;
+    stats.backwardAcceleration *= 0.72;
+    stats.strafeAcceleration *= 0.7;
+    stats.turnYaw *= 0.68;
+    stats.turnPitch *= 0.68;
+
     stats.maxSpeed = Number(stats.maxSpeed.toFixed(2));
     stats.forwardAcceleration = Number(stats.forwardAcceleration.toFixed(3));
     stats.backwardAcceleration = Number(stats.backwardAcceleration.toFixed(3));
@@ -8342,7 +8417,7 @@ function computeShipBattleStats(shipId){
     stats.fireCooldown = Math.max(60, Math.round(stats.fireCooldown));
     stats.turnYaw = Number(stats.turnYaw.toFixed(4));
     stats.turnPitch = Number(stats.turnPitch.toFixed(4));
-    stats.rollLimit = Number(stats.rollLimit.toFixed(2));
+    stats.rollLimit = Number((stats.rollLimit * 0.82).toFixed(2));
     stats.projectileWidth = Number(stats.projectileWidth.toFixed(2));
     stats.projectileLength = Number(stats.projectileLength.toFixed(2));
     stats.projectileOffset = Number(stats.projectileOffset.toFixed(2));
