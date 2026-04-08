@@ -3638,6 +3638,7 @@ function updateBattlePlayerWorldHp(){
 
 function updateBattlePlayerHud(){
     const hud = document.getElementById('battle-player-hud');
+    const hudTitle = hud?.querySelector?.('.battle-player-title');
     const hpFill = document.getElementById('battle-player-hp-fill');
     const hpText = document.getElementById('battle-player-hp-text');
     const hpInlineText = document.getElementById('battle-player-hp-inline-text');
@@ -3648,6 +3649,10 @@ function updateBattlePlayerHud(){
     const visible = gameState === 'BATTLE' && !battleObserverMode;
     hud.style.display = visible ? 'block' : 'none';
     if(!visible) return;
+    if(hudTitle){
+        const currentShipName = String(currentBattleShipStats?.ship?.name || getSelectedShipItem?.()?.name || player?.ships?.[0]?.name || 'Cargo Drone').trim() || 'Cargo Drone';
+        hudTitle.textContent = currentShipName;
+    }
     const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
     hpFill.style.width = hpPercent + '%';
     hpText.textContent = `HP: ${Math.round(playerHp)} / ${playerMaxHp}`;
@@ -8161,11 +8166,11 @@ function computeShipBattleStats(shipId){
     const damageFactor = THREE.MathUtils.clamp(stats.damage / 6.0, 0.72, 1.9);
     const energyFactor = THREE.MathUtils.clamp(stats.energy / 7.0, 0.72, 2.0);
 
-    stats.maxSpeed = 3.5 + speedFactor * 0.95;
-    stats.forwardAcceleration = 0.095 + speedFactor * 0.034;
-    stats.backwardAcceleration = 0.048 + speedFactor * 0.018;
-    stats.strafeAcceleration = 0.028 + speedFactor * 0.013;
-    stats.damping = 0.979 + Math.min(0.012, speedFactor * 0.0032);
+    stats.maxSpeed = 2.2 + speedFactor * 0.45;
+    stats.forwardAcceleration = 0.06 + speedFactor * 0.018;
+    stats.backwardAcceleration = 0.032 + speedFactor * 0.009;
+    stats.strafeAcceleration = 0.02 + speedFactor * 0.007;
+    stats.damping = 0.974 + Math.min(0.01, speedFactor * 0.0024);
     stats.hp = Math.round(78 + armorFactor * 21);
     stats.weaponDamage = Math.round(7 + damageFactor * 1.7);
     stats.clipSize = Math.round(32 + energyFactor * 4.2);
@@ -9140,7 +9145,7 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
     const applyBattleVisualTweaks = (root) => {
         if(!root) return root;
         root.rotation.order = 'YXZ';
-        root.rotation.y = Math.PI;
+        root.rotation.y = 0;
         root.traverse?.((child) => {
             if(child?.isMesh){
                 child.castShadow = true;
