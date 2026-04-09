@@ -4957,6 +4957,216 @@ shop-main-head{
   #hangar-window .hangar-stage-wrap{grid-template-columns:320px 54px minmax(0,1fr) 54px;}
 }
 
+
+
+/* ===== V127 HANGAR LAYOUT STABLE FIX ===== */
+#hangar-window .hangar-shell{
+  display:flex !important;
+  flex-direction:column !important;
+  min-height:0 !important;
+}
+#hangar-window .hangar-topbar{
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:space-between !important;
+  gap:20px !important;
+  padding:22px 28px 12px !important;
+}
+#hangar-window .hangar-title-wrap{
+  flex:0 0 auto !important;
+  min-width:240px !important;
+}
+#hangar-window .hangar-class-filter{
+  margin-left:auto !important;
+  flex:0 0 auto !important;
+}
+#hangar-window .hangar-layout{
+  display:grid !important;
+  grid-template-columns:360px minmax(860px,1fr) !important;
+  gap:24px !important;
+  align-items:stretch !important;
+  min-height:0 !important;
+  padding:8px 28px 26px !important;
+}
+#hangar-window .hangar-module-side{
+  width:360px !important;
+  min-width:360px !important;
+  max-width:360px !important;
+  min-height:620px !important;
+  height:620px !important;
+  padding:20px 18px 18px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:14px !important;
+  overflow:hidden !important;
+}
+#hangar-window .hangar-side-title{
+  font-size:18px !important;
+  text-align:center !important;
+  margin:0 0 6px !important;
+}
+#hangar-window .hangar-module-filter{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:10px !important;
+  width:100% !important;
+}
+#hangar-window .hangar-module-chip{
+  min-width:0 !important;
+  min-height:52px !important;
+  padding:10px 12px !important;
+  font-size:14px !important;
+}
+#hangar-window .hangar-module-list{
+  flex:1 1 auto !important;
+  min-height:220px !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+}
+#hangar-window .hangar-module-meta{
+  margin-top:auto !important;
+  padding-top:12px !important;
+}
+#hangar-window .hangar-stage-wrap{
+  display:grid !important;
+  grid-template-columns:340px 58px minmax(0,1fr) 58px !important;
+  gap:16px !important;
+  align-items:stretch !important;
+  min-width:0 !important;
+}
+#hangar-window .hangar-info-panel{
+  width:340px !important;
+  min-width:340px !important;
+  max-width:340px !important;
+  min-height:620px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:12px !important;
+  padding:10px 0 0 !important;
+}
+#hangar-window .hangar-ship-card.compact,
+#hangar-window .hangar-stats-grid.compact,
+#hangar-window .hangar-footer-row{
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+}
+#hangar-window .hangar-ship-card.compact{
+  padding:18px 18px !important;
+}
+#hangar-window .hangar-ship-name{
+  display:block !important;
+  width:100% !important;
+  font-size:30px !important;
+  line-height:1.02 !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:anywhere !important;
+}
+#hangar-window .hangar-ship-subtitle{
+  font-size:13px !important;
+  line-height:1.35 !important;
+}
+#hangar-window .hangar-stats-grid.compact{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:10px !important;
+}
+#hangar-window .hangar-stat-box{
+  min-width:0 !important;
+  min-height:72px !important;
+  padding:12px 14px !important;
+}
+#hangar-window .hangar-stat-label{
+  font-size:12px !important;
+  line-height:1.1 !important;
+}
+#hangar-window .hangar-stat-value{
+  font-size:18px !important;
+  line-height:1.15 !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:anywhere !important;
+}
+#hangar-window .hangar-footer-row{
+  margin-top:auto !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:flex-start !important;
+  gap:12px !important;
+}
+#hangar-window .hangar-footer-actions{
+  width:100% !important;
+  display:grid !important;
+  grid-template-columns:1fr !important;
+}
+#hangar-window .hangar-stage{
+  min-width:0 !important;
+  width:100% !important;
+  min-height:620px !important;
+  height:620px !important;
+  position:relative !important;
+  overflow:hidden !important;
+}
+#hangar-window #hangar-3d-stage{
+  position:absolute !important;
+  inset:0 !important;
+  top:0 !important;
+  width:100% !important;
+  height:100% !important;
+}
+#hangar-window .hangar-stage-overlay{
+  position:absolute !important;
+  inset:0 !important;
+  padding:0 !important;
+  pointer-events:none !important;
+}
+#hangar-window .hangar-stage-name-badge{
+  position:absolute !important;
+  top:16px !important;
+  right:16px !important;
+  font-size:16px !important;
+  padding:12px 18px !important;
+}
+#hangar-window .hangar-arrow.horizontal{
+  align-self:center !important;
+  width:58px !important;
+  height:240px !important;
+}
+@media (max-width: 1500px){
+  #hangar-window .hangar-layout{
+    grid-template-columns:340px minmax(0,1fr) !important;
+  }
+  #hangar-window .hangar-stage-wrap{
+    grid-template-columns:320px 54px minmax(0,1fr) 54px !important;
+  }
+  #hangar-window .hangar-info-panel{
+    width:320px !important;
+    min-width:320px !important;
+    max-width:320px !important;
+  }
+}
+@media (max-width: 1280px){
+  #hangar-window .hangar-layout{
+    grid-template-columns:1fr !important;
+  }
+  #hangar-window .hangar-module-side{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:auto !important;
+    min-height:0 !important;
+  }
+  #hangar-window .hangar-stage-wrap{
+    grid-template-columns:280px 52px minmax(0,1fr) 52px !important;
+  }
+  #hangar-window .hangar-info-panel{
+    width:280px !important;
+    min-width:280px !important;
+    max-width:280px !important;
+  }
+}
+
 </style>
 </head>
 
