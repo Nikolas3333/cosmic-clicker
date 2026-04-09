@@ -4840,6 +4840,123 @@ shop-main-head{
   }
 }
 
+
+/* ===== HANGAR V126 OVERRIDES ===== */
+#hangar-window .hangar-topbar{padding:22px 28px 10px;}
+#hangar-window .hangar-title-wrap h2{margin:6px 0 0;font-size:28px;}
+#hangar-window .hangar-layout{
+  flex:1; min-height:0; display:grid;
+  grid-template-columns:340px minmax(0,1fr);
+  gap:26px; padding:10px 24px 24px;
+}
+#hangar-window .hangar-module-side{
+  padding:18px 16px; border-radius:26px;
+  display:flex; flex-direction:column; gap:14px; min-height:0;
+}
+#hangar-window .hangar-side-title{margin:0; font-size:18px;}
+#hangar-window .hangar-module-filter{
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; width:100%;
+}
+#hangar-window .hangar-module-chip{
+  min-height:52px; border-radius:18px; border:1px solid rgba(120,220,255,0.22);
+  background:rgba(255,255,255,0.05); color:#dff5ff; font-weight:700; cursor:pointer;
+}
+#hangar-window .hangar-module-chip.active{
+  background:linear-gradient(180deg, rgba(78,176,255,0.28), rgba(41,92,160,0.32));
+  box-shadow:0 0 18px rgba(88,189,255,0.22);
+}
+#hangar-window .hangar-module-list{
+  flex:1; min-height:220px; overflow-y:auto; padding-right:6px;
+  display:flex; flex-direction:column; gap:10px;
+}
+#hangar-window .hangar-module-list::-webkit-scrollbar{width:8px;}
+#hangar-window .hangar-module-list::-webkit-scrollbar-thumb{
+  background:linear-gradient(#00cfff,#3c79ff); border-radius:10px;
+}
+#hangar-window .hangar-module-list-item{
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+  padding:12px 14px; border-radius:16px; cursor:pointer;
+  border:1px solid rgba(120,220,255,0.12);
+  background:rgba(9,18,34,0.84); transition:0.18s ease;
+}
+#hangar-window .hangar-module-list-item:hover{
+  transform:translateY(-1px); border-color:rgba(120,220,255,0.28);
+}
+#hangar-window .hangar-module-list-item.active{
+  background:linear-gradient(180deg, rgba(24,65,112,0.92), rgba(11,27,55,0.95));
+  border-color:rgba(110,220,255,0.38); box-shadow:0 0 18px rgba(0,180,255,0.14);
+}
+#hangar-window .hangar-module-list-item.equipped{
+  box-shadow:inset 0 0 0 1px rgba(255,207,86,0.35);
+}
+#hangar-window .hangar-module-list-name{font-size:16px; color:#f4fbff; font-weight:700;}
+#hangar-window .hangar-module-list-sub{font-size:12px; color:#9ec7df;}
+#hangar-window .hangar-module-meta{
+  border-top:1px solid rgba(255,255,255,0.08); padding-top:12px;
+  display:flex; flex-direction:column; gap:8px;
+}
+#hangar-window .hangar-module-name{font-size:22px; font-weight:800; color:#ecfbff;}
+#hangar-window .hangar-module-type{font-size:13px; color:#75cbff;}
+#hangar-window .hangar-module-tier{display:none !important;}
+#hangar-window .hangar-module-desc{font-size:13px; color:#a8c7d8; line-height:1.35; min-height:34px;}
+#hangar-window .hangar-module-actions{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+#hangar-window .hangar-module-action{min-height:46px;}
+#hangar-window #hangar-module-up,
+#hangar-window #hangar-module-down,
+#hangar-window #hangar-module-preview,
+#hangar-window .hangar-stage-toolbar,
+#hangar-window #hangar-ship-tier,
+#hangar-window #hangar-ship-desc,
+#hangar-window .hangar-ship-price-row{display:none !important;}
+
+#hangar-window .hangar-stage-wrap{
+  min-width:0; display:grid;
+  grid-template-columns:360px 58px minmax(0,1fr) 58px;
+  gap:16px; align-items:stretch;
+}
+#hangar-window .hangar-info-panel{
+  min-width:0; border-radius:24px; padding:12px 0 0;
+  display:flex; flex-direction:column; gap:14px;
+}
+#hangar-window .hangar-ship-card.compact{
+  padding:18px 20px; border-radius:22px;
+  background:rgba(7,16,31,0.9); border:1px solid rgba(120,220,255,0.14);
+}
+#hangar-window .hangar-ship-name{font-size:28px; line-height:1.05;}
+#hangar-window .hangar-ship-subtitle{font-size:13px; color:#8fbfe0; min-height:0; margin-top:6px;}
+#hangar-window .hangar-stats-grid.compact{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+}
+#hangar-window .hangar-stat-box{
+  min-height:72px; padding:12px 14px; border-radius:18px;
+  background:rgba(6,15,29,0.88); border:1px solid rgba(120,220,255,0.12);
+}
+#hangar-window .hangar-stat-label{font-size:12px; letter-spacing:0.08em;}
+#hangar-window .hangar-stat-value{font-size:18px; line-height:1.15; word-break:break-word;}
+#hangar-window .hangar-footer-row{
+  margin-top:auto; display:flex; flex-direction:column; align-items:flex-start; gap:12px;
+}
+#hangar-window .hangar-footer-actions{display:grid; grid-template-columns:1fr; gap:10px; width:100%;}
+#hangar-window .hangar-main-btn{min-height:48px;}
+#hangar-window .hangar-stage{
+  min-width:0; border-radius:26px; overflow:hidden;
+  border:1px solid rgba(120,220,255,0.14); background:rgba(8,16,30,0.78);
+}
+#hangar-window .hangar-3d-stage{width:100%; height:100%;}
+#hangar-window .hangar-stage-overlay{pointer-events:none;}
+#hangar-window .hangar-stage-name-badge{
+  position:absolute; top:16px; right:16px; padding:14px 22px; border-radius:20px;
+  background:linear-gradient(180deg, rgba(42,126,208,0.92), rgba(21,73,130,0.94));
+  border:1px solid rgba(132,220,255,0.28); color:#eefaff; font-weight:800; font-size:20px;
+  box-shadow:0 0 20px rgba(40,145,255,0.18);
+}
+#hangar-window .hangar-arrow.horizontal{
+  align-self:center; width:58px; height:240px; border-radius:26px;
+}
+@media (max-width: 1400px){
+  #hangar-window .hangar-stage-wrap{grid-template-columns:320px 54px minmax(0,1fr) 54px;}
+}
+
 </style>
 </head>
 
@@ -5311,56 +5428,45 @@ shop-main-head{
 
     <div class="hangar-layout">
       <div class="hangar-module-side">
-        <div class="hangar-side-title">Модули</div>
-        <button id="hangar-module-up" class="hangar-arrow vertical" type="button">▲</button>
-        <div class="hangar-module-view">
-          <div id="hangar-module-preview" class="hangar-module-preview"></div>
-          <div class="hangar-module-meta">
-            <div id="hangar-module-name" class="hangar-module-name">—</div>
-            <div id="hangar-module-tier" class="hangar-module-tier">—</div>
-            <div id="hangar-module-type" class="hangar-module-type">—</div>
-            <div id="hangar-module-desc" class="hangar-module-desc">—</div>
-            <div class="hangar-module-actions">
-              <button id="hangar-module-action" class="hangar-module-action" type="button">Установить</button>
-              <button id="hangar-module-sell" class="hangar-module-action hangar-module-sell" type="button">Продать</button>
-            </div>
+        <div class="hangar-side-title">Оснастка</div>
+        <div class="hangar-module-filter" id="hangar-module-filter">
+          <button class="hangar-module-chip active" data-hangar-module-type="weapon" type="button">Пушки</button>
+          <button class="hangar-module-chip" data-hangar-module-type="shield" type="button">Щиты</button>
+          <button class="hangar-module-chip" data-hangar-module-type="booster" type="button">Ускорители</button>
+        </div>
+        <div id="hangar-module-list" class="hangar-module-list"></div>
+        <div class="hangar-module-meta">
+          <div id="hangar-module-name" class="hangar-module-name">—</div>
+          <div id="hangar-module-type" class="hangar-module-type">—</div>
+          <div id="hangar-module-desc" class="hangar-module-desc">—</div>
+          <div class="hangar-module-actions">
+            <button id="hangar-module-action" class="hangar-module-action" type="button">Установить</button>
+            <button id="hangar-module-sell" class="hangar-module-action hangar-module-sell" type="button">Продать</button>
           </div>
         </div>
-        <button id="hangar-module-down" class="hangar-arrow vertical" type="button">▼</button>
       </div>
 
       <div class="hangar-stage-wrap">
-        <button id="hangar-ship-left" class="hangar-arrow horizontal" type="button">◀</button>
-        <div class="hangar-stage">
-          <div class="hangar-stage-toolbar">
-            <div class="hangar-module-filter" id="hangar-module-filter">
-              <button class="hangar-module-chip active" data-hangar-module-type="weapon" type="button">Пушки</button>
-              <button class="hangar-module-chip" data-hangar-module-type="shield" type="button">Щиты</button>
-              <button class="hangar-module-chip" data-hangar-module-type="booster" type="button">Ускорители</button>
+        <div class="hangar-info-panel">
+          <div class="hangar-ship-card compact">
+            <div id="hangar-ship-name" class="hangar-ship-name">—</div>
+            <div id="hangar-ship-subtitle" class="hangar-ship-subtitle"></div>
+          </div>
+          <div class="hangar-stats-grid compact" id="hangar-ship-stats"></div>
+          <div class="hangar-footer-row">
+            <div id="hangar-ship-position" class="hangar-position-label">1 / 1</div>
+            <div class="hangar-footer-actions">
+              <button id="hangar-ship-action" class="hangar-main-btn" type="button">Оснастить корпус</button>
+              <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать корпус</button>
             </div>
           </div>
+        </div>
+
+        <button id="hangar-ship-left" class="hangar-arrow horizontal" type="button">◀</button>
+        <div class="hangar-stage">
           <div id="hangar-3d-stage" class="hangar-3d-stage"></div>
           <div class="hangar-stage-overlay">
-            <div class="hangar-ship-card">
-              <div id="hangar-ship-tier" class="hangar-ship-tier">—</div>
-              <div id="hangar-ship-name" class="hangar-ship-name">—</div>
-              <div id="hangar-ship-subtitle" class="hangar-ship-subtitle"></div>
-              <div id="hangar-ship-desc" class="hangar-ship-desc"></div>
-              <div class="hangar-ship-price-row">
-                <span class="hangar-price-chip">🪙 <span id="hangar-ship-price-coins">0</span></span>
-                <span class="hangar-price-chip">💎 <span id="hangar-ship-price-diamonds">0</span></span>
-              </div>
-            </div>
-
-            <div class="hangar-stats-grid" id="hangar-ship-stats"></div>
-
-            <div class="hangar-footer-row">
-              <div id="hangar-ship-position" class="hangar-position-label">1 / 1</div>
-              <div class="hangar-footer-actions">
-                <button id="hangar-ship-action" class="hangar-main-btn" type="button">Оснастить корпус</button>
-                <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать корпус</button>
-              </div>
-            </div>
+            <div class="hangar-stage-name-badge" id="hangar-stage-name-badge">Cargo Drone</div>
           </div>
         </div>
         <button id="hangar-ship-right" class="hangar-arrow horizontal" type="button">▶</button>
@@ -5370,7 +5476,7 @@ shop-main-head{
 </div>
 
 
-<div id="clans-window" class="hidden">
+<div id="clans-window" class="hidden"> class="hidden">
   <div class="clans-content">
     <h2 class="window-title">Кланы</h2>
     <div id="clans-info"></div>
