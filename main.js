@@ -9154,12 +9154,49 @@ function hideHangarShipPriceRow(){
     if(row) row.style.display = 'none';
 }
 
+
+function renderHangarModuleList(ship){
+    const wrap = document.getElementById('hangar-module-list');
+    if(!wrap) return;
+    const modules = getOwnedHangarModules();
+    const activeType = getCurrentHangarModuleType();
+    const equippedByType = getEquippedModuleTypesForShip(ship?.id || player?.selectedShipId || '');
+    if(!modules.length){
+        wrap.innerHTML = `<div class="hangar-module-list-item empty"><div class="hangar-module-list-name">Нет модулей</div><div class="hangar-module-list-sub">Купи ${getHangarModuleTypeName(activeType).toLowerCase()} в магазине.</div></div>`;
+        return;
+    }
+    wrap.innerHTML = modules.map((item, index) => {
+        const typeId = String(item?.typeId || item?.classId || '').trim();
+        const equipped = String(equippedByType[typeId] || '').trim() === String(item?.id || '').trim();
+        const active = index === hangarState.moduleIndex;
+        return `
+          <button class="hangar-module-list-item ${active ? 'active' : ''} ${equipped ? 'equipped' : ''}" type="button" data-hangar-module-index="${index}">
+            <span class="hangar-module-list-name">${item?.name || 'Модуль'}</span>
+            <span class="hangar-module-list-sub">${getHangarModuleTypeName(typeId)}${equipped ? ' • установлен' : ''}</span>
+          </button>
+        `;
+    }).join('');
+    wrap.querySelectorAll('[data-hangar-module-index]').forEach(btn => {
+        if(btn.dataset.hangarBound) return;
+        btn.dataset.hangarBound = '1';
+        btn.addEventListener('click', () => {
+            const nextIndex = Number(btn.dataset.hangarModuleIndex || 0) || 0;
+            if(nextIndex === hangarState.moduleIndex) return;
+            hangarState.moduleIndex = nextIndex;
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    });
+}
+
+
 function fillHangarText(){
     hideHangarShipPriceRow();
     const ships = getOwnedHangarShips();
     const modules = getOwnedHangarModules();
     const ship = ships[hangarState.shipIndex] || null;
     const module = modules[hangarState.moduleIndex] || null;
+    renderHangarModuleList(ship);
     hangarState.shipItem = ship;
     hangarState.moduleItem = module;
 
@@ -9179,16 +9216,19 @@ function fillHangarText(){
     const moduleInstalled = !!(ship && module && getInstalledModuleForType(ship.id, module.typeId));
 
     setText('hangar-ship-tier', ship?.tier || '—');
-    setText('hangar-ship-name', ship?.name || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Нет корпусов этого типа' : 'Нет корпусов'));
-    setText('hangar-ship-subtitle', ship?.subtitle || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'В выбранном типе пока нет доступных корпусов' : 'Покупай корпуса в магазине, они появятся здесь'));
-    setText('hangar-ship-desc', ship?.description || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Смени тип выше или купи корпус этой ветки в магазине.' : 'Открой магазин и пополни ангар новыми корпусами.'));
+    const shipName = ship?.name || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Нет корпусов этого типа' : 'Нет корпусов');
+    setText('hangar-ship-name', shipName);
+    setText('hangar-ship-subtitle', ship ? 'Выбери модуль слева, чтобы увидеть его на корпусе.' : 'Купи корпус в магазине, и он появится здесь.');
+    const stageBadge = document.getElementById('hangar-stage-name-badge');
+    if(stageBadge) stageBadge.textContent = shipName;
+    setText('hangar-ship-desc', '');
     setText('hangar-ship-price-coins', ship && typeof getShipCoinPrice === 'function' ? String(getShipCoinPrice(ship)) : '0');
     setText('hangar-ship-price-diamonds', ship && typeof getShipDiamondPrice === 'function' ? String(getShipDiamondPrice(ship)) : '0');
 
     setText('hangar-module-name', module?.name || 'Нет модулей');
     setText('hangar-module-tier', module?.tier || '—');
     setText('hangar-module-type', module ? `${getHangarModuleTypeName(module?.classId || module?.typeId)}${moduleInstalled ? ' • установлен' : ''}` : getHangarModuleTypeName(getCurrentHangarModuleType()));
-    setText('hangar-module-desc', module?.description || 'Купленные пушки, щиты и ускорители доступны здесь для установки на выбранный корпус.');
+    setText('hangar-module-desc', module?.description || 'Список слева показывает купленные элементы выбранной категории.');
 
     const moduleBtn = document.getElementById('hangar-module-action');
     const moduleSellBtn = document.getElementById('hangar-module-sell');
@@ -9220,10 +9260,10 @@ function fillHangarText(){
 
     const statsWrap = document.getElementById('hangar-ship-stats');
     if(statsWrap){
-        const extraModules = installedModules.length ? installedModules.map(item => item.name).join(', ') : 'Нет';
         const weaponLabel = weaponInstalled?.name || 'Нет';
         const shieldLabel = shieldInstalled?.name || 'Нет';
         const boosterLabel = boosterInstalled?.name || 'Нет';
+        const compactHandling = battleStatsView.handlingLabel || 'Стандарт';
         const stats = [
             ['Скорость', battleStatsView.maxSpeed.toFixed(2)],
             ['Броня', battleStatsView.hp],
@@ -9232,9 +9272,7 @@ function fillHangarText(){
             ['Пушка', weaponLabel],
             ['Щит', shieldLabel],
             ['Ускоритель', boosterLabel],
-            ['Управление', battleStatsView.handlingLabel],
-            ['Перезарядка', `${(battleStatsView.reloadTime / 1000).toFixed(1)}с`],
-            ['Оснастка', extraModules]
+            ['Управление', compactHandling]
         ];
         statsWrap.innerHTML = stats.map(([key, value]) => `
             <div class="hangar-stat-box">
