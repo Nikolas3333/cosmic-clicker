@@ -8087,14 +8087,14 @@ const hangarState = {
     astronautGroundY: -1.72,
     astronautBob: 0,
     cameraFocus: new THREE.Vector3(0.0, -1.1, -1.8),
-    cameraPosition: new THREE.Vector3(0.0, 2.7, 17.8),
+    cameraPosition: new THREE.Vector3(0.0, 1.2, 16.6),
+    planets: [],
     cameraYaw: Math.PI,
+    cameraPitch: -0.12,
     cameraYawTarget: Math.PI,
-    cameraPitch: -0.18,
-    cameraPitchTarget: -0.18,
-    cameraDistance: 8.8,
-    cameraHeight: 2.7,
-    planets: []
+    cameraPitchTarget: -0.12,
+    cameraDistance: 8.6,
+    pointerActive: false
 };
 
 const STARTER_HULL_IDS = ['scout_1'];
@@ -9120,7 +9120,7 @@ function createHangarAstronaut(){
         legL: group.children[6],
         legR: group.children[7]
     };
-    group.position.set(0, hangarState.astronautGroundY, 8.8);
+    group.position.set(0, hangarState.astronautGroundY, 6.6);
     return group;
 }
 
@@ -9207,18 +9207,14 @@ function resetHangarAstronautState(){
     hangarState.astronautKeys = { w:false, a:false, s:false, d:false, shift:false, space:false };
     hangarState.astronautVelocity.set(0,0,0);
     hangarState.astronautDirection.set(0,0,0);
-    hangarState.cameraYaw = Math.PI;
-    hangarState.cameraYawTarget = Math.PI;
-    hangarState.cameraPitch = -0.18;
-    hangarState.cameraPitchTarget = -0.18;
-    hangarState.roomLookTarget = 0;
-    hangarState.roomLookCurrent = 0;
-    hangarState.roomTiltTarget = 0;
-    hangarState.roomTiltCurrent = 0;
     if(hangarState.astronautPivot){
-        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 8.8);
+        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 6.6);
         hangarState.astronautPivot.rotation.y = Math.PI;
     }
+    hangarState.cameraYaw = Math.PI;
+    hangarState.cameraPitch = -0.12;
+    hangarState.cameraYawTarget = Math.PI;
+    hangarState.cameraPitchTarget = -0.12;
 }
 
 function createHangarModuleMesh(item){
@@ -10021,9 +10017,9 @@ function ensureHangarRenderer(){
         });
 
         hangarState.scene = new THREE.Scene();
-        hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
-        hangarState.camera.position.copy(hangarState.cameraPosition);
-        hangarState.camera.lookAt(hangarState.cameraFocus);
+        hangarState.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
+        hangarState.camera.position.set(0, 2.0, 13.2);
+        hangarState.camera.lookAt(0, 1.1, 6.6);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -10239,38 +10235,39 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.astronautPivot){
-            const forward2 = new THREE.Vector3(Math.sin(hangarState.cameraYawTarget), 0, Math.cos(hangarState.cameraYawTarget));
-            const right2 = new THREE.Vector3(forward2.z, 0, -forward2.x);
-            const moveForward = (hangarState.astronautKeys.w ? 1 : 0) - (hangarState.astronautKeys.s ? 1 : 0);
-            const moveRight = (hangarState.astronautKeys.d ? 1 : 0) - (hangarState.astronautKeys.a ? 1 : 0);
+            const moveX = (hangarState.astronautKeys.d ? 1 : 0) - (hangarState.astronautKeys.a ? 1 : 0);
+            const moveZ = (hangarState.astronautKeys.w ? 1 : 0) - (hangarState.astronautKeys.s ? 1 : 0);
+            const cameraYawFlat = hangarState.cameraYaw;
+            const forward = new THREE.Vector3(Math.sin(cameraYawFlat), 0, Math.cos(cameraYawFlat));
+            const right = new THREE.Vector3(forward.z, 0, -forward.x);
             hangarState.astronautDirection.set(0, 0, 0);
-            hangarState.astronautDirection.addScaledVector(forward2, moveForward);
-            hangarState.astronautDirection.addScaledVector(right2, moveRight);
+            if(moveZ) hangarState.astronautDirection.add(forward.clone().multiplyScalar(moveZ));
+            if(moveX) hangarState.astronautDirection.add(right.clone().multiplyScalar(moveX));
             const isMoving = hangarState.astronautDirection.lengthSq() > 0.001;
             const runMul = hangarState.astronautKeys.shift ? 1.75 : 1.0;
-            const targetSpeed = isMoving ? 0.065 * runMul : 0;
+            const targetSpeed = isMoving ? 0.078 * runMul : 0;
             if(isMoving){
                 hangarState.astronautDirection.normalize();
                 hangarState.astronautVelocity.x += (hangarState.astronautDirection.x * targetSpeed - hangarState.astronautVelocity.x) * 0.16;
                 hangarState.astronautVelocity.z += (hangarState.astronautDirection.z * targetSpeed - hangarState.astronautVelocity.z) * 0.16;
                 hangarState.astronautTargetYaw = Math.atan2(hangarState.astronautDirection.x, hangarState.astronautDirection.z);
             }else{
-                hangarState.astronautVelocity.x *= 0.8;
-                hangarState.astronautVelocity.z *= 0.8;
+                hangarState.astronautVelocity.x *= 0.78;
+                hangarState.astronautVelocity.z *= 0.78;
             }
             if(hangarState.astronautKeys.space && Math.abs(hangarState.astronautPivot.position.y - hangarState.astronautGroundY) < 0.04){
-                hangarState.astronautVelocity.y = 0.17;
+                hangarState.astronautVelocity.y = 0.18;
             }
             hangarState.astronautVelocity.y -= 0.0095;
-            hangarState.astronautPivot.position.x = THREE.MathUtils.clamp(hangarState.astronautPivot.position.x + hangarState.astronautVelocity.x, -8.8, 8.8);
-            hangarState.astronautPivot.position.z = THREE.MathUtils.clamp(hangarState.astronautPivot.position.z + hangarState.astronautVelocity.z, -13.2, 13.8);
+            hangarState.astronautPivot.position.x = THREE.MathUtils.clamp(hangarState.astronautPivot.position.x + hangarState.astronautVelocity.x, -12.8, 12.8);
+            hangarState.astronautPivot.position.z = THREE.MathUtils.clamp(hangarState.astronautPivot.position.z + hangarState.astronautVelocity.z, -14.5, 11.8);
             hangarState.astronautPivot.position.y += hangarState.astronautVelocity.y;
             if(hangarState.astronautPivot.position.y <= hangarState.astronautGroundY){
                 hangarState.astronautPivot.position.y = hangarState.astronautGroundY;
                 hangarState.astronautVelocity.y = 0;
             }
-            hangarState.astronautPivot.rotation.y += (hangarState.astronautTargetYaw - hangarState.astronautPivot.rotation.y) * 0.16;
-            hangarState.astronautBob += isMoving ? 0.18 * runMul : 0.06;
+            hangarState.astronautPivot.rotation.y += (hangarState.astronautTargetYaw - hangarState.astronautPivot.rotation.y) * 0.18;
+            hangarState.astronautBob += isMoving ? 0.22 * runMul : 0.05;
             const walkSwing = isMoving ? Math.sin(hangarState.astronautBob) * 0.55 : 0;
             const parts = hangarState.astronautPivot.userData?.walkParts || {};
             if(parts.armL) parts.armL.rotation.x = walkSwing;
@@ -10284,28 +10281,20 @@ function ensureHangarRenderer(){
             planet.rotation.x += 0.0007 + idx * 0.0002;
         });
 
-        const roomShell = document.getElementById('hangar-room-shell');
-        if(roomShell){
-            roomShell.style.transform = 'none';
-        }
-
         if(hangarState.camera){
-            const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:8.8 };
+            const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:6.6 };
             hangarState.cameraYaw += (hangarState.cameraYawTarget - hangarState.cameraYaw) * 0.12;
             hangarState.cameraPitch += (hangarState.cameraPitchTarget - hangarState.cameraPitch) * 0.12;
-            const pitch = THREE.MathUtils.clamp(hangarState.cameraPitch, -0.85, 0.45);
-            const behind = new THREE.Vector3(
-                Math.sin(hangarState.cameraYaw) * Math.cos(pitch),
-                Math.sin(pitch),
-                Math.cos(hangarState.cameraYaw) * Math.cos(pitch)
-            );
-            const focus = new THREE.Vector3(astro.x, astro.y + hangarState.cameraHeight, astro.z);
-            const desired = focus.clone().addScaledVector(behind, hangarState.cameraDistance);
-            desired.y += 0.8;
-            desired.x = THREE.MathUtils.clamp(desired.x, -18, 18);
-            desired.z = THREE.MathUtils.clamp(desired.z, -20, 20);
-            desired.y = THREE.MathUtils.clamp(desired.y, 0.8, 9.8);
-            hangarState.camera.position.lerp(desired, 0.12);
+            const focus = new THREE.Vector3(astro.x, astro.y + 1.65, astro.z);
+            const cosPitch = Math.cos(hangarState.cameraPitch);
+            const cameraOffset = new THREE.Vector3(
+                Math.sin(hangarState.cameraYaw) * cosPitch,
+                Math.sin(hangarState.cameraPitch),
+                Math.cos(hangarState.cameraYaw) * cosPitch
+            ).multiplyScalar(hangarState.cameraDistance);
+            const desiredPos = focus.clone().sub(cameraOffset);
+            desiredPos.y += 2.2;
+            hangarState.camera.position.lerp(desiredPos, 0.12);
             hangarState.camera.lookAt(focus);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
@@ -10323,35 +10312,29 @@ function bindHangarStageInteraction(){
     if(!stage || hangarState.stageBound) return;
     hangarState.stageBound = true;
 
-    const setPointerFromClient = (clientX, clientY, smooth = false) => {
+    const updateFromMouse = (event) => {
+        if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
         const rect = stage.getBoundingClientRect();
-        const ratioX = rect.width > 0 ? (clientX - rect.left) / rect.width : 0.5;
-        const ratioY = rect.height > 0 ? (clientY - rect.top) / rect.height : 0.5;
-        const yaw = Math.PI + (ratioX - 0.5) * 2.2;
-        const pitch = -0.18 + (0.5 - ratioY) * 0.95;
-        hangarState.cameraYawTarget = yaw;
-        hangarState.cameraPitchTarget = THREE.MathUtils.clamp(pitch, -0.75, 0.35);
-        if(!smooth){
-            hangarState.cameraYaw = hangarState.cameraYawTarget;
-            hangarState.cameraPitch = hangarState.cameraPitchTarget;
-        }
+        const ratioX = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
+        const ratioY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+        hangarState.cameraYawTarget = Math.PI + (ratioX - 0.5) * 1.45;
+        hangarState.cameraPitchTarget = THREE.MathUtils.clamp(-0.08 + (0.5 - ratioY) * 0.9, -0.42, 0.38);
     };
 
-    stage.addEventListener('mouseenter', (event) => {
-        stage.classList.add('camera-look');
-        setPointerFromClient(event.clientX, event.clientY, true);
+    stage.addEventListener('mousemove', updateFromMouse);
+    stage.addEventListener('mouseenter', () => {
+        hangarState.pointerActive = true;
     });
     stage.addEventListener('mouseleave', () => {
-        stage.classList.remove('camera-look');
+        hangarState.pointerActive = false;
+        hangarState.cameraYawTarget = hangarState.cameraYaw;
+        hangarState.cameraPitchTarget = hangarState.cameraPitch;
     });
-    stage.addEventListener('mousemove', (event) => {
-        setPointerFromClient(event.clientX, event.clientY, true);
-    });
-    stage.addEventListener('mousedown', () => {
-        stage.classList.add('dragging');
-    });
-    window.addEventListener('mouseup', () => {
-        stage.classList.remove('dragging');
+
+    stage.addEventListener('mousedown', (event) => {
+        if(event.button !== 0) return;
+        if(event.target?.closest?.('.hangar-arrow')) return;
+        updateFromMouse(event);
     });
 }
 
