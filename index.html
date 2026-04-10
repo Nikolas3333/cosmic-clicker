@@ -1,1106 +1,6027 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cosmic Clicker - Hangar Prototype</title>
-  <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #04060b;
-      font-family: Arial, sans-serif;
-      color: #eaf2ff;
-    }
+<meta charset="UTF-8">
+<meta name="vercel-toolbar" content="disabled">
+<title>Galaxy Clicker</title>
 
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
 
-    #hangar-ui {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 20;
-    }
 
-    .hangar-crosshair {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 12px;
-      height: 12px;
-      transform: translate(-50%, -50%);
-      border: 2px solid rgba(255,255,255,0.78);
-      border-radius: 50%;
-      box-shadow: 0 0 16px rgba(120, 185, 255, 0.55);
-    }
+<style>
 
-    .hangar-topbar {
-      position: absolute;
-      top: 18px;
-      left: 18px;
-      right: 18px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
 
-    .hangar-chip {
-      padding: 10px 14px;
-      border: 1px solid rgba(133, 170, 255, 0.34);
-      background: rgba(10, 14, 24, 0.72);
-      backdrop-filter: blur(8px);
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(86, 142, 255, 0.14);
-      font-size: 14px;
-      letter-spacing: 0.02em;
-    }
 
-    .hangar-panel {
-      position: absolute;
-      top: 84px;
-      width: 290px;
-      padding: 16px;
-      border-radius: 16px;
-      background: rgba(8, 12, 20, 0.76);
-      border: 1px solid rgba(133, 170, 255, 0.28);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.34);
-    }
+body {
+  margin:0;
+  overflow:hidden;
+  background:black;
+  font-family:Arial;
+  color:white;
+}
 
-    .hangar-left { left: 18px; }
-    .hangar-right { right: 18px; }
+#auth-screen{
+  position:fixed;
+  inset:0;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  justify-content:center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0,180,255,0.14), transparent 24%),
+    radial-gradient(circle at 80% 30%, rgba(180,120,255,0.14), transparent 28%),
+    linear-gradient(180deg, #02040d 0%, #050916 100%);
+  z-index:25000;
+}
+.auth-card{ width:min(980px,92vw); padding:28px; border-radius:22px; background:rgba(8,14,30,0.94); border:1px solid rgba(120,220,255,0.22); box-shadow:0 0 36px rgba(0,180,255,0.18); }
+.auth-card h1{ margin:0; text-align:center; color:#9fe8ff; }
+.auth-subtitle{ margin:8px 0 20px; text-align:center; color:#ccefff; opacity:0.8; }
+.auth-columns{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.auth-panel{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:12px; }
+.auth-panel h2{ margin:0 0 6px; color:#9fe8ff; }
+.auth-panel input{ padding:12px; border-radius:10px; border:1px solid rgba(130,220,255,0.22); background:#07101f; color:#fff; }
+.auth-btn{ padding:12px 14px; border-radius:10px; border:1px solid rgba(130,220,255,0.25); cursor:pointer; color:#fff; background:#0e1a32; }
+.auth-btn.primary{ background:linear-gradient(180deg,#113662,#0b2241); }
+.auth-btn.ghost{ background:rgba(255,255,255,0.05); }
+.auth-btn.guest{ background:linear-gradient(180deg,#28402a,#16281a); }
+.auth-check{ display:flex; gap:8px; align-items:center; font-size:14px; }
+.auth-divider{ text-align:center; opacity:0.7; }
+.auth-note,.auth-message{ font-size:14px; color:#ccefff; opacity:0.85; }
+.auth-message{ margin-top:16px; min-height:20px; text-align:center; }
+.premium-item{ display:inline-flex; align-items:center; gap:6px; }
 
-    .hangar-panel-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
+#premium-bar{
+  position:fixed;
+  top:16px;
+  right:20px;
+  display:none;
+  gap:14px;
+  align-items:center;
+  padding:10px 14px;
+  border-radius:12px;
+  background:rgba(8,18,35,0.88);
+  box-shadow:0 0 16px rgba(0,180,255,0.18);
+  border:1px solid rgba(120,220,255,0.18);
+  z-index:20010;
+}
 
-    .hangar-help,
-    .hangar-list,
-    #hangar-stats-box {
-      font-size: 14px;
-      line-height: 1.55;
-      color: #d6e4ff;
-    }
 
-    .hangar-list > div,
-    .hangar-stat-row {
-      padding: 6px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
 
-    .hangar-stat-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-    }
+/* ===== V27 CENTER MODE TABS + TOURNAMENT ===== */
+#top-nav #solo-tab{
+  display:none;
+}
 
-    .hangar-bottom-hint {
-      position: absolute;
-      left: 50%;
-      bottom: 20px;
-      transform: translateX(-50%);
-      padding: 12px 18px;
-      border-radius: 14px;
-      border: 1px solid rgba(133, 170, 255, 0.3);
-      background: rgba(8, 12, 20, 0.82);
-      box-shadow: 0 0 22px rgba(86, 142, 255, 0.12);
-      font-size: 14px;
-      letter-spacing: 0.02em;
-      text-align: center;
-      min-width: 360px;
-      max-width: calc(100vw - 40px);
-    }
-  </style>
+#lobby-mode-tabs{
+  display:flex;
+  gap:10px;
+  padding:10px 12px 0;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+
+.lobby-mode-tab{
+  flex:1;
+  text-align:center;
+  padding:10px 12px;
+  cursor:pointer;
+  border-radius:10px 10px 0 0;
+  background:rgba(255,255,255,0.04);
+  color:#bfefff;
+  transition:0.2s;
+  user-select:none;
+}
+
+.lobby-mode-tab:hover{
+  background:rgba(0,255,200,0.12);
+}
+
+.lobby-mode-tab.active{
+  background:rgba(0,255,200,0.22);
+  color:#00ffff;
+  box-shadow:0 0 14px rgba(0,255,255,0.18) inset;
+}
+
+#match-status-note{
+  min-height:24px;
+  text-align:center;
+  font-size:13px;
+  color:#9fe8ff;
+  padding:6px 10px 0;
+}
+
+#map-waiting-note{
+  text-align:center;
+  font-size:13px;
+  color:#ffd784;
+  min-height:20px;
+}
+
+.map-title,
+.map-real,
+.map-mode,
+.map-players,
+.map-level,
+.map-extra{
+  display:block;
+}
+
+.map-title{ font-weight:bold; color:#d7f7ff; }
+.map-real,.map-level,.map-extra{ font-size:12px; opacity:0.82; }
+.map-mode,.map-players{ font-size:12px; color:#7fe7ff; }
+
+#tournament-window{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.86);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:21010;
+}
+
+.tournament-box{
+  width:460px;
+  max-width:94vw;
+  background:#111;
+  padding:22px;
+  border-radius:14px;
+  border:1px solid #00ffff;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.tournament-box select,
+.tournament-box input{
+  padding:8px;
+  background:#000;
+  color:white;
+  border:1px solid #00ffff;
+}
+
+.tournament-note{
+  font-size:12px;
+  color:#cdefff;
+  opacity:0.85;
+}
+
+/* ===== CANVAS ===== */
+
+canvas {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== RESOURCE BAR (ТОЛЬКО ИКОНКИ) ===== */
+
+#resource-bar {
+  display:none;
+  position: fixed;
+  top: 15px;
+  left: 20px;
+  transform: none;
+
+  display: flex;
+  gap: 45px;
+
+  font-size: 22px;
+  font-weight: bold;
+
+  z-index: 1500;
+  pointer-events: none;
+}
+
+/* ===== INVENTORY BUTTON ===== */
+
+#inventory-button {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+
+  width: 60px;
+  height: 60px;
+
+  background: radial-gradient(circle at 30% 30%, #2a3b6e, #0a0f1f);
+  border: 2px solid #4da6ff;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 28px;
+  cursor: pointer;
+
+  box-shadow: 0 0 15px rgba(77,166,255,0.6);
+  transition: 0.2s;
+  z-index: 2000;
+}
+
+
+
+
+
+/* ===== INVENTORY WINDOW ===== */
+
+#inventory-window {
+  position: absolute;
+  bottom: 100px;
+  left: 20px;
+
+  width: 350px;
+  height: 300px;
+
+  background: rgba(10, 15, 30, 0.95);
+  border: 1px solid rgba(77,166,255,0.6);
+  border-radius: 12px;
+
+  padding: 10px;
+  box-sizing: border-box;
+
+  box-shadow: 0 0 20px rgba(77,166,255,0.5);
+  z-index: 2000;
+}
+
+.hidden {
+  display: none;
+}
+
+.inventory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+#close-inventory {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+#inventory {
+  height: 230px;
+  overflow-y: auto;
+}
+
+.inventory-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+.inventory-item span:first-child{
+  flex:1;
+  min-width:0;
+}
+
+
+/* ===== LEFT UI ===== */
+
+#ui {
+  display:none;
+  position:fixed;
+  top:90px;
+  left:10px;
+  z-index:5;
+
+  background:rgba(15,20,40,0.85);
+  padding:18px;
+  border-radius:16px;
+
+  box-shadow: 0 0 25px rgba(0,150,255,0.4);
+}
+
+#hpBarContainer {
+  width:200px;
+  height:20px;
+  background:#333;
+  margin-top:5px;
+}
+
+#hpBar {
+  height:100%;
+  width:100%;
+  background:red;
+}
+
+.resource-item{
+  margin-right:15px;
+  cursor:pointer;
+  font-size:18px;
+}
+
+.resource-item:hover{
+  transform:scale(1.1);
+}
+
+
+#resource-bar{
+  position:fixed;
+  top:15px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  flex-wrap:nowrap;
+  gap:12px;
+  padding:6px 10px;
+  background:rgba(0,0,0,0.7);
+  border-bottom:1px solid rgba(255,255,255,0.15);
+  overflow-x:auto;
+  white-space:nowrap;
+  font-family:Arial;
+  max-width:calc(100vw - 260px);
+  z-index:1500;
+}
+#resource-bar::-webkit-scrollbar{ height:6px; }
+
+#orbit-scene-note{
+  display:none;
+}
+
+/* orbit left info panel temporarily disabled */
+#ui{
+  display:none !important;
+}
+
+.planet-block{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:4px 8px;
+  background:rgba(255,255,255,0.05);
+  border-radius:6px;
+  min-width:90px;
+}
+
+.planet-title{
+  font-size:11px;
+  margin-bottom:4px;
+  opacity:0.7;
+}
+
+.resource-item{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:13px;
+  cursor:pointer;
+}
+
+.icon{
+  font-size:14px;
+}
+
+.amount{
+  min-width:18px;
+}
+
+.tooltip{
+  position:absolute;
+  bottom:130%;
+  left:50%;
+  transform:translateX(-50%);
+  background:black;
+  color:white;
+  padding:4px 6px;
+  font-size:11px;
+  border-radius:4px;
+  opacity:0;
+  pointer-events:none;
+  transition:0.2s;
+  white-space:nowrap;
+  z-index:100;
+}
+
+.resource-item:hover .tooltip{
+  opacity:1;
+}
+
+#lobby-screen{
+    position:fixed;
+    display:none;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+    background:#020308;
+    z-index:10000;
+}
+
+#lobby-bg{
+    position:absolute;
+    inset:-2%;
+    z-index:0;
+    overflow:hidden;
+    background-image:url("images/lobby_space_1.png");
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+    transform:translate3d(0,0,0) scale(1.05);
+    will-change:transform, background-image;
+    filter:brightness(0.72) saturate(1.05);
+}
+
+#lobby-bg::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(circle at center, rgba(255,255,255,0.06), transparent 38%),
+      linear-gradient(180deg, rgba(3,6,16,0.18) 0%, rgba(3,6,16,0.42) 55%, rgba(2,3,8,0.70) 100%);
+    pointer-events:none;
+}
+
+
+#lobby-fog{
+    position:absolute;
+    inset:-6%;
+    z-index:1;
+    pointer-events:none;
+    background:
+      radial-gradient(circle at 22% 28%, rgba(120,190,255,0.10), transparent 24%),
+      radial-gradient(circle at 72% 36%, rgba(180,120,255,0.09), transparent 26%),
+      radial-gradient(circle at 50% 78%, rgba(255,180,120,0.07), transparent 22%);
+    mix-blend-mode:screen;
+    opacity:0.9;
+}
+
+.lobby-box{
+    text-align:center;
+}
+
+.lobby-box h1{
+    color:#00ffff;
+    margin-bottom:30px;
+}
+
+.lobby-box button{
+    display:block;
+    margin:15px auto;
+    padding:15px 30px;
+    font-size:18px;
+    background:#111;
+    color:#00ffff;
+    border:1px solid #00ffff;
+    cursor:pointer;
+}
+
+
+#orbit-exit{
+    display:none;
+    position:fixed;
+    top:20px;
+    left:20px;
+    z-index:50000;
+    display:none;
+}
+
+#orbit-exit button{
+    padding:10px 20px;
+    background:#111;
+    color:#00ffff;
+    border:1px solid #00ffff;
+    cursor:pointer;
+    border-radius:8px;
+    box-shadow:0 0 10px rgba(0,255,255,0.35);
+}
+
+#orbit-exit button:hover{
+    background:#00ffff;
+    color:#000;
+}
+
+#lobby-background{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+
+  background:
+    radial-gradient(circle at 30% 30%, rgba(0,255,255,0.15), transparent 40%),
+    radial-gradient(circle at 70% 70%, rgba(0,100,255,0.15), transparent 40%),
+    radial-gradient(circle at center, #050510 0%, #000000 80%);
+
+  animation: spacePulse 8s infinite alternate;
+  z-index:0;
+}
+
+@keyframes spacePulse{
+  0%{
+    filter: brightness(1);
+  }
+  100%{
+    filter: brightness(1.2);
+  }
+}
+
+
+/* ===== TOP NAV ===== */
+
+#top-nav {
+  display:none;
+  position: fixed;
+  top: 8px;
+  left: 20px;
+  transform: none;
+  display: flex;
+  gap: 12px;
+  white-space: nowrap;
+  background: rgba(10,15,30,0.92);
+  padding: 5px 10px;
+  border-radius: 12px;
+  max-width: calc(100vw - 520px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-shadow: 0 0 18px rgba(0,200,255,0.28);
+  z-index: 20000;
+}
+
+.nav-tab {
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  transition: 0.2s;
+  flex: 0 0 auto;
+}
+
+.nav-tab:hover {
+  color: #00ffff;
+  transform: scale(1.1);
+}
+
+/* ===== ONLINE PANEL ===== */
+
+#online-panel {
+  grid-column:2;
+  grid-row:1;
+
+  width:300px;       /* фиксированная ширина правой колонки */
+  height:380px;      /* совпадает с match-center */
+
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+
+  padding: 15px;
+  box-sizing: border-box;
+
+  box-shadow: 0 0 20px rgba(0,255,200,0.3);
+  display:flex;
+  flex-direction:column;
+}
+
+.online-header { display:none; }
+
+#online-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 330px;
+  overflow-y: auto;
+}
+
+.online-player {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.online-player:hover {
+  background: rgba(0,255,200,0.2);
+}
+
+
+
+
+
+/* ===== ONLINE SCROLL STYLE ===== */
+
+#online-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+#online-list::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+}
+
+#online-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(#00ffcc, #0088ff);
+  border-radius: 10px;
+}
+
+#online-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(#00ffff, #00aaff);
+}
+
+
+
+/* ===== CHAT PANEL ===== */
+
+#chat-panel {
+  width: 100%;
+  height: 250px;
+
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+
+  display: flex;
+  flex-direction: column;
+
+  box-shadow: 0 0 20px rgba(0,255,200,0.3);
+}
+
+/* ===== CHAT TABS ===== */
+
+#chat-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(0,255,200,0.2);
+}
+
+.chat-tab {
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  padding:8px 12px;
+  cursor:pointer;
+  font-size:14px;
+  color:#aaa;
+  background:transparent;
+  border:none;
+  text-align:left;
+}
+
+.chat-tab.active {
+  color:#00ffcc;
+  border-bottom:2px solid #00ffcc;
+}
+
+.chat-tab-title{
+  font-weight:700;
+}
+
+.chat-tab.pm-tab{
+  max-width:210px;
+  min-width:156px;
+  padding:6px 40px 6px 10px;
+}
+
+.pm-online-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.18);
+  box-shadow:none;
+  flex:0 0 auto;
+}
+
+.chat-tab.pm-tab.online .pm-online-dot{
+  background:#40ff88;
+  box-shadow:0 0 10px rgba(64,255,136,0.55);
+}
+
+.chat-tab.pm-tab.in-game .pm-online-dot{
+  background:#ffd54a;
+  box-shadow:0 0 10px rgba(255,213,74,0.55);
+}
+
+.pm-tab-content{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  flex:1;
+}
+
+.pm-tab-main{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+
+.pm-tab-label{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-weight:700;
+}
+
+.pm-tab-preview{
+  font-size:11px;
+  opacity:0.72;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.pin-state{
+  font-size:11px;
+}
+
+.chat-tab-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 6px;
+  border-radius:999px;
+  background:#ff3b3b;
+  color:#fff;
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+  box-shadow:0 0 8px rgba(255,59,59,0.6);
+  flex:0 0 auto;
+}
+
+.chat-tab .pin-tab,
+.chat-tab .close-tab{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:12px;
+  line-height:1;
+  cursor:pointer;
+  display:none;
+  user-select:none;
+}
+
+.chat-tab .pin-tab{
+  right:24px;
+  color:#ffd66b;
+}
+
+.chat-tab .close-tab{
+  right:6px;
+  color:#ff7a7a;
+}
+
+.chat-tab.pm-tab:hover .pin-tab,
+.chat-tab.pm-tab:hover .close-tab{
+  display:block;
+}
+
+.chat-tab .pin-tab:hover{
+  color:#fff0a3;
+}
+
+.chat-tab .close-tab:hover{
+  color:#ff3b3b;
+}
+
+.chat-tab.disabled{
+  opacity:0.45;
+  pointer-events:none;
+}
+
+#chat-messages {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 14px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.chat-message {
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+
+.chat-message.system {
+  color: #00ffcc;
+}
+
+#chat-input-area {
+  display: flex;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+#chat-input {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+}
+
+#chat-send {
+  width: 120px;
+  background: rgba(0,255,200,0.2);
+  border: none;
+  cursor: pointer;
+  color: white;
+  transition: 0.2s;
+}
+
+#chat-send:hover {
+  background: rgba(0,255,200,0.4);
+}
+
+
+
+/* ===== CHAT TIME ===== */
+
+.chat-time {
+  color: #888;
+  font-size: 11px;
+  margin-right: 6px;
+}
+
+.chat-author {
+  color: #00ffcc;
+  margin-right: 6px;
+}
+
+
+
+.chat-tab.notify {
+  position: relative;
+  color: #ffffff;
+  background: rgba(0,255,200,0.18);
+  box-shadow: 0 0 12px rgba(0,255,200,0.35);
+  animation: chatTabPulse 0.9s infinite alternate;
+}
+
+.chat-tab.notify::after {
+  content: "•";
+  position: absolute;
+  right: 4px;
+  top: 0;
+  color: #ff4444;
+  font-size: 18px;
+  animation: blink 0.8s infinite;
+}
+
+@keyframes chatTabPulse {
+  0% { box-shadow: 0 0 6px rgba(0,255,200,0.18); transform: translateY(0); }
+  100% { box-shadow: 0 0 18px rgba(0,255,200,0.55); transform: translateY(-1px); }
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.2; }
+  100% { opacity: 1; }
+}
+
+
+
+
+/* ===== MATCH CENTER PANEL ===== */
+
+#match-center{
+  grid-column:1;
+  grid-row:1;
+  height:380px;
+  min-height:0;
+  background:rgba(0,0,0,0.52);
+  border-radius:16px;
+  border:2px solid #00f0ff;
+  box-shadow:
+    0 0 15px #00f0ff,
+    0 0 40px #00f0ff,
+    inset 0 0 20px rgba(0,240,255,0.3);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+/* ===== MATCH CONTENT ===== */
+
+#match-content{
+  flex:1;
+  padding:12px;
+  overflow:hidden;
+  min-height:0;
+}
+
+/* ===== MATCH LIST ===== */
+
+.match-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-height:0;
+  height:100%;
+  overflow-y:scroll;
+  overflow-x:hidden;
+  padding-right:4px;
+  box-sizing:border-box;
+}
+
+.match-item{
+  padding:6px 10px;
+  background:rgba(255,255,255,0.05);
+  border-radius:6px;
+  cursor:pointer;
+  transition:0.2s;
+  font-size:13px;
+  text-align:left;
+}
+
+.match-item:hover{
+  background:rgba(0,255,200,0.2);
+}
+
+
+
+
+/* ===== MATCH LAYOUT ===== */
+
+#match-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 240px;
+  gap:15px;
+  height:100%;
+  min-height:0;
+  align-items:start;
+}
+
+/* список карт */
+
+.match-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-height:0;
+  height:100%;
+  overflow-y:scroll;
+  overflow-x:hidden;
+  padding-right:4px;
+  box-sizing:border-box;
+}
+
+/* правая панель */
+
+#match-preview{
+  width:240px;
+  min-width:240px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  gap:0;
+  overflow:hidden;
+  min-height:0;
+}
+
+
+
+/* мини карта */
+
+
+
+
+
+
+
+
+
+
+#map-players{
+  display:none !important;
+}
+
+
+
+
+
+/* игроки */
+
+#map-players{
+  width:220px;
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  margin:0 auto;
+  padding-right:4px;
+  box-sizing:border-box;
+}
+
+
+
+
+#map-players::-webkit-scrollbar{
+  width:8px;
+}
+#map-players::-webkit-scrollbar-track{
+  background:rgba(255,255,255,0.05);
+  border-radius:10px;
+}
+#map-players::-webkit-scrollbar-thumb{
+  background:linear-gradient(#00ffcc,#0088ff);
+  border-radius:10px;
+}
+#map-players::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(#00ffff,#00aaff);
+}
+
+#map-players::-webkit-scrollbar{
+  width:8px;
+}
+
+#map-players::-webkit-scrollbar-track{
+  background:rgba(255,255,255,0.05);
+  border-radius:10px;
+}
+
+#map-players::-webkit-scrollbar-thumb{
+  background:linear-gradient(#00ffcc, #0088ff);
+  border-radius:10px;
+}
+
+.player-slot{
+  background:rgba(255,255,255,0.05);
+  padding:4px 6px;
+  border-radius:6px;
+  font-size:12px;
+  min-height:24px;
+  display:flex;
+  align-items:center;
+  width:100%;
+  box-sizing:border-box;
+}
+
+
+
+
+/* КНОПКА ВОЙТИ */
+
+.join-btn{
+  margin-left:10px;
+  padding:4px 10px;
+  background:#00ffff;
+  border:none;
+  cursor:pointer;
+  border-radius:4px;
+  font-size:12px;
+}
+
+.join-btn:hover{
+  background:#00cccc;
+}
+
+
+
+/* ===== MATCH BUTTONS ===== */
+
+#match-buttons{
+  display:flex;
+  gap:6px;
+  border-top:1px solid rgba(255,255,255,0.1);
+  padding:6px;
+}
+
+.match-btn{
+  flex:1;
+  padding:8px;
+  font-size:13px;
+  background:rgba(0,255,200,0.15);
+  border:none;
+  cursor:pointer;
+  color:white;
+  transition:0.2s;
+
+  position:relative;
+  z-index:2;
+  overflow:hidden;
+}
+
+.match-btn::before,
+.match-btn::after{
+  z-index:1;
+}
+
+.match-btn span,
+.match-btn{
+  z-index:2;
+}
+
+.match-btn:hover{
+  background:rgba(0,255,200,0.35);
+}
+
+
+
+
+
+
+/* ===== MATCH TABS ===== */
+
+#match-tabs{
+  display:flex;
+  border-bottom:1px solid rgba(255,255,255,0.1);
+}
+
+.match-tab{
+  flex:1;
+  text-align:center;
+  padding:10px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.match-tab:hover{
+  background:rgba(0,255,200,0.1);
+}
+
+.match-tab.active{
+  background:rgba(0,255,200,0.2);
+}
+
+/* ===== MATCH CONTENT ===== */
+
+#match-content{
+  flex:1;
+  padding:12px;
+  overflow:hidden;
+  min-height:0;
+}
+
+.match-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-height:0;
+  height:100%;
+  overflow-y:scroll;
+  overflow-x:hidden;
+  padding-right:4px;
+  box-sizing:border-box;
+}
+
+.match-item{
+  padding:8px 12px;
+  background:rgba(255,255,255,0.05);
+  border-radius:8px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.match-item:hover{
+  background:rgba(0,255,200,0.2);
+}
+
+.match-item.selected{
+  background:rgba(0,255,200,0.35);
+  border:1px solid #00ffff;
+}
+
+
+
+
+
+
+
+
+
+/* ===== PROFILE BUTTON ===== */
+
+#profile-button {
+  position: absolute;
+  bottom: 20px;
+  left: 80px; /* рядом с инвентарём */
+  padding: 10px 15px;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 5;
+}
+
+/* ===== PROFILE WINDOW ===== */
+
+#profile-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+.profile-content {
+  background: #111;
+  padding: 30px;
+  border: 2px solid white;
+  width: 300px;
+  text-align: center;
+}
+
+.hidden {
+  display: none !important;
+}
+
+
+/* ===== HANGAR WINDOW ===== */
+
+#hangar-window {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #111;
+  padding: 25px;
+  border-radius: 10px;
+  z-index: 1000;
+  width: 350px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.7);
+}
+
+.hangar-content h2 {
+  margin-top: 0;
+}
+
+.ship-card {
+  background: #1a1a1a;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+}
+
+.hidden {
+  display: none;
+}
+
+
+
+/* ===== SETTINGS WINDOW ===== */
+
+#settings-window{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.82);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:22000;
+}
+
+.settings-content{
+  width:420px;
+  max-width:92vw;
+  background:rgba(8,14,30,0.96);
+  border:1px solid rgba(0,255,255,0.45);
+  border-radius:16px;
+  padding:22px;
+  box-shadow:0 0 28px rgba(0,180,255,0.22);
+}
+
+.settings-content h2{
+  margin-top:0;
+  margin-bottom:18px;
+  color:#00ffff;
+  text-align:center;
+}
+
+.settings-group{
+  margin-bottom:16px;
+}
+
+.settings-label{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:8px;
+  font-size:14px;
+}
+
+.settings-value{
+  color:#8deaff;
+  min-width:56px;
+  text-align:right;
+}
+
+.settings-content input[type="range"]{
+  width:100%;
+}
+
+.settings-check{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+  font-size:14px;
+}
+
+.settings-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:18px;
+}
+
+
+
+#battle-screen{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:9500;
+    pointer-events:none;
+    background:transparent;
+}
+
+#battle-crosshair{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:28px;
+    height:28px;
+    transform:translate(-50%,-50%);
+    border:2px solid rgba(0,255,255,0.92);
+    border-radius:50%;
+    box-shadow:0 0 14px rgba(0,255,255,0.32);
+}
+#battle-crosshair::before,
+#battle-crosshair::after{
+    content:"";
+    position:absolute;
+    left:50%;
+    top:50%;
+    background:rgba(0,255,255,0.95);
+    transform:translate(-50%,-50%);
+}
+#battle-crosshair::before{
+    width:2px;
+    height:16px;
+}
+#battle-crosshair::after{
+    width:16px;
+    height:2px;
+}
+#battle-crosshair span{ display:none; }
+#battle-exit-btn{ display:none !important; }
+#battle-exit-btn:hover{ background:rgba(18,36,68,0.95); }
+
+#battle-top-meta{
+    position:fixed;
+    top:16px;
+    left:20px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    color:#9cff4f;
+    text-shadow:0 0 8px rgba(120,255,90,0.22);
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.3px;
+}
+#battle-room-line{
+    color:#b8ff7b;
+}
+#battle-room-name{
+    color:#cfff8d;
+}
+#battle-room-datetime{
+    color:#d9ffd0;
+}
+#battle-ping-line{
+    position:fixed;
+    top:52px;
+    right:18px;
+    color:#7dff4f;
+    font-size:14px;
+    text-align:right;
+    z-index:60044;
+}
+#battle-top-actions{
+    position:fixed;
+    top:10px;
+    right:16px;
+    display:flex;
+    gap:8px;
+    pointer-events:auto;
+    z-index:60045;
+}
+.battle-top-action{
+    width:34px;
+    height:34px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:6px;
+    border:1px solid rgba(255,255,255,0.26);
+    background:rgba(18,22,30,0.72);
+    color:#fff;
+    font-size:18px;
+    cursor:pointer;
+    box-shadow:0 0 10px rgba(0,0,0,0.22);
+}
+.battle-top-action:hover{
+    filter:brightness(1.12);
+}
+#battle-sound-btn.muted{
+    color:#ff9c3b;
+    border-color:rgba(255,160,70,0.42);
+}
+#battle-player-world-name{
+    position:fixed;
+    z-index:9600;
+    padding:2px 8px;
+    font-size:18px;
+    font-weight:700;
+    color:#7dff7d;
+    text-shadow:0 0 8px rgba(0,0,0,0.85), 0 0 10px rgba(125,255,125,0.3);
+    pointer-events:none;
+    white-space:nowrap;
+}
+#battle-player-world-name.hidden{
+    display:none !important;
+}
+
+#enemy-hud{
+    position:absolute;
+    top:24px;
+    left:50%;
+    transform:translateX(-50%);
+    min-width:260px;
+    padding:10px 14px;
+    background:rgba(8,15,30,0.75);
+    border:1px solid rgba(255,90,90,0.65);
+    border-radius:12px;
+    box-shadow:0 0 18px rgba(255,80,80,0.18);
+    color:#fff;
+}
+
+#enemy-name{
+    font-weight:bold;
+    margin-bottom:8px;
+    color:#ff9d9d;
+    text-align:center;
+}
+
+#enemy-hp-bar-wrap{
+  position:relative;
+
+    display:none;
+}
+
+#enemy-hp-bar{
+    width:100%;
+    height:100%;
+    background:linear-gradient(90deg,#ff5a5a,#ffb347);
+}
+
+#enemy-hp-inline-text{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; text-shadow:0 0 6px rgba(0,0,0,0.95); pointer-events:none; }
+#enemy-hp-text{
+    display:none;
+}
+
+
+
+
+
+
+/* ===== CREATE MATCH WINDOW ===== */
+
+#create-match-window{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+
+  background:rgba(0,0,0,0.85);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:20000;
+}
+
+.create-match-box{
+  width:430px;
+  background:#111;
+  padding:20px;
+  border-radius:12px;
+  border:1px solid #00ffff;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.create-match-box select,
+.create-match-box input{
+  padding:6px;
+  background:#000;
+  color:white;
+  border:1px solid #00ffff;
+}
+
+
+/* ===== MAP SELECTOR (НОВАЯ ЧИСТАЯ ВЕРСИЯ) ===== */
+
+#map-selector{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-top:10px;
+}
+
+#map-preview{
+    width:100%;
+    height:150px;   /* было 180px — уменьшаем */
+    border:2px solid #00ffff;
+    border-radius:8px;
+    overflow:hidden;
+}
+
+#map-preview img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+/* НАЗВАНИЕ КАРТЫ */
+#map-name{
+    font-weight:bold;
+    text-align:center;
+}
+
+/* КНОПКА ВЫБОРА (как select игроков) */
+#map-selected{
+    background:#000;
+    border:1px solid #00ffff;
+    padding:8px;
+    cursor:pointer;
+}
+
+/* DROPDOWN */
+#map-dropdown{
+    background:#000;
+    border:1px solid #00ffff;
+    max-height:150px;
+    overflow-y:auto;
+}
+
+/* ОПЦИИ */
+.map-option{
+    padding:8px;
+    cursor:pointer;
+}
+
+.map-option:hover{
+    background:rgba(0,255,255,0.2);
+}
+
+
+/* ===== BUTTONS ===== */
+
+.create-buttons{
+  display:flex;
+  justify-content:space-between;
+  margin-top:15px;
+}
+
+
+
+#map-selected img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+}
+
+#map-dropdown {
+    position: relative;
+    margin-top: 5px;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #000;
+    border: 1px solid #444;
+    z-index: 1000;
+}
+
+.map-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    cursor: pointer;
+}
+
+.map-option:hover {
+    background: #222;
+}
+
+.map-option img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+}
+
+.hidden {
+    display: none;
+}
+
+
+
+
+
+
+
+
+
+
+.match-item{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:8px 12px;
+cursor:pointer;
+font-size:14px;
+}
+
+.match-item span{
+flex:1;
+text-align:center;
+}
+
+.map-title{
+text-align:left;
+font-weight:bold;
+}
+
+.map-real{
+opacity:0.7;
+}
+
+.map-mode{
+font-weight:bold;
+}
+
+.map-players{
+color:#ddd;
+}
+
+.map-level{
+color:#ffd700;
+}
+
+
+
+
+
+/* ===== ГЛАВНАЯ СЕТКА ЛОББИ ===== */
+#lobby-wrapper {
+  width: 1400px;
+  height: 620px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: 380px 240px;
+  gap: 12px;
+  position:relative;
+  z-index:2;
+}
+
+/* MATCH CENTER */
+#match-center { grid-column:1; grid-row:1; }
+
+/* ONLINE PANEL */
+#online-panel {
+  grid-column:2; grid-row:1;
+  width: 300px;
+  height: 380px;
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+  padding: 15px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* CHAT WRAPPER */
+#chat-wrapper {
+  grid-column:1; grid-row:2;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0,0,0,0.52);
+  border-radius: 16px;
+  border: 2px solid #00f0ff;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* EMOJI PANEL */
+#emoji-panel {
+  grid-column:2; grid-row:2;
+  height: 240px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background: rgba(10,15,30,0.78);
+  border: 1px solid rgba(0,255,200,0.4);
+  border-radius: 12px;
+  padding: 15px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+
+
+
+
+
+/* ===== COSMIC WINDOWS ===== */
+#profile-window,
+#hangar-window,
+#clans-window,
+#leaders-window{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.82);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:21000;
+}
+.profile-content,
+.hangar-content,
+.clans-content,
+.leaders-content{
+  width:min(760px,92vw);
+  max-height:84vh;
+  overflow:auto;
+  background:linear-gradient(180deg, rgba(8,14,30,0.97), rgba(11,20,40,0.97));
+  border:1px solid rgba(0,255,255,0.34);
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 0 30px rgba(0,180,255,0.18), inset 0 0 40px rgba(255,255,255,0.04);
+}
+.profile-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.stat-card,
+.ship-card,
+.clan-card,
+.leader-row{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(125,216,255,0.12);
+  border-radius:12px;
+  padding:12px 14px;
+}
+.profile-title,
+.window-title{
+  color:#9ee8ff;
+  text-shadow:0 0 10px rgba(0,255,255,0.22);
+  margin-top:0;
+}
+.leaders-table{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.leader-row{
+  display:grid;
+  grid-template-columns:56px 1.2fr 120px 120px 100px;
+  align-items:center;
+  gap:10px;
+}
+.leader-row.header{
+  background:rgba(0,255,255,0.10);
+  font-weight:bold;
+}
+.clan-actions,
+.window-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:16px;
+}
+.cosmic-btn{
+  padding:10px 14px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  color:#eaf8ff;
+  background:rgba(16,40,76,0.92);
+  box-shadow:0 0 14px rgba(0,180,255,0.18);
+}
+.cosmic-btn:hover{ background:rgba(24,58,108,0.96); }
+.cosmic-badge{ color:#8deaff; font-weight:bold; }
+
+/* ===== COSMIC SCOREBOARD ===== */
+#battle-scoreboard{
+  position:fixed;
+  top:8px;
+  right:16px;
+  width:min(610px, calc(100vw - 32px));
+  z-index:60080;
+  background:linear-gradient(180deg, rgba(5,12,26,0.94), rgba(10,22,44,0.90));
+  border:1px solid rgba(98,223,255,0.30);
+  box-shadow:0 0 22px rgba(0,195,255,0.16), inset 0 0 30px rgba(255,255,255,0.03);
+  backdrop-filter:blur(5px);
+  color:#f4f7fb;
+  font-size:11px;
+  border-radius:14px;
+  overflow:hidden;
+}
+.battle-scoreboard-header,
+.battle-scoreboard-row{
+  display:grid;
+  grid-template-columns:50px minmax(0,1fr) 58px 62px 72px 44px 54px;
+  align-items:center;
+}
+.battle-scoreboard-header{
+  background:linear-gradient(90deg, rgba(0,255,255,0.14), rgba(136,80,255,0.10));
+  font-weight:bold;
+  text-transform:uppercase;
+  letter-spacing:0;
+}
+.battle-scoreboard-header span,
+.battle-scoreboard-row span{
+  min-width:0;
+  padding:6px 6px;
+  text-align:left;
+  border-right:1px solid rgba(255,255,255,0.06);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.battle-scoreboard-header span:last-child,
+.battle-scoreboard-row span:last-child{
+  border-right:none;
+}
+.battle-scoreboard-row.enemy{
+  background:linear-gradient(90deg, rgba(150,36,58,0.52), rgba(88,30,60,0.32));
+}
+.battle-scoreboard-row.player{
+  background:linear-gradient(90deg, rgba(26,88,150,0.54), rgba(24,58,120,0.28));
+}
+.battle-scoreboard-row:hover{ filter:brightness(1.08); }
+.battle-level-cell{ display:flex; align-items:center; gap:6px; }
+.battle-level-icon{ color:#ffd54f; text-shadow:0 0 8px rgba(255,213,79,0.35); font-size:13px; line-height:1; }
+
+
+/* ===== V6 FIXES ===== */
+#create-match-window .big-map-preview{
+  width:100%;
+  height:150px;
+  object-fit:cover;
+  display:block;
+  border:2px solid #00ffff;
+  border-radius:8px;
+  background:#050914;
+}
+#min-level,#max-level,#player-count{
+  width:100%;
+  padding:8px;
+  background:#020712;
+  color:#dff8ff;
+  border:1px solid rgba(0,255,255,0.5);
+  border-radius:8px;
+}
+#hangar-window{
+  position:fixed !important;
+  inset:0 !important;
+  display:flex !important;
+  justify-content:center !important;
+  align-items:center !important;
+}
+#hangar-window.hidden{display:none !important;}
+
+
+/* ===== V8 FIXES ===== */
+#premium-bar{
+  position:fixed;
+  top:14px;
+  left:520px;
+  right:auto;
+  display:flex;
+  gap:14px;
+  align-items:center;
+  padding:8px 12px;
+  border-radius:12px;
+  background:rgba(8,18,35,0.88);
+  box-shadow:0 0 16px rgba(0,180,255,0.18);
+  border:1px solid rgba(120,220,255,0.18);
+  z-index:20000;
+}
+#kill-feed{
+  position:fixed;
+  top:88px;
+  left:18px;
+  width:380px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  z-index:60030;
+  pointer-events:none;
+}
+.kill-feed-item{
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(8,18,35,0.84);
+  border:1px solid rgba(108,219,255,0.18);
+  box-shadow:0 0 12px rgba(0,180,255,0.10);
+  color:#e9f7ff;
+  font-size:13px;
+  line-height:1.3;
+}
+.kill-feed-item.kill{ color:#ffd6d6; }
+.kill-feed-item.chat{ color:#dff8ff; }
+
+#battle-player-hud{ position:fixed; left:18px; bottom:18px; width:320px; padding:14px; border-radius:14px; background:rgba(8,18,35,0.88); border:1px solid rgba(120,220,255,0.2); box-shadow:0 0 16px rgba(0,180,255,0.14); color:#eef8ff; z-index:60015; display:none; }
+#battle-player-hp-wrap, #battle-player-hp-text{ display:none; }
+#battle-player-world-hp{
+  position:fixed;
+  left:50%;
+  bottom:22px;
+  transform:translateX(-50%);
+  width:min(560px, calc(100vw - 280px));
+  height:18px;
+  background:rgba(0,0,0,0.62);
+  border:1px solid rgba(255,255,255,0.28);
+  border-radius:999px;
+  overflow:hidden;
+  z-index:60035;
+  pointer-events:none;
+  box-shadow:0 0 12px rgba(0,0,0,0.24);
+}
+#battle-player-world-hp-fill{ width:100%; height:100%; background:linear-gradient(90deg,#39ff88,#ffe45e,#ff5c5c); }
+#battle-player-world-hp-text{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#ffffff; text-shadow:0 0 6px rgba(0,0,0,0.95); letter-spacing:0.4px; pointer-events:none; }
+#battle-pause-menu{ position:fixed; inset:0; background:rgba(0,0,0,0.42); display:flex; align-items:center; justify-content:center; z-index:60070; pointer-events:auto; }
+#battle-pause-menu.hidden{ display:none !important; }
+.battle-pause-box{ width:min(360px,92vw); display:flex; flex-direction:column; gap:12px; padding:22px; border-radius:18px; background:rgba(8,18,35,0.96); border:1px solid rgba(120,220,255,0.24); box-shadow:0 0 20px rgba(0,180,255,0.16); }
+.battle-pause-title{ text-align:center; font-weight:bold; color:#9fe8ff; font-size:20px; margin-bottom:4px; }
+.battle-pause-box button{ padding:12px 14px; border:none; border-radius:12px; background:rgba(22,46,82,0.95); color:#eef8ff; cursor:pointer; box-shadow:0 0 10px rgba(0,180,255,0.12); }
+.battle-pause-box button:hover{ background:rgba(32,62,104,0.98); }
+.battle-player-title{ font-weight:bold; margin-bottom:10px; color:#9fe8ff; }
+#battle-player-hp-wrap{ position:relative; width:100%; height:12px; background:rgba(255,255,255,0.12); border-radius:999px; overflow:hidden; margin-bottom:8px; }
+#battle-player-hp-fill{ width:100%; height:100%; background:linear-gradient(90deg,#4ed0ff,#79ffb6); }
+#battle-player-hp-inline-text{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#ffffff; text-shadow:0 0 6px rgba(0,0,0,0.95); letter-spacing:0.3px; pointer-events:none; }
+#battle-player-hp-text,
+#battle-ammo-text,
+#battle-damage-text,
+#battle-energy-text,
+#battle-reload-text{ font-size:13px; margin-top:6px; }
+#battle-energy-wrap{ position:relative; width:100%; height:10px; background:rgba(255,255,255,0.1); border-radius:999px; overflow:hidden; margin-top:8px; }
+#battle-energy-fill{ width:100%; height:100%; background:linear-gradient(90deg,#4ecbff,#7affd7,#fff27a); }
+#battle-screen{ pointer-events:none; }
+#battle-chat-box,
+#battle-chat-input{ pointer-events:auto; }
+
+#battle-scoreboard, #battle-chat-box, #battle-chat-input, #battle-pause-menu, #battle-top-actions{ pointer-events:auto; }
+#battle-chat-box{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  width:340px;
+  max-height:220px;
+  z-index:60040;
+  background:linear-gradient(180deg, rgba(7,16,32,0.94), rgba(11,22,42,0.88));
+  border:1px solid rgba(98,223,255,0.28);
+  border-radius:14px;
+  box-shadow:0 0 18px rgba(0,180,255,0.12);
+  overflow:hidden;
+}
+#battle-chat-log{
+  padding:10px 12px;
+  max-height:140px;
+  overflow-y:auto;
+  font-size:13px;
+  color:#dff8ff;
+}
+#battle-chat-input{
+  width:100%;
+  box-sizing:border-box;
+  border:none;
+  outline:none;
+  padding:12px;
+  background:rgba(255,255,255,0.04);
+  color:#fff;
+  border-top:1px solid rgba(255,255,255,0.08);
+}
+#hangar-window{
+  position:fixed !important;
+  inset:0 !important;
+  top:0 !important;
+  left:0 !important;
+  width:100vw !important;
+  height:100vh !important;
+  display:none !important;
+  justify-content:center !important;
+  align-items:center !important;
+  z-index:21000 !important;
+  transform:none !important;
+  background:rgba(0,0,0,0.82) !important;
+}
+#hangar-window:not(.hidden){ display:flex !important; }
+.hangar-content{
+  width:min(760px,92vw);
+  max-height:84vh;
+  overflow:auto;
+  margin:auto;
+  background:linear-gradient(180deg, rgba(8,14,30,0.97), rgba(11,20,40,0.97));
+  border:1px solid rgba(0,255,255,0.34);
+  border-radius:18px;
+  padding:24px;
+  box-shadow:0 0 30px rgba(0,180,255,0.18), inset 0 0 40px rgba(255,255,255,0.04);
+}
+
+
+
+/* ===== V16 STATE FIXES ===== */
+#premium-bar{
+  top:8px !important;
+  right:18px !important;
+  left:auto !important;
+  bottom:auto !important;
+  display:none;
+  z-index:21010 !important;
+}
+body.state-auth #top-nav,
+body.state-auth #resource-bar,
+body.state-auth #ui,
+body.state-auth #premium-bar,
+body.state-auth #inventory-button,
+body.state-auth #orbit-exit{ display:none !important; }
+body.state-lobby #premium-bar{ display:flex !important; }
+body.state-lobby #resource-bar,
+body.state-lobby #ui{ display:none !important; }
+body.state-orbit #premium-bar,
+body.state-orbit #battle-player-hud{ display:none !important; }
+body.state-orbit #resource-bar{
+  left:50% !important;
+  right:auto !important;
+  transform:translateX(-50%) !important;
+  top:15px !important;
+  max-width:calc(100vw - 40px) !important;
+}
+body.state-orbit #ui{
+  display:none !important;
+}
+body.state-battle #resource-bar,
+body.state-battle #ui,
+body.state-battle #inventory-button,
+body.state-observe #resource-bar,
+body.state-observe #ui,
+body.state-observe #inventory-button{ display:none !important; }
+body.state-orbit #inventory-button{
+  left:auto !important;
+  right:20px !important;
+  bottom:20px !important;
+}
+#battle-player-hud{
+  left:18px !important;
+  bottom:18px !important;
+  right:auto !important;
+  top:auto !important;
+}
+body.state-battle #battle-player-world-hp{ display:block; }
+body.state-observe #battle-player-world-hp{ display:none !important; }
+
+
+
+/* ===== AUTH + PREMIUM ACCOUNT PATCH ===== */
+#premium-bar{
+  display:none;
+  position:fixed;
+  top:8px;
+  right:18px;
+  align-items:center;
+  gap:10px;
+  padding:0 34px 0 0;
+  min-height:38px;
+  background:transparent;
+  box-shadow:none;
+  border:none;
+  z-index:20005;
+}
+
+/* ===== V93 RIGHT PANEL + TOP ROW FIX ===== */
+#top-nav{
+  top:8px !important;
+}
+#premium-bar{
+  top:8px !important;
+  right:18px !important;
+  left:auto !important;
+}
+#match-preview{
+  width:240px;
+  min-width:240px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:10px;
+  overflow:hidden;
+  min-height:0;
+}
+
+#premium-account-info,
+#premium-currency-box{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#dff7ff;
+  font-size:13px;
+  white-space:nowrap;
+  padding:5px 12px;
+  min-height:38px;
+  box-sizing:border-box;
+  border-radius:12px;
+  background:rgba(8,18,35,0.88);
+  box-shadow:0 0 16px rgba(0,180,255,0.18);
+  border:1px solid rgba(120,220,255,0.18);
+  line-height:1;
+}
+#premium-currency-box{
+  gap:12px;
+}
+#premium-player-name{
+  color:#9fe8ff;
+  font-weight:bold;
+  max-width:110px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#premium-player-id{
+  opacity:0.8;
+}
+#premium-account-info > span,
+#premium-currency-box > span{
+  display:inline-flex;
+  align-items:center;
+  line-height:1;
+}
+#premium-player-exp,
+#premium-player-level,
+#premium-player-id,
+#premium-player-name,
+#premium-coins,
+#premium-crystals{
+  position:relative;
+  top:0;
+}
+#premium-logout-btn{
+  position:absolute;
+  top:0;
+  right:0;
+  width:28px;
+  height:28px;
+  padding:0;
+  border:1px solid rgba(255,110,110,0.45);
+  border-radius:8px;
+  cursor:pointer;
+  color:#ff7d7d;
+  background:rgba(60,8,8,0.92);
+  box-shadow:0 0 12px rgba(255,70,70,0.25);
+  font-weight:bold;
+}
+#premium-logout-btn:hover{
+  background:rgba(110,12,12,0.96);
+  color:#ffd0d0;
+}
+#settings-window input[type="text"]{
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(130,220,255,0.22);
+  background:#07101f;
+  color:#fff;
+}
+#save-nickname-btn{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(130,220,255,0.25);
+  cursor:pointer;
+  color:#fff;
+  background:#0e1a32;
+}
+
+
+/* ===== REALTIME CHAT PATCH ===== */
+.chat-line{
+  padding:4px 8px;
+  background:rgba(255,255,255,0.05);
+  border-radius:6px;
+  margin-bottom:6px;
+  max-width:100%;
+  word-break:break-word;
+  line-height:1.35;
+}
+.chat-line.system{
+  color:#ffd166;
+  font-style:italic;
+}
+.chat-role-badge{
+  display:inline;
+  margin-right:4px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0;
+  text-transform:lowercase;
+}
+.chat-nick,
+.chat-nick-static{
+  display:inline;
+  padding:0;
+  border:none;
+  background:transparent;
+  color:#ffffff;
+  font-weight:700;
+  font-size:inherit;
+  font-family:inherit;
+  text-decoration:none;
+  cursor:pointer;
+  vertical-align:baseline;
+}
+.chat-nick:hover,
+.chat-nick-static:hover{
+  opacity:0.92;
+}
+.chat-id,
+.chat-time{
+  color:#d6d6d6;
+  font-size:inherit;
+  margin-left:2px;
+  margin-right:2px;
+}
+.chat-text{
+  color:#ffffff;
+  margin-left:4px;
+}
+.chat-line.chat-staff.role-mod,
+.chat-line.chat-staff.role-mod .chat-role-badge,
+.chat-line.chat-staff.role-mod .chat-nick,
+.chat-line.chat-staff.role-mod .chat-nick-static,
+.chat-line.chat-staff.role-mod .chat-id,
+.chat-line.chat-staff.role-mod .chat-time,
+.chat-line.chat-staff.role-mod .chat-text{
+  color:#ff2a2a;
+}
+.chat-line.chat-staff.role-adm,
+.chat-line.chat-staff.role-adm .chat-role-badge,
+.chat-line.chat-staff.role-adm .chat-nick,
+.chat-line.chat-staff.role-adm .chat-nick-static,
+.chat-line.chat-staff.role-adm .chat-id,
+.chat-line.chat-staff.role-adm .chat-time,
+.chat-line.chat-staff.role-adm .chat-text{
+  color:#ff8a1c;
+}
+.chat-line.chat-staff.role-owr,
+.chat-line.chat-staff.role-owr .chat-role-badge,
+.chat-line.chat-staff.role-owr .chat-nick,
+.chat-line.chat-staff.role-owr .chat-nick-static,
+.chat-line.chat-staff.role-owr .chat-id,
+.chat-line.chat-staff.role-owr .chat-time,
+.chat-line.chat-staff.role-owr .chat-text{
+  color:#ffd400;
+}
+.chat-tab.disabled{
+  opacity:0.45;
+}
+
+
+/* === FIX ROLE STYLE V10 === */
+#chat-panel{
+  overflow:hidden !important;
+}
+
+#chat-messages{
+  flex:1;
+  padding:12px;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  font-size:16px !important;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:flex-start;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+  white-space:normal !important;
+}
+
+.chat-line{
+  max-width:100%;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+  line-height:1.45;
+}
+
+.chat-message{
+  max-width:100%;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+.chat-role-badge{
+  display:inline-block;
+  margin-right:6px;
+  font-size:18px !important;
+  font-weight:900 !important;
+  letter-spacing:0;
+  text-transform:lowercase;
+  vertical-align:baseline;
+}
+
+.chat-nick,
+.chat-nick-static{
+  font-size:16px !important;
+  font-weight:700 !important;
+}
+
+.chat-time{
+  font-size:15px !important;
+}
+
+.chat-text{
+  font-size:16px !important;
+}
+
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+/* role darker than nick */
+.chat-line.chat-staff.role-mod .chat-role-badge{
+  color:#c61f1f !important;
+}
+.chat-line.chat-staff.role-adm .chat-role-badge{
+  color:#c96a14 !important;
+}
+.chat-line.chat-staff.role-owr .chat-role-badge{
+  color:#c39a00 !important;
+}
+
+/* nick and text remain brighter */
+.chat-line.chat-staff.role-mod .chat-nick,
+.chat-line.chat-staff.role-mod .chat-nick-static,
+.chat-line.chat-staff.role-mod .chat-time,
+.chat-line.chat-staff.role-mod .chat-text{
+  color:#ff2a2a !important;
+}
+.chat-line.chat-staff.role-adm .chat-nick,
+.chat-line.chat-staff.role-adm .chat-nick-static,
+.chat-line.chat-staff.role-adm .chat-time,
+.chat-line.chat-staff.role-adm .chat-text{
+  color:#ff8a1c !important;
+}
+.chat-line.chat-staff.role-owr .chat-nick,
+.chat-line.chat-staff.role-owr .chat-nick-static,
+.chat-line.chat-staff.role-owr .chat-time,
+.chat-line.chat-staff.role-owr .chat-text{
+  color:#ffd400 !important;
+}
+
+#chat-input-area{
+  overflow:hidden !important;
+}
+
+#chat-input{
+  min-width:0;
+}
+
+
+/* === V11 CHAT FIXES === */
+#chat-panel,
+#chat-tabs,
+#chat-messages,
+#chat-input-area{
+  overflow-x:hidden !important;
+  max-width:100% !important;
+}
+
+#chat-panel *{
+  box-sizing:border-box;
+}
+
+#chat-tabs{
+  flex-wrap:wrap;
+}
+
+#chat-messages{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  overscroll-behavior-x:none;
+}
+
+.chat-line,
+.chat-message{
+  width:100% !important;
+  max-width:100% !important;
+  white-space:normal !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+.chat-role-badge{
+  position:relative;
+  display:inline-block;
+  margin-right:6px;
+  font-size:18px !important;
+  font-weight:900 !important;
+  letter-spacing:0.4px;
+  line-height:1;
+  text-transform:lowercase;
+  -webkit-text-fill-color:transparent;
+  background-size:100% 240%;
+  background-position:0 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,0.55)) drop-shadow(0 0 5px rgba(255,255,255,0.10));
+  animation: roleSweepUp 2.1s linear infinite;
+}
+
+.chat-role-badge::after{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  pointer-events:none;
+  border-radius:4px;
+  opacity:.15;
+  mix-blend-mode:screen;
+  animation: rolePulseGlow 1.8s ease-in-out infinite;
+}
+
+.chat-line.chat-staff.role-mod .chat-role-badge{
+  background-image:linear-gradient(to top,#711111 0%,#b71a1a 22%,#ff8c8c 42%,#b71a1a 58%,#6c1010 100%) !important;
+}
+.chat-line.chat-staff.role-mod .chat-role-badge::after{
+  box-shadow:0 0 10px rgba(255,60,60,.32);
+}
+
+.chat-line.chat-staff.role-adm .chat-role-badge{
+  background-image:linear-gradient(to top,#73420c 0%,#b8660f 22%,#ffd08b 42%,#b8660f 58%,#653708 100%) !important;
+}
+.chat-line.chat-staff.role-adm .chat-role-badge::after{
+  box-shadow:0 0 10px rgba(255,153,51,.28);
+}
+
+.chat-line.chat-staff.role-owr .chat-role-badge{
+  background-image:linear-gradient(to top,#675200 0%,#b58d00 22%,#fff0a6 42%,#b58d00 58%,#5a4700 100%) !important;
+}
+.chat-line.chat-staff.role-owr .chat-role-badge::after{
+  box-shadow:0 0 11px rgba(255,214,64,.28);
+}
+
+@keyframes roleSweepUp{
+  0%{ background-position:0 130%; }
+  100%{ background-position:0 -80%; }
+}
+
+@keyframes rolePulseGlow{
+  0%,100%{ opacity:.10; transform:translateY(0); }
+  50%{ opacity:.24; transform:translateY(-1px); }
+}
+
+
+/* === V12 LOWER CHAT SCROLL FIX === */
+#chat-wrapper,
+#chat-panel,
+#chat-tabs,
+#chat-messages,
+#chat-input-area{
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  box-sizing:border-box !important;
+}
+
+#chat-panel{
+  min-width:0 !important;
+}
+
+#chat-tabs{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  row-gap:2px;
+}
+
+.chat-tab,
+.chat-tab.pm-tab,
+.pm-tab-content,
+.pm-tab-main,
+.pm-tab-label,
+.pm-tab-preview{
+  min-width:0 !important;
+  max-width:100% !important;
+}
+
+#chat-messages{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:hidden !important;
+  white-space:normal !important;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+}
+
+.chat-line,
+.chat-message,
+.chat-text{
+  max-width:100% !important;
+  white-space:normal !important;
+  word-break:break-word !important;
+  overflow-wrap:anywhere !important;
+}
+
+#chat-input{
+  min-width:0 !important;
+}
+
+
+/* === V14 OBSERVE/BATTLE CHAT === */
+#battle-chat-log{
+  max-width:100%;
+  overflow-x:hidden !important;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+#battle-chat-log > div{
+  max-width:100%;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
+
+/* === V15 TOP-LEFT BATTLE ANNOUNCEMENTS === */
+#kill-feed,
+#kill-feed .kill-feed-item{
+  max-width:420px;
+  white-space:normal !important;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
+
+/* === V16 GLOBAL BATTLE ANNOUNCEMENTS === */
+.kill-feed-item.chat-announcement{
+  max-width:420px;
+  white-space:normal !important;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  padding:4px 8px;
+  border-radius:8px;
+  background:rgba(5,10,22,0.72);
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:0 0 10px rgba(0,0,0,0.22);
+}
+
+.kill-feed-item.chat-announcement .chat-role-badge{
+  font-size:15px !important;
+  margin-right:5px;
+}
+
+.kill-feed-item.chat-announcement .chat-nick-static{
+  font-weight:700;
+}
+
+.kill-feed-item.chat-announcement .chat-sep{
+  margin:0 4px;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-mod .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-mod .chat-text{
+  color:#ff2a2a !important;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-adm .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-adm .chat-text{
+  color:#ff8a1c !important;
+}
+
+.kill-feed-item.chat-announcement.chat-staff.role-owr .chat-nick-static,
+.kill-feed-item.chat-announcement.chat-staff.role-owr .chat-text{
+  color:#ffd400 !important;
+}
+
+
+/* === V17 MAP INPUT ONLY MODE === */
+#battle-chat-box.input-only{
+  display:block !important;
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  padding:0 !important;
+}
+
+#battle-chat-box.input-only #battle-chat-log{
+  display:none !important;
+}
+
+#battle-chat-box.input-only #battle-chat-input{
+  width:320px;
+  max-width:45vw;
+}
+
+#battle-chat-box.input-only #battle-chat-input-area,
+#battle-chat-box.input-only .battle-chat-input-area{
+  background:rgba(5,10,22,0.72);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px;
+  padding:6px 8px;
+}
+
+
+/* === V18 SCENE->BATTLE MIRROR === */
+.chat-line.scene-mirrored,
+.chat-line[data-channel="scene"]{
+  max-width:100%;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
+
+/* === V21 CHAT ID VISIBLE === */
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  color:#c9d3df !important;
+  font-size:12px !important;
+  margin:0 6px 0 4px !important;
+}
+.kill-feed-item .chat-id{
+  color:#d6dde8 !important;
+}
+
+
+/* === V22 FORCE CHAT IDS === */
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  color:#c9d3df !important;
+  font-size:12px !important;
+  margin:0 6px 0 4px !important;
+}
+.kill-feed-item .chat-id{
+  color:#d6dde8 !important;
+}
+
+
+.clan-chat-note{
+  margin-top:12px;
+  color:#bfefff;
+  opacity:0.88;
+  font-size:13px;
+}
+
+/* === V23 BATTLE COMPOSER HIDE === */
+#chat-input-area.chat-composer-hidden{
+  display:none !important;
+}
+
+.chat-id{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+
+/* === V24 MAP ROLE BADGE VISIBILITY === */
+.kill-feed-item.chat-announcement .chat-role-badge{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  margin-right:6px !important;
+  font-size:16px !important;
+  font-weight:900 !important;
+}
+
+
+/* === V25 VISIBLE ROLE IN MAP ANNOUNCEMENTS === */
+.scene-role-badge{
+  display:inline-block !important;
+  font-weight:900 !important;
+  font-size:16px !important;
+  margin-right:6px !important;
+  letter-spacing:0.2px;
+  color:inherit;
+  -webkit-text-fill-color:currentColor !important;
+  background:none !important;
+  -webkit-background-clip:border-box !important;
+  background-clip:border-box !important;
+  text-shadow:0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(255,255,255,0.08);
+}
+
+.kill-feed-item.chat-announcement .scene-role-badge.role-mod{
+  color:#ff2a2a !important;
+}
+.kill-feed-item.chat-announcement .scene-role-badge.role-adm{
+  color:#ff8a1c !important;
+}
+.kill-feed-item.chat-announcement .scene-role-badge.role-owr{
+  color:#ffd400 !important;
+}
+
+
+
+/* === V78 BATTLE HISTORY SEARCH CENTER WINDOW + SCROLL FIX === */
+#chat-tabs{
+  position:relative;
+}
+#battle-history-search-wrap{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding-right:8px;
+}
+#battle-history-search-wrap.hidden{
+  display:none !important;
+}
+.battle-history-search-bar{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+#battle-history-player-id{
+  width:88px;
+  height:30px;
+  padding:4px 8px;
+  border-radius:7px;
+  border:1px solid rgba(120,220,255,0.22);
+  background:#07101f;
+  color:#fff;
+  font-size:13px;
+}
+#battle-history-search-btn,
+#battle-history-search-close{
+  width:32px;
+  height:30px;
+  padding:0;
+  border-radius:7px;
+  border:1px solid rgba(120,220,255,0.22);
+  background:#0e1a32;
+  color:#fff;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:16px;
+}
+#battle-history-search-btn:disabled{
+  opacity:0.6;
+  cursor:default;
+}
+#battle-history-search-modal{
+  position:absolute;
+  inset:0;
+  z-index:25050;
+}
+#battle-history-search-modal.hidden{
+  display:none !important;
+}
+.battle-history-search-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.58);
+}
+.battle-history-search-window{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:min(780px,82vw);
+  max-height:68vh;
+  background:linear-gradient(180deg, rgba(7,16,32,0.97), rgba(10,22,44,0.96));
+  border:1px solid rgba(0,255,200,0.32);
+  border-radius:16px;
+  box-shadow:0 0 30px rgba(0,180,255,0.22);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.battle-history-search-panel-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  flex-wrap:wrap;
+}
+#battle-history-search-caption{
+  color:#dff8ff;
+  font-size:16px;
+  font-weight:700;
+}
+.battle-history-search-panel-tools{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-left:auto;
+}
+#battle-history-date-filter,
+#battle-history-keyword-filter{
+  height:32px;
+  padding:4px 10px;
+  border-radius:8px;
+  border:1px solid rgba(120,220,255,0.22);
+  background:#07101f;
+  color:#fff;
+  font-size:13px;
+}
+#battle-history-date-filter{
+  width:180px;
+}
+#battle-history-keyword-filter{
+  width:150px;
+}
+.battle-history-search-results{
+  overflow-y:auto;
+  max-height:calc(68vh - 84px);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:14px 16px 16px;
+}
+.battle-history-line{
+  padding:8px 10px;
+  border-radius:10px;
+  background:rgba(255,255,255,0.04);
+}
+@media (max-width: 980px){
+  .battle-history-search-panel-tools{
+    width:100%;
+    margin-left:0;
+  }
+  #battle-history-date-filter,
+  #battle-history-keyword-filter{
+    flex:1 1 180px;
+    width:auto;
+  }
+}
+
+
+
+
+/* ===== V84 COSMIC SHOP PANEL ===== */
+#shop-screen{
+  display:none;
+  flex:1;
+  min-height:0;
+  margin:0;
+  position:relative;
+  z-index:1;
+  border-top:1px solid rgba(118,214,255,0.14);
+  background:
+    radial-gradient(circle at 20% 18%, rgba(64,120,255,0.14), transparent 24%),
+    radial-gradient(circle at 82% 24%, rgba(150,90,255,0.10), transparent 26%),
+    radial-gradient(circle at 50% 80%, rgba(40,220,255,0.06), transparent 30%),
+    linear-gradient(180deg, rgba(5,9,20,0.98) 0%, rgba(7,12,28,0.98) 100%);
+  overflow:hidden;
+}
+#shop-screen::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background-image:
+    radial-gradient(circle, rgba(255,255,255,0.74) 0 1px, transparent 1.2px),
+    radial-gradient(circle, rgba(120,220,255,0.45) 0 1px, transparent 1.2px),
+    radial-gradient(circle, rgba(180,120,255,0.30) 0 1px, transparent 1.2px);
+  background-size:180px 180px, 240px 240px, 320px 320px;
+  background-position:20px 30px, 80px 120px, 140px 60px;
+  opacity:0.26;
+}
+#shop-screen.active{ display:block; }
+
+.shop-shell{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns: 205px 1fr;
+  height:100%;
+  gap:10px;
+  padding:10px;
+  box-sizing:border-box;
+}
+.shop-sidebar{
+  min-width:0;
+  background:linear-gradient(180deg, rgba(9,18,42,0.92), rgba(7,13,30,0.94));
+  border:1px solid rgba(98,223,255,0.18);
+  border-radius:12px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  box-shadow:0 0 16px rgba(0,140,255,0.10), inset 0 0 10px rgba(255,255,255,0.02);
+}
+.shop-side-header{
+  padding:12px 12px 10px;
+  border-bottom:1px solid rgba(98,223,255,0.12);
+  background:linear-gradient(180deg, rgba(12,26,60,0.86), rgba(8,18,42,0.82));
+}
+.shop-side-title{
+  font-size:15px;
+  font-weight:900;
+  color:#a8ecff;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+.shop-side-subtitle{
+  display:none;
+}
+.shop-main-switch{
+  display:flex !important;
+  gap:8px;
+  padding:0 12px 10px;
+}
+.shop-switch-btn{
+  flex:1;
+  border:none;
+  cursor:pointer;
+  text-align:center;
+  color:#dfeeff;
+  background:linear-gradient(180deg, rgba(14,26,58,0.92), rgba(9,16,38,0.96));
+  border:1px solid rgba(108,188,255,0.10);
+  border-radius:10px;
+  padding:9px 10px;
+  font-size:12px;
+  font-weight:800;
+  transition:0.18s ease;
+}
+.shop-switch-btn:hover{
+  background:linear-gradient(180deg, rgba(16,34,74,0.96), rgba(10,20,46,0.98));
+  border-color:rgba(112,236,255,0.22);
+}
+.shop-switch-btn.active{
+  background:linear-gradient(180deg, rgba(20,64,130,0.98), rgba(13,30,76,0.98));
+  color:#f4fbff;
+  border-color:rgba(128,240,255,0.38);
+  box-shadow:0 0 14px rgba(0,170,255,0.14), inset 0 0 0 1px rgba(132,255,247,0.24);
+}
+#shop-screen.shop-ships-only #shop-module-type-label,
+#shop-screen.shop-ships-only #shop-module-type-tabs{
+  display:none !important;
+}
+#shop-screen.shop-modules-only #shop-type-label,
+#shop-screen.shop-modules-only #shop-type-tabs{
+  display:none !important;
+}
+#shop-ships-label,
+#shop-ships-list,
+#shop-modules-label,
+#shop-modules-list{
+  display:none !important;
+}
+.shop-sidebar-scroll{
+  flex:1;
+  overflow:auto;
+  padding:8px 0 10px;
+}
+.shop-section-label{
+  padding:0 12px 8px;
+  font-size:10px;
+  font-weight:800;
+  color:#cde6ff;
+  text-transform:uppercase;
+  letter-spacing:0.7px;
+  opacity:0.92;
+}
+.shop-type-tabs,
+.shop-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:0 8px;
+}
+
+.shop-module-tabs{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:0 8px;
+  margin-top:2px;
+}
+.shop-section-label.modules{
+  margin-top:8px;
+}
+.shop-type-tab,
+.shop-item-btn{
+  width:100%;
+  border:none;
+  cursor:pointer;
+  text-align:left;
+  color:#dfeeff;
+  background:linear-gradient(180deg, rgba(14,26,58,0.92), rgba(9,16,38,0.96));
+  border:1px solid rgba(108,188,255,0.10);
+  border-radius:10px;
+  padding:10px 11px;
+  transition:0.18s ease;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+.shop-type-tab:hover,
+.shop-item-btn:hover{
+  background:linear-gradient(180deg, rgba(16,34,74,0.96), rgba(10,20,46,0.98));
+  border-color:rgba(112,236,255,0.22);
+}
+.shop-type-tab.active,
+.shop-item-btn.active{
+  background:linear-gradient(180deg, rgba(20,64,130,0.98), rgba(13,30,76,0.98));
+  color:#f4fbff;
+  border-color:rgba(128,240,255,0.38);
+  box-shadow:0 0 14px rgba(0,170,255,0.14), inset 2px 0 0 rgba(132,255,247,0.94);
+}
+.shop-type-name,
+.shop-item-name{
+  display:block;
+  font-size:12px;
+  font-weight:900;
+}
+.shop-type-sub,
+.shop-item-sub{
+  display:block;
+  font-size:10px;
+  margin-top:3px;
+  opacity:0.8;
+}
+.shop-item-tier{
+  display:inline-flex;
+  margin-top:5px;
+  padding:2px 7px;
+  font-size:9px;
+  font-weight:700;
+  border-radius:999px;
+  border:1px solid rgba(167,230,255,0.16);
+  background:rgba(255,255,255,0.05);
+}
+.shop-content{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:linear-gradient(180deg, rgba(6,14,34,0.90), rgba(5,10,24,0.94));
+  border:1px solid rgba(98,223,255,0.16);
+  border-radius:12px;
+  box-shadow:0 0 18px rgba(0,120,255,0.10), inset 0 0 16px rgba(255,255,255,0.02);
+}
+shop-main-head{
+  padding:8px 12px;
+  border-bottom:1px solid rgba(98,223,255,0.12);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(98,223,255,0.12), transparent 24%),
+    linear-gradient(180deg, rgba(10,24,56,0.94), rgba(8,18,40,0.90));
+}
+.shop-main-title{
+  font-size:17px;
+  font-weight:900;
+  color:#bff6ff;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+}
+.shop-main-subtitle{
+  display:none;
+}
+.shop-catalog{
+  flex:1;
+  overflow:auto;
+  overflow-x:hidden;
+  padding:8px 10px 10px;
+}
+.shop-row{
+  display:grid;
+  grid-template-columns: 54px 112px minmax(210px, 1fr) minmax(120px, 150px) minmax(120px, 150px) 118px;
+  gap:8px 10px;
+  align-items:center;
+  padding:10px 10px 11px;
+  margin-bottom:8px;
+  border:1px solid rgba(110,190,255,0.10);
+  border-radius:11px;
+  background:linear-gradient(180deg, rgba(10,22,50,0.88), rgba(7,16,38,0.94));
+}
+.shop-row:hover{ background:linear-gradient(180deg, rgba(12,28,62,0.94), rgba(8,18,42,0.98)); }
+.shop-row.selected{
+  border-color:rgba(132,245,255,0.28);
+  box-shadow:0 0 14px rgba(0,170,255,0.08), inset 0 0 0 1px rgba(130,245,255,0.08);
+}
+.shop-row-level{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  font-weight:900;
+  color:#dff4ff;
+  justify-content:center;
+}
+.shop-row-cross{
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  border:1px solid rgba(148,233,255,0.78);
+  position:relative;
+  flex:0 0 auto;
+  box-shadow:0 0 7px rgba(0,170,255,0.12);
+}
+.shop-row-cross::before,
+.shop-row-cross::after{ content:""; position:absolute; background:rgba(148,233,255,0.92); }
+.shop-row-cross::before{ width:2px; height:10px; left:50%; top:50%; transform:translate(-50%,-50%); }
+.shop-row-cross::after{ width:10px; height:2px; left:50%; top:50%; transform:translate(-50%,-50%); }
+.shop-row-preview{
+  position:relative;
+  height:88px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.shop-row-pedestal{ position:absolute; left:50%; bottom:5px; width:84px; height:18px; transform:translateX(-50%); border-radius:50%; background:radial-gradient(circle, rgba(100,200,255,0.24) 0%, rgba(34,76,150,0.18) 42%, rgba(8,18,44,0.06) 72%, rgba(0,0,0,0) 75%); }
+.shop-row-orbit{ position:relative; width:106px; height:80px; display:flex; align-items:center; justify-content:center; transform-origin:center; }
+.shop-row.ship .shop-row-orbit{ animation:shopOrbitSpin 18s linear infinite; }
+.shop-row.module .shop-row-orbit{ animation:shopFloatSpin 7s ease-in-out infinite; }
+.shop-model-svg{ width:106px; height:80px; filter:drop-shadow(0 0 6px rgba(130,240,255,0.18)); }
+.shop-hull-main{ filter:drop-shadow(0 0 8px rgba(170,235,255,0.22)); }
+.shop-neon-line, .shop-neon-dot, .shop-weapon-glow{ animation:shopNeonPulse 1.85s ease-in-out infinite; }
+.shop-engine-flame{ animation:shopEnginePulse 0.42s ease-in-out infinite alternate; transform-origin:center; }
+.shop-engine-flame-alt{ animation:shopEnginePulse 0.34s ease-in-out infinite alternate-reverse; transform-origin:center; }
+.shop-row-info{
+  min-width:0;
+}
+.shop-row-name{ font-size:15px; font-weight:900; color:#f2fbff; line-height:1.1; }
+.shop-row-subtitle{ margin-top:2px; font-size:10px; color:#a8d9ff; }
+.shop-row-desc{ margin-top:5px; font-size:10px; line-height:1.25; color:#dceaff; opacity:0.90; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.shop-price-line{ display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; font-weight:800; color:#ffe496; flex-wrap:wrap; }
+.shop-price-chip{ display:inline-flex; align-items:center; gap:5px; padding:3px 7px; border-radius:8px; background:rgba(0,0,0,0.36); border:1px solid rgba(255,212,124,0.14); min-width:70px; justify-content:center; }
+.shop-coin{ font-size:13px; }
+.shop-stats-col{ align-self:stretch; display:flex; flex-direction:column; justify-content:center; gap:2px; min-width:0; }
+.shop-col-title{ font-size:10px; font-weight:900; color:#dff7ff; margin-bottom:3px; }
+.shop-stat{ font-size:10px; color:#d5e6ff; line-height:1.2; }
+.shop-stat strong{ color:#f7fdff; }
+.shop-buy-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:center;
+  gap:6px;
+}
+.shop-type-badge{ padding:3px 8px; font-size:9px; font-weight:900; color:#f4fcff; background:rgba(0,0,0,0.26); border:1px solid rgba(167,230,255,0.12); border-radius:999px; text-align:center; }
+.shop-buy-btn{ border:none; cursor:pointer; min-width:0; width:100%; padding:8px 10px; font-size:14px; font-weight:900; color:#f5fbff; border-radius:9px; background:linear-gradient(180deg, rgba(28,86,170,0.96), rgba(12,38,96,0.98)); box-shadow:0 0 10px rgba(0,170,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.08); }
+.shop-buy-btn:hover{ background:linear-gradient(180deg, rgba(36,102,198,0.96), rgba(15,48,118,0.98)); }
+.shop-buy-note{ font-size:9px; color:#b8dfff; opacity:0.78; text-align:center; line-height:1.2; }
+.shop-empty{ padding:16px; color:#e0f4ff; }
+@keyframes shopOrbitSpin{ 0%{ transform:rotateY(0deg); } 100%{ transform:rotateY(360deg); } }
+@keyframes shopFloatSpin{ 0%{ transform:translateY(0px) rotate(-4deg); } 50%{ transform:translateY(-5px) rotate(4deg); } 100%{ transform:translateY(0px) rotate(-4deg); } }
+@keyframes shopNeonPulse{ 0%,100%{ opacity:0.78; filter:drop-shadow(0 0 4px rgba(130,240,255,0.22)); } 50%{ opacity:1; filter:drop-shadow(0 0 11px rgba(130,240,255,0.40)); } }
+@keyframes shopEnginePulse{ 0%{ transform:scaleY(0.9); opacity:0.74; } 100%{ transform:scaleY(1.08); opacity:1; } }
+
+
+
+
+/* ===== FIXED OVERLAY CSS ===== */
+.match-list::-webkit-scrollbar,
+#map-players::-webkit-scrollbar{
+  width:8px;
+}
+.match-list::-webkit-scrollbar-track,
+#map-players::-webkit-scrollbar-track{
+  background:rgba(255,255,255,0.05);
+  border-radius:10px;
+}
+.match-list::-webkit-scrollbar-thumb,
+#map-players::-webkit-scrollbar-thumb{
+  background:linear-gradient(#00ffcc,#0088ff);
+  border-radius:10px;
+}
+.match-list::-webkit-scrollbar-thumb:hover,
+#map-players::-webkit-scrollbar-thumb:hover{
+  background:linear-gradient(#00ffff,#00aaff);
+}
+#map-mini-preview{
+  position:relative !important;
+  width:100%;
+  height:100%;
+  min-height:0;
+  background:#111;
+  border:2px solid #00ffff;
+  border-radius:24px;
+  display:block;
+  overflow:hidden;
+  margin:0;
+  box-sizing:border-box;
+  flex:1 1 auto;
+}
+#planet-preview{
+  position:absolute;
+  inset:0;
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  filter:brightness(0.98) saturate(1.04);
+}
+#map-player-overlay{
+  position:absolute;
+  top:10px;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  z-index:3;
+  pointer-events:none;
+  position:absolute;
+  inset:8px;
+  display:grid;
+  grid-template-columns:1fr;
+  grid-template-rows:repeat(8, minmax(0, 1fr));
+  gap:4px;
+  z-index:3;
+  pointer-events:none;
+}
+.map-player-chip{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:0;
+  border:none;
+  background:none;
+  color:#ffffff;
+  font-size:11px;
+  font-weight:700;
+  text-shadow:
+    0 0 4px rgba(0,0,0,1),
+    0 0 8px rgba(0,0,0,1);
+  pointer-events:auto;
+  cursor:pointer;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:4px;
+  padding:1px 6px;
+  border-radius:8px;
+  background:rgba(2,8,20,0.48);
+  border:1px solid rgba(140,240,255,0.18);
+  color:#ffffff;
+  font-size:10px;
+  font-weight:800;
+  line-height:1;
+  letter-spacing:0.1px;
+  text-shadow:0 1px 2px rgba(0,0,0,0.98), 0 0 6px rgba(0,0,0,0.98);
+  box-shadow:0 0 10px rgba(0,0,0,0.22);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  cursor:pointer;
+  pointer-events:auto;
+  user-select:none;
+  transition:transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.map-player-chip:hover{
+  background:rgba(0,180,255,0.28);
+  border-color:rgba(120,250,255,0.56);
+  transform:scale(1.01);
+}
+.map-player-chip.empty{
+  opacity:0.12;
+  cursor:default;
+}
+.map-player-chip.empty:hover{
+  transform:none;
+  background:rgba(2,8,20,0.48);
+  border-color:rgba(140,240,255,0.18);
+}
+.map-player-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.map-player-owner{
+  color:#ffd85a;
+  flex:0 0 auto;
+  text-shadow:0 0 6px rgba(0,0,0,0.98);
+}
+#map-players{
+  display:none !important;
+}
+
+
+/* ===== ADVANCED HANGAR ===== */
+#hangar-window{
+  position:fixed;
+  inset:0;
+  z-index:23000;
+  background:rgba(2,6,16,0.88);
+  backdrop-filter:blur(7px);
+}
+#hangar-window.hidden{ display:none !important; }
+
+.hangar-shell{
+  position:absolute;
+  inset:24px;
+  border-radius:28px;
+  border:1px solid rgba(120,220,255,0.22);
+  background:
+    radial-gradient(circle at 18% 20%, rgba(80,190,255,0.10), transparent 24%),
+    radial-gradient(circle at 82% 24%, rgba(160,120,255,0.10), transparent 26%),
+    linear-gradient(180deg, rgba(7,14,28,0.98) 0%, rgba(5,10,22,0.98) 100%);
+  box-shadow:0 0 44px rgba(0,180,255,0.18), inset 0 0 50px rgba(255,255,255,0.03);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.hangar-close-btn{
+  position:absolute;
+  top:18px;
+  right:18px;
+  width:42px;
+  height:42px;
+  border:none;
+  border-radius:50%;
+  cursor:pointer;
+  color:#dff8ff;
+  background:rgba(255,255,255,0.08);
+  box-shadow:0 0 14px rgba(0,180,255,0.16);
+  z-index:3;
+}
+
+.hangar-topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  padding:28px 32px 12px;
+}
+.hangar-kicker{
+  font-size:12px;
+  letter-spacing:0.24em;
+  color:#6dcfff;
+  opacity:0.84;
+}
+.hangar-title-wrap h2{
+  margin:8px 0 6px;
+  font-size:34px;
+  color:#ecfbff;
+}
+.hangar-subtitle{
+  color:#a8c7d8;
+  font-size:14px;
+  max-width:760px;
+}
+.hangar-resource-line{
+  display:none;
+}
+.hangar-res-chip,.hangar-price-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:8px 12px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.06);
+  color:#ecfbff;
+  border:1px solid rgba(255,255,255,0.08);
+}
+
+.hangar-layout{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:300px 1fr;
+  gap:24px;
+  padding:12px 28px 28px;
+}
+
+.hangar-module-side{
+  border-radius:24px;
+  border:1px solid rgba(110,220,255,0.14);
+  background:rgba(8,16,30,0.82);
+  box-shadow:inset 0 0 30px rgba(0,180,255,0.05);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  padding:24px 18px;
+  min-height:0;
+}
+.hangar-side-title{
+  font-size:20px;
+  color:#ebfbff;
+  margin-bottom:18px;
+}
+.hangar-module-view{
+  flex:1;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:18px;
+  min-height:0;
+}
+.hangar-module-preview{
+  width:100%;
+  flex:1;
+  min-height:220px;
+  border-radius:20px;
+  background:
+    radial-gradient(circle at center, rgba(80,190,255,0.12), transparent 44%),
+    linear-gradient(180deg, rgba(5,12,24,0.8), rgba(3,8,18,0.96));
+  border:1px solid rgba(120,220,255,0.14);
+  overflow:hidden;
+}
+.hangar-module-meta{
+  width:100%;
+  text-align:center;
+}
+.hangar-module-name{
+  font-size:20px;
+  color:#e9fbff;
+  margin-bottom:6px;
+}
+.hangar-module-tier{
+  color:#88dfff;
+  font-size:13px;
+  margin-bottom:6px;
+}
+.hangar-module-type{
+  color:#ffd778;
+  font-size:13px;
+  margin-bottom:8px;
+}
+.hangar-module-desc{
+  color:#a8c7d8;
+  font-size:13px;
+  line-height:1.5;
+}
+.hangar-module-action{
+  width:100%;
+  margin-top:14px;
+  padding:12px 14px;
+  border:none;
+  border-radius:16px;
+  cursor:pointer;
+  color:#f2fcff;
+  font-weight:700;
+  background:linear-gradient(180deg, #1c5e92, #103252);
+  box-shadow:0 0 18px rgba(0,170,255,0.16);
+}
+.hangar-module-action.equipped{
+  background:linear-gradient(180deg, #2a7846, #174429);
+}
+.hangar-module-action.locked{
+  background:linear-gradient(180deg, #6a4f24, #3f2d12);
+  cursor:not-allowed;
+  opacity:0.7;
+}
+.hangar-arrow{
+  border:none;
+  cursor:pointer;
+  color:#eafcff;
+  background:linear-gradient(180deg, rgba(20,42,70,0.95), rgba(9,20,36,0.98));
+  border:1px solid rgba(124,220,255,0.24);
+  box-shadow:0 0 18px rgba(0,170,255,0.12);
+  transition:transform .18s ease, opacity .18s ease, box-shadow .18s ease;
+}
+.hangar-arrow:hover:not(:disabled){ transform:translateY(-1px) scale(1.02); }
+.hangar-arrow:disabled{
+  opacity:0.34;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+.hangar-arrow.vertical{
+  width:64px;
+  height:44px;
+  border-radius:16px;
+  margin:10px 0;
+  font-size:18px;
+}
+.hangar-arrow.horizontal{
+  width:64px;
+  min-width:64px;
+  height:260px;
+  border-radius:22px;
+  align-self:center;
+  font-size:24px;
+}
+
+.hangar-stage-wrap{
+  min-width:0;
+  display:grid;
+  grid-template-columns:64px 1fr 64px;
+  gap:18px;
+  align-items:center;
+}
+.hangar-stage{
+  position:relative;
+  min-height:0;
+  height:100%;
+  border-radius:28px;
+  border:1px solid rgba(120,220,255,0.16);
+  background:
+    radial-gradient(circle at center, rgba(52,122,255,0.10), transparent 38%),
+    radial-gradient(circle at 50% 78%, rgba(0,215,255,0.08), transparent 24%),
+    linear-gradient(180deg, rgba(9,18,36,0.95), rgba(3,8,18,0.98));
+  overflow:hidden;
+}
+.hangar-3d-stage{
+  position:absolute;
+  inset:0;
+}
+.hangar-stage-overlay{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:26px 28px;
+}
+.hangar-ship-card{
+  max-width:420px;
+  padding:16px 18px;
+  border-radius:22px;
+  background:rgba(8,16,30,0.62);
+  border:1px solid rgba(120,220,255,0.14);
+  backdrop-filter:blur(4px);
+}
+.hangar-ship-tier{
+  color:#73d2ff;
+  font-size:12px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.hangar-ship-name{
+  font-size:32px;
+  color:#effcff;
+  margin-top:4px;
+}
+.hangar-ship-subtitle{
+  color:#b5d0dc;
+  margin-top:4px;
+}
+.hangar-ship-desc{
+  color:#9cb9ca;
+  line-height:1.55;
+  margin-top:10px;
+  font-size:14px;
+}
+.hangar-ship-price-row{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+}
+.hangar-stats-grid{
+  margin-top:auto;
+  width:min(520px, 100%);
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  pointer-events:auto;
+}
+.hangar-stat-box{
+  padding:12px 14px;
+  border-radius:18px;
+  background:rgba(8,16,30,0.62);
+  border:1px solid rgba(120,220,255,0.12);
+}
+.hangar-stat-label{
+  color:#7fcbff;
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:.12em;
+}
+.hangar-stat-value{
+  color:#f1fcff;
+  font-size:18px;
+  margin-top:6px;
+}
+.hangar-footer-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  pointer-events:auto;
+}
+.hangar-position-label{
+  color:#d7f6ff;
+  font-size:14px;
+  padding:10px 14px;
+  border-radius:999px;
+  background:rgba(8,16,30,0.58);
+  border:1px solid rgba(120,220,255,0.12);
+}
+.hangar-main-btn{
+  min-width:170px;
+  padding:14px 18px;
+  border:none;
+  border-radius:18px;
+  cursor:pointer;
+  color:#f2fcff;
+  font-weight:700;
+  background:linear-gradient(180deg, #1c5e92, #103252);
+  box-shadow:0 0 20px rgba(0,170,255,0.18);
+}
+.hangar-main-btn.equipped{
+  background:linear-gradient(180deg, #2a7846, #174429);
+}
+.hangar-main-btn.locked{
+  background:linear-gradient(180deg, #6a4f24, #3f2d12);
+}
+
+@media (max-width: 1180px){
+  .hangar-layout{ grid-template-columns:1fr; }
+  .hangar-stage-wrap{ grid-template-columns:52px 1fr 52px; }
+  .hangar-arrow.horizontal{ height:64px; }
+}
+
+
+/* ===== V66 HARD FIX ===== */
+#hangar-window .hangar-stage{
+  height:720px !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  justify-content:flex-start !important;
+}
+
+#hangar-window .hangar-stats-grid{
+  margin-top:20px !important;
+}
+
+#hangar-window .hangar-footer-row{
+  position:absolute !important;
+  bottom:20px !important;
+  left:50%;
+  transform:translateX(-50%);
+}
+
+
+/* ===== V67 HANGAR STABLE FIX ===== */
+#hangar-window .hangar-module-side{
+  position:relative;
+  padding-top:86px;
+  padding-bottom:86px;
+}
+
+#hangar-window .hangar-module-view{
+  width:100%;
+  height:100%;
+  justify-content:center;
+}
+
+#hangar-window #hangar-module-up,
+#hangar-window #hangar-module-down{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:8;
+  margin:0 !important;
+}
+
+#hangar-window #hangar-module-up{
+  top:24px;
+}
+
+#hangar-window #hangar-module-down{
+  bottom:24px;
+}
+
+#hangar-window .hangar-stage-wrap{
+  align-items:stretch;
+}
+
+#hangar-window .hangar-stage{
+  height:auto !important;
+  min-height:640px !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  display:grid !important;
+  grid-template-rows:auto auto 1fr auto;
+  align-content:start;
+  justify-content:stretch;
+  padding:26px 28px 22px !important;
+}
+
+#hangar-window .hangar-ship-card{
+  align-self:start;
+  max-width:540px;
+}
+
+#hangar-window .hangar-stats-grid{
+  margin-top:22px !important;
+  width:min(560px, 100%);
+  align-self:start;
+}
+
+#hangar-window .hangar-footer-row{
+  position:static !important;
+  transform:none !important;
+  left:auto !important;
+  bottom:auto !important;
+  width:min(560px, 100%);
+  align-self:start;
+  margin-top:18px;
+}
+
+
+/* ===== V69 HANGAR FINAL BALANCE ===== */
+#hangar-window .hangar-stage{
+  min-height: 660px !important;
+  height: 660px !important;
+}
+
+#hangar-window .hangar-3d-stage{
+  position:absolute !important;
+  inset:0 !important;
+  z-index:1 !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  position:absolute !important;
+  inset:0 !important;
+  z-index:3 !important;
+  pointer-events:none !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:space-between !important;
+  padding:26px 28px !important;
+}
+
+#hangar-window .hangar-ship-card,
+#hangar-window .hangar-stats-grid,
+#hangar-window .hangar-footer-row{
+  position:relative;
+  z-index:4;
+  pointer-events:auto !important;
+  width:min(520px, 100%) !important;
+}
+
+#hangar-window .hangar-footer-row{
+  position:relative !important;
+  left:auto !important;
+  bottom:auto !important;
+  transform:none !important;
+  margin-top:14px !important;
+}
+
+#hangar-window .hangar-stats-grid{
+  margin-top:auto !important;
+  margin-bottom:0 !important;
+}
+
+#hangar-window .hangar-module-side{
+  position:relative !important;
+  padding-top:78px !important;
+  padding-bottom:78px !important;
+}
+
+#hangar-window #hangar-module-up,
+#hangar-window #hangar-module-down{
+  position:absolute !important;
+  left:50% !important;
+  transform:translateX(-50%) !important;
+  z-index:7 !important;
+}
+
+#hangar-window #hangar-module-up{ top:28px !important; }
+#hangar-window #hangar-module-down{ bottom:28px !important; }
+
+
+/* ===== V72 HANGAR REAL FIX ===== */
+#hangar-window .hangar-layout{
+  grid-template-columns:300px minmax(0,1fr) !important;
+  gap:18px !important;
+}
+
+#hangar-window .hangar-module-side{
+  width:300px !important;
+  min-width:300px !important;
+  max-width:300px !important;
+  padding:24px 16px 24px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+#hangar-window .hangar-module-side .hangar-card,
+#hangar-window .hangar-module-side .hangar-main-btn,
+#hangar-window .hangar-module-view{
+  width:100% !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+}
+
+#hangar-window .hangar-module-side *,
+#hangar-window .hangar-module-side .hangar-card *,
+#hangar-window .hangar-module-side p,
+#hangar-window .hangar-module-side h3{
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+#hangar-window .hangar-stage-wrap{
+  grid-template-columns:64px minmax(0,1fr) 64px !important;
+  gap:16px !important;
+}
+
+#hangar-window .hangar-stage{
+  position:relative !important;
+  min-height:640px !important;
+  height:640px !important;
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-3d-stage{
+  position:absolute !important;
+  inset:0 !important;
+  z-index:1 !important;
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  position:absolute !important;
+  left:0 !important;
+  top:0 !important;
+  bottom:0 !important;
+  width:min(430px, calc(100% - 260px)) !important;
+  max-width:430px !important;
+  z-index:3 !important;
+  pointer-events:none !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:flex-start !important;
+  align-items:stretch !important;
+  padding:24px 20px 20px !important;
+  box-sizing:border-box !important;
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-ship-card,
+#hangar-window .hangar-stats-grid,
+#hangar-window .hangar-footer-row{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+  pointer-events:auto !important;
+}
+
+#hangar-window .hangar-ship-card{
+  padding:14px 16px !important;
+}
+
+#hangar-window .hangar-ship-name{
+  font-size:28px !important;
+  line-height:1.05 !important;
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+#hangar-window .hangar-ship-subtitle,
+#hangar-window .hangar-ship-desc{
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+#hangar-window .hangar-stats-grid{
+  margin-top:18px !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:10px !important;
+}
+
+#hangar-window .hangar-footer-row{
+  margin-top:12px !important;
+}
+
+#hangar-window .hangar-main-btn{
+  min-width:0 !important;
+  width:auto !important;
+  max-width:220px !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  z-index:8 !important;
+}
+
+
+/* ===== V73 HANGAR SPLIT LAYOUT ===== */
+#hangar-window .hangar-layout{
+  grid-template-columns:300px minmax(0,1fr) !important;
+  gap:20px !important;
+}
+
+#hangar-window .hangar-module-side{
+  width:300px !important;
+  min-width:300px !important;
+  max-width:300px !important;
+  display:grid !important;
+  grid-template-rows:42px 52px minmax(0,1fr) 52px !important;
+  align-items:stretch !important;
+  padding:18px 16px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+#hangar-window .hangar-side-title{
+  margin:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  text-align:center !important;
+}
+
+#hangar-window #hangar-module-up,
+#hangar-window #hangar-module-down{
+  position:static !important;
+  left:auto !important;
+  bottom:auto !important;
+  top:auto !important;
+  transform:none !important;
+  margin:0 auto !important;
+  z-index:10 !important;
+}
+
+#hangar-window .hangar-module-view{
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-module-preview{
+  min-height:180px !important;
+}
+
+#hangar-window .hangar-module-meta,
+#hangar-window .hangar-module-meta *{
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+  text-align:center !important;
+}
+
+#hangar-window .hangar-stage-wrap{
+  grid-template-columns:64px minmax(0,1fr) 64px !important;
+  gap:16px !important;
+  align-items:stretch !important;
+}
+
+#hangar-window .hangar-stage{
+  position:relative !important;
+  min-height:620px !important;
+  height:620px !important;
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  position:absolute !important;
+  left:0 !important;
+  top:0 !important;
+  bottom:0 !important;
+  width:420px !important;
+  max-width:420px !important;
+  inset:auto !important;
+  z-index:4 !important;
+  padding:20px 18px 18px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:flex-start !important;
+  align-items:stretch !important;
+  pointer-events:none !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+#hangar-window .hangar-3d-stage{
+  position:absolute !important;
+  top:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  left:430px !important;
+  width:auto !important;
+  z-index:1 !important;
+  overflow:hidden !important;
+}
+
+#hangar-window .hangar-ship-card,
+#hangar-window .hangar-stats-grid,
+#hangar-window .hangar-footer-row{
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  pointer-events:auto !important;
+  box-sizing:border-box !important;
+}
+
+#hangar-window .hangar-ship-name{
+  font-size:26px !important;
+  line-height:1.05 !important;
+}
+
+#hangar-window .hangar-ship-desc,
+#hangar-window .hangar-ship-subtitle,
+#hangar-window .hangar-ship-card *{
+  overflow-wrap:anywhere !important;
+  word-break:break-word !important;
+}
+
+#hangar-window .hangar-stats-grid{
+  margin-top:16px !important;
+  gap:10px !important;
+}
+
+#hangar-window .hangar-footer-row{
+  margin-top:12px !important;
+}
+
+#hangar-window .hangar-main-btn{
+  min-width:0 !important;
+  max-width:200px !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  z-index:8 !important;
+}
+
+
+/* ===== V74 HANGAR BEAUTIFUL FIX ===== */
+.hangar-topbar{
+  padding:16px 26px 6px !important;
+  min-height:auto !important;
+}
+
+.hangar-kicker{
+  font-size:11px !important;
+  letter-spacing:0.22em !important;
+}
+
+.hangar-title-wrap h2{
+  margin:4px 0 2px !important;
+  font-size:28px !important;
+  line-height:1.05 !important;
+}
+
+.hangar-subtitle{
+  font-size:12px !important;
+  max-width:520px !important;
+  opacity:0.88 !important;
+}
+
+.hangar-layout{
+  padding:8px 22px 22px !important;
+  align-items:start !important;
+}
+
+#hangar-window .hangar-module-side{
+  padding:14px 16px 16px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:flex-start !important;
+  align-items:center !important;
+}
+
+#hangar-window .hangar-side-title{
+  margin:0 0 8px !important;
+  font-size:18px !important;
+}
+
+#hangar-window .hangar-module-view{
+  justify-content:flex-start !important;
+  gap:12px !important;
+  padding-top:4px !important;
+}
+
+#hangar-window .hangar-module-preview{
+  min-height:0 !important;
+  height:210px !important;
+  flex:0 0 auto !important;
+}
+
+#hangar-window .hangar-module-meta{
+  margin-top:2px !important;
+}
+
+#hangar-window .hangar-module-name{
+  font-size:18px !important;
+  margin-bottom:4px !important;
+}
+
+#hangar-window .hangar-module-tier,
+#hangar-window .hangar-module-type,
+#hangar-window .hangar-module-desc{
+  font-size:12px !important;
+}
+
+#hangar-window .hangar-module-action{
+  margin-top:10px !important;
+}
+
+#hangar-window .hangar-stage{
+  min-height:590px !important;
+  height:590px !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  padding:16px 18px 18px !important;
+}
+
+#hangar-window .hangar-ship-card{
+  padding:14px 16px !important;
+}
+
+#hangar-window .hangar-ship-tier{
+  font-size:11px !important;
+}
+
+#hangar-window .hangar-ship-name{
+  font-size:26px !important;
+  margin-top:2px !important;
+}
+
+#hangar-window .hangar-ship-subtitle{
+  font-size:12px !important;
+  margin-top:2px !important;
+}
+
+#hangar-window .hangar-ship-desc{
+  font-size:12px !important;
+  line-height:1.45 !important;
+  margin-top:10px !important;
+}
+
+#hangar-window .hangar-ship-price-row{
+  display:none !important;
+}
+
+#hangar-window .hangar-stats-grid{
+  margin-top:14px !important;
+  gap:10px !important;
+}
+
+#hangar-window .hangar-stat-box{
+  padding:10px 12px !important;
+}
+
+#hangar-window .hangar-stat-label{
+  font-size:11px !important;
+}
+
+#hangar-window .hangar-stat-value{
+  font-size:18px !important;
+}
+
+#hangar-window .hangar-footer-row{
+  margin-top:12px !important;
+}
+
+#hangar-window .hangar-main-btn{
+  min-width:180px !important;
+  max-width:180px !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  height:220px !important;
+}
+
+#hangar-window #hangar-3d-stage{
+  top:-12px !important;
+}
+
+
+/* ===== V75 HANGAR FAST PREVIEW ===== */
+#hangar-window #hangar-3d-stage{
+  background:
+    radial-gradient(circle at 62% 34%, rgba(120,210,255,0.07), transparent 22%),
+    radial-gradient(circle at 58% 82%, rgba(70,130,255,0.06), transparent 26%);
+}
+
+#hangar-window #hangar-3d-stage::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(90deg, transparent 0%, rgba(120,220,255,0.05) 50%, transparent 100%);
+  opacity:0.55;
+}
+
+
+/* ===== V76 HANGAR REQUESTED FIX ===== */
+.hangar-topbar{
+  padding: 8px 22px 0 !important;
+  margin: 0 !important;
+  min-height: auto !important;
+}
+
+.hangar-topbar .hangar-subtitle{
+  margin-top: 2px !important;
+  margin-bottom: 0 !important;
+  max-width: 430px !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+}
+
+.hangar-topbar .hangar-title-wrap h2{
+  margin: 2px 0 2px !important;
+  font-size: 26px !important;
+  line-height: 1 !important;
+}
+
+.hangar-layout{
+  padding-top: 2px !important;
+  margin-top: 0 !important;
+  align-items: start !important;
+}
+
+#hangar-window .hangar-module-side{
+  padding-top: 6px !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+}
+
+#hangar-window .hangar-side-title{
+  margin-top: 0 !important;
+  margin-bottom: 6px !important;
+}
+
+#hangar-window .hangar-module-view{
+  padding-top: 0 !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+}
+
+#hangar-window .hangar-module-preview{
+  height: 170px !important;
+}
+
+#hangar-window .hangar-module-action{
+  margin-top: 6px !important;
+}
+
+#hangar-window .hangar-stage{
+  min-height: 560px !important;
+  height: 560px !important;
+}
+
+#hangar-window #hangar-3d-stage{
+  top: -48px !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  padding-top: 8px !important;
+}
+
+#hangar-window .hangar-ship-price-row{
+  display: none !important;
+}
+
+
+/* ===== V77 HANGAR CLASSES + LAYOUT ===== */
+.hangar-close-btn{
+  left:50% !important;
+  right:auto !important;
+  top:10px !important;
+  transform:translateX(-50%) !important;
+  width:54px !important;
+  height:54px !important;
+  font-size:22px !important;
+  border-radius:18px !important;
+  background:rgba(120,40,40,0.28) !important;
+  border:1px solid rgba(255,120,120,0.30) !important;
+  box-shadow:0 0 16px rgba(255,80,80,0.16) !important;
+}
+
+.hangar-topbar{
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:space-between !important;
+  gap:18px !important;
+  padding:22px 22px 0 !important;
+  padding-top:22px !important;
+}
+
+.hangar-title-wrap{
+  max-width:420px !important;
+}
+
+.hangar-class-filter{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  max-width:760px !important;
+  margin-left:auto !important;
+  padding-top:2px !important;
+}
+
+.hangar-class-chip{
+  border:none !important;
+  cursor:pointer !important;
+  padding:10px 14px !important;
+  border-radius:999px !important;
+  color:#dff8ff !important;
+  background:rgba(255,255,255,0.06) !important;
+  border:1px solid rgba(120,220,255,0.18) !important;
+  box-shadow:0 0 10px rgba(0,170,255,0.08) !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+}
+
+.hangar-class-chip.active{
+  background:linear-gradient(180deg, rgba(34,113,160,0.95), rgba(15,49,86,0.98)) !important;
+  color:#ffffff !important;
+  box-shadow:0 0 18px rgba(0,170,255,0.18) !important;
+}
+
+.hangar-layout{
+  padding-top:10px !important;
+}
+
+#hangar-window .hangar-stage{
+  min-height:590px !important;
+  height:590px !important;
+}
+
+#hangar-window #hangar-3d-stage{
+  top:-60px !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  padding-top:14px !important;
+}
+
+
+/* ===== V78 HANGAR FINAL UI + PLATFORM FIX ===== */
+.hangar-close-btn{
+  top:14px !important;
+  z-index:60 !important;
+}
+
+.hangar-topbar{
+  position:relative !important;
+  z-index:40 !important;
+  padding:18px 22px 6px !important;
+  gap:22px !important;
+}
+
+.hangar-class-filter{
+  position:relative !important;
+  z-index:55 !important;
+  pointer-events:auto !important;
+  padding:4px !important;
+  border-radius:18px !important;
+  background:rgba(8,20,40,0.62) !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:0 0 18px rgba(0,140,255,0.10) !important;
+  backdrop-filter:blur(8px) !important;
+}
+
+.hangar-class-chip{
+  position:relative !important;
+  z-index:56 !important;
+  pointer-events:auto !important;
+  user-select:none !important;
+  min-height:46px !important;
+  padding:11px 16px !important;
+  transition:
+    transform .18s ease,
+    background .24s ease,
+    box-shadow .24s ease,
+    border-color .24s ease,
+    color .24s ease !important;
+}
+
+.hangar-class-chip:hover{
+  transform:translateY(-1px) scale(1.02) !important;
+  background:rgba(55,110,170,0.42) !important;
+  border-color:rgba(140,230,255,0.34) !important;
+  box-shadow:0 0 16px rgba(0,170,255,0.16) !important;
+}
+
+.hangar-class-chip:active{
+  transform:translateY(0) scale(0.985) !important;
+}
+
+.hangar-class-chip.active{
+  background:linear-gradient(180deg, rgba(49,130,190,0.96), rgba(21,70,118,0.98)) !important;
+  box-shadow:
+    0 0 20px rgba(0,170,255,0.18),
+    inset 0 0 10px rgba(255,255,255,0.06) !important;
+}
+
+.hangar-layout{
+  padding-top:8px !important;
+}
+
+#hangar-window .hangar-stage{
+  min-height:590px !important;
+  height:590px !important;
+}
+
+#hangar-window #hangar-3d-stage{
+  top:-20px !important;
+  z-index:10 !important;
+  pointer-events:none !important;
+}
+
+#hangar-window .hangar-stage-overlay{
+  z-index:20 !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  z-index:45 !important;
+}
+
+#hangar-window .hangar-arrow.horizontal button,
+#hangar-window .hangar-arrow.horizontal,
+#hangar-window .hangar-arrow{
+  pointer-events:auto !important;
+}
+
+#hangar-window .hangar-stage::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  bottom:36px;
+  width:310px;
+  height:64px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(110,220,255,0.16) 0%, rgba(110,220,255,0.06) 42%, rgba(110,220,255,0) 72%);
+  filter:blur(10px);
+  pointer-events:none;
+  z-index:2;
+}
+
+
+/* ===== V79 CLICK FIX ===== */
+.hangar-class-filter{
+  pointer-events:auto !important;
+  z-index:100 !important;
+}
+.hangar-class-chip{
+  pointer-events:auto !important;
+  z-index:101 !important;
+  cursor:pointer !important;
+}
+#hangar-3d-stage{
+  pointer-events:none !important;
+}
+
+
+/* ===== V81 HANGAR REAL FIX ===== */
+#hangar-window .hangar-stage.empty-class::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 66% 56%, rgba(83,216,255,0.07), transparent 16%),
+    radial-gradient(circle at 66% 56%, rgba(83,216,255,0.035), transparent 28%);
+  z-index:1;
+}
+
+
+/* ===== V82 HANGAR UX POLISH ===== */
+#hangar-window .hangar-stage{
+  cursor:grab !important;
+}
+
+#hangar-window .hangar-stage.dragging{
+  cursor:grabbing !important;
+}
+
+#hangar-window .hangar-main-btn{
+  min-width:180px !important;
+  max-width:180px !important;
+  background:linear-gradient(180deg, #2d9e55, #196c37) !important;
+  box-shadow:0 0 22px rgba(72,255,142,0.18) !important;
+  transition:transform .18s ease, box-shadow .22s ease, filter .22s ease, background .22s ease !important;
+}
+
+#hangar-window .hangar-main-btn.ready:hover{
+  transform:translateY(-1px) scale(1.02) !important;
+  box-shadow:0 0 28px rgba(72,255,142,0.28) !important;
+}
+
+#hangar-window .hangar-main-btn.equipped{
+  background:linear-gradient(180deg, #708493, #4d5d69) !important;
+  box-shadow:0 0 18px rgba(190,220,255,0.12) !important;
+}
+
+#hangar-window .hangar-main-btn.locked{
+  background:linear-gradient(180deg, #6a4f24, #3f2d12) !important;
+  box-shadow:none !important;
+}
+
+#hangar-window .hangar-arrow.horizontal{
+  transition:transform .18s ease, box-shadow .22s ease, opacity .22s ease !important;
+}
+
+#hangar-window .hangar-arrow.horizontal:hover:not(:disabled){
+  transform:translateY(-50%) scale(1.05) !important;
+  box-shadow:0 0 22px rgba(90,210,255,0.24) !important;
+}
+
+#hangar-window .hangar-arrow:disabled{
+  opacity:0.42 !important;
+  filter:saturate(0.7) !important;
+}
+
+#hangar-window .hangar-stage.ship-loading .hangar-ship-card,
+#hangar-window .hangar-stage.ship-loading #hangar-ship-stats,
+#hangar-window .hangar-stage.ship-loading .hangar-footer-row{
+  opacity:0.72;
+}
+
+#hangar-window .hangar-stage.ship-loading::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:3;
+  background:
+    linear-gradient(110deg, rgba(255,255,255,0) 36%, rgba(125,220,255,0.12) 50%, rgba(255,255,255,0) 64%);
+  transform:translateX(-100%);
+  animation:hangarStageSweep 1.2s linear infinite;
+}
+
+@keyframes hangarStageSweep{
+  from{ transform:translateX(-100%); }
+  to{ transform:translateX(100%); }
+}
+
+#hangar-window .hangar-stage.empty-class .hangar-ship-card{
+  border-color:rgba(120,220,255,0.15) !important;
+  background:linear-gradient(180deg, rgba(7,18,34,0.9), rgba(5,11,22,0.84)) !important;
+}
+
+#hangar-window .hangar-stage.empty-class .hangar-ship-name{
+  color:#eaf9ff !important;
+}
+
+#hangar-window .hangar-stage.empty-class .hangar-ship-subtitle{
+  color:#bcecff !important;
+}
+
+
+.battle-floating-reward{
+  position:fixed;
+  transform:translate(-50%, 0) scale(0.92);
+  display:flex;
+  gap:10px;
+  align-items:center;
+  pointer-events:none;
+  z-index:60000;
+  opacity:0;
+  transition:transform 0.55s ease, opacity 0.55s ease;
+}
+.battle-floating-reward.show{
+  opacity:1;
+  transform:translate(-50%, -10px) scale(1);
+}
+.battle-floating-reward.fade{
+  opacity:0;
+  transform:translate(-50%, -44px) scale(1.04);
+}
+.battle-floating-reward .reward-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:46px;
+  height:30px;
+  padding:0 10px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:0.04em;
+  box-shadow:0 0 16px rgba(0,0,0,0.28);
+  border:1px solid rgba(255,255,255,0.18);
+}
+.battle-floating-reward .reward-chip.exp{
+  color:#b9f7ff;
+  background:linear-gradient(180deg, rgba(28,90,170,0.95), rgba(9,39,90,0.95));
+  text-shadow:0 0 10px rgba(111,241,255,0.45);
+}
+.battle-floating-reward .reward-chip.coin{
+  color:#fff3b0;
+  background:linear-gradient(180deg, rgba(150,106,18,0.96), rgba(93,57,8,0.96));
+  text-shadow:0 0 10px rgba(255,214,90,0.5);
+}
+
+
+.hangar-filter-stack{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.hangar-module-filter{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  justify-content:flex-end;
+}
+.hangar-module-chip{
+  cursor:pointer;
+  border:none;
+  border-radius:999px;
+  padding:8px 14px;
+  background:rgba(255,255,255,0.07);
+  color:#ccefff;
+  box-shadow:inset 0 0 0 1px rgba(126,247,255,0.18);
+}
+.hangar-module-chip.active{
+  background:linear-gradient(180deg, rgba(40,86,126,0.95), rgba(17,42,74,0.95));
+  color:#fff;
+  box-shadow:0 0 18px rgba(95,223,255,0.28), inset 0 0 0 1px rgba(126,247,255,0.42);
+}
+.hangar-module-actions,
+.hangar-footer-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+.hangar-module-sell,
+.hangar-sell-btn{
+  background:linear-gradient(180deg, rgba(98,48,42,0.95), rgba(58,20,18,0.95)) !important;
+}
+
+
+
+/* ===== V125 HANGAR CLEAN LAYOUT ===== */
+#hangar-window .hangar-shell{
+  padding-top: 6px !important;
+}
+#hangar-window .hangar-topbar{
+  align-items:center !important;
+  padding:18px 24px 10px !important;
+}
+#hangar-window .hangar-title-wrap{
+  max-width:none !important;
+}
+#hangar-window .hangar-subtitle,
+#hangar-window .hangar-filter-stack{
+  display:none !important;
+}
+#hangar-window .hangar-class-filter{
+  margin-left:auto !important;
+  max-width:none !important;
+}
+#hangar-window .hangar-layout{
+  display:grid !important;
+  grid-template-columns: 320px minmax(0,1fr) !important;
+  gap:22px !important;
+  padding: 8px 24px 24px !important;
+  align-items:stretch !important;
+}
+#hangar-window .hangar-module-side{
+  width:320px !important;
+  min-width:320px !important;
+  max-width:320px !important;
+  min-height:620px !important;
+  height:620px !important;
+  border-radius:28px !important;
+  padding:18px 18px 16px !important;
+  justify-content:flex-start !important;
+}
+#hangar-window .hangar-side-title{
+  width:100% !important;
+  text-align:center !important;
+  margin:4px 0 12px !important;
+}
+#hangar-window .hangar-module-view{
+  width:100% !important;
+  gap:14px !important;
+}
+#hangar-window .hangar-module-preview{
+  width:100% !important;
+  height:198px !important;
+  border-radius:24px !important;
+}
+#hangar-window .hangar-module-meta{
+  width:100% !important;
+  text-align:center !important;
+}
+#hangar-window .hangar-module-desc{
+  min-height:54px !important;
+}
+#hangar-window .hangar-stage-wrap{
+  min-width:0 !important;
+  grid-template-columns:72px minmax(0,1fr) 72px !important;
+  gap:18px !important;
+}
+#hangar-window .hangar-stage{
+  position:relative !important;
+  min-height:620px !important;
+  height:620px !important;
+  border-radius:30px !important;
+  overflow:hidden !important;
+}
+#hangar-window .hangar-stage-toolbar{
+  position:absolute !important;
+  top:18px !important;
+  right:18px !important;
+  z-index:60 !important;
+  display:flex !important;
+  justify-content:flex-end !important;
+  pointer-events:auto !important;
+}
+#hangar-window .hangar-module-filter{
+  display:flex !important;
+  gap:10px !important;
+  flex-wrap:wrap !important;
+  justify-content:flex-end !important;
+  padding:6px !important;
+  border-radius:20px !important;
+  background:rgba(8,20,40,0.58) !important;
+  border:1px solid rgba(120,220,255,0.16) !important;
+  box-shadow:0 0 22px rgba(0,140,255,0.10) !important;
+  backdrop-filter:blur(10px) !important;
+}
+#hangar-window .hangar-module-chip{
+  min-height:44px !important;
+  padding:10px 16px !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+}
+#hangar-window #hangar-3d-stage{
+  top:10px !important;
+  left:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  width:100% !important;
+  height:100% !important;
+}
+#hangar-window .hangar-stage-overlay{
+  display:grid !important;
+  grid-template-columns:minmax(320px, 420px) 1fr !important;
+  grid-template-rows:auto 1fr auto !important;
+  gap:14px 18px !important;
+  align-items:start !important;
+  padding:20px 20px 20px !important;
+}
+#hangar-window .hangar-ship-card{
+  grid-column:1 !important;
+  grid-row:1 !important;
+  max-width:420px !important;
+  background:rgba(7,16,36,0.84) !important;
+}
+#hangar-window .hangar-ship-subtitle,
+#hangar-window .hangar-ship-desc{
+  display:none !important;
+}
+#hangar-window .hangar-stats-grid{
+  grid-column:1 !important;
+  grid-row:2 !important;
+  max-width:420px !important;
+  margin-top:0 !important;
+}
+#hangar-window .hangar-footer-row{
+  grid-column:1 !important;
+  grid-row:3 !important;
+  max-width:420px !important;
+  margin-top:0 !important;
+}
+#hangar-window .hangar-arrow.horizontal{
+  height:240px !important;
+  align-self:center !important;
+}
+@media (max-width: 1480px){
+  #hangar-window .hangar-layout{
+    grid-template-columns:300px minmax(0,1fr) !important;
+  }
+  #hangar-window .hangar-module-side{
+    width:300px !important;
+    min-width:300px !important;
+    max-width:300px !important;
+  }
+  #hangar-window .hangar-stage-overlay{
+    grid-template-columns:minmax(300px, 390px) 1fr !important;
+  }
+}
+@media (max-width: 1180px){
+  #hangar-window .hangar-layout{
+    grid-template-columns:1fr !important;
+  }
+  #hangar-window .hangar-module-side{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:auto !important;
+    min-height:0 !important;
+  }
+}
+
+
+/* ===== HANGAR V126 OVERRIDES ===== */
+#hangar-window .hangar-topbar{padding:22px 28px 10px;}
+#hangar-window .hangar-title-wrap h2{margin:6px 0 0;font-size:28px;}
+#hangar-window .hangar-layout{
+  flex:1; min-height:0; display:grid;
+  grid-template-columns:340px minmax(0,1fr);
+  gap:26px; padding:10px 24px 24px;
+}
+#hangar-window .hangar-module-side{
+  padding:18px 16px; border-radius:26px;
+  display:flex; flex-direction:column; gap:14px; min-height:0;
+}
+#hangar-window .hangar-side-title{margin:0; font-size:18px;}
+#hangar-window .hangar-module-filter{
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; width:100%;
+}
+#hangar-window .hangar-module-chip{
+  min-height:52px; border-radius:18px; border:1px solid rgba(120,220,255,0.22);
+  background:rgba(255,255,255,0.05); color:#dff5ff; font-weight:700; cursor:pointer;
+}
+#hangar-window .hangar-module-chip.active{
+  background:linear-gradient(180deg, rgba(78,176,255,0.28), rgba(41,92,160,0.32));
+  box-shadow:0 0 18px rgba(88,189,255,0.22);
+}
+#hangar-window .hangar-module-list{
+  flex:1; min-height:220px; overflow-y:auto; padding-right:6px;
+  display:flex; flex-direction:column; gap:10px;
+}
+#hangar-window .hangar-module-list::-webkit-scrollbar{width:8px;}
+#hangar-window .hangar-module-list::-webkit-scrollbar-thumb{
+  background:linear-gradient(#00cfff,#3c79ff); border-radius:10px;
+}
+#hangar-window .hangar-module-list-item{
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+  padding:12px 14px; border-radius:16px; cursor:pointer;
+  border:1px solid rgba(120,220,255,0.12);
+  background:rgba(9,18,34,0.84); transition:0.18s ease;
+}
+#hangar-window .hangar-module-list-item:hover{
+  transform:translateY(-1px); border-color:rgba(120,220,255,0.28);
+}
+#hangar-window .hangar-module-list-item.active{
+  background:linear-gradient(180deg, rgba(24,65,112,0.92), rgba(11,27,55,0.95));
+  border-color:rgba(110,220,255,0.38); box-shadow:0 0 18px rgba(0,180,255,0.14);
+}
+#hangar-window .hangar-module-list-item.equipped{
+  box-shadow:inset 0 0 0 1px rgba(255,207,86,0.35);
+}
+#hangar-window .hangar-module-list-name{font-size:16px; color:#f4fbff; font-weight:700;}
+#hangar-window .hangar-module-list-sub{font-size:12px; color:#9ec7df;}
+#hangar-window .hangar-module-meta{
+  border-top:1px solid rgba(255,255,255,0.08); padding-top:12px;
+  display:flex; flex-direction:column; gap:8px;
+}
+#hangar-window .hangar-module-name{font-size:22px; font-weight:800; color:#ecfbff;}
+#hangar-window .hangar-module-type{font-size:13px; color:#75cbff;}
+#hangar-window .hangar-module-tier{display:none !important;}
+#hangar-window .hangar-module-desc{font-size:13px; color:#a8c7d8; line-height:1.35; min-height:34px;}
+#hangar-window .hangar-module-actions{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+#hangar-window .hangar-module-action{min-height:46px;}
+#hangar-window #hangar-module-up,
+#hangar-window #hangar-module-down,
+#hangar-window #hangar-module-preview,
+#hangar-window .hangar-stage-toolbar,
+#hangar-window #hangar-ship-tier,
+#hangar-window #hangar-ship-desc,
+#hangar-window .hangar-ship-price-row{display:none !important;}
+
+#hangar-window .hangar-stage-wrap{
+  min-width:0; display:grid;
+  grid-template-columns:360px 58px minmax(0,1fr) 58px;
+  gap:16px; align-items:stretch;
+}
+#hangar-window .hangar-info-panel{
+  min-width:0; border-radius:24px; padding:12px 0 0;
+  display:flex; flex-direction:column; gap:14px;
+}
+#hangar-window .hangar-ship-card.compact{
+  padding:18px 20px; border-radius:22px;
+  background:rgba(7,16,31,0.9); border:1px solid rgba(120,220,255,0.14);
+}
+#hangar-window .hangar-ship-name{font-size:28px; line-height:1.05;}
+#hangar-window .hangar-ship-subtitle{font-size:13px; color:#8fbfe0; min-height:0; margin-top:6px;}
+#hangar-window .hangar-stats-grid.compact{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+}
+#hangar-window .hangar-stat-box{
+  min-height:72px; padding:12px 14px; border-radius:18px;
+  background:rgba(6,15,29,0.88); border:1px solid rgba(120,220,255,0.12);
+}
+#hangar-window .hangar-stat-label{font-size:12px; letter-spacing:0.08em;}
+#hangar-window .hangar-stat-value{font-size:18px; line-height:1.15; word-break:break-word;}
+#hangar-window .hangar-footer-row{
+  margin-top:auto; display:flex; flex-direction:column; align-items:flex-start; gap:12px;
+}
+#hangar-window .hangar-footer-actions{display:grid; grid-template-columns:1fr; gap:10px; width:100%;}
+#hangar-window .hangar-main-btn{min-height:48px;}
+#hangar-window .hangar-stage{
+  min-width:0; border-radius:26px; overflow:hidden;
+  border:1px solid rgba(120,220,255,0.14); background:rgba(8,16,30,0.78);
+}
+#hangar-window .hangar-3d-stage{width:100%; height:100%;}
+#hangar-window .hangar-stage-overlay{pointer-events:none;}
+#hangar-window .hangar-stage-name-badge{
+  position:absolute; top:16px; right:16px; padding:14px 22px; border-radius:20px;
+  background:linear-gradient(180deg, rgba(42,126,208,0.92), rgba(21,73,130,0.94));
+  border:1px solid rgba(132,220,255,0.28); color:#eefaff; font-weight:800; font-size:20px;
+  box-shadow:0 0 20px rgba(40,145,255,0.18);
+}
+#hangar-window .hangar-arrow.horizontal{
+  align-self:center; width:58px; height:240px; border-radius:26px;
+}
+@media (max-width: 1400px){
+  #hangar-window .hangar-stage-wrap{grid-template-columns:320px 54px minmax(0,1fr) 54px;}
+}
+
+
+
+/* ===== V127 HANGAR LAYOUT STABLE FIX ===== */
+#hangar-window .hangar-shell{
+  display:flex !important;
+  flex-direction:column !important;
+  min-height:0 !important;
+}
+#hangar-window .hangar-topbar{
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:space-between !important;
+  gap:20px !important;
+  padding:22px 28px 12px !important;
+}
+#hangar-window .hangar-title-wrap{
+  flex:0 0 auto !important;
+  min-width:240px !important;
+}
+#hangar-window .hangar-class-filter{
+  margin-left:auto !important;
+  flex:0 0 auto !important;
+}
+#hangar-window .hangar-layout{
+  display:grid !important;
+  grid-template-columns:360px minmax(860px,1fr) !important;
+  gap:24px !important;
+  align-items:stretch !important;
+  min-height:0 !important;
+  padding:8px 28px 26px !important;
+}
+#hangar-window .hangar-module-side{
+  width:360px !important;
+  min-width:360px !important;
+  max-width:360px !important;
+  min-height:620px !important;
+  height:620px !important;
+  padding:20px 18px 18px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:14px !important;
+  overflow:hidden !important;
+}
+#hangar-window .hangar-side-title{
+  font-size:18px !important;
+  text-align:center !important;
+  margin:0 0 6px !important;
+}
+#hangar-window .hangar-module-filter{
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:10px !important;
+  width:100% !important;
+}
+#hangar-window .hangar-module-chip{
+  min-width:0 !important;
+  min-height:52px !important;
+  padding:10px 12px !important;
+  font-size:14px !important;
+}
+#hangar-window .hangar-module-list{
+  flex:1 1 auto !important;
+  min-height:220px !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+}
+#hangar-window .hangar-module-meta{
+  margin-top:auto !important;
+  padding-top:12px !important;
+}
+#hangar-window .hangar-stage-wrap{
+  display:grid !important;
+  grid-template-columns:340px 58px minmax(0,1fr) 58px !important;
+  gap:16px !important;
+  align-items:stretch !important;
+  min-width:0 !important;
+}
+#hangar-window .hangar-info-panel{
+  width:340px !important;
+  min-width:340px !important;
+  max-width:340px !important;
+  min-height:620px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:12px !important;
+  padding:10px 0 0 !important;
+}
+#hangar-window .hangar-ship-card.compact,
+#hangar-window .hangar-stats-grid.compact,
+#hangar-window .hangar-footer-row{
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+}
+#hangar-window .hangar-ship-card.compact{
+  padding:18px 18px !important;
+}
+#hangar-window .hangar-ship-name{
+  display:block !important;
+  width:100% !important;
+  font-size:30px !important;
+  line-height:1.02 !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:anywhere !important;
+}
+#hangar-window .hangar-ship-subtitle{
+  font-size:13px !important;
+  line-height:1.35 !important;
+}
+#hangar-window .hangar-stats-grid.compact{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:10px !important;
+}
+#hangar-window .hangar-stat-box{
+  min-width:0 !important;
+  min-height:72px !important;
+  padding:12px 14px !important;
+}
+#hangar-window .hangar-stat-label{
+  font-size:12px !important;
+  line-height:1.1 !important;
+}
+#hangar-window .hangar-stat-value{
+  font-size:18px !important;
+  line-height:1.15 !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:anywhere !important;
+}
+#hangar-window .hangar-footer-row{
+  margin-top:auto !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:flex-start !important;
+  gap:12px !important;
+}
+#hangar-window .hangar-footer-actions{
+  width:100% !important;
+  display:grid !important;
+  grid-template-columns:1fr !important;
+}
+#hangar-window .hangar-stage{
+  min-width:0 !important;
+  width:100% !important;
+  min-height:620px !important;
+  height:620px !important;
+  position:relative !important;
+  overflow:hidden !important;
+}
+#hangar-window #hangar-3d-stage{
+  position:absolute !important;
+  inset:0 !important;
+  top:0 !important;
+  width:100% !important;
+  height:100% !important;
+}
+#hangar-window .hangar-stage-overlay{
+  position:absolute !important;
+  inset:0 !important;
+  padding:0 !important;
+  pointer-events:none !important;
+}
+#hangar-window .hangar-stage-name-badge{
+  position:absolute !important;
+  top:16px !important;
+  right:16px !important;
+  font-size:16px !important;
+  padding:12px 18px !important;
+}
+#hangar-window .hangar-arrow.horizontal{
+  align-self:center !important;
+  width:58px !important;
+  height:240px !important;
+}
+@media (max-width: 1500px){
+  #hangar-window .hangar-layout{
+    grid-template-columns:340px minmax(0,1fr) !important;
+  }
+  #hangar-window .hangar-stage-wrap{
+    grid-template-columns:320px 54px minmax(0,1fr) 54px !important;
+  }
+  #hangar-window .hangar-info-panel{
+    width:320px !important;
+    min-width:320px !important;
+    max-width:320px !important;
+  }
+}
+@media (max-width: 1280px){
+  #hangar-window .hangar-layout{
+    grid-template-columns:1fr !important;
+  }
+  #hangar-window .hangar-module-side{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+    height:auto !important;
+    min-height:0 !important;
+  }
+  #hangar-window .hangar-stage-wrap{
+    grid-template-columns:280px 52px minmax(0,1fr) 52px !important;
+  }
+  #hangar-window .hangar-info-panel{
+    width:280px !important;
+    min-width:280px !important;
+    max-width:280px !important;
+  }
+}
+
+
+
+/* ===== HANGAR V128 RESET / ROOM LAYOUT ===== */
+#hangar-window{
+  background:radial-gradient(circle at 50% 18%, rgba(36,78,128,0.16), transparent 34%), rgba(2,6,14,0.96) !important;
+}
+#hangar-window .hangar-shell-v128{
+  width:min(1660px, 96vw) !important;
+  height:min(900px, 92vh) !important;
+  padding:18px 18px 20px !important;
+  border-radius:34px !important;
+  background:linear-gradient(180deg, rgba(6,14,28,0.95), rgba(3,8,18,0.98)) !important;
+  border:1px solid rgba(120,220,255,0.16) !important;
+  box-shadow:0 0 42px rgba(0,170,255,0.12), inset 0 0 40px rgba(255,255,255,0.02) !important;
+}
+#hangar-window .hangar-topbar{
+  padding:4px 8px 14px !important;
+}
+#hangar-window .hangar-layout-v128{
+  display:grid !important;
+  grid-template-columns:300px minmax(0,1fr) 280px !important;
+  gap:18px !important;
+  align-items:stretch !important;
+  padding:0 !important;
+  min-height:0 !important;
+  height:calc(100% - 76px) !important;
+}
+#hangar-window .hangar-wall-panel{
+  position:relative !important;
+  min-height:0 !important;
+  height:100% !important;
+  padding:18px 16px !important;
+  border-radius:28px !important;
+  background:
+    linear-gradient(180deg, rgba(15,28,48,0.96), rgba(8,15,28,0.98)) !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:inset 0 0 26px rgba(0,140,255,0.08), 0 0 24px rgba(0,0,0,0.24) !important;
+  overflow:hidden !important;
+}
+#hangar-window .hangar-wall-panel::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg, rgba(255,255,255,0.04), transparent 16%, transparent 84%, rgba(255,255,255,0.04));
+  pointer-events:none;
+}
+#hangar-window .hangar-left-wall,
+#hangar-window .hangar-right-wall{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:14px !important;
+}
+#hangar-window .hangar-room-wrap-v128{
+  min-width:0 !important;
+  min-height:0 !important;
+  display:grid !important;
+  grid-template-columns:56px minmax(0,1fr) 56px !important;
+  align-items:center !important;
+  gap:12px !important;
+}
+#hangar-window .hangar-room-frame{
+  min-width:0 !important;
+  min-height:0 !important;
+  height:100% !important;
+  perspective:1800px !important;
+  display:flex !important;
+}
+#hangar-window .hangar-room-shell{
+  position:relative !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:650px !important;
+  border-radius:34px !important;
+  overflow:hidden !important;
+  transform-style:preserve-3d !important;
+  transform:rotateY(0deg) rotateX(0deg) !important;
+  transition:box-shadow 0.25s ease, border-color 0.25s ease !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:0 0 34px rgba(0,150,255,0.12), inset 0 0 60px rgba(255,255,255,0.02) !important;
+  background:radial-gradient(circle at 50% 20%, rgba(46,94,166,0.12), transparent 24%), linear-gradient(180deg, #071220 0%, #050b15 100%) !important;
+}
+#hangar-window .hangar-room-wall,
+#hangar-window .hangar-room-floor,
+#hangar-window .hangar-room-glow{
+  position:absolute;
+  pointer-events:none;
+}
+#hangar-window .hangar-room-wall-left{
+  inset:0 auto 0 0;
+  width:22%;
+  background:linear-gradient(90deg, rgba(133,214,255,0.10), rgba(16,30,52,0.55) 52%, transparent 100%);
+  clip-path:polygon(0 0, 100% 10%, 100% 90%, 0 100%);
+}
+#hangar-window .hangar-room-wall-right{
+  inset:0 0 0 auto;
+  width:22%;
+  background:linear-gradient(270deg, rgba(133,214,255,0.10), rgba(16,30,52,0.55) 52%, transparent 100%);
+  clip-path:polygon(0 10%, 100% 0, 100% 100%, 0 90%);
+}
+#hangar-window .hangar-room-wall-back{
+  left:18%; right:18%; top:0; height:52%;
+  background:linear-gradient(180deg, rgba(86,180,255,0.11), rgba(10,18,34,0.18) 40%, transparent 100%);
+  clip-path:polygon(6% 0, 94% 0, 100% 18%, 100% 100%, 0 100%, 0 18%);
+}
+#hangar-window .hangar-room-floor{
+  left:12%; right:12%; bottom:-2%; height:38%;
+  background:radial-gradient(circle at 50% 0%, rgba(70,180,255,0.18), transparent 48%), linear-gradient(180deg, rgba(14,24,44,0.2), rgba(8,14,26,0.88));
+  clip-path:polygon(14% 0, 86% 0, 100% 100%, 0 100%);
+}
+#hangar-window .hangar-room-glow{
+  inset:auto 20% 10% 20%; height:20%;
+  background:radial-gradient(circle at 50% 50%, rgba(0,210,255,0.28), rgba(0,150,255,0.08) 42%, transparent 70%);
+  filter:blur(20px);
+}
+#hangar-window #hangar-3d-stage{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  z-index:3 !important;
+}
+#hangar-window .hangar-stage-overlay-v128{
+  position:absolute !important;
+  inset:0 !important;
+  padding:16px !important;
+  pointer-events:none !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:center !important;
+  z-index:5 !important;
+  background:none !important;
+}
+#hangar-window .hangar-stage-name-badge{
+  margin-top:10px !important;
+  border-radius:999px !important;
+  padding:10px 18px !important;
+  background:rgba(5,16,34,0.74) !important;
+  border:1px solid rgba(120,220,255,0.18) !important;
+  box-shadow:0 0 16px rgba(0,170,255,0.10) !important;
+}
+#hangar-window .hangar-nav-edge{
+  width:56px !important;
+  height:168px !important;
+  border-radius:22px !important;
+  background:linear-gradient(180deg, rgba(17,31,52,0.88), rgba(9,17,30,0.95)) !important;
+  border:1px solid rgba(120,220,255,0.18) !important;
+  box-shadow:0 0 18px rgba(0,150,255,0.10) !important;
+}
+#hangar-window .hangar-nav-edge:hover:not(:disabled){
+  transform:scale(1.02) !important;
+}
+#hangar-window .hangar-side-title{
+  margin:0 !important;
+  font-size:17px !important;
+  letter-spacing:0.08em !important;
+  text-transform:uppercase !important;
+  color:#d9f6ff !important;
+}
+#hangar-window .hangar-module-filter{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:8px !important;
+  padding:0 !important;
+  background:none !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+#hangar-window .hangar-module-chip{
+  width:100% !important;
+  justify-content:flex-start !important;
+  min-height:44px !important;
+  border-radius:16px !important;
+  background:rgba(255,255,255,0.04) !important;
+}
+#hangar-window .hangar-module-list{
+  flex:1 1 auto !important;
+  min-height:180px !important;
+}
+#hangar-window .hangar-module-meta.compact{
+  gap:8px !important;
+  padding-top:12px !important;
+  border-top:1px solid rgba(255,255,255,0.08) !important;
+}
+#hangar-window .hangar-module-name{
+  font-size:18px !important;
+}
+#hangar-window .hangar-module-desc{
+  min-height:auto !important;
+  font-size:12px !important;
+  line-height:1.4 !important;
+}
+#hangar-window .hangar-module-actions{
+  grid-template-columns:1fr !important;
+}
+#hangar-window .hangar-module-action,
+#hangar-window .hangar-main-btn{
+  min-height:42px !important;
+  border-radius:14px !important;
+}
+#hangar-window .hangar-ship-card-v128,
+#hangar-window .hangar-stats-grid-v128,
+#hangar-window .hangar-footer-row-v128{
+  margin:0 !important;
+  max-width:none !important;
+  width:100% !important;
+}
+#hangar-window .hangar-ship-card-v128{
+  padding:14px 14px 12px !important;
+  border-radius:18px !important;
+}
+#hangar-window .hangar-ship-name{
+  font-size:24px !important;
+  line-height:1.05 !important;
+}
+#hangar-window .hangar-ship-subtitle{
+  display:block !important;
+  margin-top:6px !important;
+  font-size:12px !important;
+  opacity:0.82 !important;
+}
+#hangar-window .hangar-stats-grid-v128{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:8px !important;
+}
+#hangar-window .hangar-stat-box{
+  padding:10px 10px !important;
+  border-radius:14px !important;
+}
+#hangar-window .hangar-stat-label{
+  font-size:10px !important;
+}
+#hangar-window .hangar-stat-value{
+  font-size:16px !important;
+}
+#hangar-window .hangar-footer-row-v128{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:10px !important;
+}
+#hangar-window .hangar-footer-actions{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:8px !important;
+}
+#hangar-window .hangar-position-label{
+  align-self:flex-start !important;
+  font-size:12px !important;
+  opacity:0.86 !important;
+}
+@media (max-width: 1320px){
+  #hangar-window .hangar-layout-v128{
+    grid-template-columns:260px minmax(0,1fr) 240px !important;
+  }
+}
+@media (max-width: 1100px){
+  #hangar-window .hangar-layout-v128{
+    grid-template-columns:1fr !important;
+    height:auto !important;
+    overflow:auto !important;
+  }
+  #hangar-window .hangar-room-shell{
+    min-height:520px !important;
+  }
+  #hangar-window .hangar-room-wrap-v128{
+    order:1 !important;
+  }
+}
+
+</style>
 </head>
+
 <body>
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-  <script>
-// Cosmic Clicker - Hangar Prototype v201
-// Standalone Three.js hangar scene built from primitives.
-// Designed as a registration-free replacement for downloaded assets.
-
-(function () {
-  const HANGAR = {
-    scene: null,
-    camera: null,
-    renderer: null,
-    clock: null,
-    root: null,
-    interactive: [],
-    colliders: [],
-    doors: [],
-    shipStands: [],
-    modulePods: [],
-    keys: {},
-    yaw: 0,
-    pitch: 0,
-    moveSpeed: 18,
-    sprintSpeed: 28,
-    lookSpeed: 0.0023,
-    playerHeight: 1.72,
-    playerRadius: 0.65,
-    velocityY: 0,
-    gravity: -28,
-    grounded: true,
-    pointerLocked: false,
-    useOrbitFallback: false,
-    hoverTarget: null,
-    selectedShip: 0,
-    selectedModule: 0,
-    currentRoom: 'hangar',
-    ui: {
-      root: null,
-      hint: null,
-      room: null,
-      ship: null,
-      module: null,
-      stats: null,
-      help: null,
-      crosshair: null
-    },
-    roomAnchors: {},
-    tmpVecA: new THREE.Vector3(),
-    tmpVecB: new THREE.Vector3(),
-    tmpBox: new THREE.Box3(),
-    raycaster: new THREE.Raycaster(),
-    mouse: new THREE.Vector2(0, 0),
-    mouseDown: false
-  };
-
-  const SHIP_DATA = [
-    { name: 'Falcon NX', hp: 120, speed: 72, energy: 85, color: 0x5dd6ff },
-    { name: 'Raptor VX', hp: 150, speed: 62, energy: 92, color: 0xff7e57 },
-    { name: 'Orion MK-II', hp: 180, speed: 55, energy: 110, color: 0x9d7bff }
-  ];
-
-  const MODULE_DATA = [
-    { name: 'Лазерный модуль', bonus: '+12 урон', color: 0x58d7ff },
-    { name: 'Щитовой модуль', bonus: '+18 защита', color: 0x7dffb2 },
-    { name: 'Энергоядро', bonus: '+25 энергия', color: 0xffcc55 },
-    { name: 'Двигатель импульса', bonus: '+14 скорость', color: 0xff7eff }
-  ];
-
-  function initHangarPrototype() {
-    const canvas = document.getElementById('game-canvas') || document.getElementById('bg') || null;
-    HANGAR.scene = new THREE.Scene();
-    HANGAR.scene.background = new THREE.Color(0x05070d);
-    HANGAR.scene.fog = new THREE.Fog(0x05070d, 70, 290);
-
-    HANGAR.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1200);
-    HANGAR.camera.position.set(0, HANGAR.playerHeight, 18);
-    HANGAR.camera.rotation.order = 'YXZ';
-
-    HANGAR.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas || undefined });
-    HANGAR.renderer.setSize(window.innerWidth, window.innerHeight);
-    HANGAR.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    HANGAR.renderer.shadowMap.enabled = true;
-    HANGAR.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    HANGAR.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    HANGAR.renderer.toneMappingExposure = 1.15;
-    if (!canvas) {
-      HANGAR.renderer.domElement.id = 'game-canvas';
-      document.body.appendChild(HANGAR.renderer.domElement);
-    }
-
-    HANGAR.clock = new THREE.Clock();
-    HANGAR.root = new THREE.Group();
-    HANGAR.root.name = 'hangarRoot';
-    HANGAR.scene.add(HANGAR.root);
-
-    buildSkyboxGlow();
-    buildLighting();
-    buildHangarArchitecture();
-    buildWalkableRooms();
-    buildShipsArea();
-    buildModulesArea();
-    buildControlRoom();
-    buildUi();
-    bindEvents();
-    refreshUi();
-    animate();
-  }
-
-  function buildSkyboxGlow() {
-    const skyGeo = new THREE.SphereGeometry(500, 32, 32);
-    const skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      uniforms: {
-        topColor: { value: new THREE.Color(0x1f1454) },
-        bottomColor: { value: new THREE.Color(0x04060b) },
-        accentColor: { value: new THREE.Color(0x0c5470) }
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 bottomColor;
-        uniform vec3 accentColor;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition).y * 0.5 + 0.5;
-          float d = clamp((vWorldPosition.z + 180.0) / 400.0, 0.0, 1.0);
-          vec3 color = mix(bottomColor, topColor, h);
-          color = mix(color, accentColor, 0.35 * (1.0 - d));
-          gl_FragColor = vec4(color, 1.0);
-        }
-      `
-    });
-    HANGAR.scene.add(new THREE.Mesh(skyGeo, skyMat));
-  }
-
-  function buildLighting() {
-    const ambient = new THREE.AmbientLight(0x8aa0ff, 0.8);
-    HANGAR.scene.add(ambient);
-
-    const topLight = new THREE.DirectionalLight(0xffffff, 1.6);
-    topLight.position.set(18, 30, 12);
-    topLight.castShadow = true;
-    topLight.shadow.mapSize.set(2048, 2048);
-    topLight.shadow.camera.left = -80;
-    topLight.shadow.camera.right = 80;
-    topLight.shadow.camera.top = 80;
-    topLight.shadow.camera.bottom = -80;
-    HANGAR.scene.add(topLight);
-
-    const blueFill = new THREE.PointLight(0x4da2ff, 22, 140, 2.0);
-    blueFill.position.set(-28, 10, 12);
-    HANGAR.scene.add(blueFill);
-
-    const magentaFill = new THREE.PointLight(0xa966ff, 18, 140, 2.0);
-    magentaFill.position.set(28, 10, -6);
-    HANGAR.scene.add(magentaFill);
-
-    const hangarGlow = new THREE.RectAreaLight(0xbfd2ff, 18, 28, 3);
-    hangarGlow.position.set(0, 18, -14);
-    hangarGlow.lookAt(0, 0, -14);
-    HANGAR.scene.add(hangarGlow);
-  }
-
-  function buildHangarArchitecture() {
-    const root = new THREE.Group();
-    root.name = 'mainHangar';
-    HANGAR.root.add(root);
-
-    const floorMat = makePbr(0x2b313d, 0.72, 0.24);
-    const darkMat = makePbr(0x181c26, 0.75, 0.3);
-    const panelMat = makePbr(0x667187, 0.45, 0.42);
-    const glowMat = new THREE.MeshStandardMaterial({ color: 0xe6eeff, emissive: 0x8ea2ff, emissiveIntensity: 2.4 });
-
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(66, 1.2, 90), floorMat);
-    floor.position.set(0, -0.6, 0);
-    floor.receiveShadow = true;
-    root.add(floor);
-
-    const runway = new THREE.Mesh(new THREE.BoxGeometry(8, 0.06, 82), darkMat);
-    runway.position.set(0, 0.05, 0);
-    runway.receiveShadow = true;
-    root.add(runway);
-
-    for (let i = -36; i <= 36; i += 6) {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 2.2), glowMat);
-      strip.position.set(0, 0.08, i);
-      root.add(strip);
-    }
-
-    buildWallFrame(root, -22);
-    buildWallFrame(root, 22);
-    buildCeilingFrames(root, glowMat, panelMat);
-
-    const rearWindow = new THREE.Mesh(new THREE.BoxGeometry(34, 14, 0.4), new THREE.MeshStandardMaterial({
-      color: 0x88a4ff,
-      roughness: 0.15,
-      metalness: 0.1,
-      emissive: 0x182660,
-      emissiveIntensity: 0.85,
-      transparent: true,
-      opacity: 0.3
-    }));
-    rearWindow.position.set(0, 8.5, -40);
-    root.add(rearWindow);
-
-    const rearGlow = new THREE.Mesh(new THREE.PlaneGeometry(32, 12), new THREE.MeshBasicMaterial({ color: 0x4d2cff, transparent: true, opacity: 0.22 }));
-    rearGlow.position.set(0, 8.5, -39.5);
-    root.add(rearGlow);
-
-    const leftDoor = createDoorFrame('Корабли', new THREE.Vector3(-19.5, 0, -6), Math.PI / 2, 0x59d5ff);
-    const rightDoor = createDoorFrame('Модули', new THREE.Vector3(19.5, 0, -6), -Math.PI / 2, 0x7cffbd);
-    const rearDoor = createDoorFrame('Управление', new THREE.Vector3(0, 0, -31.5), 0, 0xc086ff);
-    root.add(leftDoor.group, rightDoor.group, rearDoor.group);
-
-    HANGAR.roomAnchors.hangar = new THREE.Vector3(0, HANGAR.playerHeight, 18);
-    HANGAR.roomAnchors.ships = new THREE.Vector3(-44, HANGAR.playerHeight, -6);
-    HANGAR.roomAnchors.modules = new THREE.Vector3(44, HANGAR.playerHeight, -6);
-    HANGAR.roomAnchors.control = new THREE.Vector3(0, HANGAR.playerHeight, -60);
-
-    addCollider(0, 4.5, 44.5, 66, 10, 1.2);   // front invisible boundary
-    addCollider(0, 4.5, -45.5, 66, 10, 1.2);  // rear boundary
-    addCollider(-33.4, 5, 0, 1.2, 10, 88);    // left wall
-    addCollider(33.4, 5, 0, 1.2, 10, 88);     // right wall
-    addCollider(0, 14.4, 0, 66, 1, 90);       // ceiling stop
-  }
-
-  function buildWallFrame(root, sideX) {
-    const isLeft = sideX < 0;
-    const mainMat = makePbr(0x5e6677, 0.46, 0.4);
-    const beamMat = makePbr(0x2b3140, 0.75, 0.25);
-
-    for (let z = -32; z <= 24; z += 14) {
-      const outer = new THREE.Mesh(new THREE.BoxGeometry(3, 13.5, 7), mainMat);
-      outer.position.set(sideX, 6.75, z);
-      outer.castShadow = true;
-      root.add(outer);
-
-      const braceA = new THREE.Mesh(new THREE.BoxGeometry(0.9, 6.8, 0.9), beamMat);
-      braceA.position.set(sideX + (isLeft ? 2.1 : -2.1), 4, z - 2.2);
-      braceA.rotation.z = isLeft ? -0.62 : 0.62;
-      braceA.castShadow = true;
-      root.add(braceA);
-
-      const braceB = new THREE.Mesh(new THREE.BoxGeometry(0.9, 6.8, 0.9), beamMat);
-      braceB.position.set(sideX + (isLeft ? 2.1 : -2.1), 4, z + 2.2);
-      braceB.rotation.z = isLeft ? 0.62 : -0.62;
-      braceB.castShadow = true;
-      root.add(braceB);
-    }
-
-    const sideFloor = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.45, 90), beamMat);
-    sideFloor.position.set(sideX + (isLeft ? 4.6 : -4.6), 0.22, 0);
-    sideFloor.receiveShadow = true;
-    root.add(sideFloor);
-  }
-
-  function buildCeilingFrames(root, glowMat, panelMat) {
-    for (let z = -32; z <= 30; z += 16) {
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(44, 1.1, 2.8), panelMat);
-      beam.position.set(0, 15.6, z);
-      beam.castShadow = true;
-      root.add(beam);
-
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.18, 12.5), glowMat);
-      strip.position.set(0, 15.05, z);
-      root.add(strip);
-
-      const sideA = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.7, 2), panelMat);
-      sideA.position.set(-18, 14.6, z);
-      sideA.rotation.z = 0.45;
-      root.add(sideA);
-
-      const sideB = sideA.clone();
-      sideB.position.x = 18;
-      sideB.rotation.z = -0.45;
-      root.add(sideB);
-    }
-  }
-
-  function buildWalkableRooms() {
-    buildShipRoomShell();
-    buildModuleRoomShell();
-    buildControlRoomShell();
-  }
-
-  function buildShipRoomShell() {
-    const room = new THREE.Group();
-    room.name = 'shipRoom';
-    HANGAR.root.add(room);
-
-    const floorMat = makePbr(0x232a35, 0.7, 0.2);
-    const wallMat = makePbr(0x67738a, 0.42, 0.44);
-    const trimMat = makePbr(0x111724, 0.8, 0.18);
-    const glowMat = new THREE.MeshStandardMaterial({ color: 0xdce7ff, emissive: 0x59d5ff, emissiveIntensity: 2.1 });
-
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(36, 1, 26), floorMat);
-    floor.position.set(-44, -0.5, -6);
-    floor.receiveShadow = true;
-    room.add(floor);
-
-    const wallBack = new THREE.Mesh(new THREE.BoxGeometry(36, 14, 1), wallMat);
-    wallBack.position.set(-44, 7, -18.5);
-    room.add(wallBack);
-    const wallFront = new THREE.Mesh(new THREE.BoxGeometry(10, 14, 1), wallMat);
-    wallFront.position.set(-56, 7, 6.5);
-    room.add(wallFront);
-    const wallFrontB = wallFront.clone();
-    wallFrontB.position.set(-32, 7, 6.5);
-    room.add(wallFrontB);
-    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1, 14, 26), wallMat);
-    leftWall.position.set(-62, 7, -6);
-    room.add(leftWall);
-    const rightWall = leftWall.clone();
-    rightWall.position.set(-26, 7, -6);
-    room.add(rightWall);
-
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(36, 1, 26), trimMat);
-    ceiling.position.set(-44, 14.5, -6);
-    room.add(ceiling);
-
-    for (let x = -58; x <= -30; x += 8) {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 16), glowMat);
-      strip.position.set(x, 13.9, -6);
-      room.add(strip);
-    }
-
-    const doorGlow = new THREE.Mesh(new THREE.BoxGeometry(8, 8.5, 0.15), new THREE.MeshBasicMaterial({ color: 0x59d5ff, transparent: true, opacity: 0.2 }));
-    doorGlow.position.set(-44, 5, 6.06);
-    room.add(doorGlow);
-
-    addCollider(-44, 5, -19.2, 36, 10, 1.2);
-    addCollider(-62.6, 5, -6, 1.2, 10, 26);
-    addCollider(-25.4, 5, -6, 1.2, 10, 26);
-    addCollider(-56, 5, 7.2, 10, 10, 1.2);
-    addCollider(-32, 5, 7.2, 10, 10, 1.2);
-  }
-
-  function buildModuleRoomShell() {
-    const room = new THREE.Group();
-    room.name = 'moduleRoom';
-    HANGAR.root.add(room);
-
-    const floorMat = makePbr(0x242c37, 0.68, 0.24);
-    const wallMat = makePbr(0x6a768d, 0.42, 0.44);
-    const trimMat = makePbr(0x111724, 0.8, 0.18);
-    const glowMat = new THREE.MeshStandardMaterial({ color: 0xe9ffee, emissive: 0x7cffbd, emissiveIntensity: 2.1 });
-
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(36, 1, 26), floorMat);
-    floor.position.set(44, -0.5, -6);
-    floor.receiveShadow = true;
-    room.add(floor);
-
-    const wallBack = new THREE.Mesh(new THREE.BoxGeometry(36, 14, 1), wallMat);
-    wallBack.position.set(44, 7, -18.5);
-    room.add(wallBack);
-    const wallFront = new THREE.Mesh(new THREE.BoxGeometry(10, 14, 1), wallMat);
-    wallFront.position.set(32, 7, 6.5);
-    room.add(wallFront);
-    const wallFrontB = wallFront.clone();
-    wallFrontB.position.set(56, 7, 6.5);
-    room.add(wallFrontB);
-    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1, 14, 26), wallMat);
-    leftWall.position.set(26, 7, -6);
-    room.add(leftWall);
-    const rightWall = leftWall.clone();
-    rightWall.position.set(62, 7, -6);
-    room.add(rightWall);
-
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(36, 1, 26), trimMat);
-    ceiling.position.set(44, 14.5, -6);
-    room.add(ceiling);
-
-    for (let x = 30; x <= 58; x += 8) {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 16), glowMat);
-      strip.position.set(x, 13.9, -6);
-      room.add(strip);
-    }
-
-    const doorGlow = new THREE.Mesh(new THREE.BoxGeometry(8, 8.5, 0.15), new THREE.MeshBasicMaterial({ color: 0x7cffbd, transparent: true, opacity: 0.2 }));
-    doorGlow.position.set(44, 5, 6.06);
-    room.add(doorGlow);
-
-    addCollider(44, 5, -19.2, 36, 10, 1.2);
-    addCollider(25.4, 5, -6, 1.2, 10, 26);
-    addCollider(62.6, 5, -6, 1.2, 10, 26);
-    addCollider(32, 5, 7.2, 10, 10, 1.2);
-    addCollider(56, 5, 7.2, 10, 10, 1.2);
-  }
-
-  function buildControlRoomShell() {
-    const room = new THREE.Group();
-    room.name = 'controlRoom';
-    HANGAR.root.add(room);
-
-    const floorMat = makePbr(0x1d2430, 0.7, 0.22);
-    const wallMat = makePbr(0x626e84, 0.42, 0.44);
-    const trimMat = makePbr(0x101521, 0.82, 0.18);
-    const glowMat = new THREE.MeshStandardMaterial({ color: 0xfff0ff, emissive: 0xc086ff, emissiveIntensity: 2.05 });
-
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(28, 1, 34), floorMat);
-    floor.position.set(0, -0.5, -60);
-    floor.receiveShadow = true;
-    room.add(floor);
-
-    const rear = new THREE.Mesh(new THREE.BoxGeometry(28, 14, 1), wallMat);
-    rear.position.set(0, 7, -76.5);
-    room.add(rear);
-    const sideA = new THREE.Mesh(new THREE.BoxGeometry(1, 14, 34), wallMat);
-    sideA.position.set(-14, 7, -60);
-    room.add(sideA);
-    const sideB = sideA.clone();
-    sideB.position.x = 14;
-    room.add(sideB);
-    const frontA = new THREE.Mesh(new THREE.BoxGeometry(9, 14, 1), wallMat);
-    frontA.position.set(-9.5, 7, -43.5);
-    room.add(frontA);
-    const frontB = frontA.clone();
-    frontB.position.x = 9.5;
-    room.add(frontB);
-
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(28, 1, 34), trimMat);
-    ceiling.position.set(0, 14.5, -60);
-    room.add(ceiling);
-
-    for (let z = -72; z <= -48; z += 8) {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(12, 0.12, 0.9), glowMat);
-      strip.position.set(0, 13.9, z);
-      room.add(strip);
-    }
-
-    addCollider(0, 5, -77.2, 28, 10, 1.2);
-    addCollider(-14.6, 5, -60, 1.2, 10, 34);
-    addCollider(14.6, 5, -60, 1.2, 10, 34);
-    addCollider(-9.5, 5, -42.8, 9, 10, 1.2);
-    addCollider(9.5, 5, -42.8, 9, 10, 1.2);
-  }
-
-  function buildShipsArea() {
-    const area = new THREE.Group();
-    area.name = 'shipsArea';
-    HANGAR.root.add(area);
-
-    const platformMat = makePbr(0x2d3442, 0.58, 0.38);
-    const ringMat = new THREE.MeshStandardMaterial({ color: 0xf6fbff, emissive: 0x57d5ff, emissiveIntensity: 1.8, metalness: 0.32, roughness: 0.28 });
-
-    SHIP_DATA.forEach((ship, index) => {
-      const baseX = -52 + index * 8;
-      const stand = new THREE.Group();
-      stand.position.set(baseX, 0, -7);
-      stand.userData.type = 'ship';
-      stand.userData.index = index;
-      stand.userData.name = ship.name;
-
-      const disk = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.4, 0.9, 32), platformMat);
-      disk.position.y = 0.45;
-      disk.receiveShadow = true;
-      disk.castShadow = true;
-      stand.add(disk);
-
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.1, 12, 48), ringMat);
-      ring.rotation.x = Math.PI / 2;
-      ring.position.y = 0.58;
-      stand.add(ring);
-
-      const shipMesh = createShipModel(ship.color);
-      shipMesh.position.y = 2.7;
-      shipMesh.rotation.y = index * 0.8;
-      stand.add(shipMesh);
-
-      const padLight = new THREE.PointLight(ship.color, 4.5, 18, 2);
-      padLight.position.set(0, 2.5, 0);
-      stand.add(padLight);
-
-      HANGAR.shipStands.push(stand);
-      HANGAR.interactive.push(stand);
-      area.add(stand);
-    });
-
-    const sign = createSign('ЗАЛ КОРАБЛЕЙ', 0x59d5ff);
-    sign.position.set(-44, 10.6, 3.5);
-    area.add(sign);
-  }
-
-  function buildModulesArea() {
-    const area = new THREE.Group();
-    area.name = 'modulesArea';
-    HANGAR.root.add(area);
-
-    MODULE_DATA.forEach((module, index) => {
-      const row = Math.floor(index / 2);
-      const col = index % 2;
-      const x = 39 + col * 10;
-      const z = -3 - row * 9;
-      const pod = new THREE.Group();
-      pod.position.set(x, 0, z);
-      pod.userData.type = 'module';
-      pod.userData.index = index;
-      pod.userData.name = module.name;
-
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.9, 1.1, 24), makePbr(0x26303b, 0.6, 0.3));
-      base.position.y = 0.55;
-      pod.add(base);
-
-      const core = createModuleModel(module.color, index);
-      core.position.y = 2.7;
-      pod.add(core);
-
-      const glow = new THREE.PointLight(module.color, 4, 14, 2);
-      glow.position.set(0, 3.4, 0);
-      pod.add(glow);
-
-      HANGAR.modulePods.push(pod);
-      HANGAR.interactive.push(pod);
-      area.add(pod);
-    });
-
-    const sign = createSign('МОДУЛЬНЫЙ ОТСЕК', 0x7cffbd);
-    sign.position.set(44, 10.6, 3.5);
-    area.add(sign);
-  }
-
-  function buildControlRoom() {
-    const area = new THREE.Group();
-    area.name = 'controlArea';
-    HANGAR.root.add(area);
-
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 4), makePbr(0x2a3441, 0.52, 0.36));
-    desk.position.set(0, 1.6, -68);
-    desk.castShadow = true;
-    desk.receiveShadow = true;
-    area.add(desk);
-
-    const screenMat = new THREE.MeshStandardMaterial({ color: 0xeff0ff, emissive: 0xc086ff, emissiveIntensity: 2.3, roughness: 0.22, metalness: 0.18 });
-    for (let i = -1; i <= 1; i++) {
-      const screen = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.2, 0.12), screenMat);
-      screen.position.set(i * 4.4, 4.4, -69.4);
-      area.add(screen);
-    }
-
-    const holoPad = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.4, 0.3, 32), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x8a5dff, emissiveIntensity: 2.1, transparent: true, opacity: 0.82 }));
-    holoPad.position.set(0, 1.95, -61);
-    area.add(holoPad);
-
-    const holoSphere = new THREE.Mesh(new THREE.IcosahedronGeometry(1.25, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xc086ff, emissiveIntensity: 2.5, transparent: true, opacity: 0.55 }));
-    holoSphere.position.set(0, 4.2, -61);
-    holoSphere.userData.spin = 0.6;
-    area.add(holoSphere);
-
-    const sign = createSign('КОМНАТА УПРАВЛЕНИЯ', 0xc086ff);
-    sign.position.set(0, 10.6, -46.4);
-    area.add(sign);
-  }
-
-  function createDoorFrame(label, position, rotationY, color) {
-    const group = new THREE.Group();
-    group.position.copy(position);
-    group.rotation.y = rotationY;
-
-    const frameMat = makePbr(0x59657a, 0.48, 0.42);
-    const sideA = new THREE.Mesh(new THREE.BoxGeometry(1, 9.6, 1.2), frameMat);
-    sideA.position.set(-4.5, 4.8, 0);
-    const sideB = sideA.clone();
-    sideB.position.x = 4.5;
-    const top = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 1.2), frameMat);
-    top.position.set(0, 9.1, 0);
-
-    const glow = new THREE.Mesh(new THREE.BoxGeometry(8.1, 7.5, 0.14), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16 }));
-    glow.position.set(0, 4.4, 0.18);
-
-    const sign = createSign(label, color, 4.2);
-    sign.position.set(0, 11.4, 0);
-
-    group.add(sideA, sideB, top, glow, sign);
-    return { group };
-  }
-
-  function createSign(text, color, width = 6.2) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'rgba(10, 14, 24, 0.18)';
-    ctx.fillRect(18, 28, canvas.width - 36, canvas.height - 56);
-    ctx.strokeStyle = `#${color.toString(16).padStart(6, '0')}`;
-    ctx.lineWidth = 8;
-    ctx.strokeRect(18, 28, canvas.width - 36, canvas.height - 56);
-    ctx.shadowColor = `#${color.toString(16).padStart(6, '0')}`;
-    ctx.shadowBlur = 24;
-    ctx.fillStyle = '#f4f8ff';
-    ctx.font = 'bold 86px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 6);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * 0.25), mat);
-    return mesh;
-  }
-
-  function createShipModel(color) {
-    const group = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.62, roughness: 0.28, emissive: color, emissiveIntensity: 0.15 });
-    const darkMat = makePbr(0x1a202b, 0.8, 0.16);
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0xdde5ff, emissive: 0x4d5fb0, emissiveIntensity: 0.45, metalness: 0.05, roughness: 0.05, transparent: true, opacity: 0.66 });
-
-    const fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(0.9, 4.2, 6, 14), bodyMat);
-    fuselage.rotation.z = Math.PI / 2;
-    fuselage.castShadow = true;
-    group.add(fuselage);
-
-    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.8, 20, 20), glassMat);
-    cockpit.position.set(1.85, 0.35, 0);
-    group.add(cockpit);
-
-    const wingGeo = new THREE.BoxGeometry(2.6, 0.12, 1.15);
-    const leftWing = new THREE.Mesh(wingGeo, darkMat);
-    leftWing.position.set(-0.2, 0, -1.2);
-    leftWing.castShadow = true;
-    group.add(leftWing);
-    const rightWing = leftWing.clone();
-    rightWing.position.z = 1.2;
-    group.add(rightWing);
-
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, 0.12), bodyMat);
-    fin.position.set(-1.4, 0.8, 0);
-    fin.castShadow = true;
-    group.add(fin);
-
-    const engineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 2.8, roughness: 0.18, metalness: 0.12 });
-    const engineA = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.34, 0.45, 16), engineMat);
-    engineA.rotation.z = Math.PI / 2;
-    engineA.position.set(-2.4, -0.15, -0.42);
-    group.add(engineA);
-    const engineB = engineA.clone();
-    engineB.position.z = 0.42;
-    group.add(engineB);
-
-    group.scale.setScalar(1.2);
-    return group;
-  }
-
-  function createModuleModel(color, index) {
-    const group = new THREE.Group();
-    const shellMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 0.3, metalness: 0.42, roughness: 0.28 });
-    const darkMat = makePbr(0x202733, 0.78, 0.18);
-
-    if (index === 0) {
-      const core = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.1, 0.9), shellMat);
-      core.castShadow = true;
-      group.add(core);
-      const barrelA = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.4, 16), darkMat);
-      barrelA.rotation.z = Math.PI / 2;
-      barrelA.position.set(1.2, 0.18, -0.24);
-      group.add(barrelA);
-      const barrelB = barrelA.clone();
-      barrelB.position.z = 0.24;
-      group.add(barrelB);
-    } else if (index === 1) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.22, 18, 40), shellMat);
-      ring.rotation.x = Math.PI / 2;
-      group.add(ring);
-      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.55, 20, 20), shellMat);
-      group.add(orb);
-    } else if (index === 2) {
-      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(1.1, 0), shellMat);
-      crystal.castShadow = true;
-      group.add(crystal);
-      const cage = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.06, 12, 48), darkMat);
-      cage.rotation.y = Math.PI / 2;
-      group.add(cage);
-    } else {
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.75, 2.1, 18), shellMat);
-      body.rotation.z = Math.PI / 2;
-      group.add(body);
-      const finA = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.6, 0.82), darkMat);
-      finA.position.set(0, 0.72, 0);
-      group.add(finA);
-      const finB = finA.clone();
-      finB.position.y = -0.72;
-      group.add(finB);
-    }
-
-    return group;
-  }
-
-  function makePbr(color, roughness, metalness) {
-    return new THREE.MeshStandardMaterial({ color, roughness, metalness });
-  }
-
-  function addCollider(x, y, z, width, height, depth) {
-    HANGAR.colliders.push({ x, y, z, width, height, depth });
-  }
-
-  function bindEvents() {
-    window.addEventListener('resize', onResize);
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('mouseup', onMouseUp);
-
-    HANGAR.renderer.domElement.addEventListener('click', () => {
-      if (!document.pointerLockElement) {
-        HANGAR.renderer.domElement.requestPointerLock?.();
-      }
-    });
-
-    document.addEventListener('pointerlockchange', () => {
-      HANGAR.pointerLocked = document.pointerLockElement === HANGAR.renderer.domElement;
-      if (HANGAR.ui.hint) {
-        HANGAR.ui.hint.textContent = HANGAR.pointerLocked
-          ? 'WASD — ходьба | Shift — бег | E — выбрать | 1/2/3 — комнаты | Esc — отпустить мышь'
-          : 'Кликни по сцене, чтобы захватить мышь';
-      }
-    });
-  }
-
-  function onResize() {
-    HANGAR.camera.aspect = window.innerWidth / window.innerHeight;
-    HANGAR.camera.updateProjectionMatrix();
-    HANGAR.renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-
-  function onKeyDown(event) {
-    HANGAR.keys[event.code] = true;
-
-    if (event.code === 'Digit1') teleportTo('hangar');
-    if (event.code === 'Digit2') teleportTo('ships');
-    if (event.code === 'Digit3') teleportTo('modules');
-    if (event.code === 'Digit4') teleportTo('control');
-
-    if (event.code === 'KeyE') {
-      handleInteraction();
-    }
-  }
-
-  function onKeyUp(event) {
-    HANGAR.keys[event.code] = false;
-  }
-
-  function onMouseMove(event) {
-    if (HANGAR.pointerLocked) {
-      HANGAR.yaw -= event.movementX * HANGAR.lookSpeed;
-      HANGAR.pitch -= event.movementY * HANGAR.lookSpeed;
-      HANGAR.pitch = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, HANGAR.pitch));
-    }
-  }
-
-  function onMouseDown() { HANGAR.mouseDown = true; }
-  function onMouseUp() { HANGAR.mouseDown = false; }
-
-  function animate() {
-    requestAnimationFrame(animate);
-    const dt = Math.min(HANGAR.clock.getDelta(), 0.033);
-
-    updatePlayer(dt);
-    updateCameraRotation();
-    updateHover();
-    updateAnimatedProps(dt);
-    refreshUi();
-
-    HANGAR.renderer.render(HANGAR.scene, HANGAR.camera);
-  }
-
-  function updatePlayer(dt) {
-    const moveVector = new THREE.Vector3();
-    const forward = new THREE.Vector3(Math.sin(HANGAR.yaw), 0, Math.cos(HANGAR.yaw));
-    const right = new THREE.Vector3(forward.z, 0, -forward.x);
-
-    if (HANGAR.keys.KeyW) moveVector.add(forward.clone().multiplyScalar(-1));
-    if (HANGAR.keys.KeyS) moveVector.add(forward);
-    if (HANGAR.keys.KeyA) moveVector.add(right.clone().multiplyScalar(-1));
-    if (HANGAR.keys.KeyD) moveVector.add(right);
-
-    if (moveVector.lengthSq() > 0) moveVector.normalize();
-
-    const speed = HANGAR.keys.ShiftLeft || HANGAR.keys.ShiftRight ? HANGAR.sprintSpeed : HANGAR.moveSpeed;
-    moveVector.multiplyScalar(speed * dt);
-
-    const previous = HANGAR.camera.position.clone();
-    HANGAR.camera.position.x += moveVector.x;
-    HANGAR.camera.position.z += moveVector.z;
-
-    resolveCollisions(previous);
-    detectRoom();
-  }
-
-  function resolveCollisions(previous) {
-    const p = HANGAR.camera.position;
-    const r = HANGAR.playerRadius;
-
-    for (const c of HANGAR.colliders) {
-      const minX = c.x - c.width / 2 - r;
-      const maxX = c.x + c.width / 2 + r;
-      const minZ = c.z - c.depth / 2 - r;
-      const maxZ = c.z + c.depth / 2 + r;
-      const minY = c.y - c.height / 2;
-      const maxY = c.y + c.height / 2;
-
-      if (p.x > minX && p.x < maxX && p.z > minZ && p.z < maxZ && p.y > minY && p.y < maxY) {
-        p.x = previous.x;
-        p.z = previous.z;
-        break;
-      }
-    }
-  }
-
-  function detectRoom() {
-    const { x, z } = HANGAR.camera.position;
-    if (z < -43) HANGAR.currentRoom = 'control';
-    else if (x < -25) HANGAR.currentRoom = 'ships';
-    else if (x > 25) HANGAR.currentRoom = 'modules';
-    else HANGAR.currentRoom = 'hangar';
-  }
-
-  function updateCameraRotation() {
-    HANGAR.camera.rotation.y = HANGAR.yaw;
-    HANGAR.camera.rotation.x = HANGAR.pitch;
-  }
-
-  function updateHover() {
-    HANGAR.raycaster.setFromCamera(HANGAR.mouse, HANGAR.camera);
-    let bestTarget = null;
-    let bestDistance = 4.8;
-
-    for (const target of HANGAR.interactive) {
-      HANGAR.tmpVecA.setFromMatrixPosition(target.matrixWorld);
-      const distance = HANGAR.camera.position.distanceTo(HANGAR.tmpVecA);
-      if (distance > bestDistance) continue;
-
-      HANGAR.tmpVecB.copy(HANGAR.tmpVecA).sub(HANGAR.camera.position).normalize();
-      const viewForward = new THREE.Vector3(0, 0, -1).applyQuaternion(HANGAR.camera.quaternion).normalize();
-      const alignment = viewForward.dot(HANGAR.tmpVecB);
-      if (alignment > 0.92) {
-        bestDistance = distance;
-        bestTarget = target;
-      }
-    }
-
-    HANGAR.hoverTarget = bestTarget;
-
-    HANGAR.shipStands.forEach((stand, index) => {
-      const active = index === HANGAR.selectedShip || stand === HANGAR.hoverTarget;
-      stand.scale.lerp(new THREE.Vector3(active ? 1.06 : 1, active ? 1.06 : 1, active ? 1.06 : 1), 0.12);
-    });
-
-    HANGAR.modulePods.forEach((pod, index) => {
-      const active = index === HANGAR.selectedModule || pod === HANGAR.hoverTarget;
-      pod.scale.lerp(new THREE.Vector3(active ? 1.08 : 1, active ? 1.08 : 1, active ? 1.08 : 1), 0.12);
-    });
-  }
-
-  function handleInteraction() {
-    if (!HANGAR.hoverTarget) return;
-
-    if (HANGAR.hoverTarget.userData.type === 'ship') {
-      HANGAR.selectedShip = HANGAR.hoverTarget.userData.index;
-    }
-    if (HANGAR.hoverTarget.userData.type === 'module') {
-      HANGAR.selectedModule = HANGAR.hoverTarget.userData.index;
-    }
-  }
-
-  function updateAnimatedProps(dt) {
-    HANGAR.shipStands.forEach((stand, index) => {
-      const shipMesh = stand.children[2];
-      if (shipMesh) {
-        shipMesh.rotation.y += dt * (0.24 + index * 0.07);
-        shipMesh.position.y = 2.7 + Math.sin(performance.now() * 0.0013 + index) * 0.08;
-      }
-    });
-
-    HANGAR.modulePods.forEach((pod, index) => {
-      const core = pod.children[1];
-      if (core) {
-        core.rotation.x += dt * 0.35;
-        core.rotation.y += dt * (0.6 + index * 0.07);
-        core.position.y = 2.7 + Math.sin(performance.now() * 0.0018 + index) * 0.25;
-      }
-    });
-
-    HANGAR.root.traverse((obj) => {
-      if (obj.userData.spin) {
-        obj.rotation.y += dt * obj.userData.spin;
-      }
-    });
-  }
-
-  function teleportTo(roomKey) {
-    const anchor = HANGAR.roomAnchors[roomKey];
-    if (!anchor) return;
-    HANGAR.camera.position.copy(anchor);
-    if (roomKey === 'ships') HANGAR.yaw = -Math.PI / 2;
-    else if (roomKey === 'modules') HANGAR.yaw = Math.PI / 2;
-    else HANGAR.yaw = Math.PI;
-    HANGAR.pitch = 0;
-    detectRoom();
-  }
-
-  function buildUi() {
-    const root = document.createElement('div');
-    root.id = 'hangar-ui';
-    root.innerHTML = `
-      <div class="hangar-crosshair"></div>
-      <div class="hangar-topbar">
-        <div class="hangar-chip" id="hangar-room-chip">Локация: Главный ангар</div>
-        <div class="hangar-chip" id="hangar-ship-chip">Корабль: ${SHIP_DATA[0].name}</div>
-        <div class="hangar-chip" id="hangar-module-chip">Модуль: ${MODULE_DATA[0].name}</div>
+<div id="kill-feed"></div>
+<div id='premium-bar'>
+  <div id="premium-account-info">
+    <span id="premium-player-name">Commander</span>
+    <span id="premium-player-id">ID: 0</span>
+    <span id="premium-player-level">⭐ 1</span>
+    <span id="premium-player-exp">EXP 0 / 100</span>
+    <span class='premium-item' id="premium-coins">🪙 0</span>
+    <span class='premium-item' id="premium-crystals">💎 0</span>
+  </div>
+  <button id="premium-logout-btn" type="button" title="Сменить аккаунт / сервер">✕</button>
+</div>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1>Cosmic Clicker</h1>
+    <div class="auth-subtitle">Сначала зарегистрируйся или войди. Гость может играть без сохранения прогресса.</div>
+    <div class="auth-columns">
+      <div class="auth-panel">
+        <h2>Войти</h2>
+        <input id="login-email" type="email" placeholder="Email">
+        <input id="login-password" type="password" placeholder="Пароль">
+        <label class="auth-check"><input id="remember-password" type="checkbox"> <span>Запомнить пароль</span></label>
+        <button id="login-btn" class="auth-btn primary">Войти</button>
+        <button id="forgot-password-btn" class="auth-btn ghost">Забыли пароль?</button>
+        <div class="auth-note">После регистрации нужно отдельно выполнить вход.</div>
       </div>
-      <div class="hangar-panel hangar-left">
-        <div class="hangar-panel-title">Управление</div>
-        <div class="hangar-help" id="hangar-help-text">Кликни по сцене, чтобы захватить мышь</div>
-        <div class="hangar-list">
-          <div>1 — Главный ангар</div>
-          <div>2 — Зал кораблей</div>
-          <div>3 — Модульный отсек</div>
-          <div>4 — Комната управления</div>
-          <div>WASD — ходьба</div>
-          <div>Shift — бег</div>
-          <div>E — выбор</div>
+      <div class="auth-panel">
+        <h2>Регистрация</h2>
+        <input id="register-email" type="email" placeholder="Email">
+        <input id="register-password" type="password" placeholder="Пароль">
+        <button id="register-btn" class="auth-btn primary">Зарегистрироваться</button>
+        <div class="auth-note">После регистрации выполни обычный вход через Email и пароль.</div>
+        <div class="auth-divider">или</div>
+        <button id="guest-login-btn" class="auth-btn guest">Войти как гость</button>
+        <div class="auth-note">У гостя прогресс не сохраняется.</div>
+      </div>
+    </div>
+    <div id="auth-message" class="auth-message"></div>
+  </div>
+</div>
+
+<div id="lobby-screen">
+  <div id="lobby-bg"></div>
+  <div id="lobby-fog"></div>
+
+  <div id="lobby-wrapper">
+
+    <!-- MATCH CENTER -->
+    <div id="match-center">
+      <div id="lobby-mode-tabs">
+        <div class="lobby-mode-tab active" id="lobby-battle-tab">🗂 Комнаты</div>
+        <div class="lobby-mode-tab" id="lobby-solo-tab">🤖 Одиночная игра</div>
+        <div class="lobby-mode-tab" id="lobby-tournament-tab">🏆 Турнир</div>
+      </div>
+      <div id="match-status-note"></div>
+      <div id="match-content">
+        <div id="match-layout">
+          <div class="match-list" id="match-list"></div>
+
+          <div id="match-preview">
+            <div id="map-mini-preview">
+              <div id="planet-preview"></div>
+              <div id="map-player-overlay"></div>
+            </div>
+            <div id="map-players"></div>
+          </div>
+
         </div>
       </div>
-      <div class="hangar-panel hangar-right">
-        <div class="hangar-panel-title">Характеристики</div>
-        <div id="hangar-stats-box"></div>
+
+
+      
+      <div id="shop-screen">
+        <div class="shop-shell">
+          <div class="shop-sidebar">
+            <div class="shop-side-header">
+              <div class="shop-side-title">Магазин</div>
+                          </div>
+            <div class="shop-main-switch" id="shop-main-switch"></div>
+            <div class="shop-sidebar-scroll">
+              <div class="shop-section-label" id="shop-type-label">Типы корпусов</div>
+              <div class="shop-type-tabs" id="shop-type-tabs"></div>
+              <div class="shop-section-label modules" id="shop-module-type-label">Оборудование</div>
+              <div class="shop-module-tabs" id="shop-module-type-tabs"></div>
+              <div class="shop-list" id="shop-ships-list"></div>
+              <div class="shop-list" id="shop-modules-list"></div>
+            </div>
+          </div>
+          <div class="shop-content">
+            <div class="shop-main-head">
+              <div class="shop-main-title" id="shop-main-title">КОРПУСА</div>
+              <div class="shop-main-subtitle" id="shop-main-subtitle"></div>
+            </div>
+            <div class="shop-catalog" id="shop-catalog-list"></div>
+          </div>
+        </div>
       </div>
-      <div class="hangar-bottom-hint" id="hangar-bottom-hint">Подойди ближе к кораблю или модулю и нажми E</div>
-    `;
-    document.body.appendChild(root);
 
-    HANGAR.ui.root = root;
-    HANGAR.ui.crosshair = root.querySelector('.hangar-crosshair');
-    HANGAR.ui.hint = document.getElementById('hangar-help-text');
-    HANGAR.ui.room = document.getElementById('hangar-room-chip');
-    HANGAR.ui.ship = document.getElementById('hangar-ship-chip');
-    HANGAR.ui.module = document.getElementById('hangar-module-chip');
-    HANGAR.ui.stats = document.getElementById('hangar-stats-box');
-    HANGAR.ui.help = document.getElementById('hangar-bottom-hint');
+      <div id="match-buttons">
+        <button class="match-btn" id="create-match-btn">Создать</button>
+        <button class="match-btn" id="observe-match-btn">Наблюдать</button>
+        <button class="match-btn" id="join-match-btn"><span>Войти</span></button>
+        <button class="match-btn" id="refresh-matches-btn">Обновить</button>
+      </div>
+    </div>
+
+    <!-- ONLINE PANEL -->
+    <div id="online-panel">
+      <div id="online-list"></div>
+    </div>
+
+    <!-- CHAT WRAPPER -->
+    <div id="chat-wrapper">
+      <div id="chat-panel">
+        <div id="chat-tabs">
+          <button class="chat-tab active" data-scope="global" type="button">Global</button>
+          <button class="chat-tab" data-scope="clan" type="button">Clan</button>
+          <button class="chat-tab" data-scope="battle" type="button">Battle</button>
+        </div>
+        <div id="chat-messages">
+          <div class="chat-message system">🚀 Добро пожаловать в галактику!</div>
+        </div>
+        <div id="chat-input-area">
+          <input type="text" id="chat-input" placeholder="Введите сообщение..." />
+          <button id="chat-send">Отправить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMOJI PANEL -->
+    <div id="emoji-panel">
+      <div class="emoji">😀</div>
+      <div class="emoji">🚀</div>
+      <div class="emoji">🔥</div>
+      <div class="emoji">😎</div>
+      <div class="emoji">💀</div>
+      <div class="emoji">🌌</div>
+      <div class="emoji">🛰</div>
+      <div class="emoji">⚔</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TOP NAVIGATION ===== -->
+<div id="top-nav">
+  <div class="nav-tab" id="battle-zone-tab">⚔ Боевая зона</div>
+  <div id="hangar-tab" class="nav-tab">🚀 Ангар</div>
+  <div class="nav-tab" id="profile-tab">👤 Профиль</div>
+  <div class="nav-tab" id="clans-tab">👥 Кланы</div>
+  <div class="nav-tab" id="leaders-tab">🏆 Лидеры</div>
+  <div class="nav-tab" id="orbit-tab" onclick="switchState('ORBIT')">🌌 Выйти на орбиту</div>
+  <div class="nav-tab" id="shop-tab">🛒 Магазин</div>
+  <div class="nav-tab" id="settings-tab">⚙ Настройки</div>
+</div>
+
+<!-- РЕСУРСЫ -->
+<div id="resource-bar"></div>
+
+<!-- ЛЕВОЕ UI -->
+<div id="ui">
+  <div id="planetName"></div>
+  <div id="levelText"></div>
+  <div id="damageText"></div>
+  <div id="pointsText"></div>
+
+  <div id="hpBarContainer">
+    <div id="hpBar"></div>
+  </div>
+
+  <div id="hpText"></div>
+  <div id="structuresUI"></div>
+</div>
+
+<!-- ИНВЕНТАРЬ -->
+<div id="inventory-button">🛰</div>
+
+<div id="inventory-window" class="hidden">
+  <div class="inventory-header">
+    <span>INVENTORY</span>
+    <button id="close-inventory">✖</button>
+  </div>
+  <div id="inventory"></div>
+</div>
+
+<div id="orbit-exit">
+  <button onclick="switchState('LOBBY')">⬅ В лобби</button>
+</div>
+
+
+
+<!-- ===== PROFILE WINDOW ===== -->
+<div id="profile-window" class="hidden">
+  <div class="profile-content">
+    <h2>Профиль</h2>
+    <div id="profile-info"></div>
+    <div class="auth-note">Профиль, ID игрока и базовая статистика синхронизируются через Supabase.</div>
+    <br>
+    <button id="close-profile">Закрыть</button>
+  </div>
+</div>
+
+
+
+<!-- ===== CREATE MATCH WINDOW ===== -->
+<div id="create-match-window" class="hidden">
+
+
+  <div class="create-match-box">
+
+    <h2>Создать карту</h2>
+
+    <div id="map-selector">
+
+    <!-- БОЛЬШАЯ КАРТИНКА -->
+    <img id="map-preview" src="maps/mercury.jpg" class="big-map-preview">
+
+    <!-- НАЗВАНИЕ -->
+    <div id="map-selected-name">Выберите карту</div>
+
+    <!-- ВЫБОР КАРТЫ -->
+    <div id="map-selected">
+        Выбрать карту ▼
+    </div>
+
+    <div id="map-dropdown" class="hidden"></div>
+
+</div>
+
+
+
+    
+
+    <label>Название карты:</label>
+<input id="room-title" type="text" maxlength="32" placeholder="Например: Орбита Марса #1">
+
+<!-- Игроки -->
+<label>Игроков:</label>
+<select id="player-count">
+  <option value="2">2</option>
+  <option value="3">3</option>
+  <option value="4">4</option>
+  <option value="5">5</option>
+  <option value="6">6</option>
+  <option value="7">7</option>
+  <option value="8">8</option>
+</select>
+
+<!-- Минимальный уровень -->
+<label>Мин. уровень:</label>
+<select id="min-level"></select>
+
+<!-- Максимальный уровень -->
+<label>Макс. уровень:</label>
+<select id="max-level"></select>
+
+<div class="create-buttons">
+  <button id="confirm-create">Создать</button>
+  <button id="cancel-create">Отмена</button>
+</div>
+
+</div>
+</div>
+
+<div id="tournament-window" class="hidden">
+  <div class="tournament-box">
+    <h2>Создать турнир</h2>
+
+    <label>Название турнира:</label>
+    <input id="tournament-title" type="text" maxlength="40" placeholder="Например: Mars Cup">
+
+    <label>Карта:</label>
+    <select id="tournament-map"></select>
+
+    <label>Игроков:</label>
+    <select id="tournament-player-count">
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+    </select>
+
+    <label>Мин. уровень:</label>
+    <select id="tournament-min-level"></select>
+
+    <label>Макс. уровень:</label>
+    <select id="tournament-max-level"></select>
+
+    <label>Очки для победы:</label>
+    <select id="tournament-goal">
+      <option value="10">10 убийств</option>
+      <option value="20">20 убийств</option>
+    </select>
+
+    <label>Ставка монетами:</label>
+    <select id="tournament-stake-coins">
+      <option value="0">Без ставки монетами</option>
+      <option value="50">50 монет</option>
+      <option value="100">100 монет</option>
+      <option value="250">250 монет</option>
+      <option value="500">500 монет</option>
+    </select>
+
+    <label>Ставка кристаллами:</label>
+    <select id="tournament-stake-crystals">
+      <option value="0">Без ставки кристаллами</option>
+      <option value="1">1 кристалл</option>
+      <option value="2">2 кристалла</option>
+      <option value="5">5 кристаллов</option>
+      <option value="10">10 кристаллов</option>
+    </select>
+
+    <div class="tournament-note">Можно ставить только монеты, только кристаллы или обе ставки сразу. Максимум: 500 монет и 10 кристаллов. Победитель получает 80% общего банка.</div>
+
+    <div class="create-buttons">
+      <button id="confirm-tournament-create">Создать турнир</button>
+      <button id="cancel-tournament-create">Отмена</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="settings-window" class="hidden">
+  <div class="settings-content">
+    <h2>Настройки</h2>
+
+    <div class="settings-group">
+      <div class="settings-label">
+        <span>Чувствительность мыши</span>
+        <span class="settings-value" id="mouse-sensitivity-value">1.00x</span>
+      </div>
+      <input type="range" id="mouse-sensitivity" min="0.2" max="2.5" step="0.05" value="1">
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-check">
+        <input type="checkbox" id="invert-y">
+        <span>Инверсия по Y</span>
+      </label>
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-check">
+        <input type="checkbox" id="sound-enabled" checked>
+        <span>Включить звуки эффектов</span>
+      </label>
+
+      <div class="settings-label">
+        <span>Громкость эффектов</span>
+        <span class="settings-value" id="sound-volume-value">100%</span>
+      </div>
+      <input type="range" id="sound-volume" min="0" max="1" step="0.01" value="1">
+    </div>
+
+    <div class="settings-group">
+      <label class="settings-check">
+        <input type="checkbox" id="music-enabled" checked>
+        <span>Включить музыку</span>
+      </label>
+
+      <div class="settings-label">
+        <span>Громкость музыки</span>
+        <span class="settings-value" id="music-volume-value">40%</span>
+      </div>
+      <input type="range" id="music-volume" min="0" max="1" step="0.01" value="0.4">
+    </div>
+
+    <div class="settings-group" id="settings-nickname-group">
+      <div class="settings-label">
+        <span>Ник пилота</span>
+        <span class="settings-value" id="nickname-status">текущий</span>
+      </div>
+      <input type="text" id="nickname-input" maxlength="20" placeholder="Новый ник">
+      <button id="save-nickname-btn" type="button">Сохранить ник</button>
+    </div>
+
+    <div class="settings-actions">
+      <button id="battle-settings-save-btn" type="button" style="display:none;">Сохранить</button>
+      <button id="close-settings">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="battle-screen" style="display:none;">
+  <div id="battle-crosshair"></div>
+  <div id="battle-top-meta">
+    <div id="battle-room-line"><span id="battle-room-name">Комната</span> | <span id="battle-room-datetime">--/--/---- --:--</span></div>
+    <div id="battle-ping-line">ping: <span id="battle-ping-value">--</span></div>
+  </div>
+  <div id="battle-top-actions">
+    <button id="battle-fullscreen-btn" class="battle-top-action" type="button" title="Полный экран">◱</button>
+    <button id="battle-sound-btn" class="battle-top-action" type="button" title="Звук">🔊</button>
+    <button id="battle-settings-icon-btn" class="battle-top-action" type="button" title="Настройки">⚙</button>
+  </div>
+  <div id="enemy-hud">
+    <div id="enemy-name">BOT DRONE</div>
+    <div id="enemy-hp-bar-wrap"><div id="enemy-hp-bar"></div><div id="enemy-hp-inline-text">0 / 0</div></div>
+    <div id="enemy-hp-text">0 / 0</div>
+  </div>
+  <div id="battle-player-hud">
+    <div class="battle-player-title">Корабль</div>
+    <div id="battle-player-hp-wrap"><div id="battle-player-hp-fill"></div><div id="battle-player-hp-inline-text">100 / 100</div></div>
+    <div id="battle-player-hp-text">HP: 100 / 100</div>
+    <div id="battle-ammo-text">Боеприпасы: 50 / 50 | запас ∞</div>
+    <div id="battle-damage-text">Урон: 12</div>
+    <div id="battle-energy-wrap"><div id="battle-energy-fill"></div></div>
+    <div id="battle-energy-text">Энергия: ⚡ 0.0 / 120</div>
+    <div id="battle-reload-text">R — перезарядка</div>
+  </div>
+  <div id="battle-player-world-name" class="hidden"></div>
+  <div id="battle-player-world-hp" class="hidden">
+    <div id="battle-player-world-hp-fill"></div><div id="battle-player-world-hp-text">100 / 100</div>
+  </div>
+  <div id="battle-scoreboard" class="hidden">
+    <div class="battle-scoreboard-header">
+      <span>CLAN</span>
+      <span>НИК</span>
+      <span>ФРАГИ</span>
+      <span>СМЕРТИ</span>
+      <span>УРОВЕНЬ</span>
+      <span>ID</span>
+      <span>PING</span>
+    </div>
+    <div id="battle-scoreboard-body">
+      <div class="battle-scoreboard-row enemy">
+        <span></span>
+        <span>На карте нет активных игроков</span>
+        <span>0</span>
+        <span>0</span>
+        <span>—</span>
+        <span>—</span>
+      </div>
+    </div>
+  </div>
+  <div id="battle-pause-menu" class="hidden">
+    <div class="battle-pause-box">
+      <div class="battle-pause-title">Меню карты</div>
+      <button id="battle-open-settings-btn" type="button">Настройки</button>
+      <button id="battle-save-settings-btn" type="button">Сохранить изменения</button>
+      <button id="battle-leave-map-btn" type="button">Выйти с карты</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== HANGAR WINDOW ===== -->
+<div id="hangar-window" class="hidden">
+  <div class="hangar-shell hangar-shell-v128">
+    <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
+
+    <div class="hangar-topbar">
+      <div class="hangar-title-wrap">
+        <div class="hangar-kicker">COSMIC DOCK</div>
+        <h2>Ангар</h2>
+      </div>
+      <div class="hangar-class-filter" id="hangar-class-filter">
+        <button class="hangar-class-chip active" data-hangar-class="fighters" type="button">Cargo Drone</button>
+      </div>
+    </div>
+
+    <div class="hangar-layout hangar-layout-v128">
+      <aside class="hangar-wall-panel hangar-left-wall" id="hangar-left-wall">
+        <div class="hangar-side-title">Модули</div>
+        <div class="hangar-module-filter" id="hangar-module-filter">
+          <button class="hangar-module-chip active" data-hangar-module-type="weapon" type="button">Пушки</button>
+          <button class="hangar-module-chip" data-hangar-module-type="shield" type="button">Щиты</button>
+          <button class="hangar-module-chip" data-hangar-module-type="booster" type="button">Ускорители</button>
+        </div>
+        <div id="hangar-module-list" class="hangar-module-list"></div>
+        <div class="hangar-module-meta compact">
+          <div id="hangar-module-name" class="hangar-module-name">—</div>
+          <div id="hangar-module-type" class="hangar-module-type">—</div>
+          <div id="hangar-module-desc" class="hangar-module-desc">—</div>
+          <div class="hangar-module-actions">
+            <button id="hangar-module-action" class="hangar-module-action" type="button">Установить</button>
+            <button id="hangar-module-sell" class="hangar-module-action hangar-module-sell" type="button">Продать</button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="hangar-room-wrap-v128">
+        <button id="hangar-ship-left" class="hangar-arrow horizontal hangar-nav-edge" type="button">◀</button>
+        <div class="hangar-room-frame">
+          <div class="hangar-room-shell hangar-stage" id="hangar-room-shell" data-look="center">
+            <div class="hangar-room-wall hangar-room-wall-left"></div>
+            <div class="hangar-room-wall hangar-room-wall-right"></div>
+            <div class="hangar-room-wall hangar-room-wall-back"></div>
+            <div class="hangar-room-floor"></div>
+            <div class="hangar-room-glow"></div>
+            <div id="hangar-3d-stage" class="hangar-3d-stage"></div>
+            <div class="hangar-stage-overlay hangar-stage-overlay-v128">
+              <div class="hangar-stage-name-badge" id="hangar-stage-name-badge">Cargo Drone</div>
+            </div>
+          </div>
+        </div>
+        <button id="hangar-ship-right" class="hangar-arrow horizontal hangar-nav-edge" type="button">▶</button>
+      </section>
+
+      <aside class="hangar-wall-panel hangar-right-wall" id="hangar-right-wall">
+        <div class="hangar-side-title">Корабль</div>
+        <div class="hangar-ship-card compact hangar-ship-card-v128">
+          <div id="hangar-ship-name" class="hangar-ship-name">—</div>
+          <div id="hangar-ship-subtitle" class="hangar-ship-subtitle"></div>
+        </div>
+        <div class="hangar-stats-grid compact hangar-stats-grid-v128" id="hangar-ship-stats"></div>
+        <div class="hangar-footer-row hangar-footer-row-v128">
+          <div id="hangar-ship-position" class="hangar-position-label">1 / 1</div>
+          <div class="hangar-footer-actions">
+            <button id="hangar-ship-action" class="hangar-main-btn" type="button">Оснастить корпус</button>
+            <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать корпус</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+
+<div id="clans-window" class="hidden">
+  <div class="clans-content">
+    <h2 class="window-title">Кланы</h2>
+    <div id="clans-info"></div>
+    <div class="clan-chat-note">💬 Клановый чат теперь живёт во вкладке <b>Clan</b> в общем чате лобби.</div>
+    <div class="clan-actions">
+      <button id="close-clans" class="cosmic-btn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<div id="leaders-window" class="hidden">
+  <div class="leaders-content">
+    <h2 class="window-title">Лидеры</h2>
+    <div id="leaders-info"></div>
+    <div class="window-actions">
+      <button id="close-leaders" class="cosmic-btn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="battle-chat-box" class="hidden">
+  <div id="battle-chat-log"></div>
+  <input id="battle-chat-input" type="text" placeholder="Напишите сообщение и нажмите Enter...">
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://htflrhpqrbwqvlyxgbpu.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_SWbPj79rY6fTYjaoHODtDg_0KNOSRLb';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+window.supabaseClient = supabase;
+window.supabaseReady = true;
+
+console.log('🔥 Supabase подключен и готов к работе');
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
   }
+}
+</script>
+<script type="module" src="main.js"></script>
 
-  function refreshUi() {
-    if (!HANGAR.ui.root) return;
-    const roomLabel = HANGAR.currentRoom === 'ships'
-      ? 'Зал кораблей'
-      : HANGAR.currentRoom === 'modules'
-      ? 'Модульный отсек'
-      : HANGAR.currentRoom === 'control'
-      ? 'Комната управления'
-      : 'Главный ангар';
 
-    HANGAR.ui.room.textContent = `Локация: ${roomLabel}`;
-    HANGAR.ui.ship.textContent = `Корабль: ${SHIP_DATA[HANGAR.selectedShip].name}`;
-    HANGAR.ui.module.textContent = `Модуль: ${MODULE_DATA[HANGAR.selectedModule].name}`;
-
-    HANGAR.ui.stats.innerHTML = `
-      <div class="hangar-stat-row"><span>HP</span><strong>${SHIP_DATA[HANGAR.selectedShip].hp}</strong></div>
-      <div class="hangar-stat-row"><span>Скорость</span><strong>${SHIP_DATA[HANGAR.selectedShip].speed}</strong></div>
-      <div class="hangar-stat-row"><span>Энергия</span><strong>${SHIP_DATA[HANGAR.selectedShip].energy}</strong></div>
-      <div class="hangar-stat-row"><span>Модуль</span><strong>${MODULE_DATA[HANGAR.selectedModule].bonus}</strong></div>
-    `;
-
-    if (HANGAR.hoverTarget) {
-      HANGAR.ui.help.textContent = `Нажми E: ${HANGAR.hoverTarget.userData.name}`;
-    } else {
-      HANGAR.ui.help.textContent = 'Подойди ближе к кораблю или модулю и нажми E';
-    }
-  }
-
-  window.startCosmicHangarPrototype = initHangarPrototype;
-})();
-    startCosmicHangarPrototype();
-  </script>
+<script>
+// ===== V79 FIX ACTIVE CLASS =====
+document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.hangar-class-chip').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
 </body>
 </html>
