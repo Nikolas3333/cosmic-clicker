@@ -5238,48 +5238,24 @@ shop-main-head{
   position:relative !important;
   width:100% !important;
   height:100% !important;
-  min-height:650px !important;
-  border-radius:34px !important;
+  min-height:720px !important;
+  border-radius:38px !important;
   overflow:hidden !important;
   transform-style:preserve-3d !important;
   transform:rotateY(0deg) rotateX(0deg) !important;
   transition:box-shadow 0.25s ease, border-color 0.25s ease !important;
-  border:1px solid rgba(120,220,255,0.14) !important;
-  box-shadow:0 0 34px rgba(0,150,255,0.12), inset 0 0 60px rgba(255,255,255,0.02) !important;
-  background:radial-gradient(circle at 50% 18%, rgba(46,94,166,0.16), transparent 22%), linear-gradient(180deg, #081423 0%, #050b15 100%) !important;
+  border:1px solid rgba(120,220,255,0.10) !important;
+  box-shadow:0 0 44px rgba(0,150,255,0.14), inset 0 0 120px rgba(255,255,255,0.015) !important;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(76,132,220,0.12), transparent 24%),
+    linear-gradient(180deg, #060d18 0%, #040810 45%, #02050b 100%) !important;
 }
 #hangar-window .hangar-room-wall,
 #hangar-window .hangar-room-floor,
 #hangar-window .hangar-room-glow{
   position:absolute;
   pointer-events:none;
-}
-#hangar-window .hangar-room-wall-left{
-  inset:0 auto 0 0;
-  width:22%;
-  background:linear-gradient(90deg, rgba(133,214,255,0.10), rgba(16,30,52,0.55) 52%, transparent 100%);
-  clip-path:polygon(0 0, 100% 10%, 100% 90%, 0 100%);
-}
-#hangar-window .hangar-room-wall-right{
-  inset:0 0 0 auto;
-  width:22%;
-  background:linear-gradient(270deg, rgba(133,214,255,0.10), rgba(16,30,52,0.55) 52%, transparent 100%);
-  clip-path:polygon(0 10%, 100% 0, 100% 100%, 0 90%);
-}
-#hangar-window .hangar-room-wall-back{
-  left:18%; right:18%; top:0; height:52%;
-  background:linear-gradient(180deg, rgba(86,180,255,0.11), rgba(10,18,34,0.18) 40%, transparent 100%);
-  clip-path:polygon(6% 0, 94% 0, 100% 18%, 100% 100%, 0 100%, 0 18%);
-}
-#hangar-window .hangar-room-floor{
-  left:12%; right:12%; bottom:-2%; height:38%;
-  background:radial-gradient(circle at 50% 0%, rgba(70,180,255,0.18), transparent 48%), linear-gradient(180deg, rgba(14,24,44,0.2), rgba(8,14,26,0.88));
-  clip-path:polygon(14% 0, 86% 0, 100% 100%, 0 100%);
-}
-#hangar-window .hangar-room-glow{
-  inset:auto 20% 10% 20%; height:20%;
-  background:radial-gradient(circle at 50% 50%, rgba(0,210,255,0.28), rgba(0,150,255,0.08) 42%, transparent 70%);
-  filter:blur(20px);
+  opacity:0 !important;
 }
 #hangar-window #hangar-3d-stage{
   position:absolute !important;
@@ -5293,21 +5269,21 @@ shop-main-head{
 #hangar-window .hangar-stage-overlay-v128{
   position:absolute !important;
   inset:0 !important;
-  padding:16px !important;
+  padding:18px !important;
   pointer-events:none !important;
   display:flex !important;
   align-items:flex-start !important;
   justify-content:center !important;
   z-index:5 !important;
-  background:none !important;
+  background:linear-gradient(180deg, rgba(0,0,0,0.14), transparent 16%, transparent 78%, rgba(0,0,0,0.18)) !important;
 }
 #hangar-window .hangar-stage-name-badge{
   margin-top:10px !important;
   border-radius:999px !important;
   padding:10px 18px !important;
-  background:rgba(5,16,34,0.74) !important;
-  border:1px solid rgba(120,220,255,0.18) !important;
-  box-shadow:0 0 16px rgba(0,170,255,0.10) !important;
+  background:rgba(5,16,34,0.56) !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:0 0 16px rgba(0,170,255,0.08) !important;
 }
 #hangar-window .hangar-stage-overlay-stack{
   display:flex !important;
@@ -5318,21 +5294,21 @@ shop-main-head{
 #hangar-window .hangar-move-hint{
   border-radius:999px !important;
   padding:8px 14px !important;
-  background:rgba(5,14,28,0.52) !important;
-  border:1px solid rgba(120,220,255,0.12) !important;
+  background:rgba(5,14,28,0.42) !important;
+  border:1px solid rgba(120,220,255,0.08) !important;
   color:#d6f8ff !important;
   font-size:11px !important;
   letter-spacing:0.04em !important;
   text-transform:uppercase !important;
-  box-shadow:0 0 14px rgba(0,170,255,0.08) !important;
+  box-shadow:0 0 14px rgba(0,170,255,0.04) !important;
 }
 #hangar-window .hangar-nav-edge{
   width:56px !important;
   height:168px !important;
   border-radius:22px !important;
-  background:linear-gradient(180deg, rgba(17,31,52,0.88), rgba(9,17,30,0.95)) !important;
-  border:1px solid rgba(120,220,255,0.18) !important;
-  box-shadow:0 0 18px rgba(0,150,255,0.10) !important;
+  background:linear-gradient(180deg, rgba(17,31,52,0.74), rgba(9,17,30,0.82)) !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:0 0 18px rgba(0,150,255,0.08) !important;
 }
 #hangar-window .hangar-nav-edge:hover:not(:disabled){
   transform:scale(1.02) !important;
@@ -5369,17 +5345,13 @@ shop-main-head{
   padding-top:12px !important;
   border-top:1px solid rgba(255,255,255,0.08) !important;
 }
-#hangar-window .hangar-module-name{
-  font-size:18px !important;
-}
+#hangar-window .hangar-module-name{ font-size:18px !important; }
 #hangar-window .hangar-module-desc{
   min-height:auto !important;
   font-size:12px !important;
   line-height:1.4 !important;
 }
-#hangar-window .hangar-module-actions{
-  grid-template-columns:1fr !important;
-}
+#hangar-window .hangar-module-actions{ grid-template-columns:1fr !important; }
 #hangar-window .hangar-module-action,
 #hangar-window .hangar-main-btn{
   min-height:42px !important;
@@ -5415,12 +5387,8 @@ shop-main-head{
   padding:10px 10px !important;
   border-radius:14px !important;
 }
-#hangar-window .hangar-stat-label{
-  font-size:10px !important;
-}
-#hangar-window .hangar-stat-value{
-  font-size:16px !important;
-}
+#hangar-window .hangar-stat-label{ font-size:10px !important; }
+#hangar-window .hangar-stat-value{ font-size:16px !important; }
 #hangar-window .hangar-footer-row-v128{
   display:flex !important;
   flex-direction:column !important;
@@ -5448,7 +5416,7 @@ shop-main-head{
     overflow:auto !important;
   }
   #hangar-window .hangar-room-shell{
-    min-height:520px !important;
+    min-height:560px !important;
   }
   #hangar-window .hangar-room-wrap-v128{
     order:1 !important;
