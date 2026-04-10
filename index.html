@@ -5309,6 +5309,23 @@ shop-main-head{
   border:1px solid rgba(120,220,255,0.18) !important;
   box-shadow:0 0 16px rgba(0,170,255,0.10) !important;
 }
+#hangar-window .hangar-stage-overlay-stack{
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  gap:8px !important;
+}
+#hangar-window .hangar-move-hint{
+  border-radius:999px !important;
+  padding:8px 14px !important;
+  background:rgba(5,14,28,0.52) !important;
+  border:1px solid rgba(120,220,255,0.12) !important;
+  color:#d6f8ff !important;
+  font-size:11px !important;
+  letter-spacing:0.04em !important;
+  text-transform:uppercase !important;
+  box-shadow:0 0 14px rgba(0,170,255,0.08) !important;
+}
 #hangar-window .hangar-nav-edge{
   width:56px !important;
   height:168px !important;
@@ -5938,7 +5955,7 @@ shop-main-head{
             <div class="hangar-room-glow"></div>
             <div id="hangar-3d-stage" class="hangar-3d-stage"></div>
             <div class="hangar-stage-overlay hangar-stage-overlay-v128">
-              <div class="hangar-stage-name-badge" id="hangar-stage-name-badge">Cargo Drone</div>
+              <div class="hangar-stage-overlay-stack"><div class="hangar-stage-name-badge" id="hangar-stage-name-badge">Cargo Drone</div><div class="hangar-move-hint">WASD — движение • Space — прыжок • Shift — бег</div></div>
             </div>
           </div>
         </div>
