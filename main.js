@@ -8054,6 +8054,8 @@ const hangarState = {
     platformBeams: [],
     shipPivot: null,
     modulePivot: null,
+    modulePads: {},
+    supportPlatforms: [],
     frameId: 0,
     resizeBound: false,
     shipItem: null,
@@ -8066,6 +8068,7 @@ const hangarState = {
     transitionDirection: 0,
     transitionStartedAt: 0,
     stageBound: false,
+    moveBound: false,
     isShipLoading: false,
     roomLookTarget: 0,
     roomLookCurrent: 0,
@@ -8074,7 +8077,18 @@ const hangarState = {
     envGroup: null,
     envAnimatedMaterials: [],
     envLightBars: [],
-    envGlowPanels: []
+    envGlowPanels: [],
+    astronaut: null,
+    astronautPivot: null,
+    astronautKeys: { w:false, a:false, s:false, d:false, shift:false, space:false },
+    astronautVelocity: new THREE.Vector3(),
+    astronautDirection: new THREE.Vector3(),
+    astronautTargetYaw: 0,
+    astronautGroundY: -1.84,
+    astronautBob: 0,
+    cameraFocus: new THREE.Vector3(0.72, -1.56, 0.86),
+    cameraPosition: new THREE.Vector3(0.18, 0.48, 12.2),
+    planets: []
 };
 
 const STARTER_HULL_IDS = ['scout_1'];
@@ -9042,6 +9056,157 @@ function createHangarShipMesh(item){
     return group;
 }
 
+
+function createHangarAstronaut(){
+    const group = new THREE.Group();
+    const suitMat = new THREE.MeshStandardMaterial({ color:0xe7edf6, metalness:0.35, roughness:0.56 });
+    const trimMat = new THREE.MeshStandardMaterial({ color:0x2c4e86, metalness:0.58, roughness:0.34 });
+    const visorMat = new THREE.MeshStandardMaterial({ color:0x7bd8ff, emissive:0x2cb8ff, emissiveIntensity:0.45, metalness:0.85, roughness:0.12, transparent:true, opacity:0.92 });
+    const glowMat = new THREE.MeshBasicMaterial({ color:0x6ee7ff });
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.0, 0.42), suitMat);
+    torso.position.y = 1.6;
+    group.add(torso);
+
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.08), trimMat);
+    chest.position.set(0, 1.62, 0.25);
+    group.add(chest);
+
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), suitMat);
+    helmet.position.y = 2.36;
+    group.add(helmet);
+
+    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.23, 16, 16, 0, Math.PI), visorMat);
+    visor.position.set(0, 2.34, 0.18);
+    visor.scale.set(1, 0.82, 0.55);
+    group.add(visor);
+
+    const backpack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.62, 0.22), trimMat);
+    backpack.position.set(0, 1.56, -0.28);
+    group.add(backpack);
+
+    const addLimb = (geo, x, y, z, rotZ=0) => {
+        const mesh = new THREE.Mesh(geo, suitMat);
+        mesh.position.set(x, y, z);
+        mesh.rotation.z = rotZ;
+        group.add(mesh);
+        return mesh;
+    };
+
+    addLimb(new THREE.CapsuleGeometry(0.1, 0.66, 5, 12), -0.44, 1.6, 0, 0.18);
+    addLimb(new THREE.CapsuleGeometry(0.1, 0.66, 5, 12), 0.44, 1.6, 0, -0.18);
+    addLimb(new THREE.CapsuleGeometry(0.12, 0.82, 5, 12), -0.18, 0.76, 0, 0.04);
+    addLimb(new THREE.CapsuleGeometry(0.12, 0.82, 5, 12), 0.18, 0.76, 0, -0.04);
+
+    [-0.18, 0.18].forEach((x) => {
+        const boot = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.34), trimMat);
+        boot.position.set(x, 0.16, 0.06);
+        group.add(boot);
+    });
+
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 10), glowMat);
+    lamp.position.set(0.12, 2.42, 0.24);
+    group.add(lamp);
+
+    group.userData.walkParts = {
+        armL: group.children[4],
+        armR: group.children[5],
+        legL: group.children[6],
+        legR: group.children[7]
+    };
+    group.position.set(0, hangarState.astronautGroundY, 5.2);
+    return group;
+}
+
+function createHangarExteriorPlanets(){
+    const items = [];
+    const makePlanet = (radius, color, emissive, x, y, z, scaleX=1, ring=false) => {
+        const pivot = new THREE.Group();
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(radius, 28, 28),
+            new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity:0.22, metalness:0.08, roughness:0.92 })
+        );
+        mesh.scale.x = scaleX;
+        pivot.add(mesh);
+        if(ring){
+            const ringMesh = new THREE.Mesh(
+                new THREE.TorusGeometry(radius * 1.7, radius * 0.18, 16, 64),
+                new THREE.MeshBasicMaterial({ color:0xcdb8ff, transparent:true, opacity:0.42 })
+            );
+            ringMesh.rotation.x = Math.PI / 2.35;
+            ringMesh.rotation.y = 0.4;
+            pivot.add(ringMesh);
+        }
+        pivot.position.set(x,y,z);
+        return pivot;
+    };
+    items.push(makePlanet(1.45, 0x4f7bff, 0x2746aa, 0, 2.6, 24));
+    items.push(makePlanet(0.95, 0xb982ff, 0x5f2bb8, -18, 1.4, -1, 1.08, true));
+    items.push(makePlanet(1.18, 0xf2b16d, 0xb85c1b, 18, 2.0, -4));
+    return items;
+}
+
+function createHangarSidePlatform(labelText = ''){
+    const group = new THREE.Group();
+    const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.18, 1.45, 0.22, 24),
+        new THREE.MeshStandardMaterial({ color:0x213757, metalness:0.72, roughness:0.34 })
+    );
+    group.add(base);
+    const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.98, 0.06, 12, 42),
+        new THREE.MeshBasicMaterial({ color:0x74dfff, transparent:true, opacity:0.72 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.14;
+    group.add(ring);
+    const glow = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.88, 0.88, 0.04, 24),
+        new THREE.MeshBasicMaterial({ color:0x39c8ff, transparent:true, opacity:0.16 })
+    );
+    glow.position.y = 0.16;
+    group.add(glow);
+    group.userData.ring = ring;
+    group.userData.glow = glow;
+    group.userData.label = labelText;
+    return group;
+}
+
+function bindHangarMovementControls(){
+    if(hangarState.moveBound) return;
+    hangarState.moveBound = true;
+    const setKey = (code, active) => {
+        if(code === 'KeyW') hangarState.astronautKeys.w = active;
+        if(code === 'KeyA') hangarState.astronautKeys.a = active;
+        if(code === 'KeyS') hangarState.astronautKeys.s = active;
+        if(code === 'KeyD') hangarState.astronautKeys.d = active;
+        if(code === 'ShiftLeft' || code === 'ShiftRight') hangarState.astronautKeys.shift = active;
+        if(code === 'Space') hangarState.astronautKeys.space = active;
+    };
+    document.addEventListener('keydown', (e) => {
+        if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
+        if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(e.code)){
+            if(e.code === 'Space') e.preventDefault();
+            setKey(e.code, true);
+        }
+    });
+    document.addEventListener('keyup', (e) => {
+        if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(e.code)){
+            setKey(e.code, false);
+        }
+    });
+}
+
+function resetHangarAstronautState(){
+    hangarState.astronautKeys = { w:false, a:false, s:false, d:false, shift:false, space:false };
+    hangarState.astronautVelocity.set(0,0,0);
+    hangarState.astronautDirection.set(0,0,0);
+    if(hangarState.astronautPivot){
+        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 5.2);
+        hangarState.astronautPivot.rotation.y = Math.PI;
+    }
+}
+
 function createHangarModuleMesh(item){
     const art = String(item?.art || item?.typeId || 'module').toLowerCase();
     const neon = item?.neon || '#7efcff';
@@ -9288,6 +9453,12 @@ function disposeHangarRenderer(){
     hangarState.envAnimatedMaterials = [];
     hangarState.envLightBars = [];
     hangarState.envGlowPanels = [];
+    hangarState.modulePads = {};
+    hangarState.supportPlatforms = [];
+    hangarState.astronaut = null;
+    hangarState.astronautPivot = null;
+    hangarState.planets = [];
+    resetHangarAstronautState();
 }
 
 function updateHangarHeaderNumbers(){
@@ -9795,7 +9966,13 @@ function rebuildHangarSceneObjects(){
 
     if(currentModule){
         const moduleMesh = createHangarModuleMesh(currentModule);
-        moduleMesh.position.set(-6.9, 2.7, 0.18);
+        const currentType = String(currentModule?.classId || currentModule?.typeId || getCurrentHangarModuleType()).trim();
+        const pad = hangarState.modulePads?.[currentType] || hangarState.modulePads?.weapon || null;
+        if(pad){
+            moduleMesh.position.set(pad.position.x, pad.position.y + 1.02, pad.position.z + 0.02);
+        }else{
+            moduleMesh.position.set(-6.9, 2.7, 0.18);
+        }
         hangarState.modulePivot.add(moduleMesh);
     }
 
@@ -9807,6 +9984,7 @@ function ensureHangarRenderer(){
     if(!stage) return;
 
     bindHangarStageInteraction();
+    bindHangarMovementControls();
 
     if(!hangarState.renderer){
         hangarState.renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
@@ -9816,8 +9994,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
-        hangarState.camera.position.set(0.18, 0.48, 12.2);
-        hangarState.camera.lookAt(0.7, -1.55, 0.86);
+        hangarState.camera.position.copy(hangarState.cameraPosition);
+        hangarState.camera.lookAt(hangarState.cameraFocus);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -9847,6 +10025,9 @@ function ensureHangarRenderer(){
         hangarState.envGlowPanels = hangarState.envGroup.userData?.glowPanels || [];
         hangarState.scene.add(hangarState.envGroup);
 
+        hangarState.planets = createHangarExteriorPlanets();
+        hangarState.planets.forEach(planet => hangarState.scene.add(planet));
+
         hangarState.platform = createHangarPlatform();
         hangarState.platform.position.set(0.42, -1.82, 1.0);
         hangarState.platform.scale.set(0.188, 0.188, 0.188);
@@ -9857,6 +10038,28 @@ function ensureHangarRenderer(){
 
         hangarState.shipPivot = new THREE.Group();
         hangarState.modulePivot = new THREE.Group();
+        hangarState.modulePads = {
+            weapon: createHangarSidePlatform('Пушки'),
+            shield: createHangarSidePlatform('Щиты'),
+            booster: createHangarSidePlatform('Ускорители')
+        };
+        hangarState.modulePads.weapon.position.set(-7.55, -1.62, -4.8);
+        hangarState.modulePads.shield.position.set(-7.55, -1.62, 0.2);
+        hangarState.modulePads.booster.position.set(-7.55, -1.62, 5.2);
+        Object.values(hangarState.modulePads).forEach(pad => hangarState.scene.add(pad));
+
+        hangarState.supportPlatforms = [];
+        [[7.45, -4.8], [7.45, 0.15], [7.45, 5.1], [-2.9, -6.8], [2.9, -6.8]].forEach(([x,z]) => {
+            const pad = createHangarSidePlatform();
+            pad.scale.setScalar(x > 6 ? 0.92 : 0.84);
+            pad.position.set(x, -1.7, z);
+            hangarState.supportPlatforms.push(pad);
+            hangarState.scene.add(pad);
+        });
+
+        hangarState.astronautPivot = createHangarAstronaut();
+        hangarState.astronaut = hangarState.astronautPivot;
+        hangarState.scene.add(hangarState.astronautPivot);
         requestAnimationFrame(() => {
             try{
                 const shipsToWarm = getOwnedHangarShips().slice(0, 6);
@@ -9965,9 +10168,27 @@ function ensureHangarRenderer(){
         if(hangarState.modulePivot){
             hangarState.modulePivot.visible = !!hangarState.moduleItem;
             hangarState.modulePivot.rotation.y -= 0.012;
-            hangarState.modulePivot.rotation.x = Math.sin(time * 0.8) * 0.16;
-            hangarState.modulePivot.position.set(-6.7, 1.55 + Math.sin(time * 1.5) * 0.12, 0.3);
+            hangarState.modulePivot.rotation.x = Math.sin(time * 0.8) * 0.1;
         }
+        Object.entries(hangarState.modulePads || {}).forEach(([typeId, pad], idx) => {
+            if(!pad?.userData) return;
+            const active = typeId === getCurrentHangarModuleType();
+            const ring = pad.userData.ring;
+            const glow = pad.userData.glow;
+            if(ring?.material){
+                ring.material.opacity = active ? 0.95 : 0.42;
+                ring.material.color.setHSL(active ? 0.53 : 0.58 + idx * 0.03, 0.9, active ? 0.72 : 0.58);
+            }
+            if(glow?.material){
+                glow.material.opacity = active ? 0.26 : 0.08;
+            }
+            pad.rotation.y += active ? 0.006 : 0.002;
+        });
+        (hangarState.supportPlatforms || []).forEach((pad, idx) => {
+            if(!pad?.userData?.ring?.material) return;
+            pad.rotation.y += 0.0012 + idx * 0.00012;
+            pad.userData.ring.material.opacity = 0.22 + Math.sin(time * 0.8 + idx) * 0.05;
+        });
 
         if(Array.isArray(hangarState.envAnimatedMaterials)){
             hangarState.envAnimatedMaterials.forEach((mat, idx) => {
@@ -9989,6 +10210,48 @@ function ensureHangarRenderer(){
             });
         }
 
+        if(hangarState.astronautPivot){
+            const moveX = (hangarState.astronautKeys.d ? 1 : 0) - (hangarState.astronautKeys.a ? 1 : 0);
+            const moveZ = (hangarState.astronautKeys.s ? 1 : 0) - (hangarState.astronautKeys.w ? 1 : 0);
+            hangarState.astronautDirection.set(moveX, 0, moveZ);
+            const isMoving = hangarState.astronautDirection.lengthSq() > 0.001;
+            const runMul = hangarState.astronautKeys.shift ? 1.75 : 1.0;
+            const targetSpeed = isMoving ? 0.065 * runMul : 0;
+            if(isMoving){
+                hangarState.astronautDirection.normalize();
+                hangarState.astronautVelocity.x += (hangarState.astronautDirection.x * targetSpeed - hangarState.astronautVelocity.x) * 0.16;
+                hangarState.astronautVelocity.z += (hangarState.astronautDirection.z * targetSpeed - hangarState.astronautVelocity.z) * 0.16;
+                hangarState.astronautTargetYaw = Math.atan2(hangarState.astronautDirection.x, hangarState.astronautDirection.z);
+            }else{
+                hangarState.astronautVelocity.x *= 0.8;
+                hangarState.astronautVelocity.z *= 0.8;
+            }
+            if(hangarState.astronautKeys.space && Math.abs(hangarState.astronautPivot.position.y - hangarState.astronautGroundY) < 0.04){
+                hangarState.astronautVelocity.y = 0.17;
+            }
+            hangarState.astronautVelocity.y -= 0.0095;
+            hangarState.astronautPivot.position.x = THREE.MathUtils.clamp(hangarState.astronautPivot.position.x + hangarState.astronautVelocity.x, -4.6, 4.6);
+            hangarState.astronautPivot.position.z = THREE.MathUtils.clamp(hangarState.astronautPivot.position.z + hangarState.astronautVelocity.z, 2.35, 8.6);
+            hangarState.astronautPivot.position.y += hangarState.astronautVelocity.y;
+            if(hangarState.astronautPivot.position.y <= hangarState.astronautGroundY){
+                hangarState.astronautPivot.position.y = hangarState.astronautGroundY;
+                hangarState.astronautVelocity.y = 0;
+            }
+            hangarState.astronautPivot.rotation.y += (hangarState.astronautTargetYaw - hangarState.astronautPivot.rotation.y) * 0.16;
+            hangarState.astronautBob += isMoving ? 0.18 * runMul : 0.06;
+            const walkSwing = isMoving ? Math.sin(hangarState.astronautBob) * 0.55 : 0;
+            const parts = hangarState.astronautPivot.userData?.walkParts || {};
+            if(parts.armL) parts.armL.rotation.x = walkSwing;
+            if(parts.armR) parts.armR.rotation.x = -walkSwing;
+            if(parts.legL) parts.legL.rotation.x = -walkSwing;
+            if(parts.legR) parts.legR.rotation.x = walkSwing;
+        }
+        (hangarState.planets || []).forEach((planet, idx) => {
+            if(!planet) return;
+            planet.rotation.y += 0.0018 + idx * 0.0006;
+            planet.rotation.x += 0.0007 + idx * 0.0002;
+        });
+
         hangarState.roomLookCurrent += (hangarState.roomLookTarget - hangarState.roomLookCurrent) * 0.08;
         hangarState.roomTiltCurrent += (hangarState.roomTiltTarget - hangarState.roomTiltCurrent) * 0.08;
 
@@ -9998,10 +10261,14 @@ function ensureHangarRenderer(){
         }
 
         if(hangarState.camera){
-            const camX = 0.2 + hangarState.roomLookCurrent * 0.026;
+            const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:5.2 };
+            const camX = 0.2 + hangarState.roomLookCurrent * 0.026 + astro.x * 0.22;
+            const camY = 0.42 + hangarState.roomTiltCurrent * 0.018 + Math.max(0, astro.y - hangarState.astronautGroundY) * 0.9;
+            const camZ = 12.2 + (astro.z - 5.2) * 0.22;
             hangarState.camera.position.x += (camX - hangarState.camera.position.x) * 0.06;
-            hangarState.camera.position.y += (0.42 + hangarState.roomTiltCurrent * 0.018 - hangarState.camera.position.y) * 0.06;
-            hangarState.camera.lookAt(0.72 + hangarState.roomLookCurrent * 0.08, -1.56, 0.86);
+            hangarState.camera.position.y += (camY - hangarState.camera.position.y) * 0.06;
+            hangarState.camera.position.z += (camZ - hangarState.camera.position.z) * 0.06;
+            hangarState.camera.lookAt(0.72 + hangarState.roomLookCurrent * 0.08 + astro.x * 0.09, -1.56 + Math.max(0, astro.y - hangarState.astronautGroundY) * 0.14, 0.86 + (astro.z - 5.2) * 0.04);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
@@ -10210,6 +10477,7 @@ function bindHangarControls(){
 
     bindOnce('close-hangar', () => {
         document.getElementById('hangar-window')?.classList.add('hidden');
+        resetHangarAstronautState();
         disposeHangarRenderer();
     });
 }
@@ -10219,6 +10487,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
         syncHangarSelectionState({ forceClass:true });
     }
     ensureHangarIndexes();
+    resetHangarAstronautState();
     bindHangarControls();
     updateHangarFilterButtons();
     fillHangarText();
