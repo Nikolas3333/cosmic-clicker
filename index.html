@@ -5246,7 +5246,7 @@ shop-main-head{
   transition:box-shadow 0.25s ease, border-color 0.25s ease !important;
   border:1px solid rgba(120,220,255,0.14) !important;
   box-shadow:0 0 34px rgba(0,150,255,0.12), inset 0 0 60px rgba(255,255,255,0.02) !important;
-  background:radial-gradient(circle at 50% 20%, rgba(46,94,166,0.12), transparent 24%), linear-gradient(180deg, #071220 0%, #050b15 100%) !important;
+  background:radial-gradient(circle at 50% 18%, rgba(46,94,166,0.16), transparent 22%), linear-gradient(180deg, #081423 0%, #050b15 100%) !important;
 }
 #hangar-window .hangar-room-wall,
 #hangar-window .hangar-room-floor,
@@ -5287,7 +5287,9 @@ shop-main-head{
   width:100% !important;
   height:100% !important;
   z-index:3 !important;
+  cursor:grab !important;
 }
+#hangar-window .hangar-room-shell.dragging #hangar-3d-stage{ cursor:grabbing !important; }
 #hangar-window .hangar-stage-overlay-v128{
   position:absolute !important;
   inset:0 !important;
