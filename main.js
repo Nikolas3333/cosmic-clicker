@@ -8070,7 +8070,11 @@ const hangarState = {
     roomLookTarget: 0,
     roomLookCurrent: 0,
     roomTiltTarget: 0,
-    roomTiltCurrent: 0
+    roomTiltCurrent: 0,
+    envGroup: null,
+    envAnimatedMaterials: [],
+    envLightBars: [],
+    envGlowPanels: []
 };
 
 const STARTER_HULL_IDS = ['scout_1'];
@@ -9094,6 +9098,173 @@ function createHangarModuleMesh(item){
     return group;
 }
 
+
+function createHangarRoomEnvironment(){
+    const group = new THREE.Group();
+    const animatedMaterials = [];
+    const lightBars = [];
+    const glowPanels = [];
+
+    const wallMat = new THREE.MeshStandardMaterial({ color:0x1a2436, metalness:0.72, roughness:0.34 });
+    const panelMat = new THREE.MeshStandardMaterial({ color:0x243752, metalness:0.82, roughness:0.28 });
+    const frameMat = new THREE.MeshStandardMaterial({ color:0x4b5d78, metalness:0.88, roughness:0.22 });
+    const floorMat = new THREE.MeshStandardMaterial({ color:0x0f1725, metalness:0.68, roughness:0.4 });
+    const laneMat = new THREE.MeshStandardMaterial({ color:0x121d2e, metalness:0.78, roughness:0.22 });
+    const stripMatBase = new THREE.MeshStandardMaterial({ color:0xe8f8ff, emissive:0x9edcff, emissiveIntensity:1.8, metalness:0.4, roughness:0.2 });
+    const cyanGlowMatBase = new THREE.MeshStandardMaterial({ color:0x8cdfff, emissive:0x37bfff, emissiveIntensity:1.35, metalness:0.3, roughness:0.22 });
+    const violetGlowMatBase = new THREE.MeshStandardMaterial({ color:0xe0b6ff, emissive:0x8f45ff, emissiveIntensity:0.9, metalness:0.25, roughness:0.24 });
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(30, 0.36, 24), floorMat.clone());
+    floor.position.set(0, -2.25, 0.2);
+    group.add(floor);
+
+    const centerLane = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.05, 22), laneMat.clone());
+    centerLane.position.set(0, -2.045, 0.15);
+    group.add(centerLane);
+
+    for(let i = 0; i < 9; i++){
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.02, 0.85), stripMatBase.clone());
+        strip.position.set(0, -2.01, -9.2 + i * 2.3);
+        strip.material.emissiveIntensity = 1.4 + (i % 2) * 0.35;
+        animatedMaterials.push(strip.material);
+        lightBars.push(strip);
+        group.add(strip);
+    }
+
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(22, 8.4, 0.5), wallMat.clone());
+    backWall.position.set(0, 1.3, -10.8);
+    group.add(backWall);
+
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(22, 0.38, 24), wallMat.clone());
+    ceiling.position.set(0, 4.95, 0.2);
+    group.add(ceiling);
+
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.45, 8, 24), wallMat.clone());
+    leftWall.position.set(-11.25, 1.05, 0.2);
+    group.add(leftWall);
+
+    const rightWall = leftWall.clone();
+    rightWall.position.x = 11.25;
+    group.add(rightWall);
+
+    const frontFrameTop = new THREE.Mesh(new THREE.BoxGeometry(18, 0.42, 0.65), frameMat.clone());
+    frontFrameTop.position.set(0, 3.95, 10.35);
+    group.add(frontFrameTop);
+
+    const frontFrameLeft = new THREE.Mesh(new THREE.BoxGeometry(0.45, 6.2, 0.65), frameMat.clone());
+    frontFrameLeft.position.set(-8.95, 1.0, 10.35);
+    group.add(frontFrameLeft);
+
+    const frontFrameRight = frontFrameLeft.clone();
+    frontFrameRight.position.x = 8.95;
+    group.add(frontFrameRight);
+
+    const frontView = new THREE.Mesh(
+        new THREE.PlaneGeometry(17.2, 6.8),
+        new THREE.MeshBasicMaterial({ color:0x3b4d7a, transparent:true, opacity:0.34 })
+    );
+    frontView.position.set(0, 1.05, 10.02);
+    group.add(frontView);
+
+    const frontGlow = new THREE.Mesh(
+        new THREE.PlaneGeometry(17, 6.5),
+        new THREE.MeshBasicMaterial({ color:0x5d5df7, transparent:true, opacity:0.2 })
+    );
+    frontGlow.position.set(0, 1.0, 9.94);
+    glowPanels.push(frontGlow);
+    group.add(frontGlow);
+
+    for(const side of [-1, 1]){
+        const sideFrame = new THREE.Mesh(new THREE.BoxGeometry(0.34, 7.2, 20), frameMat.clone());
+        sideFrame.position.set(8.9 * side, 1.15, 0.2);
+        group.add(sideFrame);
+
+        const sideGlass = new THREE.Mesh(
+            new THREE.PlaneGeometry(14.6, 5.8),
+            new THREE.MeshBasicMaterial({ color:0x394d80, transparent:true, opacity:0.22 })
+        );
+        sideGlass.position.set(8.67 * side, 1.2, 0.2);
+        sideGlass.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+        group.add(sideGlass);
+
+        const sideGlow = new THREE.Mesh(
+            new THREE.PlaneGeometry(14.2, 5.4),
+            new THREE.MeshBasicMaterial({ color: side < 0 ? 0x2c8dff : 0xa357ff, transparent:true, opacity:0.12 })
+        );
+        sideGlow.position.set(8.55 * side, 1.15, 0.2);
+        sideGlow.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+        glowPanels.push(sideGlow);
+        group.add(sideGlow);
+
+        for(let i = 0; i < 4; i++){
+            const beam = new THREE.Mesh(new THREE.BoxGeometry(18.4, 0.42, 0.5), frameMat.clone());
+            beam.position.set(0, 4.42, -8.4 + i * 5.3);
+            beam.rotation.z = 0;
+            group.add(beam);
+
+            const lightBar = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.12, 0.32), stripMatBase.clone());
+            lightBar.position.set(0, 4.17, -8.4 + i * 5.3);
+            lightBar.material.emissiveIntensity = 2.2;
+            animatedMaterials.push(lightBar.material);
+            lightBars.push(lightBar);
+            group.add(lightBar);
+        }
+
+        for(let bay = 0; bay < 3; bay++){
+            const z = -6.4 + bay * 6.2;
+            const dockBase = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.15, 3.5), panelMat.clone());
+            dockBase.position.set(side * 8.2, -1.64, z);
+            group.add(dockBase);
+
+            const dockArm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.24, 2.7), frameMat.clone());
+            dockArm.position.set(side * 7.15, -0.92, z);
+            dockArm.rotation.z = side * 0.42;
+            group.add(dockArm);
+
+            const glowPlate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.05, 2.2), (side < 0 ? cyanGlowMatBase : violetGlowMatBase).clone());
+            glowPlate.position.set(side * 7.45, -1.02, z);
+            glowPlate.material.emissiveIntensity = side < 0 ? 1.1 : 0.9;
+            animatedMaterials.push(glowPlate.material);
+            lightBars.push(glowPlate);
+            group.add(glowPlate);
+        }
+
+        for(let p = 0; p < 5; p++){
+            const lightPillar = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.8, 0.18), stripMatBase.clone());
+            lightPillar.position.set(side * 10.72, 0.68, -8 + p * 4.0);
+            lightPillar.material.emissiveIntensity = 1.2;
+            animatedMaterials.push(lightPillar.material);
+            lightBars.push(lightPillar);
+            group.add(lightPillar);
+        }
+    }
+
+    const backDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(6.4, 5.2, 0.36), frameMat.clone());
+    backDoorFrame.position.set(0, 0.15, -10.42);
+    group.add(backDoorFrame);
+
+    const backDoor = new THREE.Mesh(new THREE.BoxGeometry(4.6, 3.9, 0.12), panelMat.clone());
+    backDoor.position.set(0, -0.1, -10.16);
+    group.add(backDoor);
+
+    const leftAccent = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.08, 0.08), cyanGlowMatBase.clone());
+    leftAccent.position.set(-6.6, 2.05, -10.05);
+    animatedMaterials.push(leftAccent.material);
+    lightBars.push(leftAccent);
+    group.add(leftAccent);
+
+    const rightAccent = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.08, 0.08), violetGlowMatBase.clone());
+    rightAccent.position.set(6.6, 2.05, -10.05);
+    animatedMaterials.push(rightAccent.material);
+    lightBars.push(rightAccent);
+    group.add(rightAccent);
+
+    group.userData.animatedMaterials = animatedMaterials;
+    group.userData.lightBars = lightBars;
+    group.userData.glowPanels = glowPanels;
+    return group;
+}
+
 function disposeHangarRenderer(){
     if(hangarState.frameId){
         cancelAnimationFrame(hangarState.frameId);
@@ -9113,6 +9284,10 @@ function disposeHangarRenderer(){
     hangarState.shipPivot = null;
     hangarState.modulePivot = null;
     hangarState.platformBeams = [];
+    hangarState.envGroup = null;
+    hangarState.envAnimatedMaterials = [];
+    hangarState.envLightBars = [];
+    hangarState.envGlowPanels = [];
 }
 
 function updateHangarHeaderNumbers(){
@@ -9640,8 +9815,8 @@ function ensureHangarRenderer(){
         stage.appendChild(hangarState.renderer.domElement);
 
         hangarState.scene = new THREE.Scene();
-        hangarState.camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
-        hangarState.camera.position.set(0.2, 0.42, 11.4);
+        hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
+        hangarState.camera.position.set(0.18, 0.48, 12.2);
         hangarState.camera.lookAt(0.7, -1.55, 0.86);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
@@ -9665,6 +9840,12 @@ function ensureHangarRenderer(){
             new THREE.PointsMaterial({ color:0x9fdfff, size:0.22 })
         );
         hangarState.scene.add(stars);
+
+        hangarState.envGroup = createHangarRoomEnvironment();
+        hangarState.envAnimatedMaterials = hangarState.envGroup.userData?.animatedMaterials || [];
+        hangarState.envLightBars = hangarState.envGroup.userData?.lightBars || [];
+        hangarState.envGlowPanels = hangarState.envGroup.userData?.glowPanels || [];
+        hangarState.scene.add(hangarState.envGroup);
 
         hangarState.platform = createHangarPlatform();
         hangarState.platform.position.set(0.42, -1.82, 1.0);
@@ -9782,10 +9963,30 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.position.z = 0.86;
         }
         if(hangarState.modulePivot){
-            hangarState.modulePivot.visible = false;
+            hangarState.modulePivot.visible = !!hangarState.moduleItem;
             hangarState.modulePivot.rotation.y -= 0.012;
             hangarState.modulePivot.rotation.x = Math.sin(time * 0.8) * 0.16;
-            hangarState.modulePivot.position.y = Math.sin(time * 1.5) * 0.12;
+            hangarState.modulePivot.position.set(-6.7, 1.55 + Math.sin(time * 1.5) * 0.12, 0.3);
+        }
+
+        if(Array.isArray(hangarState.envAnimatedMaterials)){
+            hangarState.envAnimatedMaterials.forEach((mat, idx) => {
+                if(!mat) return;
+                const pulse = 0.88 + Math.sin(time * 1.25 + idx * 0.7) * 0.22;
+                if('emissiveIntensity' in mat) mat.emissiveIntensity = pulse * (idx % 3 === 0 ? 1.6 : 1.1);
+            });
+        }
+        if(Array.isArray(hangarState.envLightBars)){
+            hangarState.envLightBars.forEach((mesh, idx) => {
+                if(!mesh) return;
+                mesh.scale.y = 1 + Math.sin(time * 1.05 + idx * 0.45) * 0.035;
+            });
+        }
+        if(Array.isArray(hangarState.envGlowPanels)){
+            hangarState.envGlowPanels.forEach((mesh, idx) => {
+                if(!mesh?.material) return;
+                mesh.material.opacity = 0.08 + (idx % 2 ? 0.06 : 0.1) + Math.sin(time * 0.85 + idx) * 0.02;
+            });
         }
 
         hangarState.roomLookCurrent += (hangarState.roomLookTarget - hangarState.roomLookCurrent) * 0.08;
