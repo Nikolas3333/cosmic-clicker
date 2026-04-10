@@ -9998,6 +9998,13 @@ function ensureHangarRenderer(){
         hangarState.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         hangarState.renderer.outputColorSpace = THREE.SRGBColorSpace;
         stage.appendChild(hangarState.renderer.domElement);
+        Object.assign(hangarState.renderer.domElement.style, {
+            position:'absolute',
+            inset:'0',
+            width:'100%',
+            height:'100%',
+            display:'block'
+        });
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 200);
@@ -10036,7 +10043,7 @@ function ensureHangarRenderer(){
         hangarState.planets.forEach(planet => hangarState.scene.add(planet));
 
         hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0.0, -1.78, -2.4);
+        hangarState.platform.position.set(0.0, -1.78, -4.8);
         hangarState.platform.scale.set(0.235, 0.235, 0.235);
         hangarState.platformRing = hangarState.platform.userData?.ring || null;
         hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
@@ -10087,8 +10094,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(hangarState.shipPivot, hangarState.modulePivot);
     }
 
-    const width = stage.clientWidth || 1000;
-    const height = stage.clientHeight || 700;
+    const width = window.innerWidth || stage.clientWidth || 1000;
+    const height = window.innerHeight || stage.clientHeight || 700;
     hangarState.renderer.setSize(width, height, false);
     hangarState.camera.aspect = width / Math.max(1, height);
     hangarState.camera.updateProjectionMatrix();
@@ -10170,7 +10177,7 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
             hangarState.shipPivot.position.x = 0.58 + transitionOffset * 0.55;
             hangarState.shipPivot.position.y = -0.54 + Math.sin(time * 1.18) * 0.01;
-            hangarState.shipPivot.position.z = 0.86;
+            hangarState.shipPivot.position.z = -1.2;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.visible = !!hangarState.moduleItem;
@@ -10264,14 +10271,14 @@ function ensureHangarRenderer(){
 
         const roomShell = document.getElementById('hangar-room-shell');
         if(roomShell){
-            roomShell.style.transform = `rotateY(${hangarState.roomLookCurrent.toFixed(2)}deg) rotateX(${hangarState.roomTiltCurrent.toFixed(2)}deg)`;
+            roomShell.style.transform = 'none';
         }
 
         if(hangarState.camera){
             const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:5.2 };
             const camX = 0.0 + hangarState.roomLookCurrent * 0.032 + astro.x * 0.24;
             const camY = 1.2 + hangarState.roomTiltCurrent * 0.02 + Math.max(0, astro.y - hangarState.astronautGroundY) * 0.92;
-            const camZ = 16.6 + (astro.z - 8.8) * 0.14;
+            const camZ = 20.4 + (astro.z - 8.8) * 0.10;
             hangarState.camera.position.x += (camX - hangarState.camera.position.x) * 0.06;
             hangarState.camera.position.y += (camY - hangarState.camera.position.y) * 0.06;
             hangarState.camera.position.z += (camZ - hangarState.camera.position.z) * 0.06;
@@ -10288,7 +10295,7 @@ function ensureHangarRenderer(){
 
 
 function bindHangarStageInteraction(){
-    const stage = document.querySelector('#hangar-window .hangar-room-shell');
+    const stage = document.getElementById('hangar-3d-stage') || document.querySelector('#hangar-window .hangar-room-shell');
     const leftWall = document.getElementById('hangar-left-wall');
     const rightWall = document.getElementById('hangar-right-wall');
     if(!stage || hangarState.stageBound) return;
@@ -10298,11 +10305,11 @@ function bindHangarStageInteraction(){
         const safe = String(look || 'center').trim();
         stage.dataset.look = safe;
         if(safe === 'left'){
-            hangarState.roomLookTarget = -12;
-            hangarState.roomTiltTarget = 1.4;
+            hangarState.roomLookTarget = -7;
+            hangarState.roomTiltTarget = 0.7;
         }else if(safe === 'right'){
-            hangarState.roomLookTarget = 12;
-            hangarState.roomTiltTarget = 1.4;
+            hangarState.roomLookTarget = 7;
+            hangarState.roomTiltTarget = 0.7;
         }else{
             hangarState.roomLookTarget = 0;
             hangarState.roomTiltTarget = 0;
@@ -10333,8 +10340,8 @@ function bindHangarStageInteraction(){
         const ratioX = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
         const ratioY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
         if(!hangarState.isDraggingShip){
-            hangarState.roomLookTarget = (ratioX - 0.5) * 10;
-            hangarState.roomTiltTarget = (0.5 - ratioY) * 2.8;
+            hangarState.roomLookTarget = (ratioX - 0.5) * 6;
+            hangarState.roomTiltTarget = (0.5 - ratioY) * 1.2;
         }
     });
 
