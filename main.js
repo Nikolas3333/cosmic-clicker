@@ -8066,7 +8066,11 @@ const hangarState = {
     transitionDirection: 0,
     transitionStartedAt: 0,
     stageBound: false,
-    isShipLoading: false
+    isShipLoading: false,
+    roomLookTarget: 0,
+    roomLookCurrent: 0,
+    roomTiltTarget: 0,
+    roomTiltCurrent: 0
 };
 
 const STARTER_HULL_IDS = ['scout_1'];
@@ -9778,13 +9782,25 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.position.z = 0.86;
         }
         if(hangarState.modulePivot){
+            hangarState.modulePivot.visible = false;
             hangarState.modulePivot.rotation.y -= 0.012;
             hangarState.modulePivot.rotation.x = Math.sin(time * 0.8) * 0.16;
             hangarState.modulePivot.position.y = Math.sin(time * 1.5) * 0.12;
         }
 
+        hangarState.roomLookCurrent += (hangarState.roomLookTarget - hangarState.roomLookCurrent) * 0.08;
+        hangarState.roomTiltCurrent += (hangarState.roomTiltTarget - hangarState.roomTiltCurrent) * 0.08;
+
+        const roomShell = document.getElementById('hangar-room-shell');
+        if(roomShell){
+            roomShell.style.transform = `rotateY(${hangarState.roomLookCurrent.toFixed(2)}deg) rotateX(${hangarState.roomTiltCurrent.toFixed(2)}deg)`;
+        }
+
         if(hangarState.camera){
-            hangarState.camera.lookAt(1.15, -0.92, 0.92);
+            const camX = 0.2 + hangarState.roomLookCurrent * 0.026;
+            hangarState.camera.position.x += (camX - hangarState.camera.position.x) * 0.06;
+            hangarState.camera.position.y += (0.42 + hangarState.roomTiltCurrent * 0.018 - hangarState.camera.position.y) * 0.06;
+            hangarState.camera.lookAt(0.72 + hangarState.roomLookCurrent * 0.08, -1.56, 0.86);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
@@ -9797,9 +9813,26 @@ function ensureHangarRenderer(){
 
 
 function bindHangarStageInteraction(){
-    const stage = document.querySelector('#hangar-window .hangar-stage');
+    const stage = document.querySelector('#hangar-window .hangar-room-shell');
+    const leftWall = document.getElementById('hangar-left-wall');
+    const rightWall = document.getElementById('hangar-right-wall');
     if(!stage || hangarState.stageBound) return;
     hangarState.stageBound = true;
+
+    const setLook = (look = 'center') => {
+        const safe = String(look || 'center').trim();
+        stage.dataset.look = safe;
+        if(safe === 'left'){
+            hangarState.roomLookTarget = -12;
+            hangarState.roomTiltTarget = 1.4;
+        }else if(safe === 'right'){
+            hangarState.roomLookTarget = 12;
+            hangarState.roomTiltTarget = 1.4;
+        }else{
+            hangarState.roomLookTarget = 0;
+            hangarState.roomTiltTarget = 0;
+        }
+    };
 
     const endDrag = () => {
         hangarState.isDraggingShip = false;
@@ -9815,6 +9848,29 @@ function bindHangarStageInteraction(){
         stage.classList.add('dragging');
         event.preventDefault();
     });
+
+    stage.addEventListener('mouseenter', () => setLook('center'));
+    stage.addEventListener('mouseleave', () => {
+        if(!hangarState.isDraggingShip) setLook('center');
+    });
+    stage.addEventListener('mousemove', (event) => {
+        const rect = stage.getBoundingClientRect();
+        const ratioX = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
+        const ratioY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+        if(!hangarState.isDraggingShip){
+            hangarState.roomLookTarget = (ratioX - 0.5) * 10;
+            hangarState.roomTiltTarget = (0.5 - ratioY) * 2.8;
+        }
+    });
+
+    if(leftWall){
+        leftWall.addEventListener('mouseenter', () => setLook('left'));
+        leftWall.addEventListener('mouseleave', () => setLook('center'));
+    }
+    if(rightWall){
+        rightWall.addEventListener('mouseenter', () => setLook('right'));
+        rightWall.addEventListener('mouseleave', () => setLook('center'));
+    }
 
     window.addEventListener('mousemove', (event) => {
         if(!hangarState.isDraggingShip) return;
