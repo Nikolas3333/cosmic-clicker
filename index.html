@@ -6062,9 +6062,6 @@ shop-main-head{
         <div class="hangar-kicker">COSMIC DOCK</div>
         <h2>Ангар</h2>
       </div>
-      <div class="hangar-class-filter" id="hangar-class-filter">
-        <button class="hangar-class-chip active" data-hangar-class="fighters" type="button">Cargo Drone</button>
-      </div>
     </div>
 
     <div class="hangar-layout hangar-layout-v128">
@@ -6097,8 +6094,7 @@ shop-main-head{
             <div class="hangar-room-floor"></div>
             <div class="hangar-room-glow"></div>
             <div id="hangar-3d-stage" class="hangar-3d-stage"></div>
-            <div class="hangar-stage-overlay hangar-stage-overlay-v128">
-              <div class="hangar-stage-overlay-stack"><div class="hangar-stage-name-badge" id="hangar-stage-name-badge">Cargo Drone</div><div class="hangar-move-hint">WASD — движение • Space — прыжок • Shift — бег</div></div>
+            <div class="hangar-stage-overlay hangar-stage-overlay-v128"></div>
             </div>
           </div>
         </div>
@@ -6123,6 +6119,42 @@ shop-main-head{
     </div>
   </div>
 </div>
+
+/* ===== V133 HANGAR CAMERA CLEANUP ===== */
+#hangar-window .hangar-class-filter,
+#hangar-window .hangar-stage-overlay,
+#hangar-window .hangar-stage-name-badge,
+#hangar-window .hangar-move-hint{
+  display:none !important;
+}
+#hangar-window .hangar-topbar{
+  right:24px !important;
+}
+#hangar-window .hangar-topbar h2{
+  margin-right:0 !important;
+}
+#hangar-window .hangar-room-wrap-v128{
+  position:absolute !important;
+  inset:0 !important;
+  pointer-events:none !important;
+}
+#hangar-window #hangar-ship-left,
+#hangar-window #hangar-ship-right{
+  pointer-events:auto !important;
+  z-index:40 !important;
+  top:50% !important;
+  transform:translateY(-50%) !important;
+}
+#hangar-window #hangar-ship-left{ left:360px !important; }
+#hangar-window #hangar-ship-right{ right:360px !important; }
+#hangar-window #hangar-3d-stage{
+  cursor:grab !important;
+}
+#hangar-window #hangar-3d-stage.dragging,
+#hangar-window #hangar-3d-stage.camera-look{
+  cursor:grabbing !important;
+}
+
 
 
 <div id="clans-window" class="hidden">
