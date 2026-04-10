@@ -5167,6 +5167,275 @@ shop-main-head{
   }
 }
 
+
+
+/* ===== HANGAR V128 RESET / ROOM LAYOUT ===== */
+#hangar-window{
+  background:radial-gradient(circle at 50% 18%, rgba(36,78,128,0.16), transparent 34%), rgba(2,6,14,0.96) !important;
+}
+#hangar-window .hangar-shell-v128{
+  width:min(1660px, 96vw) !important;
+  height:min(900px, 92vh) !important;
+  padding:18px 18px 20px !important;
+  border-radius:34px !important;
+  background:linear-gradient(180deg, rgba(6,14,28,0.95), rgba(3,8,18,0.98)) !important;
+  border:1px solid rgba(120,220,255,0.16) !important;
+  box-shadow:0 0 42px rgba(0,170,255,0.12), inset 0 0 40px rgba(255,255,255,0.02) !important;
+}
+#hangar-window .hangar-topbar{
+  padding:4px 8px 14px !important;
+}
+#hangar-window .hangar-layout-v128{
+  display:grid !important;
+  grid-template-columns:300px minmax(0,1fr) 280px !important;
+  gap:18px !important;
+  align-items:stretch !important;
+  padding:0 !important;
+  min-height:0 !important;
+  height:calc(100% - 76px) !important;
+}
+#hangar-window .hangar-wall-panel{
+  position:relative !important;
+  min-height:0 !important;
+  height:100% !important;
+  padding:18px 16px !important;
+  border-radius:28px !important;
+  background:
+    linear-gradient(180deg, rgba(15,28,48,0.96), rgba(8,15,28,0.98)) !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:inset 0 0 26px rgba(0,140,255,0.08), 0 0 24px rgba(0,0,0,0.24) !important;
+  overflow:hidden !important;
+}
+#hangar-window .hangar-wall-panel::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg, rgba(255,255,255,0.04), transparent 16%, transparent 84%, rgba(255,255,255,0.04));
+  pointer-events:none;
+}
+#hangar-window .hangar-left-wall,
+#hangar-window .hangar-right-wall{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:14px !important;
+}
+#hangar-window .hangar-room-wrap-v128{
+  min-width:0 !important;
+  min-height:0 !important;
+  display:grid !important;
+  grid-template-columns:56px minmax(0,1fr) 56px !important;
+  align-items:center !important;
+  gap:12px !important;
+}
+#hangar-window .hangar-room-frame{
+  min-width:0 !important;
+  min-height:0 !important;
+  height:100% !important;
+  perspective:1800px !important;
+  display:flex !important;
+}
+#hangar-window .hangar-room-shell{
+  position:relative !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:650px !important;
+  border-radius:34px !important;
+  overflow:hidden !important;
+  transform-style:preserve-3d !important;
+  transform:rotateY(0deg) rotateX(0deg) !important;
+  transition:box-shadow 0.25s ease, border-color 0.25s ease !important;
+  border:1px solid rgba(120,220,255,0.14) !important;
+  box-shadow:0 0 34px rgba(0,150,255,0.12), inset 0 0 60px rgba(255,255,255,0.02) !important;
+  background:radial-gradient(circle at 50% 20%, rgba(46,94,166,0.12), transparent 24%), linear-gradient(180deg, #071220 0%, #050b15 100%) !important;
+}
+#hangar-window .hangar-room-wall,
+#hangar-window .hangar-room-floor,
+#hangar-window .hangar-room-glow{
+  position:absolute;
+  pointer-events:none;
+}
+#hangar-window .hangar-room-wall-left{
+  inset:0 auto 0 0;
+  width:22%;
+  background:linear-gradient(90deg, rgba(133,214,255,0.10), rgba(16,30,52,0.55) 52%, transparent 100%);
+  clip-path:polygon(0 0, 100% 10%, 100% 90%, 0 100%);
+}
+#hangar-window .hangar-room-wall-right{
+  inset:0 0 0 auto;
+  width:22%;
+  background:linear-gradient(270deg, rgba(133,214,255,0.10), rgba(16,30,52,0.55) 52%, transparent 100%);
+  clip-path:polygon(0 10%, 100% 0, 100% 100%, 0 90%);
+}
+#hangar-window .hangar-room-wall-back{
+  left:18%; right:18%; top:0; height:52%;
+  background:linear-gradient(180deg, rgba(86,180,255,0.11), rgba(10,18,34,0.18) 40%, transparent 100%);
+  clip-path:polygon(6% 0, 94% 0, 100% 18%, 100% 100%, 0 100%, 0 18%);
+}
+#hangar-window .hangar-room-floor{
+  left:12%; right:12%; bottom:-2%; height:38%;
+  background:radial-gradient(circle at 50% 0%, rgba(70,180,255,0.18), transparent 48%), linear-gradient(180deg, rgba(14,24,44,0.2), rgba(8,14,26,0.88));
+  clip-path:polygon(14% 0, 86% 0, 100% 100%, 0 100%);
+}
+#hangar-window .hangar-room-glow{
+  inset:auto 20% 10% 20%; height:20%;
+  background:radial-gradient(circle at 50% 50%, rgba(0,210,255,0.28), rgba(0,150,255,0.08) 42%, transparent 70%);
+  filter:blur(20px);
+}
+#hangar-window #hangar-3d-stage{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  z-index:3 !important;
+}
+#hangar-window .hangar-stage-overlay-v128{
+  position:absolute !important;
+  inset:0 !important;
+  padding:16px !important;
+  pointer-events:none !important;
+  display:flex !important;
+  align-items:flex-start !important;
+  justify-content:center !important;
+  z-index:5 !important;
+  background:none !important;
+}
+#hangar-window .hangar-stage-name-badge{
+  margin-top:10px !important;
+  border-radius:999px !important;
+  padding:10px 18px !important;
+  background:rgba(5,16,34,0.74) !important;
+  border:1px solid rgba(120,220,255,0.18) !important;
+  box-shadow:0 0 16px rgba(0,170,255,0.10) !important;
+}
+#hangar-window .hangar-nav-edge{
+  width:56px !important;
+  height:168px !important;
+  border-radius:22px !important;
+  background:linear-gradient(180deg, rgba(17,31,52,0.88), rgba(9,17,30,0.95)) !important;
+  border:1px solid rgba(120,220,255,0.18) !important;
+  box-shadow:0 0 18px rgba(0,150,255,0.10) !important;
+}
+#hangar-window .hangar-nav-edge:hover:not(:disabled){
+  transform:scale(1.02) !important;
+}
+#hangar-window .hangar-side-title{
+  margin:0 !important;
+  font-size:17px !important;
+  letter-spacing:0.08em !important;
+  text-transform:uppercase !important;
+  color:#d9f6ff !important;
+}
+#hangar-window .hangar-module-filter{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:8px !important;
+  padding:0 !important;
+  background:none !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+#hangar-window .hangar-module-chip{
+  width:100% !important;
+  justify-content:flex-start !important;
+  min-height:44px !important;
+  border-radius:16px !important;
+  background:rgba(255,255,255,0.04) !important;
+}
+#hangar-window .hangar-module-list{
+  flex:1 1 auto !important;
+  min-height:180px !important;
+}
+#hangar-window .hangar-module-meta.compact{
+  gap:8px !important;
+  padding-top:12px !important;
+  border-top:1px solid rgba(255,255,255,0.08) !important;
+}
+#hangar-window .hangar-module-name{
+  font-size:18px !important;
+}
+#hangar-window .hangar-module-desc{
+  min-height:auto !important;
+  font-size:12px !important;
+  line-height:1.4 !important;
+}
+#hangar-window .hangar-module-actions{
+  grid-template-columns:1fr !important;
+}
+#hangar-window .hangar-module-action,
+#hangar-window .hangar-main-btn{
+  min-height:42px !important;
+  border-radius:14px !important;
+}
+#hangar-window .hangar-ship-card-v128,
+#hangar-window .hangar-stats-grid-v128,
+#hangar-window .hangar-footer-row-v128{
+  margin:0 !important;
+  max-width:none !important;
+  width:100% !important;
+}
+#hangar-window .hangar-ship-card-v128{
+  padding:14px 14px 12px !important;
+  border-radius:18px !important;
+}
+#hangar-window .hangar-ship-name{
+  font-size:24px !important;
+  line-height:1.05 !important;
+}
+#hangar-window .hangar-ship-subtitle{
+  display:block !important;
+  margin-top:6px !important;
+  font-size:12px !important;
+  opacity:0.82 !important;
+}
+#hangar-window .hangar-stats-grid-v128{
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:8px !important;
+}
+#hangar-window .hangar-stat-box{
+  padding:10px 10px !important;
+  border-radius:14px !important;
+}
+#hangar-window .hangar-stat-label{
+  font-size:10px !important;
+}
+#hangar-window .hangar-stat-value{
+  font-size:16px !important;
+}
+#hangar-window .hangar-footer-row-v128{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:10px !important;
+}
+#hangar-window .hangar-footer-actions{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:8px !important;
+}
+#hangar-window .hangar-position-label{
+  align-self:flex-start !important;
+  font-size:12px !important;
+  opacity:0.86 !important;
+}
+@media (max-width: 1320px){
+  #hangar-window .hangar-layout-v128{
+    grid-template-columns:260px minmax(0,1fr) 240px !important;
+  }
+}
+@media (max-width: 1100px){
+  #hangar-window .hangar-layout-v128{
+    grid-template-columns:1fr !important;
+    height:auto !important;
+    overflow:auto !important;
+  }
+  #hangar-window .hangar-room-shell{
+    min-height:520px !important;
+  }
+  #hangar-window .hangar-room-wrap-v128{
+    order:1 !important;
+  }
+}
+
 </style>
 </head>
 
@@ -5623,7 +5892,7 @@ shop-main-head{
 
 <!-- ===== HANGAR WINDOW ===== -->
 <div id="hangar-window" class="hidden">
-  <div class="hangar-shell">
+  <div class="hangar-shell hangar-shell-v128">
     <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
 
     <div class="hangar-topbar">
@@ -5636,16 +5905,16 @@ shop-main-head{
       </div>
     </div>
 
-    <div class="hangar-layout">
-      <div class="hangar-module-side">
-        <div class="hangar-side-title">Оснастка</div>
+    <div class="hangar-layout hangar-layout-v128">
+      <aside class="hangar-wall-panel hangar-left-wall" id="hangar-left-wall">
+        <div class="hangar-side-title">Модули</div>
         <div class="hangar-module-filter" id="hangar-module-filter">
           <button class="hangar-module-chip active" data-hangar-module-type="weapon" type="button">Пушки</button>
           <button class="hangar-module-chip" data-hangar-module-type="shield" type="button">Щиты</button>
           <button class="hangar-module-chip" data-hangar-module-type="booster" type="button">Ускорители</button>
         </div>
         <div id="hangar-module-list" class="hangar-module-list"></div>
-        <div class="hangar-module-meta">
+        <div class="hangar-module-meta compact">
           <div id="hangar-module-name" class="hangar-module-name">—</div>
           <div id="hangar-module-type" class="hangar-module-type">—</div>
           <div id="hangar-module-desc" class="hangar-module-desc">—</div>
@@ -5654,39 +5923,47 @@ shop-main-head{
             <button id="hangar-module-sell" class="hangar-module-action hangar-module-sell" type="button">Продать</button>
           </div>
         </div>
-      </div>
+      </aside>
 
-      <div class="hangar-stage-wrap">
-        <div class="hangar-info-panel">
-          <div class="hangar-ship-card compact">
-            <div id="hangar-ship-name" class="hangar-ship-name">—</div>
-            <div id="hangar-ship-subtitle" class="hangar-ship-subtitle"></div>
-          </div>
-          <div class="hangar-stats-grid compact" id="hangar-ship-stats"></div>
-          <div class="hangar-footer-row">
-            <div id="hangar-ship-position" class="hangar-position-label">1 / 1</div>
-            <div class="hangar-footer-actions">
-              <button id="hangar-ship-action" class="hangar-main-btn" type="button">Оснастить корпус</button>
-              <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать корпус</button>
+      <section class="hangar-room-wrap-v128">
+        <button id="hangar-ship-left" class="hangar-arrow horizontal hangar-nav-edge" type="button">◀</button>
+        <div class="hangar-room-frame">
+          <div class="hangar-room-shell hangar-stage" id="hangar-room-shell" data-look="center">
+            <div class="hangar-room-wall hangar-room-wall-left"></div>
+            <div class="hangar-room-wall hangar-room-wall-right"></div>
+            <div class="hangar-room-wall hangar-room-wall-back"></div>
+            <div class="hangar-room-floor"></div>
+            <div class="hangar-room-glow"></div>
+            <div id="hangar-3d-stage" class="hangar-3d-stage"></div>
+            <div class="hangar-stage-overlay hangar-stage-overlay-v128">
+              <div class="hangar-stage-name-badge" id="hangar-stage-name-badge">Cargo Drone</div>
             </div>
           </div>
         </div>
+        <button id="hangar-ship-right" class="hangar-arrow horizontal hangar-nav-edge" type="button">▶</button>
+      </section>
 
-        <button id="hangar-ship-left" class="hangar-arrow horizontal" type="button">◀</button>
-        <div class="hangar-stage">
-          <div id="hangar-3d-stage" class="hangar-3d-stage"></div>
-          <div class="hangar-stage-overlay">
-            <div class="hangar-stage-name-badge" id="hangar-stage-name-badge">Cargo Drone</div>
+      <aside class="hangar-wall-panel hangar-right-wall" id="hangar-right-wall">
+        <div class="hangar-side-title">Корабль</div>
+        <div class="hangar-ship-card compact hangar-ship-card-v128">
+          <div id="hangar-ship-name" class="hangar-ship-name">—</div>
+          <div id="hangar-ship-subtitle" class="hangar-ship-subtitle"></div>
+        </div>
+        <div class="hangar-stats-grid compact hangar-stats-grid-v128" id="hangar-ship-stats"></div>
+        <div class="hangar-footer-row hangar-footer-row-v128">
+          <div id="hangar-ship-position" class="hangar-position-label">1 / 1</div>
+          <div class="hangar-footer-actions">
+            <button id="hangar-ship-action" class="hangar-main-btn" type="button">Оснастить корпус</button>
+            <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать корпус</button>
           </div>
         </div>
-        <button id="hangar-ship-right" class="hangar-arrow horizontal" type="button">▶</button>
-      </div>
+      </aside>
     </div>
   </div>
 </div>
 
 
-<div id="clans-window" class="hidden"> class="hidden">
+<div id="clans-window" class="hidden">
   <div class="clans-content">
     <h2 class="window-title">Кланы</h2>
     <div id="clans-info"></div>
