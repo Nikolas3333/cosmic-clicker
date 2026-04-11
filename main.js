@@ -9130,37 +9130,7 @@ function createHangarAstronaut(){
     root.userData.walkParts = placeholder.userData.walkParts || {};
     root.position.set(0, hangarState.astronautGroundY, 7.8);
     root.rotation.y = Math.PI;
-
-    const loader = new GLTFLoader();
-    loader.load(
-        'astronaut/Astronaut.glb',
-        (gltf) => {
-            try{
-                const model = gltf?.scene || null;
-                if(!model || !root) return;
-                while(root.children.length) root.remove(root.children[0]);
-                model.traverse?.((child) => {
-                    if(child?.isMesh){
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                        if(child.material){
-                            child.material.metalness = Math.min(1, Number(child.material.metalness || 0.15) + 0.05);
-                            child.material.roughness = Math.max(0.15, Number(child.material.roughness || 0.8));
-                        }
-                    }
-                });
-                model.scale.setScalar(1.55);
-                model.position.set(0, 0, 0);
-                model.rotation.set(0, Math.PI, 0);
-                root.add(model);
-                root.userData.walkParts = {};
-                root.userData.externalModel = model;
-            }catch(_){ }
-        },
-        undefined,
-        () => {}
-    );
-
+    root.userData.externalModel = null;
     return root;
 }
 
@@ -9255,7 +9225,11 @@ function resetHangarAstronautState(){
     hangarState.cameraPitch = -0.12;
     hangarState.cameraYawTarget = Math.PI;
     hangarState.cameraPitchTarget = -0.12;
+    hangarState.mouseLookActive = false;
+    hangarState.lastMouseX = 0;
+    hangarState.lastMouseY = 0;
 }
+
 
 function createHangarModuleMesh(item){
     const art = String(item?.art || item?.typeId || 'module').toLowerCase();
@@ -9517,7 +9491,11 @@ function disposeHangarRenderer(){
     hangarState.planets = [];
     resetHangarAstronautState();
     try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
+    hangarState.mouseLookActive = false;
+    hangarState.lastMouseX = 0;
+    hangarState.lastMouseY = 0;
 }
+
 
 function updateHangarHeaderNumbers(){
     const coinsEl = document.getElementById('hangar-coins');
@@ -10313,34 +10291,49 @@ function bindHangarStageInteraction(){
     const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage') || document.querySelector('#hangar-window .hangar-room-shell');
     if(!stage || hangarState.stageBound) return;
     hangarState.stageBound = true;
+    hangarState.mouseLookActive = false;
+    hangarState.lastMouseX = 0;
+    hangarState.lastMouseY = 0;
+
+    const applyDelta = (dx, dy) => {
+        hangarState.cameraYawTarget -= (Number(dx || 0) || 0) * 0.0032;
+        hangarState.cameraPitchTarget = THREE.MathUtils.clamp(
+            hangarState.cameraPitchTarget - (Number(dy || 0) || 0) * 0.0024,
+            -0.6,
+            0.5
+        );
+    };
 
     const onPointerMove = (event) => {
         if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
         if(document.pointerLockElement === stage){
-            hangarState.cameraYawTarget -= (Number(event.movementX || 0) || 0) * 0.0032;
-            hangarState.cameraPitchTarget = THREE.MathUtils.clamp(
-                hangarState.cameraPitchTarget - (Number(event.movementY || 0) || 0) * 0.0024,
-                -0.6,
-                0.5
-            );
+            applyDelta(event.movementX, event.movementY);
             return;
         }
-        const rect = stage.getBoundingClientRect();
-        const ratioX = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
-        const ratioY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
-        hangarState.cameraYawTarget = Math.PI + (ratioX - 0.5) * 0.35;
-        hangarState.cameraPitchTarget = THREE.MathUtils.clamp(-0.12 + (0.5 - ratioY) * 0.18, -0.32, 0.16);
+        if(hangarState.mouseLookActive){
+            const dx = (Number(event.clientX || 0) || 0) - hangarState.lastMouseX;
+            const dy = (Number(event.clientY || 0) || 0) - hangarState.lastMouseY;
+            hangarState.lastMouseX = Number(event.clientX || 0) || 0;
+            hangarState.lastMouseY = Number(event.clientY || 0) || 0;
+            applyDelta(dx, dy);
+        }
     };
 
-    stage.addEventListener('mousemove', onPointerMove);
     document.addEventListener('mousemove', onPointerMove);
+    document.addEventListener('mouseup', () => {
+        hangarState.mouseLookActive = false;
+    });
     document.addEventListener('pointerlockchange', () => {
         hangarState.pointerActive = document.pointerLockElement === stage;
+        if(!hangarState.pointerActive) hangarState.mouseLookActive = false;
     });
 
     stage.addEventListener('mousedown', (event) => {
         if(event.button !== 0) return;
         if(event.target?.closest?.('.hangar-arrow')) return;
+        hangarState.mouseLookActive = true;
+        hangarState.lastMouseX = Number(event.clientX || 0) || 0;
+        hangarState.lastMouseY = Number(event.clientY || 0) || 0;
         safeRequestPointerLock(stage);
     });
 }
