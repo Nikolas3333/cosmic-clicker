@@ -3889,9 +3889,18 @@ const canvas = renderer.domElement;
 
 
 document.addEventListener("pointerlockchange", () => {
-    if (document.pointerLockElement === canvas) {
-    } else {
-    }
+    try{
+        const hangarCanvas = document.querySelector('#hangar-window canvas');
+        if(document.pointerLockElement){
+            if(hangarCanvas && document.pointerLockElement === hangarCanvas){
+                hangarCanvas.style.cursor = 'none';
+                document.body.style.cursor = 'none';
+            }
+        } else {
+            if(hangarCanvas) hangarCanvas.style.cursor = 'auto';
+            document.body.style.cursor = 'auto';
+        }
+    }catch(_){ }
 });
 
 
@@ -9350,16 +9359,16 @@ function createHangarRoomEnvironment(){
     }
 
 
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 15.6, 0.7), wallMat.clone());
-    backWall.position.set(0, 4.9, -16.8);
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 24.8, 0.7), wallMat.clone());
+    backWall.position.set(0, 9.4, -16.8);
     group.add(backWall);
 
     const ceiling = new THREE.Mesh(new THREE.BoxGeometry(42, 0.44, 38), wallMat.clone());
-    ceiling.position.set(0, 10.2, 1.8);
+    ceiling.position.set(0, 16.8, 1.8);
     group.add(ceiling);
 
-    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.7, 14.8, 38), wallMat.clone());
-    leftWall.position.set(-20.7, 4.2, 1.8);
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.7, 23.8, 38), wallMat.clone());
+    leftWall.position.set(-20.7, 8.8, 1.8);
     group.add(leftWall);
     const rightWall = leftWall.clone();
     rightWall.position.x = 20.7;
@@ -9379,10 +9388,10 @@ function createHangarRoomEnvironment(){
     }
 
     const frontTop = new THREE.Mesh(new THREE.BoxGeometry(26, 0.65, 1.0), frameMat.clone());
-    frontTop.position.set(0, 8.9, 17.4);
+    frontTop.position.set(0, 13.8, 17.4);
     group.add(frontTop);
     const frontLeft = new THREE.Mesh(new THREE.BoxGeometry(0.75, 13.8, 1.0), frameMat.clone());
-    frontLeft.position.set(-13.2, 3.2, 17.4);
+    frontLeft.position.set(-13.2, 6.8, 17.4);
     group.add(frontLeft);
     const frontRight = frontLeft.clone();
     frontRight.position.x = 13.2;
@@ -9392,37 +9401,37 @@ function createHangarRoomEnvironment(){
     group.add(frontBottom);
 
     const frontGlass = new THREE.Mesh(
-        new THREE.PlaneGeometry(25, 11.8),
+        new THREE.PlaneGeometry(25, 16.8),
         new THREE.MeshBasicMaterial({ color:0x49619a, transparent:true, opacity:0.14 })
     );
-    frontGlass.position.set(0, 3.7, 17.0);
+    frontGlass.position.set(0, 6.6, 17.0);
     group.add(frontGlass);
     const frontGlow = new THREE.Mesh(
-        new THREE.PlaneGeometry(24.5, 11.0),
+        new THREE.PlaneGeometry(24.5, 16.0),
         new THREE.MeshBasicMaterial({ color:0x4eb7ff, transparent:true, opacity:0.08 })
     );
-    frontGlow.position.set(0, 3.65, 16.9);
+    frontGlow.position.set(0, 6.55, 16.9);
     glowPanels.push(frontGlow);
     group.add(frontGlow);
 
     for(const side of [-1, 1]){
-        const sideWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(0.48, 11.4, 16.5), frameMat.clone());
-        sideWindowFrame.position.set(side * 17.2, 3.7, 0.8);
+        const sideWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(0.48, 15.6, 16.5), frameMat.clone());
+        sideWindowFrame.position.set(side * 17.2, 6.4, 0.8);
         group.add(sideWindowFrame);
 
         const sideGlass = new THREE.Mesh(
-            new THREE.PlaneGeometry(15.8, 9.8),
+            new THREE.PlaneGeometry(15.8, 13.2),
             new THREE.MeshBasicMaterial({ color:0x34486e, transparent:true, opacity:0.12 })
         );
-        sideGlass.position.set(side * 16.9, 3.7, 0.8);
+        sideGlass.position.set(side * 16.9, 6.2, 0.8);
         sideGlass.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         group.add(sideGlass);
 
         const sideGlow = new THREE.Mesh(
-            new THREE.PlaneGeometry(15.1, 9.1),
+            new THREE.PlaneGeometry(15.1, 12.5),
             new THREE.MeshBasicMaterial({ color: side < 0 ? 0x42a4ff : 0xb069ff, transparent:true, opacity:0.08 })
         );
-        sideGlow.position.set(side * 16.78, 3.65, 0.8);
+        sideGlow.position.set(side * 16.78, 6.15, 0.8);
         sideGlow.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         glowPanels.push(sideGlow);
         group.add(sideGlow);
@@ -9511,6 +9520,8 @@ function disposeHangarRenderer(){
     hangarState.planets = [];
     resetHangarAstronautState();
     try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
+    try{ document.body.style.cursor='auto'; }catch(_){ }
+    try{ const c = document.querySelector('#hangar-window canvas'); if(c) c.style.cursor='auto'; }catch(_){ }
     hangarState.mouseLookActive = false;
     hangarState.lastMouseX = 0;
     hangarState.lastMouseY = 0;
@@ -10110,19 +10121,20 @@ function ensureHangarRenderer(){
         hangarState.platformGlowDisc = null;
         hangarState.platformBeams = [];
 
-        hangarState.shipPivot.position.set(-13.8, -0.28, -8.6);
+        hangarState.shipPivot.position.set(0, -0.74, -8.6);
         hangarState.scene.add(hangarState.shipPivot);
 
         const supportPads = [
-            { key:'weapon', x:-13.8, y:-0.72, z:-8.6 },
-            { key:'booster', x:-13.8, y:-0.72, z:7.4 },
-            { key:'shield', x:13.8, y:-0.72, z:-8.6 },
-            { key:'support_a', x:13.8, y:-0.72, z:7.4 }
+            { key:'weapon', x:-13.8, y:-0.74, z:-8.6 },
+            { key:'shield', x:13.8, y:-0.74, z:-8.6 },
+            { key:'booster', x:-13.8, y:-0.74, z:7.4 },
+            { key:'support_a', x:13.8, y:-0.74, z:7.4 }
         ];
         supportPads.forEach((cfg, idx) => {
             const pad = createHangarSidePlatform(cfg.key);
             pad.position.set(cfg.x, cfg.y, cfg.z);
-            pad.scale.setScalar(idx >= 4 ? 1.24 : 1.08);
+            pad.userData.baseY = cfg.y;
+            pad.scale.setScalar(1.08);
             hangarState.scene.add(pad);
             hangarState.supportPlatforms.push(pad);
             if(['weapon','shield','booster'].includes(cfg.key)){
@@ -10131,7 +10143,7 @@ function ensureHangarRenderer(){
         });
 
         if(hangarState.envGroup){
-            hangarState.envGroup.scale.set(1.34, 1.34, 1.48);
+            hangarState.envGroup.scale.set(1.34, 1.72, 1.48);
         }
     }
 
@@ -10169,7 +10181,7 @@ function ensureHangarRenderer(){
 
         const now = performance.now();
         const time = now * 0.001;
-        const currentShip = getOwnedHangarShips()[hangarState.shipIndex] || null;
+        const currentShip = getOwnedHangarShips()[hangarState.shipIndex] || getAllOwnedHangarShips?.()[0] || null;
         const isViewedShipSelected = !!currentShip && String(currentShip?.id || '').trim() === String(player?.selectedShipId || '').trim();
 
         if(hangarState.platform){
@@ -10224,7 +10236,8 @@ function ensureHangarRenderer(){
             if(glow?.material){
                 glow.material.opacity = 0.16 + Math.sin(time * 1.35 + idx * 0.7) * 0.05;
             }
-            pad.position.y = hangarState.astronautGroundY + 0.02 + Math.sin(time * 1.1 + idx * 0.5) * 0.012;
+            const baseY = pad.userData?.baseY ?? pad.position.y;
+            pad.position.y = baseY + Math.sin(time * 1.1 + idx * 0.5) * 0.012;
         });
 
         const transitionElapsed = now - hangarState.transitionStartedAt;
@@ -10247,9 +10260,9 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.y = hangarState.shipYaw;
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
-            hangarState.shipPivot.position.x = -13.8 + transitionOffset * 0.35;
-            hangarState.shipPivot.position.y = -0.38 + Math.sin(time * 1.18) * 0.01;
-            hangarState.shipPivot.position.z = -0.6;
+            hangarState.shipPivot.position.x = 0 + transitionOffset * 0.12;
+            hangarState.shipPivot.position.y = -0.18 + Math.sin(time * 1.18) * 0.01;
+            hangarState.shipPivot.position.z = -8.6;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.visible = !!hangarState.moduleItem;
@@ -10355,8 +10368,8 @@ function ensureHangarRenderer(){
                 Math.cos(hangarState.cameraYaw) * cosPitch
             ).multiplyScalar(hangarState.cameraDistance);
             const desiredPos = focus.clone().sub(cameraOffset);
-            desiredPos.y += 2.35;
-            hangarState.camera.position.lerp(desiredPos, 0.42);
+            desiredPos.y += 3.6;
+            hangarState.camera.position.lerp(desiredPos, 0.34);
             hangarState.camera.lookAt(focus);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
@@ -10385,7 +10398,8 @@ function bindHangarStageInteraction(){
     };
 
     hangarState.mouseLookActive = true;
-    try{ stage.style.cursor = 'none'; }catch(_){}
+    try{ stage.style.cursor = 'auto'; }catch(_){}
+    try{ document.body.style.cursor = 'auto'; }catch(_){}
 
     if(!hangarState.stageDocBound){
         hangarState.stageDocBound = true;
@@ -10439,7 +10453,7 @@ function bindHangarStageInteraction(){
     const canvas = hangarState?.renderer?.domElement || null;
     if(canvas && !canvas.dataset.hangarLookBound){
         canvas.dataset.hangarLookBound = '1';
-        canvas.style.cursor = 'none';
+        canvas.style.cursor = 'auto';
         canvas.addEventListener('mousemove', (event) => {
             if(document.pointerLockElement !== canvas) return;
             applyDelta(event.movementX || 0, event.movementY || 0);
@@ -10455,6 +10469,8 @@ function bindHangarControls(){
             document.getElementById('hangar-window')?.classList.add('hidden');
             try{ resetHangarAstronautState?.(); }catch(_){ }
             try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
+            try{ document.body.style.cursor='auto'; }catch(_){ }
+            try{ const c = document.querySelector('#hangar-window canvas'); if(c) c.style.cursor='auto'; }catch(_){ }
             try{ disposeHangarRenderer?.(); }catch(_){ }
         });
     }
