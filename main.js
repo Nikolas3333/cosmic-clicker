@@ -9063,7 +9063,7 @@ function createHangarShipMesh(item){
 }
 
 
-function createHangarAstronaut(){
+function createHangarAstronautFallback(){
     const group = new THREE.Group();
     const suitMat = new THREE.MeshStandardMaterial({ color:0xe7edf6, metalness:0.35, roughness:0.56 });
     const trimMat = new THREE.MeshStandardMaterial({ color:0x2c4e86, metalness:0.58, roughness:0.34 });
@@ -9120,8 +9120,48 @@ function createHangarAstronaut(){
         legL: group.children[6],
         legR: group.children[7]
     };
-    group.position.set(0, hangarState.astronautGroundY, 7.8);
     return group;
+}
+
+function createHangarAstronaut(){
+    const root = new THREE.Group();
+    const placeholder = createHangarAstronautFallback();
+    root.add(placeholder);
+    root.userData.walkParts = placeholder.userData.walkParts || {};
+    root.position.set(0, hangarState.astronautGroundY, 7.8);
+    root.rotation.y = Math.PI;
+
+    const loader = new GLTFLoader();
+    loader.load(
+        'astronaut/Astronaut.glb',
+        (gltf) => {
+            try{
+                const model = gltf?.scene || null;
+                if(!model || !root) return;
+                while(root.children.length) root.remove(root.children[0]);
+                model.traverse?.((child) => {
+                    if(child?.isMesh){
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if(child.material){
+                            child.material.metalness = Math.min(1, Number(child.material.metalness || 0.15) + 0.05);
+                            child.material.roughness = Math.max(0.15, Number(child.material.roughness || 0.8));
+                        }
+                    }
+                });
+                model.scale.setScalar(1.55);
+                model.position.set(0, 0, 0);
+                model.rotation.set(0, Math.PI, 0);
+                root.add(model);
+                root.userData.walkParts = {};
+                root.userData.externalModel = model;
+            }catch(_){ }
+        },
+        undefined,
+        () => {}
+    );
+
+    return root;
 }
 
 function createHangarExteriorPlanets(){
@@ -9476,6 +9516,7 @@ function disposeHangarRenderer(){
     hangarState.astronautPivot = null;
     hangarState.planets = [];
     resetHangarAstronautState();
+    try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
 }
 
 function updateHangarHeaderNumbers(){
@@ -10200,7 +10241,7 @@ function ensureHangarRenderer(){
             const moveZ = (hangarState.astronautKeys.w ? 1 : 0) - (hangarState.astronautKeys.s ? 1 : 0);
             const cameraYawFlat = hangarState.cameraYaw;
             const forward = new THREE.Vector3(Math.sin(cameraYawFlat), 0, Math.cos(cameraYawFlat));
-            const right = new THREE.Vector3(forward.z, 0, -forward.x);
+            const right = new THREE.Vector3(-forward.z, 0, forward.x);
             hangarState.astronautDirection.set(0, 0, 0);
             if(moveZ) hangarState.astronautDirection.add(forward.clone().multiplyScalar(moveZ));
             if(moveX) hangarState.astronautDirection.add(right.clone().multiplyScalar(moveX));
@@ -10273,29 +10314,34 @@ function bindHangarStageInteraction(){
     if(!stage || hangarState.stageBound) return;
     hangarState.stageBound = true;
 
-    const updateFromMouse = (event) => {
+    const onPointerMove = (event) => {
         if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
+        if(document.pointerLockElement === stage){
+            hangarState.cameraYawTarget -= (Number(event.movementX || 0) || 0) * 0.0032;
+            hangarState.cameraPitchTarget = THREE.MathUtils.clamp(
+                hangarState.cameraPitchTarget - (Number(event.movementY || 0) || 0) * 0.0024,
+                -0.6,
+                0.5
+            );
+            return;
+        }
         const rect = stage.getBoundingClientRect();
         const ratioX = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
         const ratioY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
-        hangarState.cameraYawTarget = Math.PI + (ratioX - 0.5) * 1.45;
-        hangarState.cameraPitchTarget = THREE.MathUtils.clamp(-0.08 + (0.5 - ratioY) * 0.9, -0.42, 0.38);
+        hangarState.cameraYawTarget = Math.PI + (ratioX - 0.5) * 0.35;
+        hangarState.cameraPitchTarget = THREE.MathUtils.clamp(-0.12 + (0.5 - ratioY) * 0.18, -0.32, 0.16);
     };
 
-    stage.addEventListener('mousemove', updateFromMouse);
-    stage.addEventListener('mouseenter', () => {
-        hangarState.pointerActive = true;
-    });
-    stage.addEventListener('mouseleave', () => {
-        hangarState.pointerActive = false;
-        hangarState.cameraYawTarget = hangarState.cameraYaw;
-        hangarState.cameraPitchTarget = hangarState.cameraPitch;
+    stage.addEventListener('mousemove', onPointerMove);
+    document.addEventListener('mousemove', onPointerMove);
+    document.addEventListener('pointerlockchange', () => {
+        hangarState.pointerActive = document.pointerLockElement === stage;
     });
 
     stage.addEventListener('mousedown', (event) => {
         if(event.button !== 0) return;
         if(event.target?.closest?.('.hangar-arrow')) return;
-        updateFromMouse(event);
+        safeRequestPointerLock(stage);
     });
 }
 
@@ -10306,6 +10352,7 @@ function bindHangarControls(){
         closeBtn.addEventListener('click', () => {
             document.getElementById('hangar-window')?.classList.add('hidden');
             try{ resetHangarAstronautState?.(); }catch(_){ }
+            try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
             try{ disposeHangarRenderer?.(); }catch(_){ }
         });
     }
@@ -10325,7 +10372,6 @@ function renderHangarCosmic(forceSyncToSelected = true){
           <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
           <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
           <div class="hangar-runtime-fade"></div>
-          <div class="hangar-runtime-note">WASD — движение · Shift — бег · Space — прыжок</div>
         `;
     }
 
