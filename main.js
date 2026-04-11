@@ -10348,8 +10348,8 @@ function ensureHangarRenderer(){
 
         if(hangarState.camera){
             const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:6.6 };
-            hangarState.cameraYaw += (hangarState.cameraYawTarget - hangarState.cameraYaw) * 0.24;
-            hangarState.cameraPitch += (hangarState.cameraPitchTarget - hangarState.cameraPitch) * 0.24;
+            hangarState.cameraYaw += (hangarState.cameraYawTarget - hangarState.cameraYaw) * 0.34;
+            hangarState.cameraPitch += (hangarState.cameraPitchTarget - hangarState.cameraPitch) * 0.34;
             const focus = new THREE.Vector3(astro.x, astro.y + 1.65, astro.z);
             const cosPitch = Math.cos(hangarState.cameraPitch);
             const cameraOffset = new THREE.Vector3(
@@ -10359,7 +10359,7 @@ function ensureHangarRenderer(){
             ).multiplyScalar(hangarState.cameraDistance);
             const desiredPos = focus.clone().sub(cameraOffset);
             desiredPos.y += 2.35;
-            hangarState.camera.position.lerp(desiredPos, 0.22);
+            hangarState.camera.position.lerp(desiredPos, 0.3);
             hangarState.camera.lookAt(focus);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
@@ -10382,9 +10382,11 @@ function bindHangarStageInteraction(){
     hangarState.lastMouseY = 0;
 
     const applyDelta = (dx, dy) => {
-        hangarState.cameraYawTarget -= (Number(dx || 0) || 0) * 0.0048;
+        const safeDx = THREE.MathUtils.clamp(Number(dx || 0) || 0, -18, 18);
+        const safeDy = THREE.MathUtils.clamp(Number(dy || 0) || 0, -18, 18);
+        hangarState.cameraYawTarget -= safeDx * 0.0031;
         hangarState.cameraPitchTarget = THREE.MathUtils.clamp(
-            hangarState.cameraPitchTarget - (Number(dy || 0) || 0) * 0.0036,
+            hangarState.cameraPitchTarget - safeDy * 0.0024,
             -0.62,
             0.5
         );
@@ -10403,8 +10405,10 @@ function bindHangarStageInteraction(){
             if(!hangarState.mouseLookActive) return;
             const nextX = Number(event.clientX || 0) || 0;
             const nextY = Number(event.clientY || 0) || 0;
-            const dx = nextX - hangarState.lastMouseX;
-            const dy = nextY - hangarState.lastMouseY;
+            const rawDx = Number(event.movementX);
+            const rawDy = Number(event.movementY);
+            const dx = Number.isFinite(rawDx) && rawDx !== 0 ? rawDx : (nextX - hangarState.lastMouseX);
+            const dy = Number.isFinite(rawDy) && rawDy !== 0 ? rawDy : (nextY - hangarState.lastMouseY);
             hangarState.lastMouseX = nextX;
             hangarState.lastMouseY = nextY;
             applyDelta(dx, dy);
