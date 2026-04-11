@@ -5622,6 +5622,32 @@ shop-main-head{
   z-index:30 !important;
 }
 
+
+
+/* ===== V135 EMPTY HANGAR RESET ===== */
+#hangar-window{
+  position:fixed !important;
+  inset:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  background:rgba(0,0,0,0.88) !important;
+  z-index:21000 !important;
+}
+#hangar-window.hidden{ display:none !important; }
+#hangar-window *:not(#close-hangar){ display:none !important; }
+#hangar-window .hangar-empty-shell{
+  position:relative;
+  width:100vw;
+  height:100vh;
+}
+#hangar-window .hangar-close-btn{
+  position:fixed !important;
+  top:22px !important;
+  right:22px !important;
+  z-index:21010 !important;
+}
+
 </style>
 </head>
 
@@ -6078,65 +6104,10 @@ shop-main-head{
 
 <!-- ===== HANGAR WINDOW ===== -->
 <div id="hangar-window" class="hidden">
-  <div class="hangar-shell hangar-shell-v128">
+  <div class="hangar-empty-shell">
     <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
-
-    <div class="hangar-topbar">
-      <div class="hangar-title-wrap">
-        <div class="hangar-kicker">COSMIC DOCK</div>
-        <h2>Ангар</h2>
-      </div>
-    </div>
-
-    <div class="hangar-layout hangar-layout-v128">
-      <aside class="hangar-wall-panel hangar-left-wall" id="hangar-left-wall">
-        <div class="hangar-side-title">Модули</div>
-        <div class="hangar-module-filter" id="hangar-module-filter">
-          <button class="hangar-module-chip active" data-hangar-module-type="weapon" type="button">Пушки</button>
-          <button class="hangar-module-chip" data-hangar-module-type="shield" type="button">Щиты</button>
-          <button class="hangar-module-chip" data-hangar-module-type="booster" type="button">Ускорители</button>
-        </div>
-        <div id="hangar-module-list" class="hangar-module-list"></div>
-        <div class="hangar-module-meta compact">
-          <div id="hangar-module-name" class="hangar-module-name">—</div>
-          <div id="hangar-module-type" class="hangar-module-type">—</div>
-          <div id="hangar-module-desc" class="hangar-module-desc">—</div>
-          <div class="hangar-module-actions">
-            <button id="hangar-module-action" class="hangar-module-action" type="button">Установить</button>
-            <button id="hangar-module-sell" class="hangar-module-action hangar-module-sell" type="button">Продать</button>
-          </div>
-        </div>
-      </aside>
-
-      <section class="hangar-room-wrap-v128">
-        <button id="hangar-ship-left" class="hangar-arrow horizontal hangar-nav-edge" type="button">◀</button>
-        <div class="hangar-room-frame">
-          <div class="hangar-room-shell hangar-stage" id="hangar-room-shell" data-look="center">
-            <div id="hangar-3d-stage" class="hangar-3d-stage"></div>
-          </div>
-        </div>
-        <button id="hangar-ship-right" class="hangar-arrow horizontal hangar-nav-edge" type="button">▶</button>
-      </section>
-
-      <aside class="hangar-wall-panel hangar-right-wall" id="hangar-right-wall">
-        <div class="hangar-side-title">Корабль</div>
-        <div class="hangar-ship-card compact hangar-ship-card-v128">
-          <div id="hangar-ship-name" class="hangar-ship-name">—</div>
-          <div id="hangar-ship-subtitle" class="hangar-ship-subtitle"></div>
-        </div>
-        <div class="hangar-stats-grid compact hangar-stats-grid-v128" id="hangar-ship-stats"></div>
-        <div class="hangar-footer-row hangar-footer-row-v128">
-          <div id="hangar-ship-position" class="hangar-position-label">1 / 1</div>
-          <div class="hangar-footer-actions">
-            <button id="hangar-ship-action" class="hangar-main-btn" type="button">Оснастить корпус</button>
-            <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать корпус</button>
-          </div>
-        </div>
-      </aside>
-    </div>
   </div>
 </div>
-
 
 <div id="clans-window" class="hidden">
   <div class="clans-content">
