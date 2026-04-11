@@ -5624,22 +5624,59 @@ shop-main-head{
 
 
 
-/* ===== V135 EMPTY HANGAR RESET ===== */
+/* ===== V136 MINIMAL HANGAR ROOM ===== */
 #hangar-window{
   position:fixed !important;
   inset:0 !important;
   display:flex !important;
   align-items:center !important;
   justify-content:center !important;
-  background:rgba(0,0,0,0.88) !important;
+  background:rgba(0,0,0,0.96) !important;
   z-index:21000 !important;
 }
 #hangar-window.hidden{ display:none !important; }
-#hangar-window *:not(#close-hangar){ display:none !important; }
 #hangar-window .hangar-empty-shell{
   position:relative;
   width:100vw;
   height:100vh;
+}
+#hangar-window .hangar-runtime-stage{
+  position:absolute;
+  inset:0;
+  display:block !important;
+}
+#hangar-window .hangar-runtime-stage canvas{
+  position:absolute;
+  inset:0;
+  width:100% !important;
+  height:100% !important;
+  display:block;
+}
+#hangar-window .hangar-runtime-fade{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  display:block !important;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.18) 74%, rgba(0,0,0,0.54) 100%),
+    linear-gradient(180deg, rgba(3,10,22,0.16) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 78%, rgba(2,8,18,0.3) 100%);
+}
+#hangar-window .hangar-runtime-note{
+  position:fixed;
+  left:50%;
+  bottom:18px;
+  transform:translateX(-50%);
+  padding:10px 18px;
+  border-radius:999px;
+  border:1px solid rgba(120,220,255,0.2);
+  background:rgba(3,12,24,0.6);
+  color:#d9f6ff;
+  font-size:14px;
+  letter-spacing:0.02em;
+  z-index:21008 !important;
+  display:block !important;
+  box-shadow:0 0 18px rgba(0,160,255,0.12);
+  pointer-events:none;
 }
 #hangar-window .hangar-close-btn{
   position:fixed !important;
@@ -5647,6 +5684,7 @@ shop-main-head{
   right:22px !important;
   z-index:21010 !important;
 }
+
 
 </style>
 </head>
