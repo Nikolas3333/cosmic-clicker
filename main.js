@@ -9120,7 +9120,7 @@ function createHangarAstronaut(){
         legL: group.children[6],
         legR: group.children[7]
     };
-    group.position.set(0, hangarState.astronautGroundY, 6.6);
+    group.position.set(0, hangarState.astronautGroundY, 7.8);
     return group;
 }
 
@@ -9208,7 +9208,7 @@ function resetHangarAstronautState(){
     hangarState.astronautVelocity.set(0,0,0);
     hangarState.astronautDirection.set(0,0,0);
     if(hangarState.astronautPivot){
-        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 6.6);
+        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 7.8);
         hangarState.astronautPivot.rotation.y = Math.PI;
     }
     hangarState.cameraYaw = Math.PI;
@@ -9452,7 +9452,7 @@ function disposeHangarRenderer(){
         cancelAnimationFrame(hangarState.frameId);
         hangarState.frameId = 0;
     }
-    const stage = document.getElementById('hangar-3d-stage');
+    const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage');
     if(hangarState.renderer){
         try{ hangarState.renderer.dispose(); }catch(_){}
         if(stage && hangarState.renderer.domElement.parentNode === stage){
@@ -9997,7 +9997,7 @@ function rebuildHangarSceneObjects(){
 }
 
 function ensureHangarRenderer(){
-    const stage = document.getElementById('hangar-3d-stage');
+    const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage');
     if(!stage) return;
 
     bindHangarStageInteraction();
@@ -10019,7 +10019,7 @@ function ensureHangarRenderer(){
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
         hangarState.camera.position.set(0, 2.0, 13.2);
-        hangarState.camera.lookAt(0, 1.1, 6.6);
+        hangarState.camera.lookAt(0, 1.3, 7.8);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.0);
         const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
@@ -10051,57 +10051,19 @@ function ensureHangarRenderer(){
 
         hangarState.planets = createHangarExteriorPlanets();
         hangarState.planets.forEach(planet => hangarState.scene.add(planet));
-
-        hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0.0, -1.78, -4.8);
-        hangarState.platform.scale.set(0.235, 0.235, 0.235);
-        hangarState.platformRing = hangarState.platform.userData?.ring || null;
-        hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
-        hangarState.platformBeams = hangarState.platform.userData?.beams || [];
-        hangarState.scene.add(hangarState.platform);
-
+        hangarState.platform = null;
+        hangarState.platformRing = null;
+        hangarState.platformGlowDisc = null;
+        hangarState.platformBeams = [];
         hangarState.shipPivot = new THREE.Group();
         hangarState.modulePivot = new THREE.Group();
-        hangarState.modulePads = {
-            weapon: createHangarSidePlatform('Пушки'),
-            shield: createHangarSidePlatform('Щиты'),
-            booster: createHangarSidePlatform('Ускорители')
-        };
-        hangarState.modulePads.weapon.position.set(-13.4, -1.55, -8.6);
-        hangarState.modulePads.shield.position.set(-13.4, -1.55, -0.4);
-        hangarState.modulePads.booster.position.set(-13.4, -1.55, 7.8);
-        Object.values(hangarState.modulePads).forEach(pad => hangarState.scene.add(pad));
-
+        hangarState.modulePads = {};
         hangarState.supportPlatforms = [];
-        [[13.1, -8.8], [13.1, -0.5], [13.1, 7.8], [-5.8, -12.0], [5.8, -12.0], [-8.8, 12.6], [8.8, 12.6]].forEach(([x,z]) => {
-            const pad = createHangarSidePlatform();
-            pad.scale.setScalar(x > 6 ? 0.92 : 0.84);
-            pad.position.set(x, -1.7, z);
-            hangarState.supportPlatforms.push(pad);
-            hangarState.scene.add(pad);
-        });
 
         hangarState.astronautPivot = createHangarAstronaut();
         hangarState.astronaut = hangarState.astronautPivot;
         hangarState.scene.add(hangarState.astronautPivot);
-        requestAnimationFrame(() => {
-            try{
-                const shipsToWarm = getOwnedHangarShips().slice(0, 6);
-                shipsToWarm.forEach((ship, index) => {
-                    setTimeout(() => {
-                        try{
-                            const shipId = String(ship?.id || '').trim();
-                            if(!shipId || hangarShipMeshCache.has(shipId)) return;
-                            buildHangarShipMeshAsync(ship).then((normalized) => {
-                                if(normalized) hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(normalized));
-                            }).catch(() => {});
-                        }catch(_){}
-                    }, 40 * index);
-                });
-            }catch(_){}
-        });
 
-        hangarState.scene.add(hangarState.shipPivot, hangarState.modulePivot);
     }
 
     const width = window.innerWidth || stage.clientWidth || 1000;
@@ -10118,7 +10080,6 @@ function ensureHangarRenderer(){
         });
     }
 
-    rebuildHangarSceneObjects();
 
     const animate = () => {
         if(document.getElementById('hangar-window')?.classList.contains('hidden')){
@@ -10308,7 +10269,7 @@ function ensureHangarRenderer(){
 
 
 function bindHangarStageInteraction(){
-    const stage = document.getElementById('hangar-3d-stage') || document.querySelector('#hangar-window .hangar-room-shell');
+    const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage') || document.querySelector('#hangar-window .hangar-room-shell');
     if(!stage || hangarState.stageBound) return;
     hangarState.stageBound = true;
 
@@ -10355,10 +10316,23 @@ function renderHangarCosmic(forceSyncToSelected = true){
     try{ disposeHangarRenderer?.(); }catch(_){ }
     try{ resetHangarAstronautState?.(); }catch(_){ }
     const win = document.getElementById('hangar-window');
-    if(win) win.classList.remove('hidden');
-    const stage = document.getElementById('hangar-3d-stage');
-    if(stage) stage.innerHTML = '';
+    if(!win) return;
+    win.classList.remove('hidden');
+
+    const shell = win.querySelector('.hangar-empty-shell');
+    if(shell){
+        shell.innerHTML = `
+          <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
+          <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
+          <div class="hangar-runtime-fade"></div>
+          <div class="hangar-runtime-note">WASD — движение · Shift — бег · Space — прыжок</div>
+        `;
+    }
+
+    bindHangarControls();
+    ensureHangarRenderer();
 }
+
 
 function renderClansWindow(){
     const clansInfo = document.getElementById('clans-info');
