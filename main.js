@@ -9253,18 +9253,20 @@ function resetHangarAstronautState(){
     hangarState.astronautVelocity.set(0,0,0);
     hangarState.astronautDirection.set(0,0,0);
     if(hangarState.astronautPivot){
-        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 10.8);
+        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 18.0);
         hangarState.astronautPivot.rotation.y = Math.PI;
     }
     hangarState.cameraYaw = Math.PI;
-    hangarState.cameraPitch = -0.1;
+    hangarState.cameraPitch = -0.14;
     hangarState.cameraYawTarget = Math.PI;
-    hangarState.cameraPitchTarget = -0.1;
+    hangarState.cameraPitchTarget = -0.14;
+    hangarState.cameraDistance = 14.8;
     hangarState.mouseLookActive = false;
     hangarState.lastMouseX = 0;
     hangarState.lastMouseY = 0;
     try{ document.querySelector('#hangar-window .hangar-room-shell')?.classList.remove('dragging'); }catch(_){ }
-    try{ const c = document.querySelector('#hangar-window canvas'); if(c) c.style.cursor='none'; }catch(_){}
+    try{ const c = document.querySelector('#hangar-window canvas'); if(c) c.style.cursor='auto'; }catch(_){}
+    try{ document.body.style.cursor='auto'; }catch(_){}
 }
 
 
@@ -9330,163 +9332,182 @@ function createHangarRoomEnvironment(){
     const animatedMaterials = [];
     const lightBars = [];
     const glowPanels = [];
+    const dockSlotsLeft = [];
+    const dockSlotsRight = [];
 
-    const wallMat = new THREE.MeshStandardMaterial({ color:0x131b28, metalness:0.78, roughness:0.34 });
-    const panelMat = new THREE.MeshStandardMaterial({ color:0x1f3047, metalness:0.8, roughness:0.28 });
-    const frameMat = new THREE.MeshStandardMaterial({ color:0x546684, metalness:0.9, roughness:0.2 });
-    const floorMat = new THREE.MeshStandardMaterial({ color:0x0b111a, metalness:0.68, roughness:0.42 });
-    const catwalkMat = new THREE.MeshStandardMaterial({ color:0x0f1826, metalness:0.82, roughness:0.25 });
-    const stripMatBase = new THREE.MeshStandardMaterial({ color:0xe8f8ff, emissive:0x9edcff, emissiveIntensity:1.8, metalness:0.4, roughness:0.2 });
+    const wallMat = new THREE.MeshStandardMaterial({ color:0x101826, metalness:0.78, roughness:0.34 });
+    const panelMat = new THREE.MeshStandardMaterial({ color:0x1a2940, metalness:0.82, roughness:0.26 });
+    const frameMat = new THREE.MeshStandardMaterial({ color:0x51637e, metalness:0.9, roughness:0.2 });
+    const floorMat = new THREE.MeshStandardMaterial({ color:0x090f18, metalness:0.66, roughness:0.46 });
+    const catwalkMat = new THREE.MeshStandardMaterial({ color:0x0f1724, metalness:0.84, roughness:0.24 });
+    const stripMatBase = new THREE.MeshStandardMaterial({ color:0xe8f8ff, emissive:0x9edcff, emissiveIntensity:1.95, metalness:0.4, roughness:0.2 });
     const cyanGlowMatBase = new THREE.MeshStandardMaterial({ color:0x8cdfff, emissive:0x37bfff, emissiveIntensity:1.35, metalness:0.3, roughness:0.22 });
     const violetGlowMatBase = new THREE.MeshStandardMaterial({ color:0xe0b6ff, emissive:0x8f45ff, emissiveIntensity:0.9, metalness:0.25, roughness:0.24 });
 
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(42, 0.44, 38), floorMat.clone());
-    floor.position.set(0, -2.28, 1.8);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(84, 0.65, 124), floorMat.clone());
+    floor.position.set(0, -2.8, 0);
     group.add(floor);
 
-    const centerLane = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.07, 28), catwalkMat.clone());
-    centerLane.position.set(0, -2.02, 0.8);
-    group.add(centerLane);
+    const mainLane = new THREE.Mesh(new THREE.BoxGeometry(18, 0.08, 100), catwalkMat.clone());
+    mainLane.position.set(0, -2.42, 0);
+    group.add(mainLane);
 
-    const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(17, 0.09, 8.6), catwalkMat.clone());
-    rearDeck.position.set(0, -2.0, -10.6);
+    const rearDeck = new THREE.Mesh(new THREE.BoxGeometry(34, 0.12, 16), catwalkMat.clone());
+    rearDeck.position.set(0, -2.38, -38);
     group.add(rearDeck);
 
-    for(const x of [-11.8, 11.8]){
-        const sideWalk = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.08, 28), catwalkMat.clone());
-        sideWalk.position.set(x, -2.0, 0.8);
-        group.add(sideWalk);
-    }
-
-
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 24.8, 0.7), wallMat.clone());
-    backWall.position.set(0, 9.4, -16.8);
-    group.add(backWall);
-
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(42, 0.44, 38), wallMat.clone());
-    ceiling.position.set(0, 16.8, 1.8);
-    group.add(ceiling);
-
-    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.7, 23.8, 38), wallMat.clone());
-    leftWall.position.set(-20.7, 8.8, 1.8);
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.8, 38, 124), wallMat.clone());
+    leftWall.position.set(-41.5, 14.5, 0);
     group.add(leftWall);
     const rightWall = leftWall.clone();
-    rightWall.position.x = 20.7;
+    rightWall.position.x = 41.5;
     group.add(rightWall);
 
-    for(let i = 0; i < 5; i++){
-        const beam = new THREE.Mesh(new THREE.BoxGeometry(33.5, 0.46, 0.65), frameMat.clone());
-        beam.position.set(0, 5.65, -12.4 + i * 6.4);
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(84, 42, 0.8), wallMat.clone());
+    backWall.position.set(0, 15.5, -61.5);
+    group.add(backWall);
+
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(84, 0.7, 124), wallMat.clone());
+    ceiling.position.set(0, 34.8, 0);
+    group.add(ceiling);
+
+    for(let i = 0; i < 8; i++){
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(64, 0.72, 1.2), frameMat.clone());
+        beam.position.set(0, 27.5, -49 + i * 13.8);
         group.add(beam);
 
-        const lightBar = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.13, 0.32), stripMatBase.clone());
-        lightBar.position.set(0, 5.28, -12.4 + i * 6.4);
-        lightBar.material.emissiveIntensity = 2.0;
+        const lightBar = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.16, 0.42), stripMatBase.clone());
+        lightBar.position.set(0, 26.95, -49 + i * 13.8);
         animatedMaterials.push(lightBar.material);
         lightBars.push(lightBar);
         group.add(lightBar);
     }
 
-    const frontTop = new THREE.Mesh(new THREE.BoxGeometry(26, 0.65, 1.0), frameMat.clone());
-    frontTop.position.set(0, 13.8, 17.4);
+    const frontTop = new THREE.Mesh(new THREE.BoxGeometry(52, 0.75, 1.1), frameMat.clone());
+    frontTop.position.set(0, 28.5, 58.5);
     group.add(frontTop);
-    const frontLeft = new THREE.Mesh(new THREE.BoxGeometry(0.75, 13.8, 1.0), frameMat.clone());
-    frontLeft.position.set(-13.2, 6.8, 17.4);
+    const frontBottom = new THREE.Mesh(new THREE.BoxGeometry(52, 0.42, 1.1), frameMat.clone());
+    frontBottom.position.set(0, -2.15, 58.5);
+    group.add(frontBottom);
+    const frontLeft = new THREE.Mesh(new THREE.BoxGeometry(0.82, 28.8, 1.1), frameMat.clone());
+    frontLeft.position.set(-26.3, 13.2, 58.5);
     group.add(frontLeft);
     const frontRight = frontLeft.clone();
-    frontRight.position.x = 13.2;
+    frontRight.position.x = 26.3;
     group.add(frontRight);
-    const frontBottom = new THREE.Mesh(new THREE.BoxGeometry(26, 0.35, 1.0), frameMat.clone());
-    frontBottom.position.set(0, -2.05, 17.4);
-    group.add(frontBottom);
 
     const frontGlass = new THREE.Mesh(
-        new THREE.PlaneGeometry(25, 16.8),
-        new THREE.MeshBasicMaterial({ color:0x49619a, transparent:true, opacity:0.14 })
+        new THREE.PlaneGeometry(50.6, 28.8),
+        new THREE.MeshBasicMaterial({ color:0x49619a, transparent:true, opacity:0.12 })
     );
-    frontGlass.position.set(0, 6.6, 17.0);
+    frontGlass.position.set(0, 13.2, 58.0);
     group.add(frontGlass);
+
     const frontGlow = new THREE.Mesh(
-        new THREE.PlaneGeometry(24.5, 16.0),
-        new THREE.MeshBasicMaterial({ color:0x4eb7ff, transparent:true, opacity:0.08 })
+        new THREE.PlaneGeometry(49.6, 27.8),
+        new THREE.MeshBasicMaterial({ color:0x4eb7ff, transparent:true, opacity:0.07 })
     );
-    frontGlow.position.set(0, 6.55, 16.9);
+    frontGlow.position.set(0, 13.2, 57.85);
     glowPanels.push(frontGlow);
     group.add(frontGlow);
 
     for(const side of [-1, 1]){
-        const sideWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(0.48, 15.6, 16.5), frameMat.clone());
-        sideWindowFrame.position.set(side * 17.2, 6.4, 0.8);
+        const sideWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(0.54, 24.2, 42), frameMat.clone());
+        sideWindowFrame.position.set(side * 34.6, 14.2, 0);
         group.add(sideWindowFrame);
 
         const sideGlass = new THREE.Mesh(
-            new THREE.PlaneGeometry(15.8, 13.2),
-            new THREE.MeshBasicMaterial({ color:0x34486e, transparent:true, opacity:0.12 })
+            new THREE.PlaneGeometry(41, 22),
+            new THREE.MeshBasicMaterial({ color:0x34486e, transparent:true, opacity:0.1 })
         );
-        sideGlass.position.set(side * 16.9, 6.2, 0.8);
+        sideGlass.position.set(side * 34.2, 14.0, 0);
         sideGlass.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         group.add(sideGlass);
 
         const sideGlow = new THREE.Mesh(
-            new THREE.PlaneGeometry(15.1, 12.5),
-            new THREE.MeshBasicMaterial({ color: side < 0 ? 0x42a4ff : 0xb069ff, transparent:true, opacity:0.08 })
+            new THREE.PlaneGeometry(40, 21),
+            new THREE.MeshBasicMaterial({ color: side < 0 ? 0x42a4ff : 0xb069ff, transparent:true, opacity:0.07 })
         );
-        sideGlow.position.set(side * 16.78, 6.15, 0.8);
+        sideGlow.position.set(side * 34.05, 14.0, 0);
         sideGlow.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         glowPanels.push(sideGlow);
         group.add(sideGlow);
-
-        for(let bay = 0; bay < 3; bay++){
-            const z = -8.6 + bay * 8.0;
-            const dockBase = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.45, 4.8), panelMat.clone());
-            dockBase.position.set(side * 13.8, -1.56, z);
-            group.add(dockBase);
-
-            const dockArm = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 3.4), frameMat.clone());
-            dockArm.position.set(side * 11.95, -0.74, z);
-            dockArm.rotation.z = side * 0.34;
-            group.add(dockArm);
-
-            const glowPlate = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.05, 3.2), (side < 0 ? cyanGlowMatBase : violetGlowMatBase).clone());
-            glowPlate.position.set(side * 12.45, -0.98, z);
-            glowPlate.material.emissiveIntensity = side < 0 ? 1.05 : 0.88;
-            animatedMaterials.push(glowPlate.material);
-            lightBars.push(glowPlate);
-            group.add(glowPlate);
-        }
-
-        for(let p = 0; p < 5; p++){
-            const lightPillar = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.6, 0.2), stripMatBase.clone());
-            lightPillar.position.set(side * 19.65, 1.3, -10 + p * 5.2);
-            lightPillar.material.emissiveIntensity = 1.18;
-            animatedMaterials.push(lightPillar.material);
-            lightBars.push(lightPillar);
-            group.add(lightPillar);
-        }
     }
 
-    const rearDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(8.2, 9.6, 0.5), frameMat.clone());
-    rearDoorFrame.position.set(0, 2.4, -16.1);
+    const createDockTable = (x, z, accentMat, label) => {
+        const dockGroup = new THREE.Group();
+        dockGroup.position.set(x, -1.72, z);
+
+        const base = new THREE.Mesh(new THREE.BoxGeometry(7.4, 1.72, 5.4), panelMat.clone());
+        base.position.y = 0.0;
+        dockGroup.add(base);
+
+        const top = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.3, 4.5), frameMat.clone());
+        top.position.y = 0.98;
+        dockGroup.add(top);
+
+        const sideArm = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.24, 2.8), frameMat.clone());
+        sideArm.position.set(x < 0 ? 2.9 : -2.9, 0.78, 0);
+        sideArm.rotation.z = x < 0 ? -0.22 : 0.22;
+        dockGroup.add(sideArm);
+
+        const glowPlate = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.06, 0.24), accentMat.clone());
+        glowPlate.position.set(0, 1.14, -1.52);
+        animatedMaterials.push(glowPlate.material);
+        lightBars.push(glowPlate);
+        dockGroup.add(glowPlate);
+
+        const pad = createHangarSidePlatform(label);
+        pad.position.set(0, 1.22, 0);
+        pad.userData.baseY = 1.22;
+        pad.scale.setScalar(1.0);
+        dockGroup.add(pad);
+
+        group.add(dockGroup);
+        return { group:dockGroup, pad, topY: dockGroup.position.y + pad.position.y };
+    };
+
+    const dockZs = [-46, -36, -26, -16, -6, 6, 16, 26, 36, 46];
+    dockZs.forEach((z, idx) => {
+        const left = createDockTable(-23.5, z, cyanGlowMatBase, `left_${idx}`);
+        const right = createDockTable(23.5, z, violetGlowMatBase, `right_${idx}`);
+        dockSlotsLeft.push(left);
+        dockSlotsRight.push(right);
+    });
+
+    const centerDockGroup = new THREE.Group();
+    centerDockGroup.position.set(0, -1.5, -32);
+    const centerBase = new THREE.Mesh(new THREE.BoxGeometry(12.8, 2.05, 8.8), panelMat.clone());
+    centerDockGroup.add(centerBase);
+    const centerTop = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.34, 7.2), frameMat.clone());
+    centerTop.position.y = 1.2;
+    centerDockGroup.add(centerTop);
+    const centerPad = createHangarSidePlatform('ship');
+    centerPad.position.set(0, 1.58, 0);
+    centerPad.scale.setScalar(1.34);
+    centerPad.userData.baseY = 1.58;
+    centerDockGroup.add(centerPad);
+    group.add(centerDockGroup);
+
+    const rearDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(12.5, 15.5, 0.6), frameMat.clone());
+    rearDoorFrame.position.set(0, 5.5, -61.0);
     group.add(rearDoorFrame);
-    const rearDoor = new THREE.Mesh(new THREE.BoxGeometry(6.0, 7.4, 0.14), panelMat.clone());
-    rearDoor.position.set(0, 1.9, -15.8);
+    const rearDoor = new THREE.Mesh(new THREE.BoxGeometry(9.8, 12.5, 0.18), panelMat.clone());
+    rearDoor.position.set(0, 5.2, -60.6);
     group.add(rearDoor);
-
-    const leftAccent = new THREE.Mesh(new THREE.BoxGeometry(8.0, 0.08, 0.08), cyanGlowMatBase.clone());
-    leftAccent.position.set(-8.9, 2.45, -15.5);
-    animatedMaterials.push(leftAccent.material);
-    lightBars.push(leftAccent);
-    group.add(leftAccent);
-
-    const rightAccent = new THREE.Mesh(new THREE.BoxGeometry(8.0, 0.08, 0.08), violetGlowMatBase.clone());
-    rightAccent.position.set(8.9, 2.45, -15.5);
-    animatedMaterials.push(rightAccent.material);
-    lightBars.push(rightAccent);
-    group.add(rightAccent);
 
     group.userData.animatedMaterials = animatedMaterials;
     group.userData.lightBars = lightBars;
     group.userData.glowPanels = glowPanels;
+    group.userData.dockSlotsLeft = dockSlotsLeft;
+    group.userData.dockSlotsRight = dockSlotsRight;
+    group.userData.modulePadMap = {
+        weapon: dockSlotsLeft[1]?.pad || null,
+        shield: dockSlotsRight[1]?.pad || null,
+        booster: dockSlotsLeft[2]?.pad || null
+    };
+    group.userData.shipDock = centerPad;
+    group.userData.shipDockWorld = new THREE.Vector3(0, centerDockGroup.position.y + centerPad.position.y, centerDockGroup.position.z);
     return group;
 }
 
@@ -10018,15 +10039,27 @@ function rebuildHangarSceneObjects(){
 
     const ships = getOwnedHangarShips();
     const modules = getOwnedHangarModules();
-    const currentShip = ships[hangarState.shipIndex];
-    const currentModule = modules[hangarState.moduleIndex];
+    const currentShip = ships[hangarState.shipIndex] || getSelectedShipItem() || player?.ships?.[0] || null;
+    const currentModule = modules[hangarState.moduleIndex] || null;
+
+    const shipDock = hangarState?.envGroup?.userData?.shipDock || null;
+    if(shipDock){
+        const shipParent = shipDock.parent || null;
+        const worldPos = new THREE.Vector3();
+        shipDock.getWorldPosition(worldPos);
+        if(shipParent) shipParent.updateMatrixWorld?.(true);
+        hangarState.shipPivot.position.set(worldPos.x, worldPos.y + 0.75, worldPos.z);
+    }else{
+        hangarState.shipPivot.position.set(0, 0.2, -32);
+    }
 
     if(currentShip){
-        hangarState.isShipLoading = true;
-        const placeholder = createHangarLoadingPlaceholder();
-        placeholder.position.set(0, 0, 0);
-        hangarState.shipPivot.add(placeholder);
-        queueHangarShipBuild(currentShip);
+        const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
+        instantMesh.position.set(0, 0, 0);
+        hangarState.shipPivot.add(instantMesh);
+        try{
+            queueHangarShipBuild(currentShip);
+        }catch(_){}
     }else{
         hangarState.shipPivot.add(createHangarNoShipPlaceholder());
     }
@@ -10036,9 +10069,11 @@ function rebuildHangarSceneObjects(){
         const currentType = String(currentModule?.classId || currentModule?.typeId || getCurrentHangarModuleType()).trim();
         const pad = hangarState.modulePads?.[currentType] || hangarState.modulePads?.weapon || null;
         if(pad){
-            moduleMesh.position.set(pad.position.x, pad.position.y + 1.02, pad.position.z + 0.02);
+            const worldPos = new THREE.Vector3();
+            pad.getWorldPosition(worldPos);
+            moduleMesh.position.set(worldPos.x, worldPos.y + 1.05, worldPos.z);
         }else{
-            moduleMesh.position.set(-6.9, 2.7, 0.18);
+            moduleMesh.position.set(-18, 0.8, -8);
         }
         hangarState.modulePivot.add(moduleMesh);
     }
@@ -10069,17 +10104,17 @@ function ensureHangarRenderer(){
         hangarState.renderer.domElement.setAttribute('data-hangar-canvas', '1');
 
         hangarState.scene = new THREE.Scene();
-        hangarState.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
-        hangarState.camera.position.set(0, 2.0, 13.2);
-        hangarState.camera.lookAt(0, 1.3, 7.8);
+        hangarState.camera = new THREE.PerspectiveCamera(64, 1, 0.1, 320);
+        hangarState.camera.position.set(0, 5.8, 24.5);
+        hangarState.camera.lookAt(0, 3.0, 6.0);
 
-        const ambient = new THREE.AmbientLight(0xffffff, 1.0);
-        const key = new THREE.DirectionalLight(0xbbe6ff, 1.45);
-        key.position.set(8, 12, 10);
-        const rim = new THREE.DirectionalLight(0x7e8dff, 0.8);
-        rim.position.set(-9, 6, -8);
-        const floorGlow = new THREE.PointLight(0x4ac8ff, 1.8, 38);
-        floorGlow.position.set(0, 1.4, 0.2);
+        const ambient = new THREE.AmbientLight(0xffffff, 1.08);
+        const key = new THREE.DirectionalLight(0xbbe6ff, 1.6);
+        key.position.set(14, 26, 18);
+        const rim = new THREE.DirectionalLight(0x7e8dff, 0.9);
+        rim.position.set(-15, 12, -18);
+        const floorGlow = new THREE.PointLight(0x4ac8ff, 2.2, 80);
+        floorGlow.position.set(0, 3.0, -16);
 
         hangarState.scene.add(ambient, key, rim, floorGlow);
 
@@ -10087,11 +10122,11 @@ function ensureHangarRenderer(){
             new THREE.BufferGeometry().setAttribute(
                 'position',
                 new THREE.Float32BufferAttribute([
-                    -24, 10, -14, -16, 18, -12, 15, 9, -18, 18, 16, -10, -12, 7, -16, 12, 20, -18,
-                    -20, 14, -20, 22, 6, -16, 0, 21, -24, 9, 4, -22, -7, 18, -12, 17, 13, -15
+                    -40, 22, -26, -26, 31, -18, 24, 20, -22, 30, 26, -14, -18, 15, -24, 20, 34, -24,
+                    -32, 26, -28, 38, 14, -20, 0, 33, -36, 14, 7, -26, -12, 29, -20, 29, 22, -18
                 ], 3)
             ),
-            new THREE.PointsMaterial({ color:0x9fdfff, size:0.22 })
+            new THREE.PointsMaterial({ color:0x9fdfff, size:0.26 })
         );
         hangarState.scene.add(stars);
 
@@ -10103,48 +10138,33 @@ function ensureHangarRenderer(){
 
         hangarState.planets = createHangarExteriorPlanets();
         hangarState.planets.forEach(planet => hangarState.scene.add(planet));
-        hangarState.platform = null;
-        hangarState.platformRing = null;
-        hangarState.platformGlowDisc = null;
+
+        hangarState.platform = hangarState?.envGroup?.userData?.shipDock || null;
+        hangarState.platformRing = hangarState.platform?.userData?.ring || null;
+        hangarState.platformGlowDisc = hangarState.platform?.userData?.glow || null;
         hangarState.platformBeams = [];
         hangarState.shipPivot = new THREE.Group();
         hangarState.modulePivot = new THREE.Group();
-        hangarState.modulePads = {};
-        hangarState.supportPlatforms = [];
+        hangarState.modulePads = hangarState?.envGroup?.userData?.modulePadMap || {};
+        hangarState.supportPlatforms = [
+            ...(hangarState?.envGroup?.userData?.dockSlotsLeft || []).map(item => item?.pad).filter(Boolean),
+            ...(hangarState?.envGroup?.userData?.dockSlotsRight || []).map(item => item?.pad).filter(Boolean)
+        ];
 
+        hangarState.astronautGroundY = -1.72;
         hangarState.astronautPivot = createHangarAstronaut();
         hangarState.astronaut = hangarState.astronautPivot;
         hangarState.scene.add(hangarState.astronautPivot);
-
-        hangarState.platform = null;
-        hangarState.platformRing = null;
-        hangarState.platformGlowDisc = null;
-        hangarState.platformBeams = [];
-
-        hangarState.shipPivot.position.set(0, -0.74, -8.6);
         hangarState.scene.add(hangarState.shipPivot);
+        hangarState.scene.add(hangarState.modulePivot);
 
-        const supportPads = [
-            { key:'weapon', x:-13.8, y:-0.74, z:-8.6 },
-            { key:'shield', x:13.8, y:-0.74, z:-8.6 },
-            { key:'booster', x:-13.8, y:-0.74, z:7.4 },
-            { key:'support_a', x:13.8, y:-0.74, z:7.4 }
-        ];
-        supportPads.forEach((cfg, idx) => {
-            const pad = createHangarSidePlatform(cfg.key);
-            pad.position.set(cfg.x, cfg.y, cfg.z);
-            pad.userData.baseY = cfg.y;
-            pad.scale.setScalar(1.08);
-            hangarState.scene.add(pad);
-            hangarState.supportPlatforms.push(pad);
-            if(['weapon','shield','booster'].includes(cfg.key)){
-                hangarState.modulePads[cfg.key] = pad;
-            }
-        });
-
-        if(hangarState.envGroup){
-            hangarState.envGroup.scale.set(1.34, 1.72, 1.48);
-        }
+        hangarState.cameraDistance = 14.8;
+        hangarState.cameraYaw = Math.PI;
+        hangarState.cameraPitch = -0.14;
+        hangarState.cameraYawTarget = Math.PI;
+        hangarState.cameraPitchTarget = -0.14;
+        hangarState.lastMouseX = window.innerWidth * 0.5;
+        hangarState.lastMouseY = window.innerHeight * 0.5;
     }
 
     bindHangarStageInteraction();
@@ -10172,7 +10192,6 @@ function ensureHangarRenderer(){
         });
     }
 
-
     const animate = () => {
         if(document.getElementById('hangar-window')?.classList.contains('hidden')){
             hangarState.frameId = 0;
@@ -10181,15 +10200,13 @@ function ensureHangarRenderer(){
 
         const now = performance.now();
         const time = now * 0.001;
-        const currentShip = getOwnedHangarShips()[hangarState.shipIndex] || getAllOwnedHangarShips?.()[0] || null;
+        const currentShip = getOwnedHangarShips()[hangarState.shipIndex] || getSelectedShipItem() || null;
         const isViewedShipSelected = !!currentShip && String(currentShip?.id || '').trim() === String(player?.selectedShipId || '').trim();
 
-        if(hangarState.platform){
-            hangarState.platform.rotation.y += 0.0021;
-        }
         const neonHue = (time * 0.055) % 1;
         const ringColor = new THREE.Color().setHSL(neonHue, 0.95, isViewedShipSelected ? 0.72 : 0.66);
         const glowColor = new THREE.Color().setHSL((neonHue + 0.08) % 1, 1.0, isViewedShipSelected ? 0.56 : 0.5);
+
         if(hangarState.platformRing?.material){
             hangarState.platformRing.material.opacity = isViewedShipSelected ? 1 : 0.82;
             hangarState.platformRing.material.color.copy(ringColor);
@@ -10198,95 +10215,24 @@ function ensureHangarRenderer(){
             hangarState.platformGlowDisc.material.opacity = isViewedShipSelected ? 0.30 : 0.2;
             hangarState.platformGlowDisc.material.color.copy(glowColor);
         }
-        if(Array.isArray(hangarState.platformBeams)){
-            hangarState.platformBeams.forEach((beam, idx) => {
-                const mat = beam?.material;
-                if(!mat) return;
-                const hue = 0.50 + Math.sin(time * 0.8 + idx * 0.9) * 0.035;
-                mat.color.setHSL(hue, 0.88, idx === 0 ? 0.72 : 0.68);
-                mat.opacity = (idx === 0 ? 0.34 : 0.20) + Math.sin(time * 1.9 + idx * 1.1) * 0.03;
-                const pulse = 1 + Math.sin(time * 1.35 + idx * 0.8) * 0.04;
-                beam.scale.x = (idx === 0 ? 3.6 : 2.3) * pulse;
-                beam.scale.y = (idx === 0 ? 8.4 : 6.6) * (1 + Math.sin(time * 1.15 + idx * 0.7) * 0.03);
-            });
-        }
-        if(hangarState.platform?.userData?.baseHalo?.material){
-            const halo = hangarState.platform.userData.baseHalo;
-            halo.material.color.setHSL(0.53 + Math.sin(time * 0.7) * 0.02, 0.95, 0.7);
-            halo.material.opacity = 0.14 + Math.sin(time * 1.5) * 0.025;
-            halo.scale.x = 6.8 + Math.sin(time * 1.1) * 0.3;
-            halo.scale.y = 2.2 + Math.cos(time * 1.3) * 0.12;
-        }
 
         if(hangarState.shipPivot){
-            if(!hangarState.isDraggingShip){
-                hangarState.shipYaw += 0.0042;
-            }
+            hangarState.shipYaw += 0.0045;
             hangarState.shipPivot.rotation.y = hangarState.shipYaw;
-            hangarState.shipPivot.position.y = hangarState.astronautGroundY + 0.62 + Math.sin(time * 1.25) * 0.04;
         }
 
         (hangarState.supportPlatforms || []).forEach((pad, idx) => {
             const ring = pad?.userData?.ring;
             const glow = pad?.userData?.glow;
             if(ring?.material){
-                ring.material.color.setHSL((0.52 + idx * 0.06 + Math.sin(time * 0.8 + idx) * 0.02) % 1, 0.92, 0.70);
-                ring.material.opacity = 0.72 + Math.sin(time * 1.8 + idx) * 0.08;
+                ring.material.color.setHSL((0.52 + idx * 0.02 + Math.sin(time * 0.8 + idx) * 0.015) % 1, 0.92, 0.70);
+                ring.material.opacity = 0.70 + Math.sin(time * 1.8 + idx) * 0.06;
             }
             if(glow?.material){
-                glow.material.opacity = 0.16 + Math.sin(time * 1.35 + idx * 0.7) * 0.05;
+                glow.material.opacity = 0.14 + Math.sin(time * 1.35 + idx * 0.7) * 0.04;
             }
             const baseY = pad.userData?.baseY ?? pad.position.y;
-            pad.position.y = baseY + Math.sin(time * 1.1 + idx * 0.5) * 0.012;
-        });
-
-        const transitionElapsed = now - hangarState.transitionStartedAt;
-        const transitionProgress = Math.min(1, transitionElapsed / 320);
-        const transitionEase = 1 - Math.pow(1 - transitionProgress, 3);
-        const transitionOffset = transitionProgress < 1 ? (1 - transitionEase) * hangarState.transitionDirection * 1.3 : 0;
-        if(transitionProgress >= 1){
-            hangarState.transitionDirection = 0;
-        }
-
-        if(!hangarState.isDraggingShip && (now - hangarState.lastManualRotateAt) > 1600){
-            hangarState.shipSpinVelocity += (0.0062 - hangarState.shipSpinVelocity) * 0.06;
-        }else{
-            hangarState.shipSpinVelocity *= 0.92;
-        }
-        hangarState.shipYaw += hangarState.shipSpinVelocity;
-        hangarState.shipSpinVelocity *= 0.985;
-
-        if(hangarState.shipPivot){
-            hangarState.shipPivot.rotation.y = hangarState.shipYaw;
-            hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
-            hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
-            hangarState.shipPivot.position.x = 0 + transitionOffset * 0.12;
-            hangarState.shipPivot.position.y = -0.18 + Math.sin(time * 1.18) * 0.01;
-            hangarState.shipPivot.position.z = -8.6;
-        }
-        if(hangarState.modulePivot){
-            hangarState.modulePivot.visible = !!hangarState.moduleItem;
-            hangarState.modulePivot.rotation.y -= 0.012;
-            hangarState.modulePivot.rotation.x = Math.sin(time * 0.8) * 0.1;
-        }
-        Object.entries(hangarState.modulePads || {}).forEach(([typeId, pad], idx) => {
-            if(!pad?.userData) return;
-            const active = typeId === getCurrentHangarModuleType();
-            const ring = pad.userData.ring;
-            const glow = pad.userData.glow;
-            if(ring?.material){
-                ring.material.opacity = active ? 0.95 : 0.42;
-                ring.material.color.setHSL(active ? 0.53 : 0.58 + idx * 0.03, 0.9, active ? 0.72 : 0.58);
-            }
-            if(glow?.material){
-                glow.material.opacity = active ? 0.26 : 0.08;
-            }
-            pad.rotation.y += active ? 0.006 : 0.002;
-        });
-        (hangarState.supportPlatforms || []).forEach((pad, idx) => {
-            if(!pad?.userData?.ring?.material) return;
-            pad.rotation.y += 0.0012 + idx * 0.00012;
-            pad.userData.ring.material.opacity = 0.22 + Math.sin(time * 0.8 + idx) * 0.05;
+            pad.position.y = baseY + Math.sin(time * 1.1 + idx * 0.5) * 0.01;
         });
 
         if(Array.isArray(hangarState.envAnimatedMaterials)){
@@ -10305,7 +10251,7 @@ function ensureHangarRenderer(){
         if(Array.isArray(hangarState.envGlowPanels)){
             hangarState.envGlowPanels.forEach((mesh, idx) => {
                 if(!mesh?.material) return;
-                mesh.material.opacity = 0.08 + (idx % 2 ? 0.06 : 0.1) + Math.sin(time * 0.85 + idx) * 0.02;
+                mesh.material.opacity = 0.07 + (idx % 2 ? 0.05 : 0.09) + Math.sin(time * 0.85 + idx) * 0.02;
             });
         }
 
@@ -10320,7 +10266,7 @@ function ensureHangarRenderer(){
             if(moveX) hangarState.astronautDirection.add(right.clone().multiplyScalar(moveX));
             const isMoving = hangarState.astronautDirection.lengthSq() > 0.001;
             const runMul = hangarState.astronautKeys.shift ? 1.75 : 1.0;
-            const targetSpeed = isMoving ? 0.078 * runMul : 0;
+            const targetSpeed = isMoving ? 0.082 * runMul : 0;
             if(isMoving){
                 hangarState.astronautDirection.normalize();
                 hangarState.astronautVelocity.x += (hangarState.astronautDirection.x * targetSpeed - hangarState.astronautVelocity.x) * 0.16;
@@ -10334,8 +10280,8 @@ function ensureHangarRenderer(){
                 hangarState.astronautVelocity.y = 0.18;
             }
             hangarState.astronautVelocity.y -= 0.0095;
-            hangarState.astronautPivot.position.x = THREE.MathUtils.clamp(hangarState.astronautPivot.position.x + hangarState.astronautVelocity.x, -22.0, 22.0);
-            hangarState.astronautPivot.position.z = THREE.MathUtils.clamp(hangarState.astronautPivot.position.z + hangarState.astronautVelocity.z, -24.0, 14.5);
+            hangarState.astronautPivot.position.x = THREE.MathUtils.clamp(hangarState.astronautPivot.position.x + hangarState.astronautVelocity.x, -30.0, 30.0);
+            hangarState.astronautPivot.position.z = THREE.MathUtils.clamp(hangarState.astronautPivot.position.z + hangarState.astronautVelocity.z, -52.0, 52.0);
             hangarState.astronautPivot.position.y += hangarState.astronautVelocity.y;
             if(hangarState.astronautPivot.position.y <= hangarState.astronautGroundY){
                 hangarState.astronautPivot.position.y = hangarState.astronautGroundY;
@@ -10350,6 +10296,7 @@ function ensureHangarRenderer(){
             if(parts.legL) parts.legL.rotation.x = -walkSwing;
             if(parts.legR) parts.legR.rotation.x = walkSwing;
         }
+
         (hangarState.planets || []).forEach((planet, idx) => {
             if(!planet) return;
             planet.rotation.y += 0.0018 + idx * 0.0006;
@@ -10357,10 +10304,10 @@ function ensureHangarRenderer(){
         });
 
         if(hangarState.camera){
-            const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:6.6 };
+            const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:8 };
             hangarState.cameraYaw += (hangarState.cameraYawTarget - hangarState.cameraYaw) * 0.52;
             hangarState.cameraPitch += (hangarState.cameraPitchTarget - hangarState.cameraPitch) * 0.52;
-            const focus = new THREE.Vector3(astro.x, astro.y + 1.65, astro.z);
+            const focus = new THREE.Vector3(astro.x, astro.y + 1.85, astro.z);
             const cosPitch = Math.cos(hangarState.cameraPitch);
             const cameraOffset = new THREE.Vector3(
                 Math.sin(hangarState.cameraYaw) * cosPitch,
@@ -10368,8 +10315,8 @@ function ensureHangarRenderer(){
                 Math.cos(hangarState.cameraYaw) * cosPitch
             ).multiplyScalar(hangarState.cameraDistance);
             const desiredPos = focus.clone().sub(cameraOffset);
-            desiredPos.y += 3.6;
-            hangarState.camera.position.lerp(desiredPos, 0.34);
+            desiredPos.y += 5.4;
+            hangarState.camera.position.lerp(desiredPos, 0.28);
             hangarState.camera.lookAt(focus);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
