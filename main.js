@@ -9228,6 +9228,7 @@ function resetHangarAstronautState(){
     hangarState.mouseLookActive = false;
     hangarState.lastMouseX = 0;
     hangarState.lastMouseY = 0;
+    try{ document.querySelector('#hangar-window .hangar-room-shell')?.classList.remove('dragging'); }catch(_){ }
 }
 
 
@@ -10034,6 +10035,8 @@ function ensureHangarRenderer(){
             height:'100%',
             display:'block'
         });
+        hangarState.renderer.domElement.tabIndex = 0;
+        hangarState.renderer.domElement.setAttribute('data-hangar-canvas', '1');
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
@@ -10084,6 +10087,8 @@ function ensureHangarRenderer(){
         hangarState.scene.add(hangarState.astronautPivot);
 
     }
+
+    bindHangarStageInteraction();
 
     const width = window.innerWidth || stage.clientWidth || 1000;
     const height = window.innerHeight || stage.clientHeight || 700;
@@ -10289,12 +10294,14 @@ function ensureHangarRenderer(){
 
 function bindHangarStageInteraction(){
     const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage') || document.querySelector('#hangar-window .hangar-room-shell');
-    if(!stage || hangarState.stageBound) return;
-    hangarState.stageBound = true;
+    const shell = document.querySelector('#hangar-window .hangar-room-shell');
+    if(!stage) return;
+
     hangarState.mouseLookActive = false;
     hangarState.lastMouseX = 0;
     hangarState.lastMouseY = 0;
 
+    const getLookSurface = () => hangarState?.renderer?.domElement || stage;
     const applyDelta = (dx, dy) => {
         hangarState.cameraYawTarget -= (Number(dx || 0) || 0) * 0.0032;
         hangarState.cameraPitchTarget = THREE.MathUtils.clamp(
@@ -10304,38 +10311,64 @@ function bindHangarStageInteraction(){
         );
     };
 
-    const onPointerMove = (event) => {
-        if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
-        if(document.pointerLockElement === stage){
-            applyDelta(event.movementX, event.movementY);
-            return;
-        }
-        if(hangarState.mouseLookActive){
-            const dx = (Number(event.clientX || 0) || 0) - hangarState.lastMouseX;
-            const dy = (Number(event.clientY || 0) || 0) - hangarState.lastMouseY;
-            hangarState.lastMouseX = Number(event.clientX || 0) || 0;
-            hangarState.lastMouseY = Number(event.clientY || 0) || 0;
-            applyDelta(dx, dy);
-        }
+    const stopLook = () => {
+        hangarState.mouseLookActive = false;
+        shell?.classList.remove('dragging');
     };
 
-    document.addEventListener('mousemove', onPointerMove);
-    document.addEventListener('mouseup', () => {
-        hangarState.mouseLookActive = false;
-    });
-    document.addEventListener('pointerlockchange', () => {
-        hangarState.pointerActive = document.pointerLockElement === stage;
-        if(!hangarState.pointerActive) hangarState.mouseLookActive = false;
-    });
+    if(!hangarState.stageDocBound){
+        hangarState.stageDocBound = true;
+        document.addEventListener('mousemove', (event) => {
+            if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
+            const activeSurface = getLookSurface();
+            if(document.pointerLockElement === activeSurface){
+                applyDelta(event.movementX, event.movementY);
+                return;
+            }
+            if(!hangarState.mouseLookActive) return;
+            const nextX = Number(event.clientX || 0) || 0;
+            const nextY = Number(event.clientY || 0) || 0;
+            const dx = nextX - hangarState.lastMouseX;
+            const dy = nextY - hangarState.lastMouseY;
+            hangarState.lastMouseX = nextX;
+            hangarState.lastMouseY = nextY;
+            applyDelta(dx, dy);
+        });
+        document.addEventListener('mouseup', stopLook);
+        document.addEventListener('mouseleave', stopLook);
+        document.addEventListener('pointerlockchange', () => {
+            const activeSurface = getLookSurface();
+            hangarState.pointerActive = document.pointerLockElement === activeSurface;
+            if(!hangarState.pointerActive) stopLook();
+        });
+    }
 
-    stage.addEventListener('mousedown', (event) => {
+    const activateLook = (event) => {
         if(event.button !== 0) return;
         if(event.target?.closest?.('.hangar-arrow')) return;
         hangarState.mouseLookActive = true;
         hangarState.lastMouseX = Number(event.clientX || 0) || 0;
         hangarState.lastMouseY = Number(event.clientY || 0) || 0;
-        safeRequestPointerLock(stage);
-    });
+        shell?.classList.add('dragging');
+        const activeSurface = getLookSurface();
+        try{ activeSurface?.focus?.({ preventScroll:true }); }catch(_){ }
+        safeRequestPointerLock(activeSurface);
+    };
+
+    if(!stage.dataset.hangarLookBound){
+        stage.dataset.hangarLookBound = '1';
+        stage.addEventListener('mousedown', activateLook);
+    }
+
+    const canvas = hangarState?.renderer?.domElement || null;
+    if(canvas && !canvas.dataset.hangarLookBound){
+        canvas.dataset.hangarLookBound = '1';
+        canvas.style.cursor = 'grab';
+        canvas.addEventListener('mousedown', activateLook);
+        canvas.addEventListener('mouseup', () => {
+            canvas.style.cursor = 'grab';
+        });
+    }
 }
 
 function bindHangarControls(){
