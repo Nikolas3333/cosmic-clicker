@@ -9350,16 +9350,16 @@ function createHangarRoomEnvironment(){
     }
 
 
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 10.8, 0.7), wallMat.clone());
-    backWall.position.set(0, 2.3, -16.8);
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 15.6, 0.7), wallMat.clone());
+    backWall.position.set(0, 4.9, -16.8);
     group.add(backWall);
 
     const ceiling = new THREE.Mesh(new THREE.BoxGeometry(42, 0.44, 38), wallMat.clone());
-    ceiling.position.set(0, 6.3, 1.8);
+    ceiling.position.set(0, 10.2, 1.8);
     group.add(ceiling);
 
-    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.7, 10.2, 38), wallMat.clone());
-    leftWall.position.set(-20.7, 2.0, 1.8);
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.7, 14.8, 38), wallMat.clone());
+    leftWall.position.set(-20.7, 4.2, 1.8);
     group.add(leftWall);
     const rightWall = leftWall.clone();
     rightWall.position.x = 20.7;
@@ -9379,10 +9379,10 @@ function createHangarRoomEnvironment(){
     }
 
     const frontTop = new THREE.Mesh(new THREE.BoxGeometry(26, 0.65, 1.0), frameMat.clone());
-    frontTop.position.set(0, 5.35, 17.4);
+    frontTop.position.set(0, 8.9, 17.4);
     group.add(frontTop);
-    const frontLeft = new THREE.Mesh(new THREE.BoxGeometry(0.75, 9.4, 1.0), frameMat.clone());
-    frontLeft.position.set(-13.2, 1.0, 17.4);
+    const frontLeft = new THREE.Mesh(new THREE.BoxGeometry(0.75, 13.8, 1.0), frameMat.clone());
+    frontLeft.position.set(-13.2, 3.2, 17.4);
     group.add(frontLeft);
     const frontRight = frontLeft.clone();
     frontRight.position.x = 13.2;
@@ -9392,37 +9392,37 @@ function createHangarRoomEnvironment(){
     group.add(frontBottom);
 
     const frontGlass = new THREE.Mesh(
-        new THREE.PlaneGeometry(25, 7.9),
+        new THREE.PlaneGeometry(25, 11.8),
         new THREE.MeshBasicMaterial({ color:0x49619a, transparent:true, opacity:0.14 })
     );
-    frontGlass.position.set(0, 1.5, 17.0);
+    frontGlass.position.set(0, 3.7, 17.0);
     group.add(frontGlass);
     const frontGlow = new THREE.Mesh(
-        new THREE.PlaneGeometry(24.5, 7.3),
+        new THREE.PlaneGeometry(24.5, 11.0),
         new THREE.MeshBasicMaterial({ color:0x4eb7ff, transparent:true, opacity:0.08 })
     );
-    frontGlow.position.set(0, 1.45, 16.9);
+    frontGlow.position.set(0, 3.65, 16.9);
     glowPanels.push(frontGlow);
     group.add(frontGlow);
 
     for(const side of [-1, 1]){
-        const sideWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(0.48, 7.6, 16.5), frameMat.clone());
-        sideWindowFrame.position.set(side * 17.2, 1.8, 0.8);
+        const sideWindowFrame = new THREE.Mesh(new THREE.BoxGeometry(0.48, 11.4, 16.5), frameMat.clone());
+        sideWindowFrame.position.set(side * 17.2, 3.7, 0.8);
         group.add(sideWindowFrame);
 
         const sideGlass = new THREE.Mesh(
-            new THREE.PlaneGeometry(15.8, 6.4),
+            new THREE.PlaneGeometry(15.8, 9.8),
             new THREE.MeshBasicMaterial({ color:0x34486e, transparent:true, opacity:0.12 })
         );
-        sideGlass.position.set(side * 16.9, 1.8, 0.8);
+        sideGlass.position.set(side * 16.9, 3.7, 0.8);
         sideGlass.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         group.add(sideGlass);
 
         const sideGlow = new THREE.Mesh(
-            new THREE.PlaneGeometry(15.1, 5.9),
+            new THREE.PlaneGeometry(15.1, 9.1),
             new THREE.MeshBasicMaterial({ color: side < 0 ? 0x42a4ff : 0xb069ff, transparent:true, opacity:0.08 })
         );
-        sideGlow.position.set(side * 16.78, 1.75, 0.8);
+        sideGlow.position.set(side * 16.78, 3.65, 0.8);
         sideGlow.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         glowPanels.push(sideGlow);
         group.add(sideGlow);
@@ -9456,11 +9456,11 @@ function createHangarRoomEnvironment(){
         }
     }
 
-    const rearDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(8.2, 6.2, 0.5), frameMat.clone());
-    rearDoorFrame.position.set(0, 0.6, -16.1);
+    const rearDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(8.2, 9.6, 0.5), frameMat.clone());
+    rearDoorFrame.position.set(0, 2.4, -16.1);
     group.add(rearDoorFrame);
-    const rearDoor = new THREE.Mesh(new THREE.BoxGeometry(6.0, 4.8, 0.14), panelMat.clone());
-    rearDoor.position.set(0, 0.2, -15.8);
+    const rearDoor = new THREE.Mesh(new THREE.BoxGeometry(6.0, 7.4, 0.14), panelMat.clone());
+    rearDoor.position.set(0, 1.9, -15.8);
     group.add(rearDoor);
 
     const leftAccent = new THREE.Mesh(new THREE.BoxGeometry(8.0, 0.08, 0.08), cyanGlowMatBase.clone());
@@ -10110,14 +10110,14 @@ function ensureHangarRenderer(){
         hangarState.platformGlowDisc = null;
         hangarState.platformBeams = [];
 
-        hangarState.shipPivot.position.set(-13.8, -0.38, -0.6);
+        hangarState.shipPivot.position.set(-13.8, -0.28, -8.6);
         hangarState.scene.add(hangarState.shipPivot);
 
         const supportPads = [
-            { key:'weapon', x:-13.8, y:-0.82, z:-8.6 },
-            { key:'booster', x:-13.8, y:-0.82, z:7.4 },
-            { key:'shield', x:13.8, y:-0.82, z:-8.6 },
-            { key:'support_a', x:13.8, y:-0.82, z:7.4 }
+            { key:'weapon', x:-13.8, y:-0.72, z:-8.6 },
+            { key:'booster', x:-13.8, y:-0.72, z:7.4 },
+            { key:'shield', x:13.8, y:-0.72, z:-8.6 },
+            { key:'support_a', x:13.8, y:-0.72, z:7.4 }
         ];
         supportPads.forEach((cfg, idx) => {
             const pad = createHangarSidePlatform(cfg.key);
@@ -10131,7 +10131,7 @@ function ensureHangarRenderer(){
         });
 
         if(hangarState.envGroup){
-            hangarState.envGroup.scale.set(1.34, 1.18, 1.48);
+            hangarState.envGroup.scale.set(1.34, 1.34, 1.48);
         }
     }
 
@@ -10473,7 +10473,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
         shell.innerHTML = `
           <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
           <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
-          <div class="hangar-runtime-fade"></div>\n          <div class="hangar-runtime-note">Мышь — осмотр • WASD — движение • Shift — бег • Space — прыжок</div>
+          <div class="hangar-runtime-fade"></div>
         `;
     }
 
