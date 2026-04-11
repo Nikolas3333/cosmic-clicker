@@ -10339,145 +10339,27 @@ function bindHangarStageInteraction(){
 }
 
 function bindHangarControls(){
-    const bindOnce = (id, handler) => {
-        const el = document.getElementById(id);
-        if(!el || el.dataset.hangarBound) return;
-        el.dataset.hangarBound = '1';
-        el.addEventListener('click', handler);
-    };
-
-
-    const filterButtons = document.querySelectorAll('.hangar-class-chip[data-hangar-class]');
-    filterButtons.forEach(btn => {
-        if(btn.dataset.hangarBound) return;
-        btn.dataset.hangarBound = '1';
-        btn.addEventListener('click', () => {
-            const nextFilter = String(btn.dataset.hangarClass || 'all').trim() || 'all';
-            if(hangarState.shipFilter !== nextFilter){
-                setHangarTransition(nextFilter === 'all' ? 0 : 1);
-            }
-            hangarState.shipFilter = nextFilter;
-            hangarState.shipIndex = 0;
-            const filteredShips = getOwnedHangarShips();
-            const selectedIndex = filteredShips.findIndex(item => String(item?.id || '').trim() === String(player?.selectedShipId || '').trim());
-            if(selectedIndex >= 0){
-                hangarState.shipIndex = selectedIndex;
-            }
-            ensureHangarIndexes();
-            updateHangarFilterButtons();
-            fillHangarText();
-            rebuildHangarSceneObjects();
+    const closeBtn = document.getElementById('close-hangar');
+    if(closeBtn && !closeBtn.dataset.hangarBound){
+        closeBtn.dataset.hangarBound = '1';
+        closeBtn.addEventListener('click', () => {
+            document.getElementById('hangar-window')?.classList.add('hidden');
+            try{ resetHangarAstronautState?.(); }catch(_){ }
+            try{ disposeHangarRenderer?.(); }catch(_){ }
         });
-    });
-
-    const moduleTypeButtons = document.querySelectorAll('.hangar-module-chip[data-hangar-module-type]');
-    moduleTypeButtons.forEach(btn => {
-        if(btn.dataset.hangarBound) return;
-        btn.dataset.hangarBound = '1';
-        btn.addEventListener('click', () => {
-            const nextType = String(btn.dataset.hangarModuleType || 'weapon').trim() || 'weapon';
-            hangarState.moduleFilter = nextType;
-            hangarState.moduleIndex = 0;
-            document.querySelectorAll('.hangar-module-chip[data-hangar-module-type]').forEach(chip => {
-                chip.classList.toggle('active', String(chip.dataset.hangarModuleType || '') === nextType);
-            });
-            fillHangarText();
-            rebuildHangarSceneObjects();
-        });
-    });
-
-    bindOnce('hangar-ship-left', () => {
-        const nextIndex = Math.max(0, hangarState.shipIndex - 1);
-        if(nextIndex === hangarState.shipIndex) return;
-        hangarState.shipIndex = nextIndex;
-        setHangarTransition(-1);
-        rebuildHangarSceneObjects();
-    });
-
-    bindOnce('hangar-ship-right', () => {
-        const ships = getOwnedHangarShips();
-        const nextIndex = Math.min(Math.max(0, ships.length - 1), hangarState.shipIndex + 1);
-        if(nextIndex === hangarState.shipIndex) return;
-        hangarState.shipIndex = nextIndex;
-        setHangarTransition(1);
-        rebuildHangarSceneObjects();
-    });
-
-    bindOnce('hangar-module-up', () => {
-        hangarState.moduleIndex = Math.max(0, hangarState.moduleIndex - 1);
-        rebuildHangarSceneObjects();
-    });
-
-    bindOnce('hangar-module-down', () => {
-        const modules = getOwnedHangarModules();
-        hangarState.moduleIndex = Math.min(Math.max(0, modules.length - 1), hangarState.moduleIndex + 1);
-        rebuildHangarSceneObjects();
-    });
-
-    bindOnce('hangar-module-action', () => {
-        const ships = getOwnedHangarShips();
-        const modules = getOwnedHangarModules();
-        const currentShip = ships[hangarState.shipIndex];
-        const currentModule = modules[hangarState.moduleIndex];
-        if(!currentShip || !currentModule) return;
-        if(toggleShipModule(currentModule.id, currentShip.id)){
-            currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || currentShip.id);
-            fillHangarText();
-        }
-    });
-
-    bindOnce('hangar-ship-action', () => {
-        const ships = getOwnedHangarShips();
-        const current = ships[hangarState.shipIndex];
-        if(!current) return;
-        player.selectedShipId = current.id;
-        if(typeof equipOwnedShip === 'function'){
-            try{ equipOwnedShip(current.id); }catch(_){}
-        }else{
-            try{ saveGame?.(); }catch(_){}
-        }
-        fillHangarText();
-        rebuildHangarSceneObjects();
-    });
-
-    bindOnce('hangar-ship-sell', () => {
-        const current = getOwnedHangarShips()[hangarState.shipIndex];
-        if(!current || !canSellHull(current.id)) return;
-        if(sellHullFromHangar(current.id)){
-            hangarState.shipIndex = Math.max(0, Math.min(hangarState.shipIndex, getOwnedHangarShips().length - 1));
-            fillHangarText();
-            rebuildHangarSceneObjects();
-        }
-    });
-
-    bindOnce('hangar-module-sell', () => {
-        const currentModule = getOwnedHangarModules()[hangarState.moduleIndex];
-        if(!currentModule || !canSellModule(currentModule.id)) return;
-        if(sellModuleFromHangar(currentModule.id)){
-            hangarState.moduleIndex = Math.max(0, Math.min(hangarState.moduleIndex, getOwnedHangarModules().length - 1));
-            fillHangarText();
-            rebuildHangarSceneObjects();
-        }
-    });
-
-    bindOnce('close-hangar', () => {
-        document.getElementById('hangar-window')?.classList.add('hidden');
-        resetHangarAstronautState();
-        disposeHangarRenderer();
-    });
+    }
 }
+
 
 function renderHangarCosmic(forceSyncToSelected = true){
-    if(forceSyncToSelected){
-        syncHangarSelectionState({ forceClass:true });
-    }
-    ensureHangarIndexes();
-    resetHangarAstronautState();
-    bindHangarControls();
-    updateHangarFilterButtons();
-    fillHangarText();
-    ensureHangarRenderer();
+    try{ disposeHangarRenderer?.(); }catch(_){ }
+    try{ resetHangarAstronautState?.(); }catch(_){ }
+    const win = document.getElementById('hangar-window');
+    if(win) win.classList.remove('hidden');
+    const stage = document.getElementById('hangar-3d-stage');
+    if(stage) stage.innerHTML = '';
 }
+
 function renderClansWindow(){
     const clansInfo = document.getElementById('clans-info');
     if(!clansInfo) return;
