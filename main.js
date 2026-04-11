@@ -9255,6 +9255,7 @@ function resetHangarAstronautState(){
     hangarState.lastMouseX = 0;
     hangarState.lastMouseY = 0;
     try{ document.querySelector('#hangar-window .hangar-room-shell')?.classList.remove('dragging'); }catch(_){ }
+    try{ const c = document.querySelector('#hangar-window canvas'); if(c) c.style.cursor='none'; }catch(_){}
 }
 
 
@@ -9348,14 +9349,6 @@ function createHangarRoomEnvironment(){
         group.add(sideWalk);
     }
 
-    for(let i = 0; i < 12; i++){
-        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.02, 1.05), stripMatBase.clone());
-        strip.position.set(0, -1.98, -12.2 + i * 2.35);
-        strip.material.emissiveIntensity = 1.45 + (i % 2) * 0.28;
-        animatedMaterials.push(strip.material);
-        lightBars.push(strip);
-        group.add(strip);
-    }
 
     const backWall = new THREE.Mesh(new THREE.BoxGeometry(28, 10.8, 0.7), wallMat.clone());
     backWall.position.set(0, 2.3, -16.8);
@@ -10112,24 +10105,19 @@ function ensureHangarRenderer(){
         hangarState.astronaut = hangarState.astronautPivot;
         hangarState.scene.add(hangarState.astronautPivot);
 
-        hangarState.platform = createHangarPlatform();
-        hangarState.platform.position.set(0, hangarState.astronautGroundY, -2.8);
-        hangarState.scene.add(hangarState.platform);
-        hangarState.platformRing = hangarState.platform.userData?.ring || null;
-        hangarState.platformGlowDisc = hangarState.platform.userData?.glowDisc || null;
-        hangarState.platformBeams = hangarState.platform.userData?.beams || [];
+        hangarState.platform = null;
+        hangarState.platformRing = null;
+        hangarState.platformGlowDisc = null;
+        hangarState.platformBeams = [];
 
-        hangarState.shipPivot.position.set(0, hangarState.astronautGroundY + 0.54, -2.8);
+        hangarState.shipPivot.position.set(-13.8, -0.38, -0.6);
         hangarState.scene.add(hangarState.shipPivot);
 
         const supportPads = [
-            { key:'weapon', x:-9.5, y:hangarState.astronautGroundY + 0.02, z:-1.8 },
-            { key:'shield', x:9.5, y:hangarState.astronautGroundY + 0.02, z:-1.8 },
-            { key:'booster', x:-9.5, y:hangarState.astronautGroundY + 0.02, z:-8.2 },
-            { key:'support_a', x:9.5, y:hangarState.astronautGroundY + 0.02, z:-8.2 },
-            { key:'support_b', x:0.0, y:hangarState.astronautGroundY + 0.02, z:-12.2 },
-            { key:'support_c', x:-16.0, y:hangarState.astronautGroundY + 0.02, z:-12.0 },
-            { key:'support_d', x:16.0, y:hangarState.astronautGroundY + 0.02, z:-12.0 }
+            { key:'weapon', x:-13.8, y:-0.82, z:-8.6 },
+            { key:'booster', x:-13.8, y:-0.82, z:7.4 },
+            { key:'shield', x:13.8, y:-0.82, z:-8.6 },
+            { key:'support_a', x:13.8, y:-0.82, z:7.4 }
         ];
         supportPads.forEach((cfg, idx) => {
             const pad = createHangarSidePlatform(cfg.key);
@@ -10148,6 +10136,15 @@ function ensureHangarRenderer(){
     }
 
     bindHangarStageInteraction();
+
+    try{
+        const canvas = hangarState?.renderer?.domElement || null;
+        if(canvas && document.getElementById('hangar-window') && !document.getElementById('hangar-window').classList.contains('hidden')){
+            hangarState.lastMouseX = window.innerWidth * 0.5;
+            hangarState.lastMouseY = window.innerHeight * 0.5;
+            safeRequestPointerLock(canvas);
+        }
+    }catch(_){}
 
     const width = window.innerWidth || stage.clientWidth || 1000;
     const height = window.innerHeight || stage.clientHeight || 700;
@@ -10250,9 +10247,9 @@ function ensureHangarRenderer(){
             hangarState.shipPivot.rotation.y = hangarState.shipYaw;
             hangarState.shipPivot.rotation.z = Math.sin(time * 1.18) * 0.01;
             hangarState.shipPivot.rotation.x = Math.cos(time * 0.92) * 0.006;
-            hangarState.shipPivot.position.x = 0.58 + transitionOffset * 0.55;
-            hangarState.shipPivot.position.y = -0.54 + Math.sin(time * 1.18) * 0.01;
-            hangarState.shipPivot.position.z = -1.2;
+            hangarState.shipPivot.position.x = -13.8 + transitionOffset * 0.35;
+            hangarState.shipPivot.position.y = -0.38 + Math.sin(time * 1.18) * 0.01;
+            hangarState.shipPivot.position.z = -0.6;
         }
         if(hangarState.modulePivot){
             hangarState.modulePivot.visible = !!hangarState.moduleItem;
@@ -10348,8 +10345,8 @@ function ensureHangarRenderer(){
 
         if(hangarState.camera){
             const astro = hangarState.astronautPivot?.position || { x:0, y:hangarState.astronautGroundY, z:6.6 };
-            hangarState.cameraYaw += (hangarState.cameraYawTarget - hangarState.cameraYaw) * 0.34;
-            hangarState.cameraPitch += (hangarState.cameraPitchTarget - hangarState.cameraPitch) * 0.34;
+            hangarState.cameraYaw += (hangarState.cameraYawTarget - hangarState.cameraYaw) * 0.52;
+            hangarState.cameraPitch += (hangarState.cameraPitchTarget - hangarState.cameraPitch) * 0.52;
             const focus = new THREE.Vector3(astro.x, astro.y + 1.65, astro.z);
             const cosPitch = Math.cos(hangarState.cameraPitch);
             const cameraOffset = new THREE.Vector3(
@@ -10359,7 +10356,7 @@ function ensureHangarRenderer(){
             ).multiplyScalar(hangarState.cameraDistance);
             const desiredPos = focus.clone().sub(cameraOffset);
             desiredPos.y += 2.35;
-            hangarState.camera.position.lerp(desiredPos, 0.3);
+            hangarState.camera.position.lerp(desiredPos, 0.42);
             hangarState.camera.lookAt(focus);
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
@@ -10376,68 +10373,77 @@ function bindHangarStageInteraction(){
     const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage') || document.querySelector('#hangar-window .hangar-room-shell');
     if(!stage) return;
 
-    const shell = stage;
-    hangarState.mouseLookActive = false;
-    hangarState.lastMouseX = 0;
-    hangarState.lastMouseY = 0;
-
     const applyDelta = (dx, dy) => {
-        const safeDx = THREE.MathUtils.clamp(Number(dx || 0) || 0, -18, 18);
-        const safeDy = THREE.MathUtils.clamp(Number(dy || 0) || 0, -18, 18);
-        hangarState.cameraYawTarget -= safeDx * 0.0031;
+        const safeDx = THREE.MathUtils.clamp(Number(dx || 0) || 0, -22, 22);
+        const safeDy = THREE.MathUtils.clamp(Number(dy || 0) || 0, -22, 22);
+        hangarState.cameraYawTarget -= safeDx * 0.00235;
         hangarState.cameraPitchTarget = THREE.MathUtils.clamp(
-            hangarState.cameraPitchTarget - safeDy * 0.0024,
-            -0.62,
-            0.5
+            hangarState.cameraPitchTarget - safeDy * 0.00185,
+            -0.58,
+            0.42
         );
     };
 
-    const stopLook = () => {
-        hangarState.mouseLookActive = false;
-        try{ stage.style.cursor = 'grab'; }catch(_){}
-        shell?.classList.remove('dragging');
-    };
+    hangarState.mouseLookActive = true;
+    try{ stage.style.cursor = 'none'; }catch(_){}
 
     if(!hangarState.stageDocBound){
         hangarState.stageDocBound = true;
         document.addEventListener('mousemove', (event) => {
-            if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
-            if(!hangarState.mouseLookActive) return;
-            const nextX = Number(event.clientX || 0) || 0;
-            const nextY = Number(event.clientY || 0) || 0;
-            const rawDx = Number(event.movementX);
-            const rawDy = Number(event.movementY);
-            const dx = Number.isFinite(rawDx) && rawDx !== 0 ? rawDx : (nextX - hangarState.lastMouseX);
-            const dy = Number.isFinite(rawDy) && rawDy !== 0 ? rawDy : (nextY - hangarState.lastMouseY);
-            hangarState.lastMouseX = nextX;
-            hangarState.lastMouseY = nextY;
+            const hangarWindow = document.getElementById('hangar-window');
+            if(!hangarWindow || hangarWindow.classList.contains('hidden')) return;
+
+            const canvas = hangarState?.renderer?.domElement || null;
+            const usingPointerLock = !!(canvas && document.pointerLockElement === canvas);
+
+            let dx = 0;
+            let dy = 0;
+
+            if(usingPointerLock){
+                dx = Number(event.movementX || 0) || 0;
+                dy = Number(event.movementY || 0) || 0;
+            }else{
+                const nextX = Number(event.clientX || 0) || 0;
+                const nextY = Number(event.clientY || 0) || 0;
+                dx = nextX - Number(hangarState.lastMouseX || nextX);
+                dy = nextY - Number(hangarState.lastMouseY || nextY);
+                hangarState.lastMouseX = nextX;
+                hangarState.lastMouseY = nextY;
+
+                const insideStage = (() => {
+                    try{
+                        const rect = stage.getBoundingClientRect();
+                        return nextX >= rect.left && nextX <= rect.right && nextY >= rect.top && nextY <= rect.bottom;
+                    }catch(_){
+                        return true;
+                    }
+                })();
+
+                if(!insideStage) return;
+            }
+
             applyDelta(dx, dy);
         }, { passive:true });
-        document.addEventListener('mouseup', stopLook, { passive:true });
-        window.addEventListener('blur', stopLook, { passive:true });
-    }
 
-    const activateLook = (event) => {
-        if(event.button !== 0) return;
-        hangarState.mouseLookActive = true;
-        hangarState.lastMouseX = Number(event.clientX || 0) || 0;
-        hangarState.lastMouseY = Number(event.clientY || 0) || 0;
-        try{ stage.style.cursor = 'grabbing'; }catch(_){}
-        shell?.classList.add('dragging');
-        event.preventDefault();
-    };
+        document.addEventListener('mouseenter', (event) => {
+            hangarState.lastMouseX = Number(event.clientX || 0) || 0;
+            hangarState.lastMouseY = Number(event.clientY || 0) || 0;
+        }, { passive:true, capture:true });
 
-    if(!stage.dataset.hangarLookBound){
-        stage.dataset.hangarLookBound = '1';
-        try{ stage.style.cursor = 'grab'; }catch(_){}
-        stage.addEventListener('mousedown', activateLook);
+        window.addEventListener('blur', () => {
+            hangarState.lastMouseX = 0;
+            hangarState.lastMouseY = 0;
+        }, { passive:true });
     }
 
     const canvas = hangarState?.renderer?.domElement || null;
     if(canvas && !canvas.dataset.hangarLookBound){
         canvas.dataset.hangarLookBound = '1';
-        canvas.style.cursor = 'grab';
-        canvas.addEventListener('mousedown', activateLook);
+        canvas.style.cursor = 'none';
+        canvas.addEventListener('mousemove', (event) => {
+            if(document.pointerLockElement !== canvas) return;
+            applyDelta(event.movementX || 0, event.movementY || 0);
+        }, { passive:true });
     }
 }
 
@@ -10467,7 +10473,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
         shell.innerHTML = `
           <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
           <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
-          <div class="hangar-runtime-fade"></div>\n          <div class="hangar-runtime-note">ЛКМ + движение мышью — осмотр • WASD — движение • Shift — бег • Space — прыжок</div>
+          <div class="hangar-runtime-fade"></div>\n          <div class="hangar-runtime-note">Мышь — осмотр • WASD — движение • Shift — бег • Space — прыжок</div>
         `;
     }
 
