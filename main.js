@@ -9270,7 +9270,16 @@ function getHangarDisplayShipStats(ship){
 
 function refreshHangarInfoBoards(){
     const boards = Array.isArray(hangarState?.infoBoards) ? hangarState.infoBoards : [];
-    const currentShip = getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || getSelectedShipItem?.() || null;
+    const currentShip = getOwnedHangarShips?.()[hangarState?.shipIndex || 0]
+        || getSelectedShipItem?.()
+        || player?.ships?.[0]
+        || {
+            id: String(player?.selectedShipId || 'scout_1').trim() || 'scout_1',
+            name: 'Cargo Drone',
+            hp: 100,
+            attack: 10,
+            speed: 5
+        };
 
     boards.forEach(entry => {
         const plaque = entry?.plaque || null;
@@ -9608,7 +9617,7 @@ function createHangarRoomEnvironment(){
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
         plaque.rotation.x = 0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-        plaque.rotation.z = 0;
+        plaque.rotation.z = x < 0 ? -0.26 : 0.26;
         dockGroup.add(plaque);
 
         group.add(dockGroup);
@@ -10126,15 +10135,15 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
-            shipMesh.position.set(0, 0.8, 0);
-            shipMesh.scale.setScalar(1.75);
+            shipMesh.position.set(0, 0.2, 0);
+            shipMesh.scale.setScalar(2.2);
             hangarState.shipPivot.add(shipMesh);
         })
         .catch(() => {
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
             const fallback = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-            fallback.position.set(0,0,0);
+            fallback.position.set(0,0.15,0);
             hangarState.shipPivot.add(fallback);
         })
         .finally(() => {
@@ -10217,21 +10226,21 @@ function rebuildHangarSceneObjects(){
         const worldPos = new THREE.Vector3();
         shipDock.getWorldPosition(worldPos);
         if(shipParent) shipParent.updateMatrixWorld?.(true);
-        hangarState.shipPivot.position.set(worldPos.x, worldPos.y + 3.45, worldPos.z);
+        hangarState.shipPivot.position.set(worldPos.x, worldPos.y + 1.35, worldPos.z - 0.15);
     }else{
         hangarState.shipPivot.position.set(0, 0.2, -32);
     }
 
     if(currentShip){
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-        instantMesh.position.set(0, 0.8, 0);
-        instantMesh.scale.setScalar(1.75);
+        instantMesh.position.set(0, 0.2, 0);
+        instantMesh.scale.setScalar(2.2);
         hangarState.shipPivot.add(instantMesh);
         const emergencyHull = new THREE.Mesh(
-            new THREE.BoxGeometry(2.2, 0.8, 5.2),
-            new THREE.MeshStandardMaterial({ color:0x9ecbff, metalness:0.55, roughness:0.3, emissive:0x16334a, emissiveIntensity:0.35 })
+            new THREE.BoxGeometry(3.6, 1.2, 7.4),
+            new THREE.MeshStandardMaterial({ color:0xb7e5ff, metalness:0.48, roughness:0.24, emissive:0x2a8cff, emissiveIntensity:1.15 })
         );
-        emergencyHull.position.set(0, 0.65, 0);
+        emergencyHull.position.set(0, 0.92, 0);
         emergencyHull.visible = true;
         hangarState.shipPivot.add(emergencyHull);
         try{
