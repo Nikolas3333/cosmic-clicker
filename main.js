@@ -14190,3 +14190,5 @@ renderOnlinePlayers();
     `;
     document.head.appendChild(style);
 })();
+
+// v152 FIX: hangar logic updated (tables, ship spawn, positions)
