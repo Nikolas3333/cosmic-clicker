@@ -9293,8 +9293,8 @@ function refreshHangarInfoBoards(){
 
         if(entry.kind === 'center_ship'){
             drawHangarPlaque(plaque, {
-                title: String(currentShip?.name || 'Корабль').trim(),
-                lines: getHangarDisplayShipStats(currentShip)
+                title: String(currentShip?.name || 'DEBUG SHIP V164').trim(),
+                lines: getHangarDisplayShipStats(currentShip || { id:'forced_debug_ship', name:'DEBUG SHIP V164' })
             });
         }else{
             drawHangarPlaque(plaque, {});
@@ -9621,7 +9621,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0;
         dockGroup.add(plaque);
@@ -9650,6 +9650,48 @@ function createHangarRoomEnvironment(){
     centerPad.scale.setScalar(1.34);
     centerPad.userData.baseY = 1.58;
     centerDockGroup.add(centerPad);
+
+    const debugShipRoot = new THREE.Group();
+    debugShipRoot.name = 'HANGAR_V164_DEBUG_SHIP';
+    debugShipRoot.position.set(0, 2.85, 0);
+
+    const debugHull = new THREE.Mesh(
+        new THREE.BoxGeometry(6.8, 2.4, 13.8),
+        new THREE.MeshStandardMaterial({ color:0xff3b30, emissive:0x7a0f08, emissiveIntensity:1.65, metalness:0.32, roughness:0.28 })
+    );
+    debugHull.position.set(0, 0, 0);
+    debugShipRoot.add(debugHull);
+
+    const debugNose = new THREE.Mesh(
+        new THREE.ConeGeometry(2.2, 4.8, 16),
+        new THREE.MeshStandardMaterial({ color:0xffe3df, emissive:0x8a2010, emissiveIntensity:1.15, metalness:0.24, roughness:0.22 })
+    );
+    debugNose.rotation.x = Math.PI * 0.5;
+    debugNose.position.set(0, 0, 8.4);
+    debugShipRoot.add(debugNose);
+
+    const debugWingL = new THREE.Mesh(
+        new THREE.BoxGeometry(5.4, 0.28, 3.8),
+        new THREE.MeshStandardMaterial({ color:0x9fefff, emissive:0x2aa4ff, emissiveIntensity:1.05, metalness:0.28, roughness:0.24 })
+    );
+    debugWingL.position.set(-4.9, 0, -0.8);
+    debugWingL.rotation.z = -0.16;
+    debugShipRoot.add(debugWingL);
+
+    const debugWingR = debugWingL.clone();
+    debugWingR.position.x = 4.9;
+    debugWingR.rotation.z = 0.16;
+    debugShipRoot.add(debugWingR);
+
+    const debugGlow = new THREE.Mesh(
+        new THREE.SphereGeometry(3.3, 20, 20),
+        new THREE.MeshBasicMaterial({ color:0xff5b4d, transparent:true, opacity:0.32 })
+    );
+    debugGlow.position.set(0, 0, 0);
+    debugGlow.scale.set(1.8, 0.72, 3.4);
+    debugShipRoot.add(debugGlow);
+
+    centerDockGroup.add(debugShipRoot);
 
     const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
     centerPlaque.position.set(0, 1.28, -5.08);
