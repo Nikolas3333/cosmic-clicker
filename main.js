@@ -9268,12 +9268,10 @@ function getHangarDisplayShipStats(ship){
     ];
 }
 
-function getGuaranteedHangarShipFallback(){
-    return {
+function getForcedHangarDisplayShip(){
+    return getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || getSelectedShipItem?.() || player?.ships?.[0] || {
         id: String(player?.selectedShipId || 'scout_1').trim() || 'scout_1',
         name: 'Cargo Drone',
-        subtitle: 'Основной корпус ангара',
-        description: 'Центральная платформа всегда показывает базовый корабль проекта.',
         hp: 100,
         attack: 10,
         speed: 5,
@@ -9284,33 +9282,18 @@ function getGuaranteedHangarShipFallback(){
     };
 }
 
-function getResolvedHangarShowcaseShip(){
-    const ownedShips = typeof getOwnedHangarShips === 'function' ? getOwnedHangarShips() : [];
-    const currentIndex = Math.max(0, Number(hangarState?.shipIndex || 0) || 0);
-    return ownedShips[currentIndex] || getSelectedShipItem?.() || player?.ships?.[0] || getGuaranteedHangarShipFallback();
-}
-
-function getHangarShipPlaqueLines(ship){
-    const safeShip = ship || getGuaranteedHangarShipFallback();
-    const subtitle = String(safeShip?.subtitle || safeShip?.tier || safeShip?.description || 'Базовый корабль').trim();
-    return [
-        subtitle,
-        ...getHangarDisplayShipStats(safeShip)
-    ].filter(Boolean).slice(0, 4);
-}
-
 function refreshHangarInfoBoards(){
     const boards = Array.isArray(hangarState?.infoBoards) ? hangarState.infoBoards : [];
-    const currentShip = getResolvedHangarShowcaseShip();
+    const currentShip = getForcedHangarDisplayShip();
 
     boards.forEach(entry => {
         const plaque = entry?.plaque || null;
         if(!plaque) return;
 
-        if(entry.kind === 'center_ship' && currentShip){
+        if(entry.kind === 'center_ship'){
             drawHangarPlaque(plaque, {
                 title: String(currentShip?.name || 'Корабль').trim(),
-                lines: getHangarShipPlaqueLines(currentShip)
+                lines: getHangarDisplayShipStats(currentShip)
             });
         }else{
             drawHangarPlaque(plaque, {});
@@ -9668,8 +9651,8 @@ function createHangarRoomEnvironment(){
     centerDockGroup.add(centerPad);
 
     const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
-    centerPlaque.position.set(0, 1.18, -5.15);
-    centerPlaque.rotation.x = 0.34;
+    centerPlaque.position.set(0, 1.28, -5.08);
+    centerPlaque.rotation.x = 0.42;
     centerPlaque.rotation.y = 0;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
@@ -10210,7 +10193,7 @@ function queueHangarShipBuild(currentShip){
     if(cached){
         hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip) hangarState.shipPivot.remove(child); });
         const readyMesh = cloneObject3DDeepSafe(cached);
-        readyMesh.position.set(0, 1.35, 0);
+        readyMesh.position.set(0, 1.52, 0);
         hangarState.shipPivot.add(readyMesh);
         hangarState.isShipLoading = false;
         fillHangarText();
@@ -10223,7 +10206,7 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip) hangarState.shipPivot.remove(child); });
-            shipMesh.position.set(0, 1.35, 0);
+            shipMesh.position.set(0, 1.52, 0);
             shipMesh.scale.setScalar(2.3);
             hangarState.shipPivot.add(shipMesh);
         })
@@ -10231,7 +10214,7 @@ function queueHangarShipBuild(currentShip){
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip) hangarState.shipPivot.remove(child); });
             const fallback = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-            fallback.position.set(0,1.35,0);
+            fallback.position.set(0,1.52,0);
             hangarState.shipPivot.add(fallback);
         })
         .finally(() => {
@@ -10295,7 +10278,7 @@ function rebuildHangarSceneObjects(){
 
     const ships = getOwnedHangarShips();
     const modules = getOwnedHangarModules();
-    const currentShip = ships[hangarState.shipIndex] || getResolvedHangarShowcaseShip();
+    const currentShip = getForcedHangarDisplayShip();
     const currentModule = modules[hangarState.moduleIndex] || null;
 
     const shipDock = hangarState?.envGroup?.userData?.shipDock || null;
@@ -10307,31 +10290,41 @@ function rebuildHangarSceneObjects(){
 
     if(currentShip){
         const guaranteedShowcaseShip = createGuaranteedCentralShowcaseShip();
-        guaranteedShowcaseShip.position.set(0, 1.52, 0);
-        guaranteedShowcaseShip.scale.setScalar(1.12);
-        guaranteedShowcaseShip.visible = true;
+        guaranteedShowcaseShip.position.set(0, 1.62, 0);
+        guaranteedShowcaseShip.scale.setScalar(1.18);
         hangarState.shipPivot.add(guaranteedShowcaseShip);
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-        instantMesh.position.set(0, 1.18, 0);
-        instantMesh.scale.setScalar(3.05);
+        instantMesh.position.set(0, 1.48, 0);
+        instantMesh.scale.setScalar(3.1);
         instantMesh.rotation.y = Math.PI;
-        instantMesh.visible = true;
+        instantMesh.userData.isHangarInstantShip = true;
         hangarState.shipPivot.add(instantMesh);
+
+        const emergencyHull = new THREE.Mesh(
+            new THREE.BoxGeometry(4.4, 1.55, 8.9),
+            new THREE.MeshStandardMaterial({ color:0xe2f6ff, metalness:0.62, roughness:0.2, emissive:0x4fd8ff, emissiveIntensity:0.9 })
+        );
+        emergencyHull.position.set(0, 1.62, 0);
+        emergencyHull.visible = true;
+        emergencyHull.userData.isHangarEmergencyHull = true;
+        hangarState.shipPivot.add(emergencyHull);
 
         try{
             queueHangarShipBuild(currentShip);
         }catch(_){}
     }else{
         const guaranteedShowcaseShip = createGuaranteedCentralShowcaseShip();
-        guaranteedShowcaseShip.position.set(0, 1.45, 0);
+        guaranteedShowcaseShip.position.set(0, 1.62, 0);
+        guaranteedShowcaseShip.scale.setScalar(1.18);
         hangarState.shipPivot.add(guaranteedShowcaseShip);
 
         const emergencyHull = new THREE.Mesh(
-            new THREE.BoxGeometry(4.2, 1.45, 8.6),
-            new THREE.MeshStandardMaterial({ color:0xd8f2ff, metalness:0.62, roughness:0.22, emissive:0x38b2ff, emissiveIntensity:0.65 })
+            new THREE.BoxGeometry(4.4, 1.55, 8.9),
+            new THREE.MeshStandardMaterial({ color:0xe2f6ff, metalness:0.62, roughness:0.2, emissive:0x4fd8ff, emissiveIntensity:0.9 })
         );
-        emergencyHull.position.set(0, 1.55, 0);
+        emergencyHull.position.set(0, 1.62, 0);
+        emergencyHull.userData.isHangarEmergencyHull = true;
         hangarState.shipPivot.add(emergencyHull);
     }
 
