@@ -9276,26 +9276,18 @@ function getHangarDisplayShipStats(ship){
 }
 
 function getForcedHangarDisplayShip(){
-    const selectedId = String(player?.selectedShipId || 'scout_1').trim() || 'scout_1';
-    const localShip = Array.isArray(player?.ships)
-        ? player.ships.find(ship => String(ship?.id || '').trim() === selectedId) || player.ships[0] || null
-        : null;
-
-    return getOwnedHangarShips?.()[hangarState?.shipIndex || 0]
-        || getSelectedShipItem?.()
-        || localShip
-        || {
-            id: selectedId,
-            name: 'Cargo Drone',
-            hp: 100,
-            attack: 10,
-            speed: 5,
-            art: 'arrow',
-            neon: '#7efcff',
-            engine: '#63d1ff',
-            accent: '#7a8cff',
-            modelPath: 'ships/Spaceship.glb'
-        };
+    return getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || getSelectedShipItem?.() || player?.ships?.[0] || {
+        id: String(player?.selectedShipId || 'scout_1').trim() || 'scout_1',
+        name: 'Cargo Drone',
+        hp: 100,
+        attack: 10,
+        speed: 5,
+        art: 'arrow',
+        neon: '#7efcff',
+        engine: '#63d1ff',
+        accent: '#7a8cff',
+        modelPath: 'ships/Spaceship.glb'
+    };
 }
 
 function refreshHangarInfoBoards(){
@@ -9672,11 +9664,11 @@ function createHangarRoomEnvironment(){
     centerDockGroup.add(centerShowcaseGroup);
 
     const emergencyHull = new THREE.Mesh(
-        new THREE.BoxGeometry(2.6, 0.7, 4.8),
+        new THREE.BoxGeometry(4.2, 1.5, 8.0),
         new THREE.MeshStandardMaterial({ color:0x65e9ff, emissive:0x1ba8ff, emissiveIntensity:1.4, metalness:0.42, roughness:0.22 })
     );
     emergencyHull.name = 'HANGAR_EMERGENCY_HULL';
-    emergencyHull.position.set(0, 1.86, 0);
+    emergencyHull.position.set(0, 2.2, 0);
     centerDockGroup.add(emergencyHull);
 
     const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
@@ -10338,44 +10330,45 @@ function rebuildHangarSceneObjects(){
             }
         }catch(_){ }
 
-        const liveItem = findOwnedHangarShipById(player?.selectedShipId || '') || currentShip || getSelectedShipItem?.() || player?.ships?.[0] || null;
+        const liveItemRaw = findOwnedHangarShipById(player?.selectedShipId || '') || currentShip || getSelectedShipItem?.() || player?.ships?.[0] || null;
+        const liveItem = liveItemRaw ? {
+            ...liveItemRaw,
+            art: String(liveItemRaw?.art || 'arrow').trim() || 'arrow',
+            neon: String(liveItemRaw?.neon || '#7efcff').trim() || '#7efcff',
+            engine: String(liveItemRaw?.engine || '#63d1ff').trim() || '#63d1ff',
+            accent: String(liveItemRaw?.accent || '#7a8cff').trim() || '#7a8cff',
+            modelPath: String(liveItemRaw?.modelPath || 'ships/Spaceship.glb').trim() || 'ships/Spaceship.glb'
+        } : null;
 
         const liveEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
-        if(liveEmergency) liveEmergency.visible = false;
-
-        const displayShip = {
-            id: String(liveItem?.id || currentShip?.id || player?.selectedShipId || 'scout_1').trim() || 'scout_1',
-            name: String(liveItem?.name || currentShip?.name || 'Cargo Drone').trim() || 'Cargo Drone',
-            hp: Number(liveItem?.hp || currentShip?.hp || 100) || 100,
-            attack: Number(liveItem?.attack || currentShip?.attack || 10) || 10,
-            speed: Number(liveItem?.speed || currentShip?.speed || 5) || 5,
-            art: String(liveItem?.art || currentShip?.art || 'arrow').trim() || 'arrow',
-            neon: String(liveItem?.neon || currentShip?.neon || '#7efcff').trim() || '#7efcff',
-            engine: String(liveItem?.engine || currentShip?.engine || '#63d1ff').trim() || '#63d1ff',
-            accent: String(liveItem?.accent || currentShip?.accent || '#7a8cff').trim() || '#7a8cff',
-            modelPath: String(liveItem?.modelPath || currentShip?.modelPath || 'ships/Spaceship.glb').trim() || 'ships/Spaceship.glb'
-        };
+        if(liveEmergency) liveEmergency.visible = true;
 
         hangarState.isShipLoading = true;
 
-        while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-        const instantFallback = normalizeHangarShipMesh(createHangarShipMesh(displayShip));
-        instantFallback.position.set(0, 0.02, 0);
-        instantFallback.scale.setScalar(1.0);
-        instantFallback.rotation.y = Math.PI;
-        showcaseGroup.add(instantFallback);
-
-        buildHangarShipMeshAsync(displayShip)
+        buildHangarShipMeshAsync(liveItem || currentShip)
             .then((shipMesh) => {
-                if(buildToken !== hangarBuildToken || !showcaseGroup || !shipMesh) return;
+                if(buildToken !== hangarBuildToken || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
+                if(!shipMesh){
+                    shipMesh = normalizeHangarShipMesh(createHangarShipMesh(liveItem || currentShip));
+                }
                 shipMesh.position.set(0, 0.02, 0);
                 shipMesh.scale.setScalar(1.0);
                 shipMesh.rotation.y = Math.PI;
                 showcaseGroup.add(shipMesh);
+                const activeEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
+                if(activeEmergency) activeEmergency.visible = false;
             })
             .catch(() => {
                 if(buildToken !== hangarBuildToken || !showcaseGroup) return;
+                while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
+                const fallback = normalizeHangarShipMesh(createHangarShipMesh(liveItem || currentShip));
+                fallback.position.set(0, 0.02, 0);
+                fallback.scale.setScalar(1.0);
+                fallback.rotation.y = Math.PI;
+                showcaseGroup.add(fallback);
+                const activeEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
+                if(activeEmergency) activeEmergency.visible = false;
             })
             .finally(() => {
                 if(buildToken !== hangarBuildToken) return;
