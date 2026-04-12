@@ -9604,10 +9604,10 @@ function createHangarRoomEnvironment(){
         pad.scale.setScalar(1.0);
         dockGroup.add(pad);
 
-        const plaque = createHangarPlaqueBoard(4.3, 1.72);
-        plaque.position.set(x < 0 ? 4.55 : -4.55, 0.84, 0.10);
+        const plaque = createHangarPlaqueBoard(4.6, 1.86);
+        plaque.position.set(x < 0 ? 3.95 : -3.95, 0.92, 0.12);
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-        plaque.rotation.z = x < 0 ? -0.08 : 0.08;
+        plaque.rotation.z = x < 0 ? -0.05 : 0.05;
         dockGroup.add(plaque);
 
         group.add(dockGroup);
@@ -9635,10 +9635,11 @@ function createHangarRoomEnvironment(){
     centerPad.userData.baseY = 1.58;
     centerDockGroup.add(centerPad);
 
-    const centerPlaque = createHangarPlaqueBoard(4.8, 1.9);
-    centerPlaque.position.set(-7.1, 1.22, 0.25);
-    centerPlaque.rotation.y = Math.PI / 2;
-    centerPlaque.rotation.z = 0.08;
+    const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
+    centerPlaque.position.set(0, 1.10, -5.15);
+    centerPlaque.rotation.x = -0.28;
+    centerPlaque.rotation.y = 0;
+    centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
 
     group.add(centerDockGroup);
@@ -10161,7 +10162,7 @@ function normalizeHangarShipMesh(shipMesh){
         const scaleX = size.x > 0 ? maxWidth / size.x : 1;
         const scaleY = size.y > 0 ? maxHeight / size.y : 1;
         const scaleZ = size.z > 0 ? maxDepth / size.z : 1;
-        const finalScale = Math.min(scaleX, scaleY, scaleZ, 0.82);
+        const finalScale = Math.min(scaleX, scaleY, scaleZ, 1.08);
 
         shipMesh.scale.multiplyScalar(finalScale);
         shipMesh.updateMatrixWorld(true);
@@ -10195,7 +10196,17 @@ function rebuildHangarSceneObjects(){
 
     const ships = getOwnedHangarShips();
     const modules = getOwnedHangarModules();
-    const currentShip = ships[hangarState.shipIndex] || getSelectedShipItem() || player?.ships?.[0] || null;
+    const currentShip = ships[hangarState.shipIndex] || getSelectedShipItem() || player?.ships?.[0] || {
+        id: String(player?.selectedShipId || 'scout_1').trim() || 'scout_1',
+        name: 'Cargo Drone',
+        hp: 100,
+        attack: 10,
+        speed: 5,
+        art: 'classic',
+        neon: '#7efcff',
+        engine: '#63d1ff',
+        accent: '#7a8cff'
+    };
     const currentModule = modules[hangarState.moduleIndex] || null;
 
     const shipDock = hangarState?.envGroup?.userData?.shipDock || null;
@@ -10204,7 +10215,7 @@ function rebuildHangarSceneObjects(){
         const worldPos = new THREE.Vector3();
         shipDock.getWorldPosition(worldPos);
         if(shipParent) shipParent.updateMatrixWorld?.(true);
-        hangarState.shipPivot.position.set(worldPos.x, worldPos.y + 1.55, worldPos.z);
+        hangarState.shipPivot.position.set(worldPos.x, worldPos.y + 1.88, worldPos.z);
     }else{
         hangarState.shipPivot.position.set(0, 0.2, -32);
     }
@@ -10370,7 +10381,7 @@ function ensureHangarRenderer(){
 
         const now = performance.now();
         const time = now * 0.001;
-        const currentShip = getOwnedHangarShips()[hangarState.shipIndex] || getSelectedShipItem() || null;
+        const currentShip = getOwnedHangarShips()[hangarState.shipIndex] || getSelectedShipItem() || player?.ships?.[0] || null;
         const isViewedShipSelected = !!currentShip && String(currentShip?.id || '').trim() === String(player?.selectedShipId || '').trim();
 
         const neonHue = (time * 0.055) % 1;
@@ -10435,8 +10446,8 @@ function ensureHangarRenderer(){
             if(moveZ) hangarState.astronautDirection.add(forward.clone().multiplyScalar(moveZ));
             if(moveX) hangarState.astronautDirection.add(right.clone().multiplyScalar(moveX));
             const isMoving = hangarState.astronautDirection.lengthSq() > 0.001;
-            const runMul = hangarState.astronautKeys.shift ? 2.8 : 1.0;
-            const targetSpeed = isMoving ? 0.19 * runMul : 0;
+            const runMul = hangarState.astronautKeys.shift ? 3.1 : 1.35;
+            const targetSpeed = isMoving ? 0.26 * runMul : 0;
             if(isMoving){
                 hangarState.astronautDirection.normalize();
                 hangarState.astronautVelocity.x += (hangarState.astronautDirection.x * targetSpeed - hangarState.astronautVelocity.x) * 0.16;
