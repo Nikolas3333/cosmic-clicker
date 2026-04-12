@@ -9605,9 +9605,10 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(x < 0 ? 3.95 : -3.95, 0.92, 0.12);
+        plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
+        plaque.rotation.x = 0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-        plaque.rotation.z = x < 0 ? -0.05 : 0.05;
+        plaque.rotation.z = 0;
         dockGroup.add(plaque);
 
         group.add(dockGroup);
@@ -9636,8 +9637,8 @@ function createHangarRoomEnvironment(){
     centerDockGroup.add(centerPad);
 
     const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
-    centerPlaque.position.set(0, 1.10, -5.15);
-    centerPlaque.rotation.x = -0.28;
+    centerPlaque.position.set(0, 1.18, -5.15);
+    centerPlaque.rotation.x = 0.34;
     centerPlaque.rotation.y = 0;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
@@ -10125,7 +10126,8 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
-            shipMesh.position.set(0, 0, 0);
+            shipMesh.position.set(0, 0.8, 0);
+            shipMesh.scale.setScalar(1.75);
             hangarState.shipPivot.add(shipMesh);
         })
         .catch(() => {
@@ -10215,15 +10217,23 @@ function rebuildHangarSceneObjects(){
         const worldPos = new THREE.Vector3();
         shipDock.getWorldPosition(worldPos);
         if(shipParent) shipParent.updateMatrixWorld?.(true);
-        hangarState.shipPivot.position.set(worldPos.x, worldPos.y + 1.88, worldPos.z);
+        hangarState.shipPivot.position.set(worldPos.x, worldPos.y + 3.45, worldPos.z);
     }else{
         hangarState.shipPivot.position.set(0, 0.2, -32);
     }
 
     if(currentShip){
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-        instantMesh.position.set(0, 0, 0);
+        instantMesh.position.set(0, 0.8, 0);
+        instantMesh.scale.setScalar(1.75);
         hangarState.shipPivot.add(instantMesh);
+        const emergencyHull = new THREE.Mesh(
+            new THREE.BoxGeometry(2.2, 0.8, 5.2),
+            new THREE.MeshStandardMaterial({ color:0x9ecbff, metalness:0.55, roughness:0.3, emissive:0x16334a, emissiveIntensity:0.35 })
+        );
+        emergencyHull.position.set(0, 0.65, 0);
+        emergencyHull.visible = true;
+        hangarState.shipPivot.add(emergencyHull);
         try{
             queueHangarShipBuild(currentShip);
         }catch(_){}
