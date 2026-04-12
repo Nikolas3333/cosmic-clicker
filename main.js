@@ -9604,10 +9604,10 @@ function createHangarRoomEnvironment(){
         pad.scale.setScalar(1.0);
         dockGroup.add(pad);
 
-        const plaque = createHangarPlaqueBoard(3.8, 1.52);
-        plaque.position.set(x < 0 ? -4.55 : 4.55, 0.78, 0.10);
-        plaque.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2;
-        plaque.rotation.z = x < 0 ? 0.08 : -0.08;
+        const plaque = createHangarPlaqueBoard(4.3, 1.72);
+        plaque.position.set(x < 0 ? 4.55 : -4.55, 0.84, 0.10);
+        plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+        plaque.rotation.z = x < 0 ? -0.08 : 0.08;
         dockGroup.add(plaque);
 
         group.add(dockGroup);
@@ -9623,7 +9623,7 @@ function createHangarRoomEnvironment(){
     });
 
     const centerDockGroup = new THREE.Group();
-    centerDockGroup.position.set(0, -1.5, -32);
+    centerDockGroup.position.set(0, -1.5, 40);
     const centerBase = new THREE.Mesh(new THREE.BoxGeometry(12.8, 2.05, 8.8), panelMat.clone());
     centerDockGroup.add(centerBase);
     const centerTop = new THREE.Mesh(new THREE.BoxGeometry(10.8, 0.34, 7.2), frameMat.clone());
@@ -9635,8 +9635,8 @@ function createHangarRoomEnvironment(){
     centerPad.userData.baseY = 1.58;
     centerDockGroup.add(centerPad);
 
-    const centerPlaque = createHangarPlaqueBoard(4.4, 1.72);
-    centerPlaque.position.set(-6.1, 1.12, 0.4);
+    const centerPlaque = createHangarPlaqueBoard(4.8, 1.9);
+    centerPlaque.position.set(-7.1, 1.22, 0.25);
     centerPlaque.rotation.y = Math.PI / 2;
     centerPlaque.rotation.z = 0.08;
     centerDockGroup.add(centerPlaque);
@@ -10265,19 +10265,23 @@ function ensureHangarRenderer(){
         hangarState.camera.position.set(0, 5.8, 24.5);
         hangarState.camera.lookAt(0, 3.0, 6.0);
 
-        const ambient = new THREE.AmbientLight(0xffffff, 1.34);
-        const key = new THREE.DirectionalLight(0xccecff, 2.15);
+        const ambient = new THREE.AmbientLight(0xffffff, 1.55);
+        const key = new THREE.DirectionalLight(0xccecff, 2.45);
         key.position.set(14, 30, 20);
         const rim = new THREE.DirectionalLight(0x7e8dff, 1.08);
         rim.position.set(-15, 12, -18);
-        const floorGlow = new THREE.PointLight(0x4ac8ff, 2.8, 92);
+        const floorGlow = new THREE.PointLight(0x4ac8ff, 3.4, 96);
         floorGlow.position.set(0, 3.0, -16);
-        const sunLight = new THREE.PointLight(0xffc97a, 6.4, 320, 2.0);
+        const sunLight = new THREE.PointLight(0xffc97a, 10.5, 360, 1.8);
         sunLight.position.set(0, 16, 112);
-        const sunFill = new THREE.DirectionalLight(0xffd7a3, 1.4);
+        const sunFill = new THREE.DirectionalLight(0xffd7a3, 2.6);
         sunFill.position.set(0, 10, 80);
 
-        hangarState.scene.add(ambient, key, rim, floorGlow, sunLight, sunFill);
+        const windowSun = new THREE.SpotLight(0xffd18a, 5.2, 240, Math.PI / 5, 0.42, 1.2);
+        windowSun.position.set(0, 20, 72);
+        windowSun.target.position.set(0, 2, 30);
+
+        hangarState.scene.add(ambient, key, rim, floorGlow, sunLight, sunFill, windowSun, windowSun.target);
 
         const stars = new THREE.Points(
             new THREE.BufferGeometry().setAttribute(
@@ -10431,8 +10435,8 @@ function ensureHangarRenderer(){
             if(moveZ) hangarState.astronautDirection.add(forward.clone().multiplyScalar(moveZ));
             if(moveX) hangarState.astronautDirection.add(right.clone().multiplyScalar(moveX));
             const isMoving = hangarState.astronautDirection.lengthSq() > 0.001;
-            const runMul = hangarState.astronautKeys.shift ? 2.15 : 1.0;
-            const targetSpeed = isMoving ? 0.118 * runMul : 0;
+            const runMul = hangarState.astronautKeys.shift ? 2.8 : 1.0;
+            const targetSpeed = isMoving ? 0.19 * runMul : 0;
             if(isMoving){
                 hangarState.astronautDirection.normalize();
                 hangarState.astronautVelocity.x += (hangarState.astronautDirection.x * targetSpeed - hangarState.astronautVelocity.x) * 0.16;
