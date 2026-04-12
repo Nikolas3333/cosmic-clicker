@@ -24,7 +24,7 @@ let player = {
 
 // 🔥 ТЕСТОВЫЙ КОРАБЛЬ (можешь потом удалить)
 player.ships.push({
-  id: 1,
+  id: 'scout_1',
   name: "Cargo Drone",
   level: 1,
   hp: 100,
@@ -9622,7 +9622,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = -0.34;
+        plaque.rotation.x = 0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0;
         dockGroup.add(plaque);
@@ -10316,44 +10316,41 @@ function rebuildHangarSceneObjects(){
     if(emergencyHull) emergencyHull.visible = true;
 
     if(currentShip && showcaseGroup){
-        let instantMesh = null;
         try{
-            instantMesh = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-        }catch(_){
-            instantMesh = null;
-        }
-        if(!instantMesh){
-            instantMesh = new THREE.Mesh(
-                new THREE.BoxGeometry(4.2, 1.5, 8.0),
-                new THREE.MeshStandardMaterial({ color:0x65e9ff, emissive:0x1ba8ff, emissiveIntensity:1.4, metalness:0.42, roughness:0.22 })
-            );
-        }
-        instantMesh.position.set(0, 0.18, 0);
-        instantMesh.scale.setScalar(3.2);
-        instantMesh.rotation.y = Math.PI;
-        showcaseGroup.add(instantMesh);
-        if(emergencyHull) emergencyHull.visible = false;
+            const forcedShipId = String(player?.selectedShipId || currentShip?.id || '').trim();
+            if(forcedShipId){
+                const matchedShip = findOwnedHangarShipById(forcedShipId);
+                if(matchedShip) currentShip.id = matchedShip.id;
+            }
+        }catch(_){ }
 
-        hangarState.isShipLoading = true;
-        buildHangarShipMeshAsync(currentShip)
-            .then((shipMesh) => {
-                if(!shipMesh || buildToken !== hangarBuildToken) return;
-                const liveShowcase = hangarState?.envGroup?.userData?.shipShowcaseGroup || null;
-                if(!liveShowcase) return;
-                while(liveShowcase.children.length) liveShowcase.remove(liveShowcase.children[0]);
-                shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(3.2);
-                shipMesh.rotation.y = Math.PI;
-                liveShowcase.add(shipMesh);
-                const liveEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
-                if(liveEmergency) liveEmergency.visible = false;
+        const liveItem = findOwnedHangarShipById(player?.selectedShipId || '') || currentShip || getSelectedShipItem?.() || player?.ships?.[0] || null;
+
+        const liveEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
+        if(liveEmergency) liveEmergency.visible = true;
+
+        mountBattleShipVisual(showcaseGroup, liveItem || currentShip, 'blue')
+            .then((visual) => {
+                if(buildToken !== hangarBuildToken) return;
+                const activeEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
+                if(activeEmergency && showcaseGroup?.children?.length){
+                    const hasRealVisual = showcaseGroup.children.some(child => !child?.userData?.isHangarPlaceholder);
+                    if(hasRealVisual) activeEmergency.visible = false;
+                }
             })
-            .catch(() => {})
+            .catch(() => {
+                if(buildToken !== hangarBuildToken) return;
+                const activeEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
+                if(activeEmergency) activeEmergency.visible = true;
+            })
             .finally(() => {
                 if(buildToken !== hangarBuildToken) return;
                 hangarState.isShipLoading = false;
                 fillHangarText();
+                refreshHangarInfoBoards();
             });
+
+        hangarState.isShipLoading = true;
     }
 
     if(currentModule){
