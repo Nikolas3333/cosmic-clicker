@@ -2450,7 +2450,7 @@ const realNames = [
 
 const MAPS = [
     { id: 0, name: "Меркурий", img: "maps/mercury.jpg" },
-    { id: 1, name: "Венера", img: "maps/venus.jpg" },
+    { id: 'scout_1', name: "Венера", img: "maps/venus.jpg" },
     { id: 2, name: "Земля", img: "maps/earth.jpg" },
     { id: 3, name: "Марс", img: "maps/mars.jpg" },
     { id: 4, name: "Юпитер", img: "maps/jupiter.jpg" },
@@ -9271,17 +9271,37 @@ function getHangarDisplayShipStats(ship){
 }
 
 function getForcedHangarDisplayShip(){
-    return getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || getSelectedShipItem?.() || player?.ships?.[0] || {
-        id: String(player?.selectedShipId || 'scout_1').trim() || 'scout_1',
-        name: 'Cargo Drone',
-        hp: 100,
-        attack: 10,
-        speed: 5,
-        art: 'classic',
-        neon: '#7efcff',
-        engine: '#63d1ff',
-        accent: '#7a8cff'
-    };
+    const enrichedLocalShip = (() => {
+        const local = player?.ships?.[0] || null;
+        if(!local) return null;
+        return {
+            id: String(local?.id || player?.selectedShipId || 'scout_1').trim() || 'scout_1',
+            name: String(local?.name || 'Cargo Drone').trim() || 'Cargo Drone',
+            hp: Number(local?.hp || 100) || 100,
+            attack: Number(local?.attack || 10) || 10,
+            speed: Number(local?.speed || 5) || 5,
+            art: String(local?.art || 'arrow').trim() || 'arrow',
+            neon: String(local?.neon || '#7efcff').trim() || '#7efcff',
+            engine: String(local?.engine || '#63d1ff').trim() || '#63d1ff',
+            accent: String(local?.accent || '#7a8cff').trim() || '#7a8cff',
+            modelPath: String(local?.modelPath || '').trim()
+        };
+    })();
+
+    return getOwnedHangarShips?.()[hangarState?.shipIndex || 0]
+        || getSelectedShipItem?.()
+        || enrichedLocalShip
+        || {
+            id: String(player?.selectedShipId || 'scout_1').trim() || 'scout_1',
+            name: 'Cargo Drone',
+            hp: 100,
+            attack: 10,
+            speed: 5,
+            art: 'arrow',
+            neon: '#7efcff',
+            engine: '#63d1ff',
+            accent: '#7a8cff'
+        };
 }
 
 function refreshHangarInfoBoards(){
@@ -9294,8 +9314,8 @@ function refreshHangarInfoBoards(){
 
         if(entry.kind === 'center_ship'){
             drawHangarPlaque(plaque, {
-                title: String(currentShip?.name || 'DEBUG SHIP V164').trim(),
-                lines: getHangarDisplayShipStats(currentShip || { id:'forced_debug_ship', name:'DEBUG SHIP V164' })
+                title: String(currentShip?.name || 'Cargo Drone').trim(),
+                lines: getHangarDisplayShipStats(currentShip || { id:'scout_1', name:'Cargo Drone' })
             });
         }else{
             drawHangarPlaque(plaque, {});
@@ -9622,7 +9642,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0;
         dockGroup.add(plaque);
@@ -9658,16 +9678,16 @@ function createHangarRoomEnvironment(){
     centerDockGroup.add(centerShowcaseGroup);
 
     const emergencyHull = new THREE.Mesh(
-        new THREE.BoxGeometry(4.2, 1.5, 8.0),
+        new THREE.BoxGeometry(2.4, 0.8, 4.6),
         new THREE.MeshStandardMaterial({ color:0x65e9ff, emissive:0x1ba8ff, emissiveIntensity:1.4, metalness:0.42, roughness:0.22 })
     );
     emergencyHull.name = 'HANGAR_EMERGENCY_HULL';
-    emergencyHull.position.set(0, 2.2, 0);
+    emergencyHull.position.set(0, 1.86, 0);
     centerDockGroup.add(emergencyHull);
 
     const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
-    centerPlaque.position.set(0, 1.28, -5.08);
-    centerPlaque.rotation.x = 0.42;
+    centerPlaque.position.set(0, 0.86, -5.92);
+    centerPlaque.rotation.x = -0.24;
     centerPlaque.rotation.y = 0;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
