@@ -8065,6 +8065,7 @@ const hangarState = {
     modulePivot: null,
     modulePads: {},
     supportPlatforms: [],
+    infoBoards: [],
     frameId: 0,
     resizeBound: false,
     shipItem: null,
@@ -9146,6 +9147,146 @@ function createHangarAstronaut(){
     return root;
 }
 
+
+function createHangarPlaqueBoard(width = 3.2, height = 1.36){
+    const root = new THREE.Group();
+
+    const board = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, height),
+        new THREE.MeshStandardMaterial({
+            color:0x0a1320,
+            emissive:0x0f2238,
+            emissiveIntensity:0.48,
+            metalness:0.72,
+            roughness:0.26,
+            side:THREE.DoubleSide,
+            transparent:true,
+            opacity:0.96
+        })
+    );
+    root.add(board);
+
+    const frame = new THREE.Mesh(
+        new THREE.PlaneGeometry(width + 0.12, height + 0.12),
+        new THREE.MeshBasicMaterial({
+            color:0x7fd8ff,
+            transparent:true,
+            opacity:0.16,
+            side:THREE.DoubleSide
+        })
+    );
+    frame.position.z = -0.01;
+    root.add(frame);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 768;
+    canvas.height = 320;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    const textPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(width * 0.92, height * 0.86),
+        new THREE.MeshBasicMaterial({
+            map:texture,
+            transparent:true,
+            opacity:1,
+            side:THREE.DoubleSide
+        })
+    );
+    textPlane.position.z = 0.012;
+    root.add(textPlane);
+
+    root.userData.board = board;
+    root.userData.frame = frame;
+    root.userData.textPlane = textPlane;
+    root.userData.canvas = canvas;
+    root.userData.texture = texture;
+    root.userData.width = width;
+    root.userData.height = height;
+    return root;
+}
+
+function drawHangarPlaque(plaque, options = {}){
+    if(!plaque?.userData?.canvas || !plaque?.userData?.texture) return;
+
+    const canvas = plaque.userData.canvas;
+    const ctx = canvas.getContext('2d');
+    if(!ctx) return;
+
+    const title = String(options.title || '').trim();
+    const lines = Array.isArray(options.lines) ? options.lines.map(v => String(v || '').trim()).filter(Boolean) : [];
+    const hasContent = !!title || lines.length > 0;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if(hasContent){
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, 'rgba(7,16,28,0.96)');
+        grad.addColorStop(1, 'rgba(4,10,18,0.96)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = 'rgba(96,220,255,0.42)';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+        let y = 72;
+        if(title){
+            ctx.fillStyle = '#9ff3ff';
+            ctx.font = '700 42px Arial';
+            ctx.fillText(title, 28, y);
+            y += 54;
+        }
+
+        ctx.fillStyle = '#d8f7ff';
+        ctx.font = '600 28px Arial';
+        lines.slice(0, 4).forEach(line => {
+            ctx.fillText(line, 28, y);
+            y += 48;
+        });
+    }
+
+    plaque.userData.texture.needsUpdate = true;
+    if(plaque.userData.textPlane?.material){
+        plaque.userData.textPlane.material.opacity = hasContent ? 1 : 0;
+        plaque.userData.textPlane.visible = hasContent;
+    }
+    if(plaque.userData.board?.material){
+        plaque.userData.board.material.opacity = hasContent ? 0.96 : 0.78;
+    }
+    if(plaque.userData.frame?.material){
+        plaque.userData.frame.material.opacity = hasContent ? 0.16 : 0.10;
+    }
+}
+
+function getHangarDisplayShipStats(ship){
+    const battleStatsView = computeShipBattleStats(ship?.id || player?.selectedShipId || '');
+    return [
+        `HP: ${Math.round(Number(battleStatsView?.hp || 0) || 0)}`,
+        `Урон: ${Math.round(Number(battleStatsView?.weaponDamage || 0) || 0)}`,
+        `Скорость: ${Number(battleStatsView?.maxSpeed || 0).toFixed(2)}`
+    ];
+}
+
+function refreshHangarInfoBoards(){
+    const boards = Array.isArray(hangarState?.infoBoards) ? hangarState.infoBoards : [];
+    const currentShip = getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || getSelectedShipItem?.() || null;
+
+    boards.forEach(entry => {
+        const plaque = entry?.plaque || null;
+        if(!plaque) return;
+
+        if(entry.kind === 'center_ship' && currentShip){
+            drawHangarPlaque(plaque, {
+                title: String(currentShip?.name || 'Корабль').trim(),
+                lines: getHangarDisplayShipStats(currentShip)
+            });
+        }else{
+            drawHangarPlaque(plaque, {});
+        }
+    });
+}
+
 function createHangarExteriorPlanets(){
     const items = [];
     const makePlanet = (radius, color, emissive, x, y, z, scaleX=1, ring=false, glow=true) => {
@@ -9187,13 +9328,13 @@ function createHangarExteriorPlanets(){
         new THREE.MeshBasicMaterial({ color:0xffb347, transparent:true, opacity:0.16 })
     );
     sunPivot.add(sunHalo);
-    sunPivot.position.set(0, 6.8, -54);
+    sunPivot.position.set(0, 13.0, 186);
     items.push(sunPivot);
 
-    items.push(makePlanet(1.65, 0x4f7bff, 0x2746aa, -22, 3.8, -42));
-    items.push(makePlanet(1.15, 0xb982ff, 0x5f2bb8, -38, 6.0, -68, 1.08, true));
-    items.push(makePlanet(1.45, 0xf2b16d, 0xb85c1b, 28, 4.6, -48));
-    items.push(makePlanet(2.4, 0x89a2c7, 0x223355, 46, 8.0, -88, 1.18, true, false));
+    items.push(makePlanet(4.2, 0x4f7bff, 0x2746aa, -118, 14.0, 174));
+    items.push(makePlanet(3.0, 0xb982ff, 0x5f2bb8, -156, 19.0, 144, 1.12, true));
+    items.push(makePlanet(3.8, 0xf2b16d, 0xb85c1b, 126, 16.0, 168));
+    items.push(makePlanet(6.6, 0x89a2c7, 0x223355, 164, 24.0, 132, 1.18, true, false));
     return items;
 }
 
@@ -9463,8 +9604,13 @@ function createHangarRoomEnvironment(){
         pad.scale.setScalar(1.0);
         dockGroup.add(pad);
 
+        const plaque = createHangarPlaqueBoard(3.0, 1.18);
+        plaque.position.set(0, 0.62, 4.02);
+        plaque.rotation.x = -0.56;
+        dockGroup.add(plaque);
+
         group.add(dockGroup);
-        return { group:dockGroup, pad, topY: dockGroup.position.y + pad.position.y };
+        return { group:dockGroup, pad, plaque, topY: dockGroup.position.y + pad.position.y, side: x < 0 ? 'left' : 'right', index: label };
     };
 
     const dockZs = [-46, -36, -26, -16, -6, 6, 16, 26, 36, 46];
@@ -9487,6 +9633,12 @@ function createHangarRoomEnvironment(){
     centerPad.scale.setScalar(1.34);
     centerPad.userData.baseY = 1.58;
     centerDockGroup.add(centerPad);
+
+    const centerPlaque = createHangarPlaqueBoard(3.8, 1.42);
+    centerPlaque.position.set(0, 0.92, 6.0);
+    centerPlaque.rotation.x = -0.58;
+    centerDockGroup.add(centerPlaque);
+
     group.add(centerDockGroup);
 
     const rearDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(12.5, 15.5, 0.6), frameMat.clone());
@@ -9507,6 +9659,7 @@ function createHangarRoomEnvironment(){
         booster: dockSlotsLeft[2]?.pad || null
     };
     group.userData.shipDock = centerPad;
+    group.userData.shipDockPlaque = centerPlaque;
     group.userData.shipDockWorld = new THREE.Vector3(0, centerDockGroup.position.y + centerPad.position.y, centerDockGroup.position.z);
     return group;
 }
@@ -9536,6 +9689,7 @@ function disposeHangarRenderer(){
     hangarState.envGlowPanels = [];
     hangarState.modulePads = {};
     hangarState.supportPlatforms = [];
+    hangarState.infoBoards = [];
     hangarState.astronaut = null;
     hangarState.astronautPivot = null;
     hangarState.planets = [];
@@ -10078,6 +10232,7 @@ function rebuildHangarSceneObjects(){
         hangarState.modulePivot.add(moduleMesh);
     }
 
+    refreshHangarInfoBoards();
     fillHangarText();
 }
 
@@ -10149,6 +10304,11 @@ function ensureHangarRenderer(){
         hangarState.supportPlatforms = [
             ...(hangarState?.envGroup?.userData?.dockSlotsLeft || []).map(item => item?.pad).filter(Boolean),
             ...(hangarState?.envGroup?.userData?.dockSlotsRight || []).map(item => item?.pad).filter(Boolean)
+        ];
+        hangarState.infoBoards = [
+            { kind:'center_ship', plaque: hangarState?.envGroup?.userData?.shipDockPlaque || null },
+            ...((hangarState?.envGroup?.userData?.dockSlotsLeft || []).map(item => ({ kind:'empty', plaque:item?.plaque || null }))),
+            ...((hangarState?.envGroup?.userData?.dockSlotsRight || []).map(item => ({ kind:'empty', plaque:item?.plaque || null })))
         ];
 
         hangarState.astronautGroundY = -1.72;
