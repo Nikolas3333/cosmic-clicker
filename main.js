@@ -9620,9 +9620,9 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-        plaque.rotation.z = x < 0 ? -0.22 : 0.22;
+        plaque.rotation.z = x < 0 ? 0.22 : -0.22;
         dockGroup.add(plaque);
 
         group.add(dockGroup);
@@ -9651,9 +9651,9 @@ function createHangarRoomEnvironment(){
     centerDockGroup.add(centerPad);
 
     const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
-    centerPlaque.position.set(0, 1.28, -5.08);
-    centerPlaque.rotation.x = 0.42;
-    centerPlaque.rotation.y = 0;
+    centerPlaque.position.set(0, 1.34, 5.08);
+    centerPlaque.rotation.x = -0.42;
+    centerPlaque.rotation.y = Math.PI;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
 
@@ -9802,9 +9802,10 @@ function renderHangarModuleList(ship){
 
 function fillHangarText(){
     hideHangarShipPriceRow();
+    const displayedShip = getForcedHangarDisplayShip();
     const ships = getOwnedHangarShips();
     const modules = getOwnedHangarModules();
-    const ship = ships[hangarState.shipIndex] || null;
+    const ship = displayedShip || ships[hangarState.shipIndex] || null;
     const module = modules[hangarState.moduleIndex] || null;
     renderHangarModuleList(ship);
     hangarState.shipItem = ship;
@@ -9828,10 +9829,13 @@ function fillHangarText(){
     setText('hangar-ship-tier', ship?.tier || '—');
     const shipName = ship?.name || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Нет корпусов этого типа' : 'Нет корпусов');
     setText('hangar-ship-name', shipName);
-    setText('hangar-ship-subtitle', ship ? 'Выбери модуль слева, чтобы увидеть его на корпусе.' : 'Купи корпус в магазине, и он появится здесь.');
+    setText('hangar-ship-subtitle', ship ? 'Центральная платформа показывает текущий корпус.' : 'Купи корпус в магазине, и он появится здесь.');
     const stageBadge = document.getElementById('hangar-stage-name-badge');
     if(stageBadge) stageBadge.textContent = shipName;
-    setText('hangar-ship-desc', '');
+    const shipDesc = ship
+        ? `HP ${Math.round(Number(battleStatsView?.hp || ship?.hp || 0) || 0)} • Урон ${Math.round(Number(battleStatsView?.weaponDamage || ship?.attack || 0) || 0)} • Скорость ${Number(battleStatsView?.maxSpeed || ship?.speed || 0).toFixed(2)}`
+        : '';
+    setText('hangar-ship-desc', shipDesc);
     setText('hangar-ship-price-coins', ship && typeof getShipCoinPrice === 'function' ? String(getShipCoinPrice(ship)) : '0');
     setText('hangar-ship-price-diamonds', ship && typeof getShipDiamondPrice === 'function' ? String(getShipDiamondPrice(ship)) : '0');
 
@@ -10370,8 +10374,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(64, 1, 0.1, 320);
-        hangarState.camera.position.set(0, 5.8, 24.5);
-        hangarState.camera.lookAt(0, 3.0, 6.0);
+        hangarState.camera.position.set(0, 6.6, 28.5);
+        hangarState.camera.lookAt(0, 3.2, 36.0);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.55);
         const key = new THREE.DirectionalLight(0xccecff, 2.45);
@@ -10478,7 +10482,7 @@ function ensureHangarRenderer(){
 
         const now = performance.now();
         const time = now * 0.001;
-        const currentShip = getOwnedHangarShips()[hangarState.shipIndex] || getSelectedShipItem() || player?.ships?.[0] || null;
+        const currentShip = getForcedHangarDisplayShip();
         const isViewedShipSelected = !!currentShip && String(currentShip?.id || '').trim() === String(player?.selectedShipId || '').trim();
 
         const neonHue = (time * 0.055) % 1;
