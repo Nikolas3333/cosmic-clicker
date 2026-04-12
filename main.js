@@ -9622,7 +9622,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0;
         dockGroup.add(plaque);
@@ -9657,6 +9657,11 @@ function createHangarRoomEnvironment(){
     centerShowcaseGroup.position.set(0, 1.86, 0);
     centerDockGroup.add(centerShowcaseGroup);
 
+    const centerLiveShipGroup = new THREE.Group();
+    centerLiveShipGroup.name = 'HANGAR_CENTER_LIVE_SHIP_GROUP';
+    centerLiveShipGroup.position.set(0, 0, 0);
+    centerDockGroup.add(centerLiveShipGroup);
+
     const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
     centerPlaque.position.set(0, 1.28, -5.08);
     centerPlaque.rotation.x = 0.42;
@@ -9686,6 +9691,8 @@ function createHangarRoomEnvironment(){
     group.userData.shipDock = centerPad;
     group.userData.shipDockPlaque = centerPlaque;
     group.userData.shipShowcaseGroup = centerShowcaseGroup;
+    group.userData.shipLiveGroup = centerLiveShipGroup;
+    group.userData.centerDockGroup = centerDockGroup;
     group.userData.shipDockWorld = new THREE.Vector3(0, centerDockGroup.position.y + centerPad.position.y, centerDockGroup.position.z);
     return group;
 }
@@ -10306,36 +10313,65 @@ function rebuildHangarSceneObjects(){
     if(hangarState.shipPivot) hangarState.shipPivot.position.copy(dockWorld);
 
     const showcaseGroup = hangarState?.envGroup?.userData?.shipShowcaseGroup || null;
+    const liveShipGroup = hangarState?.envGroup?.userData?.shipLiveGroup || null;
     if(showcaseGroup){
         while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
     }
+    if(liveShipGroup){
+        while(liveShipGroup.children.length) liveShipGroup.remove(liveShipGroup.children[0]);
+    }
 
-    if(currentShip && showcaseGroup){
-        const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-        instantMesh.position.set(0, 0.18, 0);
-        instantMesh.scale.setScalar(3.6);
-        instantMesh.rotation.y = Math.PI;
-        instantMesh.userData.isHangarInstantShip = true;
-        showcaseGroup.add(instantMesh);
+    if(currentShip){
+        const emergencyHull = new THREE.Group();
+        emergencyHull.name = 'HANGAR_EMERGENCY_HULL';
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(5.2, 1.9, 9.6),
+            new THREE.MeshStandardMaterial({ color:0xcfeeff, metalness:0.72, roughness:0.22, emissive:0x3fbfff, emissiveIntensity:0.28 })
+        );
+        body.position.set(0, 2.25, 0);
+        emergencyHull.add(body);
+        const nose = new THREE.Mesh(
+            new THREE.ConeGeometry(1.2, 2.6, 10),
+            new THREE.MeshStandardMaterial({ color:0xeaf7ff, metalness:0.58, roughness:0.18, emissive:0x2a9fff, emissiveIntensity:0.18 })
+        );
+        nose.rotation.x = Math.PI / 2;
+        nose.position.set(0, 2.28, -5.3);
+        emergencyHull.add(nose);
+        const wingGeo = new THREE.BoxGeometry(3.2, 0.18, 1.4);
+        const wingMat = new THREE.MeshStandardMaterial({ color:0x7fdfff, metalness:0.4, roughness:0.2, emissive:0x3fbfff, emissiveIntensity:0.18 });
+        const wingL = new THREE.Mesh(wingGeo, wingMat);
+        wingL.position.set(-2.9, 2.1, -1.2);
+        wingL.rotation.z = 0.18;
+        emergencyHull.add(wingL);
+        const wingR = wingL.clone();
+        wingR.position.x = 2.9;
+        wingR.rotation.z = -0.18;
+        emergencyHull.add(wingR);
+        if(liveShipGroup){
+            liveShipGroup.add(emergencyHull);
+        } else if(showcaseGroup){
+            showcaseGroup.add(emergencyHull);
+        }
 
         hangarState.isShipLoading = true;
         buildHangarShipMeshAsync(currentShip)
             .then((shipMesh) => {
                 if(!shipMesh || buildToken !== hangarBuildToken) return;
-                if(!hangarState?.envGroup?.userData?.shipShowcaseGroup) return;
-                const liveShowcase = hangarState.envGroup.userData.shipShowcaseGroup;
-                while(liveShowcase.children.length) liveShowcase.remove(liveShowcase.children[0]);
-                shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(3.6);
+                const targetGroup = hangarState?.envGroup?.userData?.shipLiveGroup || hangarState?.envGroup?.userData?.shipShowcaseGroup || null;
+                if(!targetGroup) return;
+                while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
+                shipMesh.position.set(0, 2.2, 0);
+                shipMesh.scale.setScalar(1.22);
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.userData.isHangarInstantShip = true;
-                liveShowcase.add(shipMesh);
+                targetGroup.add(shipMesh);
             })
             .catch(() => {})
             .finally(() => {
                 if(buildToken !== hangarBuildToken) return;
                 hangarState.isShipLoading = false;
                 fillHangarText();
+                refreshHangarInfoBoards();
             });
     }
 
