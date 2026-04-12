@@ -29,7 +29,12 @@ player.ships.push({
   level: 1,
   hp: 100,
   attack: 10,
-  speed: 5
+  speed: 5,
+  art: 'arrow',
+  neon: '#7efcff',
+  engine: '#63d1ff',
+  accent: '#7a8cff',
+  modelPath: 'ships/Spaceship.glb'
 });
 
 /* ================= GAME STATE ================= */
@@ -9280,7 +9285,8 @@ function getForcedHangarDisplayShip(){
         art: 'classic',
         neon: '#7efcff',
         engine: '#63d1ff',
-        accent: '#7a8cff'
+        accent: '#7a8cff',
+        modelPath: 'ships/Spaceship.glb'
     };
 }
 
@@ -9622,7 +9628,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0;
         dockGroup.add(plaque);
@@ -10329,15 +10335,33 @@ function rebuildHangarSceneObjects(){
         const liveEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
         if(liveEmergency) liveEmergency.visible = true;
 
+        const syncDisplayShip = {
+            id: String(liveItem?.id || currentShip?.id || player?.selectedShipId || 'scout_1').trim() || 'scout_1',
+            name: String(liveItem?.name || currentShip?.name || 'Cargo Drone').trim() || 'Cargo Drone',
+            hp: Number(liveItem?.hp || currentShip?.hp || 100) || 100,
+            attack: Number(liveItem?.attack || currentShip?.attack || 10) || 10,
+            speed: Number(liveItem?.speed || currentShip?.speed || 5) || 5,
+            art: String(liveItem?.art || currentShip?.art || 'arrow').trim() || 'arrow',
+            neon: String(liveItem?.neon || currentShip?.neon || '#7efcff').trim() || '#7efcff',
+            engine: String(liveItem?.engine || currentShip?.engine || '#63d1ff').trim() || '#63d1ff',
+            accent: String(liveItem?.accent || currentShip?.accent || '#7a8cff').trim() || '#7a8cff',
+            modelPath: String(liveItem?.modelPath || currentShip?.modelPath || 'ships/Spaceship.glb').trim()
+        };
+
+        while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
+        const immediateShip = normalizeHangarShipMesh(createHangarShipMesh(syncDisplayShip));
+        immediateShip.position.set(0, 0.02, 0);
+        immediateShip.scale.setScalar(1.0);
+        immediateShip.rotation.y = Math.PI;
+        showcaseGroup.add(immediateShip);
+        if(liveEmergency) liveEmergency.visible = false;
+
         hangarState.isShipLoading = true;
 
-        buildHangarShipMeshAsync(liveItem || currentShip)
+        buildHangarShipMeshAsync(syncDisplayShip)
             .then((shipMesh) => {
-                if(buildToken !== hangarBuildToken || !showcaseGroup) return;
+                if(buildToken !== hangarBuildToken || !showcaseGroup || !shipMesh) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                if(!shipMesh){
-                    shipMesh = normalizeHangarShipMesh(createHangarShipMesh(liveItem || currentShip));
-                }
                 shipMesh.position.set(0, 0.02, 0);
                 shipMesh.scale.setScalar(1.0);
                 shipMesh.rotation.y = Math.PI;
@@ -10347,12 +10371,6 @@ function rebuildHangarSceneObjects(){
             })
             .catch(() => {
                 if(buildToken !== hangarBuildToken || !showcaseGroup) return;
-                while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                const fallback = normalizeHangarShipMesh(createHangarShipMesh(liveItem || currentShip));
-                fallback.position.set(0, 0.02, 0);
-                fallback.scale.setScalar(1.0);
-                fallback.rotation.y = Math.PI;
-                showcaseGroup.add(fallback);
                 const activeEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
                 if(activeEmergency) activeEmergency.visible = false;
             })
