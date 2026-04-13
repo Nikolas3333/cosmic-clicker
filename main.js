@@ -14585,3 +14585,23 @@ renderOnlinePlayers();
 })();
 
 // v152 FIX: hangar logic updated (tables, ship spawn, positions)
+
+
+// ===== HANGAR FIX v184 =====
+function fixHangarVisuals(){
+    if(window.hangarShip){
+        hangarShip.scale.set(2.4,2.4,2.4);
+        hangarShip.position.y = 0.18;
+    }
+
+    if(window.hangarBoards){
+        hangarBoards.forEach(b=>{
+            if(!b) return;
+            b.rotation.x = -0.18;
+            b.rotation.y = 0;
+            b.rotation.z = 0;
+        });
+    }
+}
+
+setInterval(fixHangarVisuals, 500);
