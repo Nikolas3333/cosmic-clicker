@@ -9628,7 +9628,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = -0.16;
+        plaque.rotation.x = 0.0;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0.0;
         dockGroup.add(plaque);
@@ -10345,13 +10345,11 @@ function rebuildHangarSceneObjects(){
     if(showcaseGroup){
         while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
         showcaseGroup.rotation.set(0, 0, 0);
-    }
-    if(hangarState.shipPivot){
-        while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+        showcaseGroup.position.set(0, 2.9, 0);
     }
     if(emergencyHull) emergencyHull.visible = false;
 
-    if(currentShip){
+    if(currentShip && showcaseGroup){
         try{
             const forcedShipId = String(player?.selectedShipId || currentShip?.id || '').trim();
             if(forcedShipId){
@@ -10372,25 +10370,29 @@ function rebuildHangarSceneObjects(){
 
         const directShipData = {
             ...(liveItem || currentShip || {}),
-            art: String((liveItem || currentShip)?.art || 'arrow').trim() || 'arrow',
-            neon: String((liveItem || currentShip)?.neon || '#7efcff').trim() || '#7efcff',
-            engine: String((liveItem || currentShip)?.engine || '#63d1ff').trim() || '#63d1ff',
-            accent: String((liveItem || currentShip)?.accent || '#a8baff').trim() || '#a8baff'
+            art: 'arrow',
+            neon: '#7efcff',
+            engine: '#63d1ff',
+            accent: '#a8baff'
         };
 
-        if(showcaseGroup){
-            const directShip = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
-            directShip.position.set(0, 0.18, 0);
-            directShip.scale.setScalar(2.55);
-            directShip.rotation.y = Math.PI;
-            directShip.userData.isGuaranteedCentralShip = true;
-            showcaseGroup.add(directShip);
-        }
+        const directShip = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
+        directShip.position.set(0, 1.35, 0);
+        directShip.scale.setScalar(3.35);
+        directShip.rotation.x = 0;
+        directShip.rotation.y = Math.PI;
+        directShip.rotation.z = 0;
+        directShip.userData.isGuaranteedCentralShip = true;
+        showcaseGroup.add(directShip);
 
         if(centerPlaque){
             drawHangarPlaque(centerPlaque, {
                 title: String(directShipData?.name || 'Cargo Drone').trim() || 'Cargo Drone',
-                lines: getHangarDisplayShipStats(directShipData)
+                lines: [
+                    'HP 100',
+                    'ATK 10',
+                    'SPD 5'
+                ]
             });
         }
 
@@ -10400,9 +10402,11 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(2.55);
+                shipMesh.position.set(0, 1.35, 0);
+                shipMesh.scale.setScalar(3.35);
+                shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
+                shipMesh.rotation.z = 0;
                 shipMesh.userData.isGuaranteedCentralShip = true;
                 showcaseGroup.add(shipMesh);
             })
