@@ -9166,7 +9166,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
             emissiveIntensity:0.48,
             metalness:0.72,
             roughness:0.26,
-            side:THREE.DoubleSide,
+            side:THREE.FrontSide,
             transparent:true,
             opacity:0.96
         })
@@ -9179,7 +9179,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
             color:0x7fd8ff,
             transparent:true,
             opacity:0.16,
-            side:THREE.DoubleSide
+            side:THREE.FrontSide
         })
     );
     frame.position.z = -0.01;
@@ -9197,7 +9197,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
             map:texture,
             transparent:true,
             opacity:1,
-            side:THREE.DoubleSide
+            side:THREE.FrontSide
         })
     );
     textPlane.position.z = 0.012;
@@ -9240,13 +9240,13 @@ function drawHangarPlaque(plaque, options = {}){
         let y = 92;
         if(title){
             ctx.fillStyle = '#cfffff';
-            ctx.font = '700 56px Arial';
+            ctx.font = '700 60px Arial';
             ctx.fillText(title, 42, y);
             y += 76;
         }
 
         ctx.fillStyle = '#f3fdff';
-        ctx.font = '700 40px Arial';
+        ctx.font = '700 42px Arial';
         lines.slice(0, 4).forEach(line => {
             ctx.fillText(line, 42, y);
             y += 62;
@@ -9627,8 +9627,8 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(0, 1.02, -2.05);
-        plaque.rotation.x = -0.52;
+        plaque.position.set(0, 1.38, -2.18);
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = 0;
         plaque.rotation.z = 0.0;
         dockGroup.add(plaque);
@@ -9660,7 +9660,7 @@ function createHangarRoomEnvironment(){
 
     const centerShowcaseGroup = new THREE.Group();
     centerShowcaseGroup.name = 'HANGAR_CENTER_SHOWCASE_GROUP';
-    centerShowcaseGroup.position.set(0, 2.42, 0);
+    centerShowcaseGroup.position.set(0, 2.18, -0.68);
     centerDockGroup.add(centerShowcaseGroup);
 
     const emergencyHull = new THREE.Mesh(
@@ -9673,9 +9673,9 @@ function createHangarRoomEnvironment(){
     centerDockGroup.add(emergencyHull);
 
     const centerPlaque = createHangarPlaqueBoard(5.9, 2.3);
-    centerPlaque.position.set(0, 1.72, -4.82);
-    centerPlaque.rotation.x = -0.16;
-    centerPlaque.rotation.y = 0;
+    centerPlaque.position.set(0, 2.04, -5.24);
+    centerPlaque.rotation.x = -0.30;
+    centerPlaque.rotation.y = Math.PI;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
 
@@ -10249,7 +10249,7 @@ function queueHangarShipBuild(currentShip){
     if(cached){
         hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
         const readyMesh = cloneObject3DDeepSafe(cached);
-        readyMesh.position.set(0, 2.0, 0);
+        readyMesh.position.set(0, 1.72, -0.72);
         hangarState.shipPivot.add(readyMesh);
         hangarState.isShipLoading = false;
         fillHangarText();
@@ -10262,15 +10262,15 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
-            shipMesh.position.set(0, 1.62, 0);
-            shipMesh.scale.setScalar(1.65);
+            shipMesh.position.set(0, 1.54, -0.72);
+            shipMesh.scale.setScalar(1.52);
             hangarState.shipPivot.add(shipMesh);
         })
         .catch(() => {
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
             const fallback = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-            fallback.position.set(0,2.0,0);
+            fallback.position.set(0,1.72,-0.72);
             hangarState.shipPivot.add(fallback);
         })
         .finally(() => {
@@ -10345,7 +10345,7 @@ function rebuildHangarSceneObjects(){
     if(showcaseGroup){
         while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
         showcaseGroup.rotation.set(0, 0, 0);
-        showcaseGroup.position.set(0, 1.86, 0);
+        showcaseGroup.position.set(0, 2.18, -0.68);
     }
     if(emergencyHull) emergencyHull.visible = false;
 
@@ -10406,8 +10406,8 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(2.05);
+                shipMesh.position.set(0, 0.18, -0.72);
+                shipMesh.scale.setScalar(1.78);
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
@@ -14533,70 +14533,26 @@ renderOnlinePlayers();
 // v152 FIX: hangar logic updated (tables, ship spawn, positions)
 
 
-// ===== HANGAR FIX v184 =====
-function fixHangarVisuals(){
-    if(window.hangarShip){
-        hangarShip.scale.set(2.4,2.4,2.4);
-        hangarShip.position.y = 0.18;
-    }
-
-    if(window.hangarBoards){
-        hangarBoards.forEach(b=>{
-            if(!b) return;
-            b.rotation.x = -0.18;
-            b.rotation.y = 0;
-            b.rotation.z = 0;
-        });
-    }
+// ===== HANGAR FIX v188 =====
+function cleanupHangarOverlayUi(){
+    const selectors = [
+        '#hangar-window .hangar-module-side',
+        '#hangar-window .hangar-ship-card',
+        '#hangar-window .hangar-footer-row',
+        '#hangar-window .hangar-stage-name-badge'
+    ];
+    selectors.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((node) => node.remove());
+    });
 }
 
-setInterval(fixHangarVisuals, 500);
-
-
-// ===== HANGAR FIX v187 CLEAN =====
-function centerModel(model){
-    const box = new THREE.Box3().setFromObject(model);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    model.position.sub(center);
+const previousOpenHangarWindowV188 = typeof openHangarWindow === 'function' ? openHangarWindow : null;
+if(previousOpenHangarWindowV188){
+    openHangarWindow = function(...args){
+        const result = previousOpenHangarWindowV188.apply(this, args);
+        setTimeout(cleanupHangarOverlayUi, 0);
+        setTimeout(cleanupHangarOverlayUi, 120);
+        return result;
+    };
+    window.openHangarWindow = openHangarWindow;
 }
-
-function createPivot(model){
-    const pivot = new THREE.Group();
-    pivot.add(model);
-    return pivot;
-}
-
-function fixHangar(){
-    try{
-        if(window.hangarShip){
-            centerModel(window.hangarShip);
-            if(!window.hangarPivot){
-                window.hangarPivot = createPivot(window.hangarShip);
-                if(window.scene){
-                    scene.add(window.hangarPivot);
-                }
-            }
-            window.hangarPivot.rotation.y += 0.01;
-            window.hangarPivot.position.y = 0.2;
-            window.hangarPivot.scale.set(1.6,1.6,1.6);
-        }
-
-        if(window.hangarBoards){
-            window.hangarBoards.forEach(b=>{
-                if(!b) return;
-                b.position.y = 0.4;
-                b.rotation.x = -0.2;
-                b.rotation.y = 0;
-                b.rotation.z = 0;
-            });
-        }
-
-        if(window.hangarMainBoard){
-            window.hangarMainBoard.rotation.y = 0;
-            window.hangarMainBoard.position.y = 0.45;
-        }
-
-    }catch(e){}
-}
-setInterval(fixHangar, 300);
