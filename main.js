@@ -14605,3 +14605,28 @@ function fixHangarVisuals(){
 }
 
 setInterval(fixHangarVisuals, 500);
+
+
+// ===== HANGAR FIX v185 (strong) =====
+(function(){
+  function applyFix(){
+    try{
+      if(window.hangarShip){
+        if(!window.hangarShip.__fixed185){
+          window.hangarShip.__fixed185 = true;
+        }
+        window.hangarShip.scale.set(1.8,1.8,1.8);
+        window.hangarShip.position.y = 0.18;
+      }
+      if(window.hangarBoards && Array.isArray(window.hangarBoards)){
+        window.hangarBoards.forEach(b=>{
+          if(!b) return;
+          b.rotation.x = -0.18;
+          b.rotation.y = 0;
+          b.rotation.z = 0;
+        });
+      }
+    }catch(e){}
+  }
+  setInterval(applyFix, 200);
+})();
