@@ -9416,13 +9416,13 @@ function resetHangarAstronautState(){
     hangarState.astronautVelocity.set(0,0,0);
     hangarState.astronautDirection.set(0,0,0);
     if(hangarState.astronautPivot){
-        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 18.0);
-        hangarState.astronautPivot.rotation.y = Math.PI;
+        hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 26.0);
+        hangarState.astronautPivot.rotation.y = 0;
     }
-    hangarState.cameraYaw = Math.PI;
-    hangarState.cameraPitch = -0.14;
-    hangarState.cameraYawTarget = Math.PI;
-    hangarState.cameraPitchTarget = -0.14;
+    hangarState.cameraYaw = 0;
+    hangarState.cameraPitch = -0.08;
+    hangarState.cameraYawTarget = 0;
+    hangarState.cameraPitchTarget = -0.08;
     hangarState.cameraDistance = 14.8;
     hangarState.mouseLookActive = false;
     hangarState.lastMouseX = 0;
@@ -9628,7 +9628,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = -0.12;
+        plaque.rotation.x = -0.22;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0.0;
         dockGroup.add(plaque);
@@ -10377,8 +10377,8 @@ function rebuildHangarSceneObjects(){
         };
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
-        instantMesh.position.set(0, 0.18, 0);
-        instantMesh.scale.setScalar(3.6);
+        instantMesh.position.set(0, 0.24, 0);
+        instantMesh.scale.setScalar(3.9);
         instantMesh.rotation.x = 0;
         instantMesh.rotation.y = Math.PI;
         instantMesh.rotation.z = 0;
@@ -10406,8 +10406,8 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(3.6);
+                shipMesh.position.set(0, 0.24, 0);
+                shipMesh.scale.setScalar(3.9);
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
@@ -10467,8 +10467,8 @@ function ensureHangarRenderer(){
 
         hangarState.scene = new THREE.Scene();
         hangarState.camera = new THREE.PerspectiveCamera(64, 1, 0.1, 320);
-        hangarState.camera.position.set(0, 6.6, 28.5);
-        hangarState.camera.lookAt(0, 3.2, 36.0);
+        hangarState.camera.position.set(0, 7.2, 14.8);
+        hangarState.camera.lookAt(0, 3.4, 40.0);
 
         const ambient = new THREE.AmbientLight(0xffffff, 1.55);
         const key = new THREE.DirectionalLight(0xccecff, 2.45);
@@ -10535,11 +10535,11 @@ function ensureHangarRenderer(){
         hangarState.scene.add(hangarState.shipPivot);
         hangarState.scene.add(hangarState.modulePivot);
 
-        hangarState.cameraDistance = 14.8;
-        hangarState.cameraYaw = Math.PI;
-        hangarState.cameraPitch = -0.14;
-        hangarState.cameraYawTarget = Math.PI;
-        hangarState.cameraPitchTarget = -0.14;
+        hangarState.cameraDistance = 15.2;
+        hangarState.cameraYaw = 0;
+        hangarState.cameraPitch = -0.08;
+        hangarState.cameraYawTarget = 0;
+        hangarState.cameraPitchTarget = -0.08;
         hangarState.lastMouseX = window.innerWidth * 0.5;
         hangarState.lastMouseY = window.innerHeight * 0.5;
     }
@@ -10785,6 +10785,125 @@ function bindHangarStageInteraction(){
     }
 }
 
+
+function bindHangarRuntimeUI(){
+    const leftBtn = document.getElementById('hangar-ship-left');
+    const rightBtn = document.getElementById('hangar-ship-right');
+    const upBtn = document.getElementById('hangar-module-up');
+    const downBtn = document.getElementById('hangar-module-down');
+    const moduleBtn = document.getElementById('hangar-module-action');
+    const moduleSellBtn = document.getElementById('hangar-module-sell');
+    const shipSellBtn = document.getElementById('hangar-ship-sell');
+    const classButtons = document.querySelectorAll('.hangar-class-chip[data-hangar-class]');
+    const moduleButtons = document.querySelectorAll('.hangar-module-chip[data-hangar-module-type]');
+
+    if(leftBtn && !leftBtn.dataset.boundHangarRuntime){
+        leftBtn.dataset.boundHangarRuntime = '1';
+        leftBtn.addEventListener('click', () => {
+            const ships = getOwnedHangarShips();
+            if(!ships.length || hangarState.shipIndex <= 0) return;
+            hangarState.shipIndex = Math.max(0, hangarState.shipIndex - 1);
+            setHangarTransition?.(-1);
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+    if(rightBtn && !rightBtn.dataset.boundHangarRuntime){
+        rightBtn.dataset.boundHangarRuntime = '1';
+        rightBtn.addEventListener('click', () => {
+            const ships = getOwnedHangarShips();
+            if(!ships.length || hangarState.shipIndex >= ships.length - 1) return;
+            hangarState.shipIndex = Math.min(ships.length - 1, hangarState.shipIndex + 1);
+            setHangarTransition?.(1);
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+    if(upBtn && !upBtn.dataset.boundHangarRuntime){
+        upBtn.dataset.boundHangarRuntime = '1';
+        upBtn.addEventListener('click', () => {
+            const modules = getOwnedHangarModules();
+            if(!modules.length || hangarState.moduleIndex <= 0) return;
+            hangarState.moduleIndex = Math.max(0, hangarState.moduleIndex - 1);
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+    if(downBtn && !downBtn.dataset.boundHangarRuntime){
+        downBtn.dataset.boundHangarRuntime = '1';
+        downBtn.addEventListener('click', () => {
+            const modules = getOwnedHangarModules();
+            if(!modules.length || hangarState.moduleIndex >= modules.length - 1) return;
+            hangarState.moduleIndex = Math.min(modules.length - 1, hangarState.moduleIndex + 1);
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+    if(moduleBtn && !moduleBtn.dataset.boundHangarRuntime){
+        moduleBtn.dataset.boundHangarRuntime = '1';
+        moduleBtn.addEventListener('click', () => {
+            const ship = getForcedHangarDisplayShip();
+            const modules = getOwnedHangarModules();
+            const module = modules[hangarState.moduleIndex] || null;
+            if(!ship || !module) return;
+            const moduleType = String(module.classId || module.typeId || '').trim();
+            const installed = getInstalledModuleForType(ship.id, moduleType);
+            if(installed && String(installed.id || '') === String(module.id || '')){
+                unequipModuleFromShip?.(ship.id, moduleType);
+            }else{
+                equipModuleToShip?.(ship.id, module.id);
+            }
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+    if(moduleSellBtn && !moduleSellBtn.dataset.boundHangarRuntime){
+        moduleSellBtn.dataset.boundHangarRuntime = '1';
+        moduleSellBtn.addEventListener('click', () => {
+            const modules = getOwnedHangarModules();
+            const module = modules[hangarState.moduleIndex] || null;
+            if(!module) return;
+            sellModuleFromHangar?.(module.id);
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+    if(shipSellBtn && !shipSellBtn.dataset.boundHangarRuntime){
+        shipSellBtn.dataset.boundHangarRuntime = '1';
+        shipSellBtn.addEventListener('click', () => {
+            const ship = getForcedHangarDisplayShip();
+            if(!ship) return;
+            sellHullFromHangar?.(ship.id);
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+
+    classButtons.forEach((btn) => {
+        if(btn.dataset.boundHangarRuntime) return;
+        btn.dataset.boundHangarRuntime = '1';
+        btn.addEventListener('click', () => {
+            hangarState.shipFilter = String(btn.dataset.hangarClass || 'all').trim() || 'all';
+            hangarState.shipIndex = 0;
+            ensureHangarIndexes();
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    });
+
+    moduleButtons.forEach((btn) => {
+        if(btn.dataset.boundHangarRuntime) return;
+        btn.dataset.boundHangarRuntime = '1';
+        btn.addEventListener('click', () => {
+            hangarState.moduleFilter = String(btn.dataset.hangarModuleType || 'weapon').trim() || 'weapon';
+            hangarState.moduleIndex = 0;
+            ensureHangarIndexes();
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    });
+}
+
 function bindHangarControls(){
     const closeBtn = document.getElementById('close-hangar');
     if(closeBtn && !closeBtn.dataset.hangarBound){
@@ -10808,17 +10927,95 @@ function renderHangarCosmic(forceSyncToSelected = true){
     if(!win) return;
     win.classList.remove('hidden');
 
+    if(forceSyncToSelected !== false){
+        try{ syncHangarSelectionState?.({ forceClass:true }); }catch(_){ }
+    }
+    try{ ensureHangarIndexes?.(); }catch(_){ }
+
     const shell = win.querySelector('.hangar-empty-shell');
     if(shell){
         shell.innerHTML = `
           <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
-          <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
-          <div class="hangar-runtime-fade"></div>
+          <div class="hangar-layout">
+            <aside class="hangar-module-side">
+              <div class="hangar-card">
+                <div class="hangar-side-title">Классы кораблей</div>
+                <div class="hangar-chip-row">
+                  <button class="hangar-class-chip active" type="button" data-hangar-class="all">Все</button>
+                  <button class="hangar-class-chip" type="button" data-hangar-class="fighters">Истребители</button>
+                  <button class="hangar-class-chip" type="button" data-hangar-class="heavy">Тяжёлые</button>
+                </div>
+              </div>
+              <div class="hangar-card">
+                <div class="hangar-side-title">Модули</div>
+                <div class="hangar-chip-row">
+                  <button class="hangar-module-chip active" type="button" data-hangar-module-type="weapon">Оружие</button>
+                  <button class="hangar-module-chip" type="button" data-hangar-module-type="shield">Щит</button>
+                  <button class="hangar-module-chip" type="button" data-hangar-module-type="booster">Ускоритель</button>
+                </div>
+                <button id="hangar-module-up" class="hangar-arrow" type="button">▲</button>
+                <div class="hangar-module-view">
+                  <div class="hangar-module-preview">МОДУЛИ</div>
+                  <div class="hangar-module-meta">
+                    <div id="hangar-module-name" class="hangar-module-name">—</div>
+                    <div id="hangar-module-tier" class="hangar-module-tier">—</div>
+                    <div id="hangar-module-type" class="hangar-module-type">—</div>
+                    <div id="hangar-module-desc" class="hangar-module-desc">—</div>
+                  </div>
+                  <div id="hangar-module-list" class="hangar-module-list"></div>
+                </div>
+                <button id="hangar-module-down" class="hangar-arrow" type="button">▼</button>
+                <div class="hangar-footer-row">
+                  <button id="hangar-module-action" class="hangar-main-btn" type="button">Установить</button>
+                  <button id="hangar-module-sell" class="hangar-main-btn" type="button">Продать</button>
+                </div>
+              </div>
+            </aside>
+            <section class="hangar-stage-wrap">
+              <div class="hangar-stage">
+                <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
+                <div class="hangar-runtime-fade"></div>
+                <div class="hangar-stage-overlay">
+                  <div id="hangar-stage-name-badge" class="hangar-stage-name-badge">Cargo Drone</div>
+                </div>
+              </div>
+            </section>
+            <aside class="hangar-module-side">
+              <div class="hangar-ship-card">
+                <div id="hangar-ship-tier" class="hangar-ship-tier">—</div>
+                <div id="hangar-ship-name" class="hangar-ship-name">—</div>
+                <div id="hangar-ship-subtitle" class="hangar-ship-subtitle">—</div>
+                <div id="hangar-ship-desc" class="hangar-ship-desc">—</div>
+                <div id="hangar-ship-price-row" class="hangar-ship-price-row">
+                  <span>🪙 <b id="hangar-ship-price-coins">0</b></span>
+                  <span>💎 <b id="hangar-ship-price-diamonds">0</b></span>
+                </div>
+              </div>
+              <div id="hangar-ship-stats" class="hangar-stats-grid"></div>
+              <div class="hangar-footer-row">
+                <button id="hangar-ship-left" class="hangar-arrow horizontal" type="button">◀</button>
+                <div id="hangar-ship-position" class="hangar-position-badge">1 / 1</div>
+                <button id="hangar-ship-right" class="hangar-arrow horizontal" type="button">▶</button>
+              </div>
+              <div class="hangar-footer-row">
+                <button id="hangar-ship-action" class="hangar-main-btn equipped" type="button" disabled>Текущий корпус</button>
+                <button id="hangar-ship-sell" class="hangar-main-btn" type="button">Продать</button>
+              </div>
+              <div class="hangar-footer-row hangar-currency-row">
+                <span>🪙 <b id="hangar-coins">0</b></span>
+                <span>💎 <b id="hangar-diamonds">0</b></span>
+              </div>
+            </aside>
+          </div>
         `;
     }
 
     bindHangarControls();
+    bindHangarRuntimeUI();
+    updateHangarFilterButtons?.();
+    fillHangarText();
     ensureHangarRenderer();
+    rebuildHangarSceneObjects();
 }
 
 
