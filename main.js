@@ -9186,8 +9186,8 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
     root.add(frame);
 
     const canvas = document.createElement('canvas');
-    canvas.width = 768;
-    canvas.height = 320;
+    canvas.width = 1024;
+    canvas.height = 420;
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
 
@@ -9233,23 +9233,23 @@ function drawHangarPlaque(plaque, options = {}){
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.strokeStyle = 'rgba(96,220,255,0.42)';
-        ctx.lineWidth = 6;
+        ctx.strokeStyle = 'rgba(96,220,255,0.82)';
+        ctx.lineWidth = 8;
         ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
-        let y = 72;
+        let y = 92;
         if(title){
-            ctx.fillStyle = '#9ff3ff';
-            ctx.font = '700 42px Arial';
-            ctx.fillText(title, 28, y);
-            y += 54;
+            ctx.fillStyle = '#cfffff';
+            ctx.font = '700 56px Arial';
+            ctx.fillText(title, 42, y);
+            y += 76;
         }
 
-        ctx.fillStyle = '#d8f7ff';
-        ctx.font = '600 28px Arial';
+        ctx.fillStyle = '#f3fdff';
+        ctx.font = '700 40px Arial';
         lines.slice(0, 4).forEach(line => {
-            ctx.fillText(line, 28, y);
-            y += 48;
+            ctx.fillText(line, 42, y);
+            y += 62;
         });
     }
 
@@ -9627,9 +9627,9 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = -0.22;
-        plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+        plaque.position.set(0, 1.02, -2.05);
+        plaque.rotation.x = -0.52;
+        plaque.rotation.y = 0;
         plaque.rotation.z = 0.0;
         dockGroup.add(plaque);
 
@@ -9672,9 +9672,9 @@ function createHangarRoomEnvironment(){
     emergencyHull.position.set(0, 1.9, 0);
     centerDockGroup.add(emergencyHull);
 
-    const centerPlaque = createHangarPlaqueBoard(5.4, 2.15);
-    centerPlaque.position.set(0, 1.28, -5.08);
-    centerPlaque.rotation.x = 0.42;
+    const centerPlaque = createHangarPlaqueBoard(5.9, 2.3);
+    centerPlaque.position.set(0, 1.72, -4.82);
+    centerPlaque.rotation.x = -0.16;
     centerPlaque.rotation.y = 0;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
@@ -10262,8 +10262,8 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
-            shipMesh.position.set(0, 2.0, 0);
-            shipMesh.scale.setScalar(2.3);
+            shipMesh.position.set(0, 1.62, 0);
+            shipMesh.scale.setScalar(1.65);
             hangarState.shipPivot.add(shipMesh);
         })
         .catch(() => {
@@ -10406,8 +10406,8 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.24, 0);
-                shipMesh.scale.setScalar(3.9);
+                shipMesh.position.set(0, 0.18, 0);
+                shipMesh.scale.setScalar(2.05);
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
@@ -10937,75 +10937,21 @@ function renderHangarCosmic(forceSyncToSelected = true){
         shell.innerHTML = `
           <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
           <div class="hangar-layout">
-            <aside class="hangar-module-side">
-              <div class="hangar-card">
-                <div class="hangar-side-title">Классы кораблей</div>
-                <div class="hangar-chip-row">
-                  <button class="hangar-class-chip active" type="button" data-hangar-class="all">Все</button>
-                  <button class="hangar-class-chip" type="button" data-hangar-class="fighters">Истребители</button>
-                  <button class="hangar-class-chip" type="button" data-hangar-class="heavy">Тяжёлые</button>
-                </div>
-              </div>
-              <div class="hangar-card">
-                <div class="hangar-side-title">Модули</div>
-                <div class="hangar-chip-row">
-                  <button class="hangar-module-chip active" type="button" data-hangar-module-type="weapon">Оружие</button>
-                  <button class="hangar-module-chip" type="button" data-hangar-module-type="shield">Щит</button>
-                  <button class="hangar-module-chip" type="button" data-hangar-module-type="booster">Ускоритель</button>
-                </div>
-                <button id="hangar-module-up" class="hangar-arrow" type="button">▲</button>
-                <div class="hangar-module-view">
-                  <div class="hangar-module-preview">МОДУЛИ</div>
-                  <div class="hangar-module-meta">
-                    <div id="hangar-module-name" class="hangar-module-name">—</div>
-                    <div id="hangar-module-tier" class="hangar-module-tier">—</div>
-                    <div id="hangar-module-type" class="hangar-module-type">—</div>
-                    <div id="hangar-module-desc" class="hangar-module-desc">—</div>
-                  </div>
-                  <div id="hangar-module-list" class="hangar-module-list"></div>
-                </div>
-                <button id="hangar-module-down" class="hangar-arrow" type="button">▼</button>
-                <div class="hangar-footer-row">
-                  <button id="hangar-module-action" class="hangar-main-btn" type="button">Установить</button>
-                  <button id="hangar-module-sell" class="hangar-main-btn" type="button">Продать</button>
-                </div>
-              </div>
-            </aside>
-            <section class="hangar-stage-wrap">
+            <section class="hangar-stage-wrap full">
               <div class="hangar-stage">
                 <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
                 <div class="hangar-runtime-fade"></div>
-                <div class="hangar-stage-overlay">
-                  <div id="hangar-stage-name-badge" class="hangar-stage-name-badge">Cargo Drone</div>
-                </div>
+                <div class="hangar-stage-overlay"></div>
               </div>
             </section>
-            <aside class="hangar-module-side">
-              <div class="hangar-ship-card">
-                <div id="hangar-ship-tier" class="hangar-ship-tier">—</div>
-                <div id="hangar-ship-name" class="hangar-ship-name">—</div>
-                <div id="hangar-ship-subtitle" class="hangar-ship-subtitle">—</div>
-                <div id="hangar-ship-desc" class="hangar-ship-desc">—</div>
-                <div id="hangar-ship-price-row" class="hangar-ship-price-row">
-                  <span>🪙 <b id="hangar-ship-price-coins">0</b></span>
-                  <span>💎 <b id="hangar-ship-price-diamonds">0</b></span>
-                </div>
-              </div>
-              <div id="hangar-ship-stats" class="hangar-stats-grid"></div>
-              <div class="hangar-footer-row">
-                <button id="hangar-ship-left" class="hangar-arrow horizontal" type="button">◀</button>
-                <div id="hangar-ship-position" class="hangar-position-badge">1 / 1</div>
-                <button id="hangar-ship-right" class="hangar-arrow horizontal" type="button">▶</button>
-              </div>
-              <div class="hangar-footer-row">
-                <button id="hangar-ship-action" class="hangar-main-btn equipped" type="button" disabled>Текущий корпус</button>
-                <button id="hangar-ship-sell" class="hangar-main-btn" type="button">Продать</button>
-              </div>
-              <div class="hangar-footer-row hangar-currency-row">
-                <span>🪙 <b id="hangar-coins">0</b></span>
-                <span>💎 <b id="hangar-diamonds">0</b></span>
-              </div>
-            </aside>
+            <div style="display:none">
+              <div id="hangar-module-list"></div><div id="hangar-module-name"></div><div id="hangar-module-tier"></div><div id="hangar-module-type"></div><div id="hangar-module-desc"></div>
+              <div id="hangar-ship-tier"></div><div id="hangar-ship-name"></div><div id="hangar-ship-subtitle"></div><div id="hangar-ship-desc"></div><div id="hangar-ship-price-row"></div><b id="hangar-ship-price-coins"></b><b id="hangar-ship-price-diamonds"></b>
+              <div id="hangar-ship-stats"></div><button id="hangar-ship-left"></button><div id="hangar-ship-position"></div><button id="hangar-ship-right"></button><button id="hangar-ship-action"></button><button id="hangar-ship-sell"></button><b id="hangar-coins"></b><b id="hangar-diamonds"></b>
+              <button id="hangar-module-up"></button><button id="hangar-module-down"></button><button id="hangar-module-action"></button><button id="hangar-module-sell"></button>
+              <button class="hangar-class-chip active" type="button" data-hangar-class="all">Все</button><button class="hangar-class-chip" type="button" data-hangar-class="fighters">Истребители</button><button class="hangar-class-chip" type="button" data-hangar-class="heavy">Тяжёлые</button>
+              <button class="hangar-module-chip active" type="button" data-hangar-module-type="weapon">Оружие</button><button class="hangar-module-chip" type="button" data-hangar-module-type="shield">Щит</button><button class="hangar-module-chip" type="button" data-hangar-module-type="booster">Ускоритель</button>
+            </div>
           </div>
         `;
     }
@@ -14605,28 +14551,3 @@ function fixHangarVisuals(){
 }
 
 setInterval(fixHangarVisuals, 500);
-
-
-// ===== HANGAR FIX v185 (strong) =====
-(function(){
-  function applyFix(){
-    try{
-      if(window.hangarShip){
-        if(!window.hangarShip.__fixed185){
-          window.hangarShip.__fixed185 = true;
-        }
-        window.hangarShip.scale.set(1.8,1.8,1.8);
-        window.hangarShip.position.y = 0.18;
-      }
-      if(window.hangarBoards && Array.isArray(window.hangarBoards)){
-        window.hangarBoards.forEach(b=>{
-          if(!b) return;
-          b.rotation.x = -0.18;
-          b.rotation.y = 0;
-          b.rotation.z = 0;
-        });
-      }
-    }catch(e){}
-  }
-  setInterval(applyFix, 200);
-})();
