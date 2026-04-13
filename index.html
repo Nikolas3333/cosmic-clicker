@@ -6226,10 +6226,9 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 </body>
 </html>
 
-
 <style>
-/* ===== HANGAR CLEANUP v185 ===== */
-#left-modules-panel, #bottom-ship-card, #hangar-extra-ui{
-  display:none !important;
-}
+#hangar-window .hangar-layout{grid-template-columns:minmax(0,1fr) !important;padding:8px 18px 18px !important;}
+#hangar-window .hangar-stage-wrap,#hangar-window .hangar-stage-wrap.full{grid-template-columns:minmax(0,1fr) !important; width:100% !important;}
+#hangar-window .hangar-stage{min-height:740px !important;height:740px !important;}
+#hangar-window .hangar-stage-name-badge,.hangar-ship-card,.hangar-footer-row,.hangar-module-side{display:none !important;}
 </style>
