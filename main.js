@@ -9628,9 +9628,9 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = 0.0;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-        plaque.rotation.z = x < 0 ? -0.16 : 0.16;
+        plaque.rotation.z = 0.0;
         dockGroup.add(plaque);
 
         group.add(dockGroup);
@@ -10344,9 +10344,12 @@ function rebuildHangarSceneObjects(){
     if(showcaseGroup){
         while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
     }
+    if(hangarState.shipPivot){
+        while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+    }
     if(emergencyHull) emergencyHull.visible = false;
 
-    if(currentShip && showcaseGroup){
+    if(currentShip){
         try{
             const forcedShipId = String(player?.selectedShipId || currentShip?.id || '').trim();
             if(forcedShipId){
@@ -10365,33 +10368,37 @@ function rebuildHangarSceneObjects(){
             modelPath: String(liveItemRaw?.modelPath || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb'
         } : null;
 
-        const instantFallbackShip = {
+        const directShipData = {
             ...(liveItem || currentShip || {}),
             art: String((liveItem || currentShip)?.art || 'arrow').trim() || 'arrow',
             neon: String((liveItem || currentShip)?.neon || '#7efcff').trim() || '#7efcff',
             engine: String((liveItem || currentShip)?.engine || '#63d1ff').trim() || '#63d1ff',
             accent: String((liveItem || currentShip)?.accent || '#a8baff').trim() || '#a8baff'
         };
-        const instantFallback = normalizeHangarShipMesh(createHangarShipMesh(instantFallbackShip));
-        instantFallback.position.set(0, 0.32, 0);
-        instantFallback.scale.setScalar(1.72);
-        instantFallback.rotation.y = Math.PI;
-        instantFallback.userData.isHangarInstantShip = true;
-        showcaseGroup.add(instantFallback);
+
+        if(hangarState.shipPivot){
+            const directShip = createHangarShipMesh(directShipData);
+            directShip.position.set(0, 0.0, 0);
+            directShip.scale.setScalar(2.35);
+            directShip.rotation.y = Math.PI;
+            directShip.userData.isGuaranteedCentralShip = true;
+            hangarState.shipPivot.add(directShip);
+        }
 
         hangarState.isShipLoading = true;
 
         buildHangarShipMeshAsync(liveItem || currentShip)
             .then((shipMesh) => {
-                if(buildToken !== hangarBuildToken || !showcaseGroup || !shipMesh) return;
-                while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.34, 0);
-                shipMesh.scale.setScalar(1.72);
+                if(buildToken !== hangarBuildToken || !shipMesh || !hangarState.shipPivot) return;
+                while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
+                shipMesh.position.set(0, 0.0, 0);
+                shipMesh.scale.setScalar(2.35);
                 shipMesh.rotation.y = Math.PI;
-                showcaseGroup.add(shipMesh);
+                shipMesh.userData.isGuaranteedCentralShip = true;
+                hangarState.shipPivot.add(shipMesh);
             })
             .catch(() => {
-                if(buildToken !== hangarBuildToken || !showcaseGroup) return;
+                if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             })
             .finally(() => {
                 if(buildToken !== hangarBuildToken) return;
@@ -10507,6 +10514,7 @@ function ensureHangarRenderer(){
         hangarState.astronautPivot = createHangarAstronaut();
         hangarState.astronaut = hangarState.astronautPivot;
         hangarState.scene.add(hangarState.astronautPivot);
+        hangarState.shipPivot.position.set(0, 0.95, 40.0);
         hangarState.scene.add(hangarState.shipPivot);
         hangarState.scene.add(hangarState.modulePivot);
 
@@ -10568,9 +10576,9 @@ function ensureHangarRenderer(){
             hangarState.platformGlowDisc.material.color.copy(glowColor);
         }
 
-        if(hangarState.showcaseGroup){
+        if(hangarState.shipPivot){
             hangarState.shipYaw += 0.0045;
-            hangarState.showcaseGroup.rotation.y = hangarState.shipYaw;
+            hangarState.shipPivot.rotation.y = hangarState.shipYaw;
         }
 
         (hangarState.supportPlatforms || []).forEach((pad, idx) => {
