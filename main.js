@@ -9290,32 +9290,6 @@ function getForcedHangarDisplayShip(){
     };
 }
 
-
-function applyHangarPlaqueGeometryFix(){
-    try{
-        const env = hangarState?.envGroup?.userData || {};
-        const centerPlaque = env?.shipDockPlaque || null;
-        if(centerPlaque){
-            centerPlaque.position.set(0, 0.42, 1.52);
-            centerPlaque.rotation.x = 0.22;
-            centerPlaque.rotation.y = Math.PI;
-            centerPlaque.rotation.z = 0;
-        }
-
-        const leftSlots = Array.isArray(env?.dockSlotsLeft) ? env.dockSlotsLeft : [];
-        const rightSlots = Array.isArray(env?.dockSlotsRight) ? env.dockSlotsRight : [];
-
-        [...leftSlots, ...rightSlots].forEach((slot) => {
-            const plaque = slot?.plaque || null;
-            if(!plaque) return;
-            plaque.position.y = 0.34;
-            plaque.rotation.x = 0.22;
-            plaque.rotation.y = 0;
-            plaque.rotation.z = 0;
-        });
-    }catch(_){}
-}
-
 function refreshHangarInfoBoards(){
     const boards = Array.isArray(hangarState?.infoBoards) ? hangarState.infoBoards : [];
     const currentShip = getForcedHangarDisplayShip();
@@ -9653,8 +9627,8 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(0, 1.38, -2.18);
-        plaque.rotation.x = -0.34;
+        plaque.position.set(0, 1.72, 2.12);
+        plaque.rotation.x = 0.34;
         plaque.rotation.y = 0;
         plaque.rotation.z = 0.0;
         dockGroup.add(plaque);
@@ -10275,7 +10249,7 @@ function queueHangarShipBuild(currentShip){
     if(cached){
         hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
         const readyMesh = cloneObject3DDeepSafe(cached);
-        readyMesh.position.set(0, 1.72, -0.72);
+        readyMesh.position.set(0, 1.72, 0.0);
         hangarState.shipPivot.add(readyMesh);
         hangarState.isShipLoading = false;
         fillHangarText();
@@ -10288,7 +10262,7 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
-            shipMesh.position.set(0, 1.54, -0.72);
+            shipMesh.position.set(0, 1.54, 0.0);
             shipMesh.scale.setScalar(1.52);
             hangarState.shipPivot.add(shipMesh);
         })
@@ -10296,7 +10270,7 @@ function queueHangarShipBuild(currentShip){
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
             const fallback = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-            fallback.position.set(0,1.72,-0.72);
+            fallback.position.set(0,1.72,0.0);
             hangarState.shipPivot.add(fallback);
         })
         .finally(() => {
@@ -10403,7 +10377,7 @@ function rebuildHangarSceneObjects(){
         };
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
-        instantMesh.position.set(0, 0.24, 0);
+        instantMesh.position.set(0, 0.24, 0.0);
         instantMesh.scale.setScalar(3.9);
         instantMesh.rotation.x = 0;
         instantMesh.rotation.y = Math.PI;
@@ -10432,7 +10406,7 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.18, -0.72);
+                shipMesh.position.set(0, 0.18, 0.0);
                 shipMesh.scale.setScalar(1.78);
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
@@ -10466,7 +10440,6 @@ function rebuildHangarSceneObjects(){
     }
 
     refreshHangarInfoBoards();
-    applyHangarPlaqueGeometryFix();
     fillHangarText();
 }
 
@@ -10596,42 +10569,7 @@ function ensureHangarRenderer(){
         });
     }
 
-    
-function enforceHangarRuntimePlacementFix(){
-    try{
-        const env = hangarState?.envGroup?.userData || {};
-        const centerPlaque = env?.shipDockPlaque || null;
-        if(centerPlaque){
-            centerPlaque.position.set(0, 0.42, 1.52);
-            centerPlaque.rotation.x = 0.22;
-            centerPlaque.rotation.y = Math.PI;
-            centerPlaque.rotation.z = 0;
-        }
-        const leftSlots = Array.isArray(env?.dockSlotsLeft) ? env.dockSlotsLeft : [];
-        const rightSlots = Array.isArray(env?.dockSlotsRight) ? env.dockSlotsRight : [];
-        [...leftSlots, ...rightSlots].forEach((slot) => {
-            const plaque = slot?.plaque || null;
-            if(!plaque) return;
-            plaque.position.y = 0.34;
-            plaque.rotation.x = 0.22;
-            plaque.rotation.y = 0;
-            plaque.rotation.z = 0;
-        });
-
-        const pivot = hangarState?.shipPivot || null;
-        if(pivot){
-            const showcase = pivot.children?.find?.(child => child?.type === 'Group' || child?.type === 'Object3D') || null;
-            const ship = showcase?.children?.[0] || null;
-            if(ship){
-                ship.position.set(0, 0.18, -0.18);
-                if(ship.scale?.setScalar) ship.scale.setScalar(2.15);
-            }
-        }
-    }catch(_){}
-}
-
-const animate = () => {
-        enforceHangarRuntimePlacementFix();
+    const animate = () => {
         if(document.getElementById('hangar-window')?.classList.contains('hidden')){
             hangarState.frameId = 0;
             return;
