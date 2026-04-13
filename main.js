@@ -9628,9 +9628,9 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(x < 0 ? 3.95 : -3.95, 1.02, 0.12);
-        plaque.rotation.x = -0.34;
+        plaque.rotation.x = 0.34;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-        plaque.rotation.z = 0;
+        plaque.rotation.z = x < 0 ? -0.16 : 0.16;
         dockGroup.add(plaque);
 
         group.add(dockGroup);
@@ -9660,7 +9660,7 @@ function createHangarRoomEnvironment(){
 
     const centerShowcaseGroup = new THREE.Group();
     centerShowcaseGroup.name = 'HANGAR_CENTER_SHOWCASE_GROUP';
-    centerShowcaseGroup.position.set(0, 1.86, 0);
+    centerShowcaseGroup.position.set(0, 2.42, 0);
     centerDockGroup.add(centerShowcaseGroup);
 
     const emergencyHull = new THREE.Mesh(
@@ -10365,9 +10365,16 @@ function rebuildHangarSceneObjects(){
             modelPath: String(liveItemRaw?.modelPath || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb'
         } : null;
 
-        const instantFallback = normalizeHangarShipMesh(createHangarShipMesh(liveItem || currentShip));
-        instantFallback.position.set(0, 0.02, 0);
-        instantFallback.scale.setScalar(1.0);
+        const instantFallbackShip = {
+            ...(liveItem || currentShip || {}),
+            art: String((liveItem || currentShip)?.art || 'arrow').trim() || 'arrow',
+            neon: String((liveItem || currentShip)?.neon || '#7efcff').trim() || '#7efcff',
+            engine: String((liveItem || currentShip)?.engine || '#63d1ff').trim() || '#63d1ff',
+            accent: String((liveItem || currentShip)?.accent || '#a8baff').trim() || '#a8baff'
+        };
+        const instantFallback = normalizeHangarShipMesh(createHangarShipMesh(instantFallbackShip));
+        instantFallback.position.set(0, 0.32, 0);
+        instantFallback.scale.setScalar(1.72);
         instantFallback.rotation.y = Math.PI;
         instantFallback.userData.isHangarInstantShip = true;
         showcaseGroup.add(instantFallback);
@@ -10378,8 +10385,8 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !showcaseGroup || !shipMesh) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.02, 0);
-                shipMesh.scale.setScalar(1.0);
+                shipMesh.position.set(0, 0.34, 0);
+                shipMesh.scale.setScalar(1.72);
                 shipMesh.rotation.y = Math.PI;
                 showcaseGroup.add(shipMesh);
             })
