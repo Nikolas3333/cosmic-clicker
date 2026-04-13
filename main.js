@@ -34,7 +34,7 @@ player.ships.push({
   neon: '#7efcff',
   engine: '#63d1ff',
   accent: '#7a8cff',
-  modelPath: 'ships/Spaceship.glb'
+  modelPath: '/ships/Spaceship.glb'
 });
 
 /* ================= GAME STATE ================= */
@@ -9931,18 +9931,32 @@ const hangarShipModelSourceCache = new Map();
 let hangarBuildToken = 0;
 
 function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
-    const safePath = String(modelPath || 'ships/Spaceship.glb').trim() || 'ships/Spaceship.glb';
-    if(hangarShipModelSourceCache.has(safePath)){
-        return Promise.resolve(cloneObject3DDeepSafe(hangarShipModelSourceCache.get(safePath)));
+    const requestedPath = String(modelPath || 'ships/Spaceship.glb').trim() || 'ships/Spaceship.glb';
+    const normalized = requestedPath.replace(/^\.\//, '').replace(/^\//, '');
+    const candidatePaths = Array.from(new Set([
+        requestedPath,
+        normalized,
+        './' + normalized,
+        '/' + normalized
+    ].filter(Boolean)));
+
+    if(hangarShipModelSourceCache.has(requestedPath)){
+        return Promise.resolve(cloneObject3DDeepSafe(hangarShipModelSourceCache.get(requestedPath)));
     }
-    if(hangarShipMeshPromiseCache.has(`src:${safePath}`)){
-        return hangarShipMeshPromiseCache.get(`src:${safePath}`).then(model => cloneObject3DDeepSafe(model));
+    if(hangarShipMeshPromiseCache.has(`src:${requestedPath}`)){
+        return hangarShipMeshPromiseCache.get(`src:${requestedPath}`).then(model => cloneObject3DDeepSafe(model));
     }
 
     const loader = new GLTFLoader();
-    const promise = new Promise((resolve, reject) => {
+
+    const tryLoadAt = (i = 0) => new Promise((resolve, reject) => {
+        const activePath = candidatePaths[i];
+        if(!activePath){
+            reject(new Error('Failed to load GLB from all candidate paths'));
+            return;
+        }
         loader.load(
-            safePath,
+            activePath,
             (gltf) => {
                 try{
                     const model = gltf?.scene || null;
@@ -9957,21 +9971,25 @@ function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
                                 materials.forEach((mat) => {
                                     if(mat && 'metalness' in mat && mat.metalness < 0.45) mat.metalness = 0.45;
                                     if(mat && 'roughness' in mat && mat.roughness > 0.62) mat.roughness = 0.62;
-                                })
+                                });
                             }
                         }
                     });
-                    hangarShipModelSourceCache.set(safePath, cloneObject3DDeepSafe(model));
+                    hangarShipModelSourceCache.set(requestedPath, cloneObject3DDeepSafe(model));
                     resolve(cloneObject3DDeepSafe(model));
                 }catch(err){
                     reject(err);
                 }
             },
             undefined,
-            (error) => reject(error || new Error('Failed to load GLB'))
+            () => {
+                tryLoadAt(i + 1).then(resolve).catch(reject);
+            }
         );
     });
-    hangarShipMeshPromiseCache.set(`src:${safePath}`, promise);
+
+    const promise = tryLoadAt(0);
+    hangarShipMeshPromiseCache.set(`src:${requestedPath}`, promise);
     return promise.then(model => cloneObject3DDeepSafe(model));
 }
 
@@ -9981,7 +9999,13 @@ function buildHangarShipMeshAsync(item){
     if(safeShipId === 'scout_1' && externalPath){
         return loadExternalHangarShipModel(externalPath)
             .then(raw => normalizeHangarShipMesh(raw))
-            .catch(() => normalizeHangarShipMesh(createHangarShipMesh(item)));
+            .catch(() => normalizeHangarShipMesh(createHangarShipMesh({
+                ...(item || {}),
+                art: String(item?.art || 'arrow').trim() || 'arrow',
+                neon: String(item?.neon || '#7efcff').trim() || '#7efcff',
+                engine: String(item?.engine || '#63d1ff').trim() || '#63d1ff',
+                accent: String(item?.accent || '#7a8cff').trim() || '#7a8cff'
+            })));
     }
     return Promise.resolve(normalizeHangarShipMesh(createHangarShipMesh(item)));
 }
@@ -10337,7 +10361,7 @@ function rebuildHangarSceneObjects(){
             neon: String(liveItemRaw?.neon || '#7efcff').trim() || '#7efcff',
             engine: String(liveItemRaw?.engine || '#63d1ff').trim() || '#63d1ff',
             accent: String(liveItemRaw?.accent || '#7a8cff').trim() || '#7a8cff',
-            modelPath: String(liveItemRaw?.modelPath || 'ships/Spaceship.glb').trim() || 'ships/Spaceship.glb'
+            modelPath: String(liveItemRaw?.modelPath || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb'
         } : null;
 
         const liveEmergency = hangarState?.envGroup?.getObjectByName?.('HANGAR_EMERGENCY_HULL') || null;
