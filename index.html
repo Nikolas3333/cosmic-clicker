@@ -6232,3 +6232,11 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 #hangar-window .hangar-stage{min-height:740px !important;height:740px !important;}
 #hangar-window .hangar-stage-name-badge,.hangar-ship-card,.hangar-footer-row,.hangar-module-side{display:none !important;}
 </style>
+
+
+<script>
+// ===== REMOVE EXTRA UI =====
+document.addEventListener("DOMContentLoaded", ()=>{
+    document.querySelectorAll('#ui, #inventory-window, #inventory-button').forEach(el=>el?.remove());
+});
+</script>
