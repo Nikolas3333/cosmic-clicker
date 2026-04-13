@@ -9290,6 +9290,32 @@ function getForcedHangarDisplayShip(){
     };
 }
 
+
+function applyHangarPlaqueGeometryFix(){
+    try{
+        const env = hangarState?.envGroup?.userData || {};
+        const centerPlaque = env?.shipDockPlaque || null;
+        if(centerPlaque){
+            centerPlaque.position.set(0, 0.42, 1.52);
+            centerPlaque.rotation.x = 0.22;
+            centerPlaque.rotation.y = Math.PI;
+            centerPlaque.rotation.z = 0;
+        }
+
+        const leftSlots = Array.isArray(env?.dockSlotsLeft) ? env.dockSlotsLeft : [];
+        const rightSlots = Array.isArray(env?.dockSlotsRight) ? env.dockSlotsRight : [];
+
+        [...leftSlots, ...rightSlots].forEach((slot) => {
+            const plaque = slot?.plaque || null;
+            if(!plaque) return;
+            plaque.position.y = 0.34;
+            plaque.rotation.x = 0.22;
+            plaque.rotation.y = 0;
+            plaque.rotation.z = 0;
+        });
+    }catch(_){}
+}
+
 function refreshHangarInfoBoards(){
     const boards = Array.isArray(hangarState?.infoBoards) ? hangarState.infoBoards : [];
     const currentShip = getForcedHangarDisplayShip();
@@ -10440,6 +10466,7 @@ function rebuildHangarSceneObjects(){
     }
 
     refreshHangarInfoBoards();
+    applyHangarPlaqueGeometryFix();
     fillHangarText();
 }
 
@@ -10569,7 +10596,42 @@ function ensureHangarRenderer(){
         });
     }
 
-    const animate = () => {
+    
+function enforceHangarRuntimePlacementFix(){
+    try{
+        const env = hangarState?.envGroup?.userData || {};
+        const centerPlaque = env?.shipDockPlaque || null;
+        if(centerPlaque){
+            centerPlaque.position.set(0, 0.42, 1.52);
+            centerPlaque.rotation.x = 0.22;
+            centerPlaque.rotation.y = Math.PI;
+            centerPlaque.rotation.z = 0;
+        }
+        const leftSlots = Array.isArray(env?.dockSlotsLeft) ? env.dockSlotsLeft : [];
+        const rightSlots = Array.isArray(env?.dockSlotsRight) ? env.dockSlotsRight : [];
+        [...leftSlots, ...rightSlots].forEach((slot) => {
+            const plaque = slot?.plaque || null;
+            if(!plaque) return;
+            plaque.position.y = 0.34;
+            plaque.rotation.x = 0.22;
+            plaque.rotation.y = 0;
+            plaque.rotation.z = 0;
+        });
+
+        const pivot = hangarState?.shipPivot || null;
+        if(pivot){
+            const showcase = pivot.children?.find?.(child => child?.type === 'Group' || child?.type === 'Object3D') || null;
+            const ship = showcase?.children?.[0] || null;
+            if(ship){
+                ship.position.set(0, 0.18, -0.18);
+                if(ship.scale?.setScalar) ship.scale.setScalar(2.15);
+            }
+        }
+    }catch(_){}
+}
+
+const animate = () => {
+        enforceHangarRuntimePlacementFix();
         if(document.getElementById('hangar-window')?.classList.contains('hidden')){
             hangarState.frameId = 0;
             return;
