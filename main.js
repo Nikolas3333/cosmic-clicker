@@ -14551,3 +14551,52 @@ function fixHangarVisuals(){
 }
 
 setInterval(fixHangarVisuals, 500);
+
+
+// ===== HANGAR FIX v187 CLEAN =====
+function centerModel(model){
+    const box = new THREE.Box3().setFromObject(model);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    model.position.sub(center);
+}
+
+function createPivot(model){
+    const pivot = new THREE.Group();
+    pivot.add(model);
+    return pivot;
+}
+
+function fixHangar(){
+    try{
+        if(window.hangarShip){
+            centerModel(window.hangarShip);
+            if(!window.hangarPivot){
+                window.hangarPivot = createPivot(window.hangarShip);
+                if(window.scene){
+                    scene.add(window.hangarPivot);
+                }
+            }
+            window.hangarPivot.rotation.y += 0.01;
+            window.hangarPivot.position.y = 0.2;
+            window.hangarPivot.scale.set(1.6,1.6,1.6);
+        }
+
+        if(window.hangarBoards){
+            window.hangarBoards.forEach(b=>{
+                if(!b) return;
+                b.position.y = 0.4;
+                b.rotation.x = -0.2;
+                b.rotation.y = 0;
+                b.rotation.z = 0;
+            });
+        }
+
+        if(window.hangarMainBoard){
+            window.hangarMainBoard.rotation.y = 0;
+            window.hangarMainBoard.position.y = 0.45;
+        }
+
+    }catch(e){}
+}
+setInterval(fixHangar, 300);
