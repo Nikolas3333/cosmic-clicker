@@ -6228,15 +6228,10 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 
 <style>
 #hangar-window .hangar-layout{grid-template-columns:minmax(0,1fr) !important;padding:8px 18px 18px !important;}
-#hangar-window .hangar-stage-wrap,#hangar-window .hangar-stage-wrap.full{grid-template-columns:minmax(0,1fr) !important; width:100% !important;}
+#hangar-window .hangar-stage-wrap,#hangar-window .hangar-stage-wrap.full{grid-template-columns:minmax(0,1fr) !important;width:100% !important;}
 #hangar-window .hangar-stage{min-height:740px !important;height:740px !important;}
-#hangar-window .hangar-stage-name-badge,.hangar-ship-card,.hangar-footer-row,.hangar-module-side{display:none !important;}
+#hangar-window .hangar-module-side,
+#hangar-window .hangar-ship-card,
+#hangar-window .hangar-footer-row,
+#hangar-window .hangar-stage-name-badge{display:none !important;}
 </style>
-
-
-<script>
-// ===== REMOVE EXTRA UI =====
-document.addEventListener("DOMContentLoaded", ()=>{
-    document.querySelectorAll('#ui, #inventory-window, #inventory-button').forEach(el=>el?.remove());
-});
-</script>
