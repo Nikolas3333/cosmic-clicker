@@ -9627,7 +9627,7 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(0, 1.72, 2.12);
+        plaque.position.set(0, 1.78, -2.18);
         plaque.rotation.x = 0.34;
         plaque.rotation.y = 0;
         plaque.rotation.z = 0.0;
@@ -9674,7 +9674,7 @@ function createHangarRoomEnvironment(){
 
     const centerPlaque = createHangarPlaqueBoard(5.9, 2.3);
     centerPlaque.position.set(0, 2.04, -5.24);
-    centerPlaque.rotation.x = -0.30;
+    centerPlaque.rotation.x = 0.26;
     centerPlaque.rotation.y = Math.PI;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
@@ -10249,7 +10249,7 @@ function queueHangarShipBuild(currentShip){
     if(cached){
         hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
         const readyMesh = cloneObject3DDeepSafe(cached);
-        readyMesh.position.set(0, 1.72, 0.0);
+        readyMesh.position.set(0, 1.72, -0.72);
         hangarState.shipPivot.add(readyMesh);
         hangarState.isShipLoading = false;
         fillHangarText();
@@ -10377,7 +10377,7 @@ function rebuildHangarSceneObjects(){
         };
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
-        instantMesh.position.set(0, 0.24, 0.0);
+        instantMesh.position.set(0, 0.24, 0);
         instantMesh.scale.setScalar(3.9);
         instantMesh.rotation.x = 0;
         instantMesh.rotation.y = Math.PI;
@@ -10406,7 +10406,7 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.18, 0.0);
+                shipMesh.position.set(0, 0.18, -0.72);
                 shipMesh.scale.setScalar(1.78);
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
