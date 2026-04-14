@@ -9627,8 +9627,8 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(0, 1.38, 0.8);
-        plaque.rotation.x = 0.34;
+        plaque.position.set(0, 1.34, 2.08);
+        plaque.rotation.x = 0.18;
         plaque.rotation.y = 0;
         plaque.rotation.z = 0.0;
         dockGroup.add(plaque);
@@ -10249,7 +10249,7 @@ function queueHangarShipBuild(currentShip){
     if(cached){
         hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
         const readyMesh = cloneObject3DDeepSafe(cached);
-        readyMesh.position.set(0, 1.72, -0.72);
+        readyMesh.position.set(0.18, 1.72, -0.04);
         hangarState.shipPivot.add(readyMesh);
         hangarState.isShipLoading = false;
         fillHangarText();
@@ -10262,15 +10262,15 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
-            shipMesh.position.set(0, 1.54, -0.72);
-            shipMesh.scale.setScalar(1.4);
+            shipMesh.position.set(0.18, 1.54, -0.04);
+            shipMesh.scale.setScalar(1.28);
             hangarState.shipPivot.add(shipMesh);
         })
         .catch(() => {
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
             const fallback = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-            fallback.position.set(0,1.72,-0.72);
+            fallback.position.set(0.18,1.72,-0.04);
             hangarState.shipPivot.add(fallback);
         })
         .finally(() => {
@@ -10345,7 +10345,7 @@ function rebuildHangarSceneObjects(){
     if(showcaseGroup){
         while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
         showcaseGroup.rotation.set(0, 0, 0);
-        showcaseGroup.position.set(0, 2.18, -0.68);
+        showcaseGroup.position.set(0.42, 2.18, -0.08);
     }
     if(emergencyHull) emergencyHull.visible = false;
 
@@ -10377,8 +10377,8 @@ function rebuildHangarSceneObjects(){
         };
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
-        instantMesh.position.set(0, 0.24, 0);
-        instantMesh.scale.setScalar(3.9);
+        instantMesh.position.set(0.18, 0.24, 0.08);
+        instantMesh.scale.setScalar(3.2);
         instantMesh.rotation.x = 0;
         instantMesh.rotation.y = Math.PI;
         instantMesh.rotation.z = 0;
@@ -10406,8 +10406,8 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.18, -0.2);
-                shipMesh.scale.setScalar(1.4);
+                shipMesh.position.set(0.18, 0.18, 0.08);
+                shipMesh.scale.setScalar(1.28);
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
