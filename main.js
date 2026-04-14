@@ -10249,7 +10249,7 @@ function queueHangarShipBuild(currentShip){
     if(cached){
         hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
         const readyMesh = cloneObject3DDeepSafe(cached);
-        readyMesh.position.set(0, 1.72, 0.0);
+        readyMesh.position.set(0, 1.72, -0.72);
         hangarState.shipPivot.add(readyMesh);
         hangarState.isShipLoading = false;
         fillHangarText();
@@ -10262,15 +10262,15 @@ function queueHangarShipBuild(currentShip){
             hangarShipMeshCache.set(shipId, cloneObject3DDeepSafe(shipMesh));
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
-            shipMesh.position.set(0, 1.54, 0.0);
-            shipMesh.scale.setScalar(1.28);
+            shipMesh.position.set(0, 1.54, -0.72);
+            shipMesh.scale.setScalar(1.4);
             hangarState.shipPivot.add(shipMesh);
         })
         .catch(() => {
             if(buildToken !== hangarBuildToken || !hangarState.shipPivot) return;
             hangarState.shipPivot.children.slice().forEach(child => { if(!child?.userData?.isGuaranteedCentralShip && !child?.userData?.isHangarEmergencyHull) hangarState.shipPivot.remove(child); });
             const fallback = normalizeHangarShipMesh(createHangarShipMesh(currentShip));
-            fallback.position.set(0,1.72,0.0);
+            fallback.position.set(0,1.72,-0.72);
             hangarState.shipPivot.add(fallback);
         })
         .finally(() => {
@@ -10406,8 +10406,8 @@ function rebuildHangarSceneObjects(){
             .then((shipMesh) => {
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
-                shipMesh.position.set(0, 0.18, 0.0);
-                shipMesh.scale.setScalar(1.28);
+                shipMesh.position.set(0, 0.18, -0.2);
+                shipMesh.scale.setScalar(1.4);
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
