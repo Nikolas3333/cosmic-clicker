@@ -9627,7 +9627,7 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(x < 0 ? 2.55 : -2.55, 1.18, 0.12);
+        plaque.position.set(x < 0 ? 1.25 : -1.25, 1.18, 1.05);
         plaque.rotation.x = -0.16;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0.0;
