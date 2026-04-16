@@ -2363,7 +2363,7 @@ this.orbitPivot.rotation.y += this.orbitSpeed;
 
 const sunGeometry = new THREE.SphereGeometry(8, 64, 64);
 
-const sunMaterial = new THREE.MeshBasicMaterial({
+const sunMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
     map: sunTexture,
     color: 0xffffff
 });
@@ -2373,7 +2373,7 @@ sun.position.set(0,0,0);
 
 const sunGlow = new THREE.Mesh(
     new THREE.SphereGeometry(9.6, 48, 48),
-    new THREE.MeshBasicMaterial({
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
         color: 0xffaa33,
         transparent: true,
         opacity: 0.18,
@@ -3441,7 +3441,7 @@ function createProjectileVisual(weaponType, options = {}){
     const addGlowShell = (sx, sy, sz, glowColor, opacity = 0.28) => {
         const glow = new THREE.Mesh(
             new THREE.SphereGeometry(1, 10, 10),
-            new THREE.MeshBasicMaterial({ color: glowColor, transparent:true, opacity, depthWrite:false })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: glowColor, transparent:true, opacity, depthWrite:false })
         );
         glow.scale.set(sx, sy, sz);
         group.add(glow);
@@ -3451,18 +3451,18 @@ function createProjectileVisual(weaponType, options = {}){
     if(weaponType === 'missile'){
         const body = new THREE.Mesh(
             new THREE.CylinderGeometry(width * 0.34, width * 0.62, length * 0.98, 10),
-            new THREE.MeshBasicMaterial({ color })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color })
         );
         body.rotation.x = Math.PI / 2;
         const tip = new THREE.Mesh(
             new THREE.ConeGeometry(width * 0.62, length * 0.34, 10),
-            new THREE.MeshBasicMaterial({ color: coreColor })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: coreColor })
         );
         tip.rotation.x = -Math.PI / 2;
         tip.position.z = -length * 0.64;
         const flame = new THREE.Mesh(
             new THREE.ConeGeometry(width * 0.34, length * 0.48, 8),
-            new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent:true, opacity:0.95 })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: '#ffd27a', transparent:true, opacity:0.95 })
         );
         flame.rotation.x = Math.PI / 2;
         flame.position.z = length * 0.62;
@@ -3470,7 +3470,7 @@ function createProjectileVisual(weaponType, options = {}){
         finOffsets.forEach(([x, y]) => {
             const fin = new THREE.Mesh(
                 new THREE.BoxGeometry(width * 0.14, width * 0.7, length * 0.26),
-                new THREE.MeshBasicMaterial({ color: coreColor })
+                new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: coreColor })
             );
             fin.position.set(x, y, length * 0.22);
             group.add(fin);
@@ -3482,15 +3482,15 @@ function createProjectileVisual(weaponType, options = {}){
     }else if(weaponType === 'plasma'){
         const orb = new THREE.Mesh(
             new THREE.SphereGeometry(width * 1.18 * scale, 12, 12),
-            new THREE.MeshBasicMaterial({ color })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color })
         );
         const core = new THREE.Mesh(
             new THREE.SphereGeometry(width * 0.62 * scale, 10, 10),
-            new THREE.MeshBasicMaterial({ color: coreColor })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: coreColor })
         );
         const ring = new THREE.Mesh(
             new THREE.TorusGeometry(width * 1.3 * scale, width * 0.16 * scale, 8, 18),
-            new THREE.MeshBasicMaterial({ color: '#ffd59c', transparent:true, opacity:0.7 })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: '#ffd59c', transparent:true, opacity:0.7 })
         );
         ring.rotation.y = Math.PI / 2;
         group.add(orb, core, ring);
@@ -3500,17 +3500,17 @@ function createProjectileVisual(weaponType, options = {}){
     }else if(weaponType === 'phase'){
         const shard = new THREE.Mesh(
             new THREE.OctahedronGeometry(width * 1.15 * scale, 0),
-            new THREE.MeshBasicMaterial({ color })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color })
         );
         shard.scale.z = length * 0.42;
         const core = new THREE.Mesh(
             new THREE.OctahedronGeometry(width * 0.48 * scale, 0),
-            new THREE.MeshBasicMaterial({ color: coreColor })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: coreColor })
         );
         core.scale.z = length * 0.22;
         const ringA = new THREE.Mesh(
             new THREE.TorusGeometry(width * 1.08 * scale, width * 0.1 * scale, 6, 16),
-            new THREE.MeshBasicMaterial({ color:'#f4c9ff', transparent:true, opacity:0.78 })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:'#f4c9ff', transparent:true, opacity:0.78 })
         );
         ringA.rotation.x = Math.PI / 2;
         const ringB = ringA.clone();
@@ -3523,17 +3523,17 @@ function createProjectileVisual(weaponType, options = {}){
     }else if(weaponType === 'beam'){
         const body = new THREE.Mesh(
             new THREE.CylinderGeometry(width * 0.22 * scale, width * 0.42 * scale, length * 1.38, 10),
-            new THREE.MeshBasicMaterial({ color })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color })
         );
         body.rotation.x = Math.PI / 2;
         const core = new THREE.Mesh(
             new THREE.CylinderGeometry(width * 0.08 * scale, width * 0.17 * scale, length * 1.28, 8),
-            new THREE.MeshBasicMaterial({ color: coreColor })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: coreColor })
         );
         core.rotation.x = Math.PI / 2;
         const halo = new THREE.Mesh(
             new THREE.CylinderGeometry(width * 0.42 * scale, width * 0.42 * scale, length * 1.08, 10),
-            new THREE.MeshBasicMaterial({ color:'#b9d0ff', transparent:true, opacity:0.18, depthWrite:false })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:'#b9d0ff', transparent:true, opacity:0.18, depthWrite:false })
         );
         halo.rotation.x = Math.PI / 2;
         group.add(halo, body, core);
@@ -3542,17 +3542,17 @@ function createProjectileVisual(weaponType, options = {}){
     }else if(weaponType === 'pulse'){
         const bolt = new THREE.Mesh(
             new THREE.CylinderGeometry(width * 0.28 * scale, width * 0.46 * scale, length * 0.96, 10),
-            new THREE.MeshBasicMaterial({ color })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color })
         );
         bolt.rotation.x = Math.PI / 2;
         const core = new THREE.Mesh(
             new THREE.CylinderGeometry(width * 0.1 * scale, width * 0.2 * scale, length * 0.74, 8),
-            new THREE.MeshBasicMaterial({ color: coreColor })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: coreColor })
         );
         core.rotation.x = Math.PI / 2;
         const sideA = new THREE.Mesh(
             new THREE.TorusGeometry(width * 0.72 * scale, width * 0.08 * scale, 6, 16),
-            new THREE.MeshBasicMaterial({ color:'#b6fcff', transparent:true, opacity:0.65 })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:'#b6fcff', transparent:true, opacity:0.65 })
         );
         sideA.rotation.y = Math.PI / 2;
         sideA.position.z = -length * 0.12;
@@ -3566,15 +3566,15 @@ function createProjectileVisual(weaponType, options = {}){
     }else{
         const shell = new THREE.Mesh(
             new THREE.BoxGeometry(width * scale, width * scale, length),
-            new THREE.MeshBasicMaterial({ color })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color })
         );
         const core = new THREE.Mesh(
             new THREE.BoxGeometry(width * 0.45 * scale, width * 0.45 * scale, length * 0.72),
-            new THREE.MeshBasicMaterial({ color: coreColor })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: coreColor })
         );
         const halo = new THREE.Mesh(
             new THREE.BoxGeometry(width * 1.8 * scale, width * 1.8 * scale, length * 0.9),
-            new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.14, depthWrite:false })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color, transparent:true, opacity:0.14, depthWrite:false })
         );
         group.add(halo, shell, core);
         group.userData.visualType = 'laser';
@@ -6434,7 +6434,7 @@ function enterBattleMap(mapName){
 
     if(mapKey === 'saturn'){
         const ringGeo = new THREE.RingGeometry(config.size * 1.35, config.size * 2.0, 96);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.65 });
+        const ringMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.65 });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = Math.PI / 2.45;
         battleMapPlanet.add(ring);
@@ -8730,7 +8730,7 @@ function createHangarPlatform(){
 
     const ring = new THREE.Mesh(
         new THREE.TorusGeometry(5.18, 0.19, 20, 56),
-        new THREE.MeshBasicMaterial({ color:0x78d9ff, transparent:true, opacity:0.92 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x78d9ff, transparent:true, opacity:0.92 })
     );
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.42;
@@ -8738,7 +8738,7 @@ function createHangarPlatform(){
 
     const glowDisc = new THREE.Mesh(
         new THREE.CylinderGeometry(4.78, 4.78, 0.08, 36),
-        new THREE.MeshBasicMaterial({ color:0x55bfff, transparent:true, opacity:0.18 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x55bfff, transparent:true, opacity:0.18 })
     );
     glowDisc.position.y = 0.5;
     group.add(glowDisc);
@@ -8803,8 +8803,8 @@ function createHangarShipMesh(item){
     const metal = new THREE.MeshStandardMaterial({ color:hullColor, metalness:0.74, roughness:0.3 });
     const darkMetal = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent).multiplyScalar(0.55), metalness:0.78, roughness:0.45 });
     const lightMetal = new THREE.MeshStandardMaterial({ color:0xdbeeff, metalness:0.35, roughness:0.24 });
-    const glowMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(neon) });
-    const engineMat = new THREE.MeshBasicMaterial({ color:new THREE.Color(engine) });
+    const glowMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:new THREE.Color(neon) });
+    const engineMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:new THREE.Color(engine) });
 
     const addEngine = (x, y, z, sx, sy, sz) => {
         const part = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), engineMat);
@@ -8951,7 +8951,7 @@ function createHangarShipMesh(item){
         core.position.y = 0.2;
         group.add(core);
 
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.12, 18, 54), new THREE.MeshBasicMaterial({ color:new THREE.Color(accent) }));
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.12, 18, 54), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:new THREE.Color(accent) }));
         ring.rotation.x = Math.PI / 2;
         ring.rotation.z = 0.42;
         group.add(ring);
@@ -9029,7 +9029,7 @@ function createHangarShipMesh(item){
 
         if(equippedWeapon){
             const weaponColor = new THREE.Color(equippedWeapon?.accent || neon);
-            const weaponGlow = new THREE.MeshBasicMaterial({ color: weaponColor });
+            const weaponGlow = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: weaponColor });
             const weaponBody = new THREE.MeshStandardMaterial({ color: weaponColor.clone().multiplyScalar(0.75), metalness:0.72, roughness:0.28 });
             const barrelLength = String(equippedWeapon?.weaponKind || '').trim() === 'beam' ? 2.0 : (String(equippedWeapon?.weaponKind || '').trim() === 'plasma' ? 1.5 : 1.25);
             const mountY = 0.04;
@@ -9053,11 +9053,11 @@ function createHangarShipMesh(item){
 
         if(equippedShield){
             const shieldColor = new THREE.Color(equippedShield?.neon || '#66e8ff');
-            const shieldMat = new THREE.MeshBasicMaterial({ color: shieldColor, transparent:true, opacity:0.34 });
+            const shieldMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: shieldColor, transparent:true, opacity:0.34 });
             const shieldRing = new THREE.Mesh(new THREE.TorusGeometry(2.25, 0.05, 14, 52), shieldMat);
             shieldRing.rotation.x = Math.PI / 2;
             shieldRing.position.y = 0.15;
-            const shieldArc = new THREE.Mesh(new THREE.SphereGeometry(1.78, 18, 18), new THREE.MeshBasicMaterial({ color:shieldColor, transparent:true, opacity:0.08, wireframe:true }));
+            const shieldArc = new THREE.Mesh(new THREE.SphereGeometry(1.78, 18, 18), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:shieldColor, transparent:true, opacity:0.08, wireframe:true }));
             shieldArc.scale.set(1.35, 0.62, 2.1);
             shieldArc.position.y = 0.1;
             group.add(shieldRing, shieldArc);
@@ -9065,7 +9065,7 @@ function createHangarShipMesh(item){
 
         if(equippedBooster){
             const boosterColor = new THREE.Color(equippedBooster?.neon || engine);
-            const boosterMat = new THREE.MeshBasicMaterial({ color: boosterColor });
+            const boosterMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: boosterColor });
             [-1.05, 1.05].forEach((x) => {
                 const boosterPod = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 0.95, 10), new THREE.MeshStandardMaterial({ color: boosterColor.clone().multiplyScalar(0.75), metalness:0.65, roughness:0.3 }));
                 boosterPod.rotation.x = Math.PI / 2;
@@ -9088,7 +9088,7 @@ function createHangarAstronautFallback(){
     const suitMat = new THREE.MeshStandardMaterial({ color:0xe7edf6, metalness:0.35, roughness:0.56 });
     const trimMat = new THREE.MeshStandardMaterial({ color:0x2c4e86, metalness:0.58, roughness:0.34 });
     const visorMat = new THREE.MeshStandardMaterial({ color:0x7bd8ff, emissive:0x2cb8ff, emissiveIntensity:0.45, metalness:0.85, roughness:0.12, transparent:true, opacity:0.92 });
-    const glowMat = new THREE.MeshBasicMaterial({ color:0x6ee7ff });
+    const glowMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x6ee7ff });
 
     const torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.0, 0.42), suitMat);
     torso.position.y = 1.6;
@@ -9175,7 +9175,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
 
     const frame = new THREE.Mesh(
         new THREE.PlaneGeometry(width + 0.12, height + 0.12),
-        new THREE.MeshBasicMaterial({
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
             color:0x7fd8ff,
             transparent:true,
             opacity:0.16,
@@ -9193,7 +9193,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
 
     const textPlane = new THREE.Mesh(
         new THREE.PlaneGeometry(width * 0.92, height * 0.86),
-        new THREE.MeshBasicMaterial({
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
             map:texture,
             transparent:true,
             opacity:1,
@@ -9322,7 +9322,7 @@ function createHangarExteriorPlanets(){
         if(ring){
             const ringMesh = new THREE.Mesh(
                 new THREE.TorusGeometry(radius * 1.85, radius * 0.16, 18, 72),
-                new THREE.MeshBasicMaterial({ color:0xd7c2ff, transparent:true, opacity:0.42 })
+                new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0xd7c2ff, transparent:true, opacity:0.42 })
             );
             ringMesh.rotation.x = Math.PI / 2.35;
             ringMesh.rotation.y = 0.4;
@@ -9331,7 +9331,7 @@ function createHangarExteriorPlanets(){
         if(glow){
             const halo = new THREE.Mesh(
                 new THREE.SphereGeometry(radius * 1.22, 24, 24),
-                new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.10 })
+                new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color, transparent:true, opacity:0.10 })
             );
             pivot.add(halo);
         }
@@ -9342,12 +9342,12 @@ function createHangarExteriorPlanets(){
     const sunPivot = new THREE.Group();
     const sunCore = new THREE.Mesh(
         new THREE.SphereGeometry(3.4, 40, 40),
-        new THREE.MeshBasicMaterial({ map: sunTexture, color: 0xffffff })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: sunTexture, color: 0xffffff })
     );
     sunPivot.add(sunCore);
     const sunHalo = new THREE.Mesh(
         new THREE.SphereGeometry(4.5, 28, 28),
-        new THREE.MeshBasicMaterial({ color:0xffb347, transparent:true, opacity:0.16 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0xffb347, transparent:true, opacity:0.16 })
     );
     sunPivot.add(sunHalo);
     sunPivot.position.set(0, 15.5, 214);
@@ -9369,14 +9369,14 @@ function createHangarSidePlatform(labelText = ''){
     group.add(base);
     const ring = new THREE.Mesh(
         new THREE.TorusGeometry(0.98, 0.06, 12, 42),
-        new THREE.MeshBasicMaterial({ color:0x74dfff, transparent:true, opacity:0.72 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x74dfff, transparent:true, opacity:0.72 })
     );
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.14;
     group.add(ring);
     const glow = new THREE.Mesh(
         new THREE.CylinderGeometry(0.88, 0.88, 0.04, 24),
-        new THREE.MeshBasicMaterial({ color:0x39c8ff, transparent:true, opacity:0.16 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x39c8ff, transparent:true, opacity:0.16 })
     );
     glow.position.y = 0.16;
     group.add(glow);
@@ -9441,7 +9441,7 @@ function createHangarModuleMesh(item){
     const group = new THREE.Group();
     const shell = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent), metalness:0.58, roughness:0.34 });
     const darkShell = new THREE.MeshStandardMaterial({ color:new THREE.Color(accent).multiplyScalar(0.62), metalness:0.72, roughness:0.42 });
-    const glow = new THREE.MeshBasicMaterial({ color:new THREE.Color(neon) });
+    const glow = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:new THREE.Color(neon) });
 
     if(art.includes('shield')){
         const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.8, 0), shell);
@@ -9561,14 +9561,14 @@ function createHangarRoomEnvironment(){
 
     const frontGlass = new THREE.Mesh(
         new THREE.PlaneGeometry(50.6, 28.8),
-        new THREE.MeshBasicMaterial({ color:0x49619a, transparent:true, opacity:0.12 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x49619a, transparent:true, opacity:0.12 })
     );
     frontGlass.position.set(0, 13.2, 58.0);
     group.add(frontGlass);
 
     const frontGlow = new THREE.Mesh(
         new THREE.PlaneGeometry(49.6, 27.8),
-        new THREE.MeshBasicMaterial({ color:0x4eb7ff, transparent:true, opacity:0.07 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x4eb7ff, transparent:true, opacity:0.07 })
     );
     frontGlow.position.set(0, 13.2, 57.85);
     glowPanels.push(frontGlow);
@@ -9581,7 +9581,7 @@ function createHangarRoomEnvironment(){
 
         const sideGlass = new THREE.Mesh(
             new THREE.PlaneGeometry(41, 22),
-            new THREE.MeshBasicMaterial({ color:0x34486e, transparent:true, opacity:0.1 })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x34486e, transparent:true, opacity:0.1 })
         );
         sideGlass.position.set(side * 34.2, 14.0, 0);
         sideGlass.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -9589,7 +9589,7 @@ function createHangarRoomEnvironment(){
 
         const sideGlow = new THREE.Mesh(
             new THREE.PlaneGeometry(40, 21),
-            new THREE.MeshBasicMaterial({ color: side < 0 ? 0x42a4ff : 0xb069ff, transparent:true, opacity:0.07 })
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: side < 0 ? 0x42a4ff : 0xb069ff, transparent:true, opacity:0.07 })
         );
         sideGlow.position.set(side * 34.05, 14.0, 0);
         sideGlow.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
@@ -9627,9 +9627,9 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(x < 0 ? 1.35 : -1.35, 1.26, 0.0);
-        plaque.rotation.x = -0.12;
-        plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+        plaque.position.set(x < 0 ? 1.2 : -1.2, 1.45, 0.35);
+        plaque.rotation.x = -0.25;
+        plaque.rotation.y = 0;
         plaque.rotation.z = 0;
         dockGroup.add(plaque);
 
@@ -10092,14 +10092,14 @@ function createHangarNoShipPlaceholder(){
 
     const ring = new THREE.Mesh(
         new THREE.TorusGeometry(1.28, 0.05, 16, 42),
-        new THREE.MeshBasicMaterial({ color:0x53d8ff, transparent:true, opacity:0.52 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x53d8ff, transparent:true, opacity:0.52 })
     );
     ring.rotation.x = Math.PI / 2;
     group.add(ring);
 
     const lineA = new THREE.Mesh(
         new THREE.BoxGeometry(1.4, 0.035, 0.15),
-        new THREE.MeshBasicMaterial({ color:0x8ee7ff, transparent:true, opacity:0.34 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x8ee7ff, transparent:true, opacity:0.34 })
     );
     lineA.position.y = 0.22;
     group.add(lineA);
@@ -11163,7 +11163,7 @@ function createObserverBot(index=0){
     const wing = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.12,0.9), new THREE.MeshStandardMaterial({ color:0x324965, roughness:0.65, metalness:0.35 }));
     wing.position.set(-1.45,0,-0.05);
     const wing2 = wing.clone(); wing2.position.x = 1.45;
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16), new THREE.MeshBasicMaterial({ color:0xf4fbff }));
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0xf4fbff }));
     core.position.set(0,0.18,-1.0);
     botGroup.add(body, wing, wing2, core);
     botGroup.position.set((Math.random()-0.5)*28, (Math.random()-0.5)*9, (Math.random()-0.5)*28);
@@ -11222,7 +11222,7 @@ function updateObserverBattle(){
 function fireObserverLaser(shooter, target){
     const dir = target.position.clone().sub(shooter.position).normalize();
     [-0.8,0.8].forEach(offsetX => {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,1.6), new THREE.MeshBasicMaterial({ color:0xfff1a8 }));
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.12,1.6), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0xfff1a8 }));
         const localOffset = new THREE.Vector3(offsetX,0,-1.6).applyQuaternion(shooter.quaternion);
         mesh.position.copy(shooter.position.clone().add(localOffset));
         mesh.lookAt(shooter.position.clone().add(dir));
@@ -11649,7 +11649,7 @@ function limitBattleArea(){
 
         const glowTube = new THREE.Mesh(
             new THREE.TubeGeometry(curve, 54, Math.max(1.25, radius * 0.010), 14, false),
-            new THREE.MeshBasicMaterial({
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
                 color: 0xff8c22,
                 transparent: true,
                 opacity: 0.22,
@@ -11660,7 +11660,7 @@ function limitBattleArea(){
 
         const coreTube = new THREE.Mesh(
             new THREE.TubeGeometry(curve, 54, Math.max(0.45, radius * 0.0038), 12, false),
-            new THREE.MeshBasicMaterial({
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
                 color: 0xfff1a8,
                 transparent: true,
                 opacity: 0.82,
@@ -11671,7 +11671,7 @@ function limitBattleArea(){
 
         const haloTube = new THREE.Mesh(
             new THREE.TubeGeometry(curve, 40, Math.max(2.1, radius * 0.016), 10, false),
-            new THREE.MeshBasicMaterial({
+            new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
                 color: 0xff5a12,
                 transparent: true,
                 opacity: 0.08,
@@ -11747,7 +11747,7 @@ function limitBattleArea(){
         const planetGeometry = new THREE.SphereGeometry(config.size, 64, 64);
         const isSunMap = mapKey === 'sun';
         const planetMaterial = isSunMap
-        ? new THREE.MeshBasicMaterial({
+        ? new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
             map: sunTexture,
             color: 0xffffff
         })
@@ -11767,7 +11767,7 @@ function limitBattleArea(){
         if(isSunMap){
             const sunBattleGlow = new THREE.Mesh(
                 new THREE.SphereGeometry(config.size * 1.08, 40, 40),
-                new THREE.MeshBasicMaterial({
+                new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
                     color: 0xffaa33,
                     transparent: true,
                     opacity: 0.12,
@@ -11781,7 +11781,7 @@ function limitBattleArea(){
 
             const sunOuterGlow = new THREE.Mesh(
                 new THREE.SphereGeometry(config.size * 1.16, 32, 32),
-                new THREE.MeshBasicMaterial({
+                new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
                     color: 0xff7a1a,
                     transparent: true,
                     opacity: 0.07,
@@ -11800,7 +11800,7 @@ function limitBattleArea(){
 
         if(mapKey === 'saturn'){
             const ringGeo = new THREE.RingGeometry(config.size * 1.42, config.size * 2.2, 128);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.66 });
+            const ringMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.66 });
             const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.rotation.x = Math.PI / 2.38;
             battleMapPlanet.add(ring);
