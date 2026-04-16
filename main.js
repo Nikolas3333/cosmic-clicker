@@ -9613,26 +9613,26 @@ function createHangarRoomEnvironment(){
         dockGroup.add(sideArm);
 
         const glowPlate = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.06, 0.24), accentMat.clone());
-        glowPlate.position.set(0, 1.14, -1.52);
-        animatedMaterials.push(glowPlate.material);
-        lightBars.push(glowPlate);
-        dockGroup.add(glowPlate);
+glowPlate.position.set(0, 1.14, -1.52);
+animatedMaterials.push(glowPlate.material);
+lightBars.push(glowPlate);
+dockGroup.add(glowPlate);
 
-        const pad = createHangarSidePlatform(label);
-        pad.position.set(0, 1.22, 0);
-        pad.userData.baseY = 1.22;
-        pad.scale.setScalar(1.0);
-        dockGroup.add(pad);
+const pad = createHangarSidePlatform(label);
+pad.position.set(0, 1.22, 0);
+pad.userData.baseY = 1.22;
+pad.scale.setScalar(1.0);
+dockGroup.add(pad);
 
-        const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(x < 0 ? 4.15 : -4.15, 1.58, 0.28);
-        plaque.rotation.x = 0.18;
-        plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-        plaque.rotation.z = 0;
-        dockGroup.add(plaque);
+const plaque = createHangarPlaqueBoard(4.6, 1.86);
+plaque.position.set(x < 0 ? 4.15 : -4.15, 1.42, 0.32);
+plaque.rotation.x = -0.22;
+plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+plaque.rotation.z = 0;
+dockGroup.add(plaque);
 
-        group.add(dockGroup);
-        return { group:dockGroup, pad, plaque, topY: dockGroup.position.y + pad.position.y, side: x < 0 ? 'left' : 'right', index: label };
+group.add(dockGroup);
+return { group:dockGroup, pad, plaque, topY: dockGroup.position.y + pad.position.y, side: x < 0 ? 'left' : 'right', index: label };
     };
 
     const dockZs = [-46, -36, -26, -16, -6, 6, 16, 26, 36, 46];
