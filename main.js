@@ -9166,7 +9166,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
             emissiveIntensity:0.48,
             metalness:0.72,
             roughness:0.26,
-            side:THREE.FrontSide,
+            side:THREE.DoubleSide,
             transparent:true,
             opacity:0.96
         })
@@ -9178,8 +9178,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
         new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
             color:0x7fd8ff,
             transparent:true,
-            opacity:0.16,
-            side:THREE.FrontSide
+            opacity:0.16
         })
     );
     frame.position.z = -0.01;
@@ -9196,8 +9195,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
         new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
             map:texture,
             transparent:true,
-            opacity:1,
-            side:THREE.FrontSide
+            opacity:1
         })
     );
     textPlane.position.z = 0.012;
@@ -9627,8 +9625,8 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(x < 0 ? 2.35 : -2.35, 1.34, 0.10);
-        plaque.rotation.x = -0.10;
+        plaque.position.set(x < 0 ? 2.35 : -2.35, 2.10, 0.10);
+        plaque.rotation.x = -0.06;
         plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
         plaque.rotation.z = 0;
         dockGroup.add(plaque);
