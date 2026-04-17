@@ -6157,7 +6157,7 @@ shop-main-head{
 
 <!-- ===== HANGAR WINDOW ===== -->
 <div id="hangar-window" class="hidden">
-  <div id="hangar-debug-badge">HANGAR V217</div>
+  <div id="hangar-debug-badge">HANGAR V218</div>
   <div class="hangar-empty-shell">
     <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
   </div>
@@ -6235,3 +6235,67 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 #hangar-window .hangar-footer-row,
 #hangar-window .hangar-stage-name-badge{display:none !important;}
 </style>
+
+
+/* ===== V218 HANGAR RUNTIME ACTIONS ===== */
+#hangar-window .hangar-module-list{
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-height:170px;
+  overflow:auto;
+  margin-top:8px;
+  padding-right:4px;
+}
+#hangar-window .hangar-module-list-item{
+  width:100%;
+  border:none;
+  text-align:left;
+  border-radius:14px;
+  padding:10px 12px;
+  cursor:pointer;
+  background:rgba(255,255,255,0.05);
+  color:#eafaff;
+  border:1px solid rgba(120,220,255,0.08);
+}
+#hangar-window .hangar-module-list-item.active{
+  background:rgba(37,112,168,0.38);
+  box-shadow:0 0 16px rgba(90,210,255,0.14);
+}
+#hangar-window .hangar-module-list-item.equipped{
+  border-color:rgba(126,255,168,0.34);
+}
+#hangar-window .hangar-module-list-name{
+  display:block;
+  font-weight:700;
+}
+#hangar-window .hangar-module-list-sub{
+  display:block;
+  font-size:12px;
+  opacity:0.82;
+  margin-top:4px;
+}
+#hangar-window .hangar-module-list-item.empty{
+  cursor:default;
+}
+#hangar-window .hangar-stage-overlay{
+  gap:12px;
+}
+#hangar-window .hangar-footer-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+#hangar-window .hangar-price-chip{
+  font-weight:700;
+}
+#hangar-window .hangar-arrow.horizontal{
+  width:56px;
+  min-width:56px;
+  height:180px;
+}
+#hangar-window .hangar-main-btn{
+  min-width:170px;
+}
+
