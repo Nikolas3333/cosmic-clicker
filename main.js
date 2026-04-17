@@ -9625,34 +9625,11 @@ function createHangarRoomEnvironment(){
         dockGroup.add(pad);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-
-// позиция — немного ниже и чуть вперед
-plaque.position.set(x < 0 ? 4.15 : -4.15, 1.42, 0.32);
-
-// 🔥 ВАЖНО: наклон назад (НЕ вбок)
-plaque.rotation.x = -0.18;
-
-// поворот к игроку (оставляем)
-plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-
-// ❌ убираем полностью
-plaque.rotation.z = 0;
-
-const plaque = createHangarPlaqueBoard(4.6, 1.86);
-
-// позиция — немного ниже и чуть вперед
-plaque.position.set(x < 0 ? 4.15 : -4.15, 1.42, 0.32);
-
-// 🔥 ВАЖНО: наклон назад (НЕ вбок)
-plaque.rotation.x = -0.18;
-
-// поворот к игроку (оставляем)
-plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
-
-// ❌ убираем полностью
-plaque.rotation.z = 0;
-
-dockGroup.add(plaque);
+        plaque.position.set(x < 0 ? 4.15 : -4.15, 1.42, 0.32);
+        plaque.rotation.x = 0.0;
+        plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+        plaque.rotation.z = x < 0 ? 0.18 : -0.18;
+        dockGroup.add(plaque);
 
         group.add(dockGroup);
         return { group:dockGroup, pad, plaque, topY: dockGroup.position.y + pad.position.y, side: x < 0 ? 'left' : 'right', index: label };
