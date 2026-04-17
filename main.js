@@ -9624,12 +9624,17 @@ function createHangarRoomEnvironment(){
         pad.scale.setScalar(1.0);
         dockGroup.add(pad);
 
+        const plaqueTilt = new THREE.Group();
+        plaqueTilt.position.set(x < 0 ? 4.15 : -4.15, 1.30, 0.22);
+        plaqueTilt.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+        dockGroup.add(plaqueTilt);
+
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
-        plaque.position.set(x < 0 ? 4.15 : -4.15, 1.30, 0.22);
+        plaque.position.set(0, 0, 0);
         plaque.rotation.x = -0.34;
-        plaque.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+        plaque.rotation.y = 0;
         plaque.rotation.z = 0;
-        dockGroup.add(plaque);
+        plaqueTilt.add(plaque);
 
         group.add(dockGroup);
         return { group:dockGroup, pad, plaque, topY: dockGroup.position.y + pad.position.y, side: x < 0 ? 'left' : 'right', index: label };
