@@ -6157,7 +6157,7 @@ shop-main-head{
 
 <!-- ===== HANGAR WINDOW ===== -->
 <div id="hangar-window" class="hidden">
-  <div id="hangar-debug-badge">HANGAR V223</div>
+  <div id="hangar-debug-badge">HANGAR V224</div>
   <div class="hangar-empty-shell">
     <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
   </div>
@@ -6309,3 +6309,18 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
   min-width:170px;
 }
 
+
+<style>
+#hangar-window .hangar-stage-overlay{display:flex !important; position:absolute !important; left:24px !important; right:24px !important; bottom:24px !important; transform:none !important; width:auto !important; justify-content:space-between !important; align-items:flex-end !important; gap:18px !important; z-index:40 !important; pointer-events:none !important;}
+#hangar-window .hangar-ship-card{display:block !important; opacity:1 !important; visibility:visible !important; pointer-events:auto !important; max-width:420px !important;}
+#hangar-window .hangar-ship-card *{opacity:1 !important; visibility:visible !important;}
+#hangar-window .hangar-footer-actions{display:grid !important; grid-template-columns:1fr 1fr !important; gap:10px !important; width:100% !important; margin-top:12px !important; pointer-events:auto !important;}
+#hangar-window .hangar-main-btn{display:inline-flex !important; align-items:center !important; justify-content:center !important; min-height:48px !important; opacity:1 !important; visibility:visible !important; pointer-events:auto !important;}
+#hangar-window #hangar-ship-action,
+#hangar-window #hangar-ship-sell{display:inline-flex !important;}
+#hangar-window .hangar-footer-row,
+#hangar-window .hangar-stage-name-badge,
+#hangar-window .hangar-ship-price-row,
+#hangar-window .hangar-ship-desc{display:block !important; opacity:1 !important; visibility:visible !important;}
+#hangar-window .hangar-stats-grid{display:grid !important;}
+</style>
