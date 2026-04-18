@@ -8897,16 +8897,6 @@ function selectCurrentHangarShip(){
     return true;
 }
 
-function selectHangarShipById(shipId){
-    const safeId = String(shipId || '').trim();
-    if(!safeId) return false;
-    const ships = getOwnedHangarShips();
-    const ownedIndex = ships.findIndex(item => String(item?.id || '').trim() === safeId);
-    if(ownedIndex < 0) return false;
-    hangarState.shipIndex = ownedIndex;
-    return selectCurrentHangarShip();
-}
-
 function getOwnedHangarShips(){
     const allShips = getAllOwnedHangarShips();
     const filterId = String(hangarState?.shipFilter || 'all').trim();
@@ -9666,24 +9656,13 @@ function bindHangarMovementControls(){
         }
         if(e.code === 'KeyE' && !e.repeat){
             const hoverIndex = Number(hangarState.hoverDockIndex);
-            let hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
-            if(!hoverShip){
-                const astroPos = hangarState?.astronautPivot?.position || null;
-                if(astroPos){
-                    let bestDist = Infinity;
-                    (hangarState.supportPlatforms || []).forEach((pad, idx) => {
-                        const candidate = getHangarDockShipByIndex(idx);
-                        if(!candidate || !pad) return;
-                        const wp = new THREE.Vector3();
-                        try{ pad.getWorldPosition(wp); }catch(_){ return; }
-                        const dist = wp.distanceTo(astroPos);
-                        if(dist < bestDist){ bestDist = dist; hoverShip = candidate; }
-                    });
-                }
-            }
+            const hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
             if(hoverShip){
                 e.preventDefault();
-                selectHangarShipById?.(hoverShip.id);
+                hangarState.shipIndex = hoverIndex;
+                fillHangarText();
+                rebuildHangarSceneObjects();
+                selectCurrentHangarShip?.();
             }
         }
     });
@@ -9916,7 +9895,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(0, 0, 0);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = 0;
         plaque.rotation.z = 0;
         plaqueTilt.add(plaque);
@@ -10699,9 +10678,9 @@ function rebuildHangarSceneObjects(){
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
         instantMesh.position.set(0, 0.18, 0);
-        instantMesh.scale.setScalar(1.08);
+        instantMesh.scale.setScalar(2.35);
         instantMesh.userData.appearStartedAt = performance.now();
-        instantMesh.userData.appearTargetScale = 1.28;
+        instantMesh.userData.appearTargetScale = 3.25;
         instantMesh.rotation.x = 0;
         instantMesh.rotation.y = Math.PI;
         instantMesh.rotation.z = 0;
@@ -10730,9 +10709,9 @@ function rebuildHangarSceneObjects(){
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
                 shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(1.06);
+                shipMesh.scale.setScalar(1.42);
                 shipMesh.userData.appearStartedAt = performance.now();
-                shipMesh.userData.appearTargetScale = 1.24;
+                shipMesh.userData.appearTargetScale = 1.72;
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
@@ -10766,9 +10745,9 @@ function rebuildHangarSceneObjects(){
                 try{ pad.remove(placeholder); }catch(_){ }
                 sideMesh.position.set(0, 1.06, 0.05);
                 sideMesh.rotation.set(0, Math.PI, 0);
-                sideMesh.scale.setScalar(0.98);
+                sideMesh.scale.setScalar(1.58);
                 sideMesh.userData.hangarDockIndex = dockIndex;
-                sideMesh.userData.baseScale = 0.98;
+                sideMesh.userData.baseScale = 1.58;
                 sideMesh.userData.shipId = shipId;
                 pad.add(sideMesh);
                 hangarState.supportShipMeshes.push(sideMesh);
@@ -11191,7 +11170,9 @@ function bindHangarStageInteraction(){
         if(activateClick && hoverIndex >= 0){
             const nextShip = getHangarDockShipByIndex(hoverIndex);
             if(nextShip){
-                selectHangarShipById?.(nextShip.id);
+                hangarState.shipIndex = hoverIndex;
+                fillHangarText();
+                rebuildHangarSceneObjects();
             }
         }
     };
