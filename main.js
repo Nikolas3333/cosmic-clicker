@@ -8117,7 +8117,9 @@ const hangarState = {
     lastMouseY: 0,
     hoverDockIndex: -1,
     selectedDockIndex: -1,
-    shipAppearStartedAt: 0
+    shipAppearStartedAt: 0,
+    supportShipMeshes: [],
+    shipTransfer: null
 };
 
 const STARTER_HULL_IDS = ['scout_1'];
@@ -8671,16 +8673,117 @@ function getHangarDockShipByIndex(dockIndex){
     return ships[safeIndex] || null;
 }
 
+
+function getHangarDockPadByIndex(dockIndex){
+    const pads = Array.isArray(hangarState?.supportPlatforms) ? hangarState.supportPlatforms : [];
+    const safeIndex = Number(dockIndex || 0);
+    return pads[safeIndex] || null;
+}
+
+function getHangarDockWorldPosition(dockIndex){
+    const pad = getHangarDockPadByIndex(dockIndex);
+    if(!pad){
+        return new THREE.Vector3(0, 0.6, 0);
+    }
+    const worldPos = new THREE.Vector3();
+    try{ pad.getWorldPosition(worldPos); }catch(_){ worldPos.set(0, 0.6, 0); }
+    worldPos.y += 0.78;
+    return worldPos;
+}
+
+function getHangarCenterWorldPosition(){
+    const showcaseGroup = hangarState?.envGroup?.userData?.shipShowcaseGroup || hangarState?.showcaseGroup || null;
+    if(showcaseGroup){
+        const worldPos = new THREE.Vector3();
+        try{ showcaseGroup.getWorldPosition(worldPos); }catch(_){ worldPos.set(0, 2.08, 40); }
+        return worldPos;
+    }
+    return new THREE.Vector3(0, 2.08, 40);
+}
+
+function createHangarTransferMesh(ship){
+    if(!ship) return null;
+    try{
+        const mesh = normalizeHangarShipMesh(createHangarShipMesh(ship));
+        mesh.rotation.x = 0;
+        mesh.rotation.y = Math.PI;
+        mesh.rotation.z = 0;
+        mesh.scale.setScalar(0.88);
+        mesh.traverse?.((child) => {
+            if(child?.material){
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach((mat) => {
+                    if(!mat) return;
+                    if('transparent' in mat) mat.transparent = true;
+                    if('opacity' in mat && typeof mat.opacity === 'number') mat.opacity = Math.min(1, Math.max(mat.opacity, 0.92));
+                });
+            }
+        });
+        return mesh;
+    }catch(_){
+        return null;
+    }
+}
+
+function startHangarShipTransfer(previousShipId, nextShipId){
+    const safePrev = String(previousShipId || '').trim();
+    const safeNext = String(nextShipId || '').trim();
+    if(!hangarState?.scene) return;
+    if(!safeNext || safePrev === safeNext) return;
+
+    const nextIndex = getAllOwnedHangarShips().findIndex(item => String(item?.id || '').trim() === safeNext);
+    const prevIndex = getAllOwnedHangarShips().findIndex(item => String(item?.id || '').trim() === safePrev);
+    const nextShip = findOwnedHangarShipById(safeNext);
+    const prevShip = findOwnedHangarShipById(safePrev);
+    const incomingMesh = createHangarTransferMesh(nextShip);
+    const outgoingMesh = createHangarTransferMesh(prevShip);
+    if(!incomingMesh && !outgoingMesh) return;
+
+    const transfer = {
+        startedAt: performance.now(),
+        duration: 560,
+        incoming: null,
+        outgoing: null
+    };
+
+    const centerPos = getHangarCenterWorldPosition();
+    if(incomingMesh){
+        const fromPos = nextIndex >= 0 ? getHangarDockWorldPosition(nextIndex) : centerPos.clone().add(new THREE.Vector3(0, 0, -3.5));
+        incomingMesh.position.copy(fromPos);
+        incomingMesh.scale.setScalar(0.86);
+        hangarState.scene.add(incomingMesh);
+        transfer.incoming = { mesh: incomingMesh, from: fromPos.clone(), to: centerPos.clone(), fromScale: 0.86, toScale: 1.18 };
+    }
+    if(outgoingMesh){
+        const toPos = prevIndex >= 0 ? getHangarDockWorldPosition(prevIndex) : centerPos.clone().add(new THREE.Vector3(0, 0, -4.2));
+        outgoingMesh.position.copy(centerPos);
+        outgoingMesh.scale.setScalar(1.18);
+        hangarState.scene.add(outgoingMesh);
+        transfer.outgoing = { mesh: outgoingMesh, from: centerPos.clone(), to: toPos.clone(), fromScale: 1.18, toScale: 0.84 };
+    }
+
+    hangarState.shipTransfer = transfer;
+}
+
 function selectCurrentHangarShip(){
     const ships = getOwnedHangarShips();
     const currentShip = ships[hangarState.shipIndex] || null;
     if(!currentShip) return false;
+    const previousShipId = String(player?.selectedShipId || '').trim();
     const previousIndex = getSelectedHangarShipIndex();
-    player.selectedShipId = String(currentShip.id || '').trim() || player.selectedShipId;
+    const nextShipId = String(currentShip.id || '').trim() || previousShipId;
+    if(nextShipId === previousShipId){
+        syncHangarDockSelection();
+        fillHangarText();
+        rebuildHangarSceneObjects();
+        return true;
+    }
+    player.selectedShipId = nextShipId;
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     syncHangarDockSelection();
     setHangarTransition?.(hangarState.shipIndex >= previousIndex ? 1 : -1);
     hangarState.shipAppearStartedAt = performance.now();
+    startHangarShipTransfer(previousShipId, nextShipId);
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
@@ -9315,7 +9418,7 @@ function getHangarDisplayShipStats(ship){
 }
 
 function getForcedHangarDisplayShip(){
-    return getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || getSelectedShipItem?.() || player?.ships?.[0] || {
+    return findOwnedHangarShipById(player?.selectedShipId || '') || getSelectedShipItem?.() || getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || player?.ships?.[0] || {
         id: String(player?.selectedShipId || 'scout_1').trim() || 'scout_1',
         name: 'Cargo Drone',
         hp: 100,
@@ -9774,7 +9877,13 @@ function disposeHangarRenderer(){
     hangarState.envGlowPanels = [];
     hangarState.modulePads = {};
     hangarState.supportPlatforms = [];
+    hangarState.supportShipMeshes = [];
     hangarState.infoBoards = [];
+    if(hangarState.shipTransfer){
+        try{ hangarState.shipTransfer.incoming?.mesh?.parent?.remove?.(hangarState.shipTransfer.incoming?.mesh); }catch(_){ }
+        try{ hangarState.shipTransfer.outgoing?.mesh?.parent?.remove?.(hangarState.shipTransfer.outgoing?.mesh); }catch(_){ }
+    }
+    hangarState.shipTransfer = null;
     hangarState.astronaut = null;
     hangarState.astronautPivot = null;
     hangarState.planets = [];
@@ -10392,6 +10501,10 @@ function rebuildHangarSceneObjects(){
         showcaseGroup.rotation.set(0, 0, 0);
         showcaseGroup.position.set(0, 2.08, 0);
     }
+    (hangarState.supportShipMeshes || []).forEach(mesh => {
+        try{ mesh?.parent?.remove?.(mesh); }catch(_){ }
+    });
+    hangarState.supportShipMeshes = [];
     if(emergencyHull) emergencyHull.visible = false;
 
     if(currentShip && showcaseGroup){
@@ -10465,6 +10578,26 @@ function rebuildHangarSceneObjects(){
                 fillHangarText();
             });
     }
+
+    const selectedShipId = String(player?.selectedShipId || '').trim();
+    const dockShips = getAllOwnedHangarShips();
+    dockShips.forEach((ship, dockIndex) => {
+        const shipId = String(ship?.id || '').trim();
+        if(!shipId || shipId === selectedShipId) return;
+        const pad = getHangarDockPadByIndex(dockIndex);
+        if(!pad) return;
+        try{
+            const sideMesh = normalizeHangarShipMesh(createHangarShipMesh(ship));
+            sideMesh.position.set(0, 1.02, 0);
+            sideMesh.rotation.set(0, Math.PI, 0);
+            sideMesh.scale.setScalar(0.74);
+            sideMesh.userData.hangarDockIndex = dockIndex;
+            sideMesh.userData.baseScale = 0.74;
+            sideMesh.userData.shipId = shipId;
+            pad.add(sideMesh);
+            hangarState.supportShipMeshes.push(sideMesh);
+        }catch(_){ }
+    });
 
     if(currentModule){
         const moduleMesh = createHangarModuleMesh(currentModule);
@@ -10650,7 +10783,9 @@ function ensureHangarRenderer(){
         (hangarState.supportPlatforms || []).forEach((pad, idx) => {
             const ring = pad?.userData?.ring;
             const glow = pad?.userData?.glow;
-            const isOccupiedDock = idx < ownedShips.length;
+            const dockShip = getHangarDockShipByIndex(idx);
+            const isSelectedShipDock = !!dockShip && String(dockShip?.id || '').trim() === String(player?.selectedShipId || '').trim();
+            const isOccupiedDock = !!dockShip && !isSelectedShipDock;
             const isHoveredDock = idx === Number(hangarState.hoverDockIndex);
             const isSelectedDock = idx === Number(hangarState.selectedDockIndex);
             const baseHue = idx < ((hangarState?.envGroup?.userData?.dockSlotsLeft || []).length || 10) ? 0.54 : 0.82;
@@ -10670,6 +10805,16 @@ function ensureHangarRenderer(){
             const currentScale = Number(pad.scale.x || 1);
             const nextScale = currentScale + (targetScale - currentScale) * 0.12;
             pad.scale.setScalar(nextScale);
+            pad.children.forEach((child) => {
+                if(!child?.userData?.shipId) return;
+                child.rotation.y += 0.0032;
+                const baseScale = Number(child.userData.baseScale || 0.74) || 0.74;
+                const hoverScale = isHoveredDock ? baseScale * 1.06 : (isSelectedDock ? baseScale * 1.1 : baseScale);
+                const currentChildScale = Number(child.scale.x || baseScale);
+                const nextChildScale = currentChildScale + (hoverScale - currentChildScale) * 0.14;
+                child.scale.setScalar(nextChildScale);
+                child.position.y = 1.02 + (isHoveredDock ? 0.05 : 0.0) + Math.sin(time * 1.7 + idx * 0.4) * 0.02;
+            });
         });
 
         if(hangarState.showcaseGroup){
@@ -10685,6 +10830,36 @@ function ensureHangarRenderer(){
                     child.position.y = 0.08 + 0.10 * eased;
                 }
             });
+        }
+
+
+        if(hangarState.shipTransfer){
+            const transfer = hangarState.shipTransfer;
+            const progress = THREE.MathUtils.clamp((now - Number(transfer.startedAt || now)) / Math.max(1, Number(transfer.duration || 560)), 0, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            ['incoming','outgoing'].forEach((key) => {
+                const entry = transfer[key];
+                if(!entry?.mesh) return;
+                entry.mesh.position.lerpVectors(entry.from, entry.to, eased);
+                const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * eased;
+                entry.mesh.scale.setScalar(scaleValue);
+                entry.mesh.rotation.y += key === 'incoming' ? 0.018 : 0.01;
+                entry.mesh.traverse?.((child) => {
+                    if(!child?.material) return;
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach((mat) => {
+                        if(mat && 'opacity' in mat){
+                            mat.opacity = key === 'outgoing' ? Math.max(0.16, 1 - eased * 0.72) : Math.min(1, 0.42 + eased * 0.58);
+                        }
+                    });
+                });
+            });
+            if(progress >= 1){
+                try{ transfer.incoming?.mesh?.parent?.remove?.(transfer.incoming?.mesh); }catch(_){ }
+                try{ transfer.outgoing?.mesh?.parent?.remove?.(transfer.outgoing?.mesh); }catch(_){ }
+                hangarState.shipTransfer = null;
+                rebuildHangarSceneObjects();
+            }
         }
 
         if(Array.isArray(hangarState.envAnimatedMaterials)){
