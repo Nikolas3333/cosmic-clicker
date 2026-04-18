@@ -8759,13 +8759,18 @@ function getSelectedHangarShipIndex(){
     return ships.findIndex(item => String(item?.id || '').trim() === safeId);
 }
 
+function getHangarSupportShips(){
+    const selectedId = String(player?.selectedShipId || '').trim();
+    return getOwnedHangarShips().filter(item => String(item?.id || '').trim() !== selectedId);
+}
+
 function syncHangarDockSelection(){
-    hangarState.selectedDockIndex = getSelectedHangarShipIndex();
+    hangarState.selectedDockIndex = -1;
     if(!Number.isFinite(hangarState.hoverDockIndex)) hangarState.hoverDockIndex = -1;
 }
 
 function getHangarDockShipByIndex(dockIndex){
-    const ships = getOwnedHangarShips();
+    const ships = getHangarSupportShips();
     const safeIndex = Number(dockIndex || 0);
     return ships[safeIndex] || null;
 }
@@ -10249,9 +10254,8 @@ function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
 }
 
 function buildHangarShipMeshAsync(item){
-    const safeShipId = String(item?.id || '').trim();
     const externalPath = String(item?.modelPath || '').trim();
-    if(safeShipId === 'scout_1' && externalPath){
+    if(externalPath){
         return loadExternalHangarShipModel(externalPath)
             .then(raw => normalizeHangarShipMesh(raw))
             .catch(() => normalizeHangarShipMesh(createHangarShipMesh({
@@ -10266,7 +10270,6 @@ function buildHangarShipMeshAsync(item){
 }
 
 function buildBattleShipVisualAsync(item, team = 'blue'){
-    const safeShipId = String(item?.id || '').trim();
     const externalPath = String(item?.modelPath || '').trim();
     const tint = new THREE.Color(getBattleShipColorHex(team));
 
@@ -10295,7 +10298,7 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
         return root;
     };
 
-    if(safeShipId === 'scout_1' && externalPath){
+    if(externalPath){
         return loadExternalHangarShipModel(externalPath)
             .then((raw) => {
                 const normalized = normalizeHangarShipMesh(raw);
@@ -10791,10 +10794,11 @@ function ensureHangarRenderer(){
         hangarState.shipPivot = new THREE.Group();
         hangarState.modulePivot = new THREE.Group();
         hangarState.modulePads = hangarState?.envGroup?.userData?.modulePadMap || {};
-        hangarState.supportPlatforms = [
-            ...(hangarState?.envGroup?.userData?.dockSlotsLeft || []).map(item => item?.pad).filter(Boolean),
-            ...(hangarState?.envGroup?.userData?.dockSlotsRight || []).map(item => item?.pad).filter(Boolean)
-        ];
+        const leftDockSlots = [...(hangarState?.envGroup?.userData?.dockSlotsLeft || [])];
+        const rightDockSlots = [...(hangarState?.envGroup?.userData?.dockSlotsRight || [])];
+        const dockOrder = [...leftDockSlots.map((slot, idx) => ({ side:'left', idx, dist: Math.abs(Number(slot?.group?.position?.z || 0) - 40) })), ...rightDockSlots.map((slot, idx) => ({ side:'right', idx, dist: Math.abs(Number(slot?.group?.position?.z || 0) - 40) }))]
+            .sort((a, b) => a.dist - b.dist || (a.side === 'left' ? -1 : 1));
+        hangarState.supportPlatforms = dockOrder.map(entry => (entry.side === 'left' ? leftDockSlots[entry.idx] : rightDockSlots[entry.idx])?.pad).filter(Boolean);
         hangarState.supportPlatforms.forEach((pad, idx) => {
             if(pad){
                 pad.userData = pad.userData || {};
@@ -10804,8 +10808,10 @@ function ensureHangarRenderer(){
         syncHangarDockSelection();
         hangarState.infoBoards = [
             { kind:'center_ship', plaque: hangarState?.envGroup?.userData?.shipDockPlaque || null },
-            ...((hangarState?.envGroup?.userData?.dockSlotsLeft || []).map(item => ({ kind:'empty', plaque:item?.plaque || null }))),
-            ...((hangarState?.envGroup?.userData?.dockSlotsRight || []).map(item => ({ kind:'empty', plaque:item?.plaque || null })))
+            ...dockOrder.map(entry => {
+                const source = entry.side === 'left' ? leftDockSlots[entry.idx] : rightDockSlots[entry.idx];
+                return { kind:'empty', plaque: source?.plaque || null };
+            })
         ];
 
         hangarState.astronautGroundY = -1.72;
@@ -11385,14 +11391,14 @@ function renderHangarCosmic(forceSyncToSelected = true){
                       <span class="hangar-price-chip">🪙 <b id="hangar-ship-price-coins">0</b></span>
                       <span class="hangar-price-chip">💎 <b id="hangar-ship-price-diamonds">0</b></span>
                     </div>
+                    <div class="hangar-footer-actions" style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px; pointer-events:auto;">
+                      <button id="hangar-ship-action" class="hangar-main-btn ready" type="button">Выбрать</button>
+                      <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать</button>
+                    </div>
                   </div>
                   <div id="hangar-ship-stats" class="hangar-stats-grid"></div>
                   <div class="hangar-footer-row">
                     <div id="hangar-ship-position" class="hangar-position-label">0 / 0</div>
-                    <div class="hangar-footer-actions">
-                      <button id="hangar-ship-action" class="hangar-main-btn ready" type="button">Выбрать</button>
-                      <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать</button>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -11744,8 +11750,23 @@ function updatePremiumAccountInfo(){
     const currentExp = Number(player?.experience || 0);
     const nextExp = Math.max(100, (Number(player?.level || 1) * 600));
     if(expEl) expEl.textContent = `EXP ${currentExp}/${nextExp}`;
-    if(crystalEl) crystalEl.textContent = `💎 ${playerResources?.crystals || 0}`;
-    if(coinsEl) coinsEl.textContent = `🪙 ${playerResources?.coins || 0}`;
+    if(crystalEl){
+        crystalEl.classList.add('premium-item','currency-item');
+        crystalEl.querySelectorAll(':scope > .premium-currency-text').forEach(node => node.remove());
+        const textNode = document.createElement('span');
+        textNode.className = 'premium-currency-text';
+        textNode.textContent = `💎 ${playerResources?.crystals || 0}`;
+        crystalEl.prepend(textNode);
+    }
+    if(coinsEl){
+        coinsEl.classList.add('premium-item','currency-item');
+        coinsEl.querySelectorAll(':scope > .premium-currency-text').forEach(node => node.remove());
+        const textNode = document.createElement('span');
+        textNode.className = 'premium-currency-text';
+        textNode.textContent = `🪙 ${playerResources?.coins || 0}`;
+        coinsEl.prepend(textNode);
+    }
+    ensurePremiumCurrencyUi?.();
 }
 function updateNicknameSettingsState(message=''){
     const nicknameInput = document.getElementById('nickname-input');
@@ -12730,7 +12751,8 @@ function buyShipFromShop(shipId){
     if(diamondPrice > 0) showCurrencyDelta?.('crystals', -diamondPrice);
     player.ownedShipIds.push(ship.id);
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds));
-    player.selectedShipId = ship.id;
+    const previousSelectedShipId = String(player.selectedShipId || 'scout_1').trim() || 'scout_1';
+    player.selectedShipId = previousSelectedShipId;
     if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object') player.activeModulesByShip = {};
     if(!player.activeModulesByShip[ship.id] || typeof player.activeModulesByShip[ship.id] !== 'object') player.activeModulesByShip[ship.id] = {};
     const defaultWeapon = player.ownedModuleIds.find(id => getModuleById(id)?.classId === 'weapon') || '';
