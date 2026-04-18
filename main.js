@@ -3964,9 +3964,10 @@ function updateHUD(){
     const premiumBar = document.getElementById('premium-bar');
     const crystalsEl = document.getElementById('premium-crystals');
     const coinsEl = document.getElementById('premium-coins');
-    if(crystalsEl) crystalsEl.textContent = `💎 ${playerResources.crystals || 0}`;
-    if(coinsEl) coinsEl.textContent = `🪙 ${playerResources.coins || 0}`;
-    updatePremiumAccountInfo();
+    if(crystalsEl || coinsEl){
+        updatePremiumAccountInfo();
+        ensurePremiumCurrencyUi?.();
+    }
     if(premiumBar){
         premiumBar.style.display = gameState === 'LOBBY' ? 'flex' : 'none';
     }
@@ -9547,6 +9548,12 @@ function refreshHangarInfoBoards(){
                 title: String(currentShip?.name || 'Cargo Drone').trim() || 'Cargo Drone',
                 lines: getHangarDisplayShipStats(currentShip || { id:'scout_1', name:'Cargo Drone', hp:100, attack:10, speed:5 })
             });
+        }else if(entry.kind === 'dock_ship'){
+            const dockShip = entry.ship || null;
+            drawHangarPlaque(plaque, {
+                title: String(dockShip?.name || 'Свободный док').trim() || 'Свободный док',
+                lines: dockShip ? getHangarDisplayShipStats(dockShip) : ['Пустая платформа']
+            });
         }else{
             drawHangarPlaque(plaque, {});
         }
@@ -10112,11 +10119,11 @@ function fillHangarText(){
     setText('hangar-ship-tier', ship?.tier || '—');
     const shipName = ship?.name || (String(hangarState?.shipFilter || 'all') !== 'all' ? 'Нет корпусов этого типа' : 'Нет корпусов');
     setText('hangar-ship-name', shipName);
-    setText('hangar-ship-subtitle', ship ? 'Центральная платформа показывает текущий корпус.' : 'Купи корпус в магазине, и он появится здесь.');
+    setText('hangar-ship-subtitle', ship ? 'Текущий выбранный корабль стоит на центральной платформе.' : 'Купи корпус в магазине, и он появится здесь.');
     const stageBadge = document.getElementById('hangar-stage-name-badge');
     if(stageBadge) stageBadge.textContent = shipName;
     const shipDesc = ship
-        ? `HP ${Math.round(Number(battleStatsView?.hp || ship?.hp || 0) || 0)} • Урон ${Math.round(Number(battleStatsView?.weaponDamage || ship?.attack || 0) || 0)} • Скорость ${Number(battleStatsView?.maxSpeed || ship?.speed || 0).toFixed(2)}`
+        ? String(ship?.description || '').trim() || `HP ${Math.round(Number(battleStatsView?.hp || ship?.hp || 0) || 0)} • Урон ${Math.round(Number(battleStatsView?.weaponDamage || ship?.attack || 0) || 0)} • Скорость ${Number(battleStatsView?.maxSpeed || ship?.speed || 0).toFixed(2)}`
         : '';
     setText('hangar-ship-desc', shipDesc);
     setText('hangar-ship-price-coins', ship && typeof getShipCoinPrice === 'function' ? String(getShipCoinPrice(ship)) : '0');
@@ -10689,17 +10696,23 @@ function rebuildHangarSceneObjects(){
         if(!shipId || shipId === selectedShipId) return;
         const pad = getHangarDockPadByIndex(dockIndex);
         if(!pad) return;
-        try{
-            const sideMesh = normalizeHangarShipMesh(createHangarShipMesh(ship));
-            sideMesh.position.set(0, 1.02, 0);
-            sideMesh.rotation.set(0, Math.PI, 0);
-            sideMesh.scale.setScalar(0.74);
-            sideMesh.userData.hangarDockIndex = dockIndex;
-            sideMesh.userData.baseScale = 0.74;
-            sideMesh.userData.shipId = shipId;
-            pad.add(sideMesh);
-            hangarState.supportShipMeshes.push(sideMesh);
-        }catch(_){ }
+        const placeholder = createHangarNoShipPlaceholder();
+        placeholder.position.set(0, 0.96, 0.02);
+        pad.add(placeholder);
+        buildHangarShipMeshAsync(ship)
+            .then((sideMesh) => {
+                if(!pad || !sideMesh) return;
+                try{ pad.remove(placeholder); }catch(_){ }
+                sideMesh.position.set(0, 1.06, 0.05);
+                sideMesh.rotation.set(0, Math.PI, 0);
+                sideMesh.scale.setScalar(1.02);
+                sideMesh.userData.hangarDockIndex = dockIndex;
+                sideMesh.userData.baseScale = 1.02;
+                sideMesh.userData.shipId = shipId;
+                pad.add(sideMesh);
+                hangarState.supportShipMeshes.push(sideMesh);
+            })
+            .catch(() => {});
     });
 
     if(currentModule){
@@ -10794,10 +10807,12 @@ function ensureHangarRenderer(){
         hangarState.shipPivot = new THREE.Group();
         hangarState.modulePivot = new THREE.Group();
         hangarState.modulePads = hangarState?.envGroup?.userData?.modulePadMap || {};
-        const leftDockSlots = [...(hangarState?.envGroup?.userData?.dockSlotsLeft || [])];
-        const rightDockSlots = [...(hangarState?.envGroup?.userData?.dockSlotsRight || [])];
-        const dockOrder = [...leftDockSlots.map((slot, idx) => ({ side:'left', idx, dist: Math.abs(Number(slot?.group?.position?.z || 0) - 40) })), ...rightDockSlots.map((slot, idx) => ({ side:'right', idx, dist: Math.abs(Number(slot?.group?.position?.z || 0) - 40) }))]
-            .sort((a, b) => a.dist - b.dist || (a.side === 'left' ? -1 : 1));
+        const leftDockSlots = [...(hangarState?.envGroup?.userData?.dockSlotsLeft || [])].sort((a, b) => Number(b?.group?.position?.z || 0) - Number(a?.group?.position?.z || 0));
+        const rightDockSlots = [...(hangarState?.envGroup?.userData?.dockSlotsRight || [])].sort((a, b) => Number(b?.group?.position?.z || 0) - Number(a?.group?.position?.z || 0));
+        const dockOrder = [
+            ...leftDockSlots.map((slot, idx) => ({ side:'left', idx })),
+            ...rightDockSlots.map((slot, idx) => ({ side:'right', idx }))
+        ];
         hangarState.supportPlatforms = dockOrder.map(entry => (entry.side === 'left' ? leftDockSlots[entry.idx] : rightDockSlots[entry.idx])?.pad).filter(Boolean);
         hangarState.supportPlatforms.forEach((pad, idx) => {
             if(pad){
@@ -10808,9 +10823,9 @@ function ensureHangarRenderer(){
         syncHangarDockSelection();
         hangarState.infoBoards = [
             { kind:'center_ship', plaque: hangarState?.envGroup?.userData?.shipDockPlaque || null },
-            ...dockOrder.map(entry => {
+            ...dockOrder.map((entry, dockIdx) => {
                 const source = entry.side === 'left' ? leftDockSlots[entry.idx] : rightDockSlots[entry.idx];
-                return { kind:'empty', plaque: source?.plaque || null };
+                return { kind:'dock_ship', plaque: source?.plaque || null, ship: getHangarDockShipByIndex(dockIdx) };
             })
         ];
 
@@ -11752,6 +11767,9 @@ function updatePremiumAccountInfo(){
     if(expEl) expEl.textContent = `EXP ${currentExp}/${nextExp}`;
     if(crystalEl){
         crystalEl.classList.add('premium-item','currency-item');
+        crystalEl.childNodes.forEach(node => {
+            if(node.nodeType === Node.TEXT_NODE && String(node.textContent || '').trim()) node.textContent = '';
+        });
         crystalEl.querySelectorAll(':scope > .premium-currency-text').forEach(node => node.remove());
         const textNode = document.createElement('span');
         textNode.className = 'premium-currency-text';
@@ -11760,6 +11778,9 @@ function updatePremiumAccountInfo(){
     }
     if(coinsEl){
         coinsEl.classList.add('premium-item','currency-item');
+        coinsEl.childNodes.forEach(node => {
+            if(node.nodeType === Node.TEXT_NODE && String(node.textContent || '').trim()) node.textContent = '';
+        });
         coinsEl.querySelectorAll(':scope > .premium-currency-text').forEach(node => node.remove());
         const textNode = document.createElement('span');
         textNode.className = 'premium-currency-text';
@@ -12091,9 +12112,10 @@ function limitBattleArea(){
         const premiumBar = document.getElementById('premium-bar');
         const premiumCrystals = document.getElementById('premium-crystals');
         const premiumCoins = document.getElementById('premium-coins');
-        if(premiumCrystals) premiumCrystals.textContent = `💎 ${playerResources.crystals}`;
-        if(premiumCoins) premiumCoins.textContent = `🪙 ${playerResources.coins}`;
-        updatePremiumAccountInfo();
+        if(premiumCrystals || premiumCoins){
+            updatePremiumAccountInfo();
+            ensurePremiumCurrencyUi?.();
+        }
         if(premiumBar){
             premiumBar.style.display = gameState === 'LOBBY' ? 'flex' : 'none';
         }
