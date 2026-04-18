@@ -9958,8 +9958,8 @@ function createHangarRoomEnvironment(){
     centerDockGroup.add(emergencyHull);
 
     const centerPlaque = createHangarPlaqueBoard(5.9, 2.3);
-    centerPlaque.position.set(0, 1.82, -4.82);
-    centerPlaque.rotation.x = -0.16;
+    centerPlaque.position.set(0, 1.58, -5.34);
+    centerPlaque.rotation.x = -0.24;
     centerPlaque.rotation.y = Math.PI;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
@@ -10080,13 +10080,28 @@ function hideHangarShipPriceRow(){
 function updateHangarPlatformPrompt(){
     const hint = document.getElementById('hangar-platform-hint');
     const sellBtn = document.getElementById('hangar-platform-sell');
-    const hoverIndex = Number(hangarState?.hoverDockIndex);
-    const hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+    let hoverIndex = Number(hangarState?.hoverDockIndex);
+    let hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+
+    if(!hoverShip){
+        const astronautPos = hangarState?.astronautPivot?.position || null;
+        const candidates = getHangarSupportShips().map((ship, idx) => ({ ship, idx, pad:getHangarDockPadByIndex(idx) })).filter(item => item.ship && item.pad);
+        if(astronautPos && candidates.length){
+            candidates.sort((a,b) => {
+                const ap = new THREE.Vector3();
+                const bp = new THREE.Vector3();
+                try{ a.pad.getWorldPosition(ap); }catch(_){ ap.set(9999,9999,9999); }
+                try{ b.pad.getWorldPosition(bp); }catch(_){ bp.set(9999,9999,9999); }
+                return astronautPos.distanceTo(ap) - astronautPos.distanceTo(bp);
+            });
+            hoverIndex = Number(candidates[0]?.idx ?? -1);
+            hoverShip = candidates[0]?.ship || null;
+        }
+    }
 
     if(hint){
-        hint.textContent = hoverShip
-            ? `${hoverShip?.name || 'Корпус'} • E выбрать` 
-            : 'Наведи на боковой корабль и нажми E, чтобы выбрать его.';
+        hint.style.display = 'none';
+        hint.textContent = '';
     }
 
     if(!sellBtn) return;
@@ -10094,6 +10109,7 @@ function updateHangarPlatformPrompt(){
         sellBtn.style.display = 'none';
         sellBtn.disabled = true;
         sellBtn.dataset.shipId = '';
+        sellBtn.dataset.dockIndex = '';
         return;
     }
 
@@ -10101,6 +10117,7 @@ function updateHangarPlatformPrompt(){
     sellBtn.style.display = 'flex';
     sellBtn.disabled = !sellableShip;
     sellBtn.dataset.shipId = String(hoverShip.id || '').trim();
+    sellBtn.dataset.dockIndex = String(hoverIndex);
     sellBtn.textContent = sellableShip ? getSellActionLabel('ship', hoverShip.id) : 'Стартовый корпус';
     sellBtn.classList.toggle('locked', !sellableShip);
 }
@@ -10283,6 +10300,7 @@ function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
                     const model = gltf?.scene || null;
                     if(!model) throw new Error('GLB scene is empty');
                     model.rotation.y = Math.PI;
+                    model.userData = { ...(model.userData || {}), sourcePath: requestedPath };
                     model.traverse((child) => {
                         if(child?.isMesh){
                             child.castShadow = true;
@@ -10611,14 +10629,16 @@ function normalizeHangarShipMesh(shipMesh){
         const wrap = new THREE.Group();
         wrap.add(shipMesh);
 
-        const maxWidth = 9.4;
-        const maxHeight = 6.4;
-        const maxDepth = 9.4;
+        const sourcePath = String(shipMesh?.userData?.sourcePath || '').trim().toLowerCase();
+        const isStarterHull = sourcePath.includes('spaceship.glb');
+        const maxWidth = isStarterHull ? 6.4 : 7.6;
+        const maxHeight = isStarterHull ? 3.1 : 4.2;
+        const maxDepth = isStarterHull ? 6.4 : 7.6;
 
         const scaleX = size.x > 0 ? maxWidth / size.x : 1;
         const scaleY = size.y > 0 ? maxHeight / size.y : 1;
         const scaleZ = size.z > 0 ? maxDepth / size.z : 1;
-        const finalScale = Math.min(scaleX, scaleY, scaleZ, 2.7);
+        const finalScale = Math.min(scaleX, scaleY, scaleZ, isStarterHull ? 1.65 : 1.95);
 
         shipMesh.scale.multiplyScalar(finalScale);
         shipMesh.updateMatrixWorld(true);
@@ -11124,17 +11144,23 @@ function ensureHangarRenderer(){
         const floatingSellBtn = document.getElementById('hangar-platform-sell');
         const stageRect = stage.getBoundingClientRect();
         if(floatingSellBtn && hangarState.camera){
-            const hoverIndex = Number(hangarState.hoverDockIndex);
-            const hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
-            if(hoverShip){
-                const worldPos = getHangarDockWorldPosition(hoverIndex).clone();
-                worldPos.y += 0.35;
+            let dockIndex = Number(floatingSellBtn.dataset.dockIndex || NaN);
+            let hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
+            if(!hoverShip){
+                dockIndex = Number(hangarState.hoverDockIndex);
+                hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
+            }
+            if(hoverShip && Number.isFinite(dockIndex) && dockIndex >= 0){
+                const worldPos = getHangarDockWorldPosition(dockIndex).clone();
+                worldPos.y += 0.58;
+                worldPos.z += 0.42;
                 const projected = worldPos.project(hangarState.camera);
                 const screenX = ((projected.x + 1) * 0.5) * stageRect.width;
                 const screenY = ((-projected.y + 1) * 0.5) * stageRect.height;
                 floatingSellBtn.style.left = `${screenX}px`;
-                floatingSellBtn.style.top = `${screenY + 56}px`;
+                floatingSellBtn.style.top = `${screenY + 42}px`;
                 floatingSellBtn.style.transform = 'translate(-50%, -50%)';
+                floatingSellBtn.style.zIndex = '12';
             }
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
@@ -11184,9 +11210,14 @@ function bindHangarStageInteraction(){
         if(activateClick && hoverIndex >= 0){
             const nextShip = getHangarDockShipByIndex(hoverIndex);
             if(nextShip){
-                hangarState.shipIndex = hoverIndex;
-                fillHangarText();
-                rebuildHangarSceneObjects();
+                const allShips = getAllOwnedHangarShips();
+                const nextIndex = allShips.findIndex(item => String(item?.id || '').trim() === String(nextShip?.id || '').trim());
+                if(nextIndex >= 0){
+                    hangarState.shipIndex = nextIndex;
+                    fillHangarText();
+                    rebuildHangarSceneObjects();
+                    selectCurrentHangarShip?.();
+                }
             }
         }
     };
@@ -11483,7 +11514,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
                 <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
                 <div class="hangar-runtime-fade"></div>
                 <div class="hangar-stage-overlay" style="pointer-events:none;">
-                  <div id="hangar-platform-hint" style="position:absolute;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 16px;border-radius:14px;background:rgba(4,10,22,0.76);border:1px solid rgba(98,216,255,0.25);box-shadow:0 0 18px rgba(0,180,255,0.16);font-size:14px;color:#dff7ff;pointer-events:none;white-space:nowrap;">Наведи на боковой корабль и нажми E, чтобы выбрать его.</div>
+                  <div id="hangar-platform-hint" style="display:none !important;position:absolute;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 16px;border-radius:14px;background:rgba(4,10,22,0.76);border:1px solid rgba(98,216,255,0.25);box-shadow:0 0 18px rgba(0,180,255,0.16);font-size:14px;color:#dff7ff;pointer-events:none;white-space:nowrap;"></div>
                   <button id="hangar-platform-sell" class="hangar-main-btn hangar-sell-btn" type="button" style="position:absolute;display:none;min-width:170px;pointer-events:auto;z-index:6;">Продать</button>
                   <div id="hangar-ship-tier" style="display:none;">Корпус</div>
                   <div id="hangar-ship-name" style="display:none;">Cargo Drone</div>
