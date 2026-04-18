@@ -9654,6 +9654,17 @@ function bindHangarMovementControls(){
             if(e.code === 'Space') e.preventDefault();
             setKey(e.code, true);
         }
+        if(e.code === 'KeyE' && !e.repeat){
+            const hoverIndex = Number(hangarState.hoverDockIndex);
+            const hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+            if(hoverShip){
+                e.preventDefault();
+                hangarState.shipIndex = hoverIndex;
+                fillHangarText();
+                rebuildHangarSceneObjects();
+                selectCurrentHangarShip?.();
+            }
+        }
     });
     document.addEventListener('keyup', (e) => {
         if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(e.code)){
@@ -9884,7 +9895,7 @@ function createHangarRoomEnvironment(){
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
         plaque.position.set(0, 0, 0);
-        plaque.rotation.x = 0.34;
+        plaque.rotation.x = -0.34;
         plaque.rotation.y = 0;
         plaque.rotation.z = 0;
         plaqueTilt.add(plaque);
@@ -9930,7 +9941,7 @@ function createHangarRoomEnvironment(){
 
     const centerPlaque = createHangarPlaqueBoard(5.9, 2.3);
     centerPlaque.position.set(0, 1.82, -4.82);
-    centerPlaque.rotation.x = 0.16;
+    centerPlaque.rotation.x = -0.16;
     centerPlaque.rotation.y = Math.PI;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
@@ -10052,6 +10063,34 @@ function updateHangarButtons(){
 function hideHangarShipPriceRow(){
     const row = document.getElementById('hangar-ship-price-row');
     if(row) row.style.display = 'none';
+}
+
+function updateHangarPlatformPrompt(){
+    const hint = document.getElementById('hangar-platform-hint');
+    const sellBtn = document.getElementById('hangar-platform-sell');
+    const hoverIndex = Number(hangarState?.hoverDockIndex);
+    const hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+
+    if(hint){
+        hint.textContent = hoverShip
+            ? `${hoverShip?.name || 'Корпус'} • E выбрать` 
+            : 'Наведи на боковой корабль и нажми E, чтобы выбрать его.';
+    }
+
+    if(!sellBtn) return;
+    if(!hoverShip){
+        sellBtn.style.display = 'none';
+        sellBtn.disabled = true;
+        sellBtn.dataset.shipId = '';
+        return;
+    }
+
+    const sellableShip = canSellHull(hoverShip.id);
+    sellBtn.style.display = 'flex';
+    sellBtn.disabled = !sellableShip;
+    sellBtn.dataset.shipId = String(hoverShip.id || '').trim();
+    sellBtn.textContent = sellableShip ? getSellActionLabel('ship', hoverShip.id) : 'Стартовый корпус';
+    sellBtn.classList.toggle('locked', !sellableShip);
 }
 
 
@@ -10188,6 +10227,7 @@ function fillHangarText(){
 
     updateHangarHeaderNumbers();
     updateHangarButtons();
+    updateHangarPlatformPrompt();
 }
 
 
@@ -10557,14 +10597,14 @@ function normalizeHangarShipMesh(shipMesh){
         const wrap = new THREE.Group();
         wrap.add(shipMesh);
 
-        const maxWidth = 7.2;
-        const maxHeight = 4.8;
-        const maxDepth = 7.2;
+        const maxWidth = 9.4;
+        const maxHeight = 6.4;
+        const maxDepth = 9.4;
 
         const scaleX = size.x > 0 ? maxWidth / size.x : 1;
         const scaleY = size.y > 0 ? maxHeight / size.y : 1;
         const scaleZ = size.z > 0 ? maxDepth / size.z : 1;
-        const finalScale = Math.min(scaleX, scaleY, scaleZ, 1.9);
+        const finalScale = Math.min(scaleX, scaleY, scaleZ, 2.7);
 
         shipMesh.scale.multiplyScalar(finalScale);
         shipMesh.updateMatrixWorld(true);
@@ -10638,9 +10678,9 @@ function rebuildHangarSceneObjects(){
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
         instantMesh.position.set(0, 0.18, 0);
-        instantMesh.scale.setScalar(1.65);
+        instantMesh.scale.setScalar(2.35);
         instantMesh.userData.appearStartedAt = performance.now();
-        instantMesh.userData.appearTargetScale = 2.4;
+        instantMesh.userData.appearTargetScale = 3.25;
         instantMesh.rotation.x = 0;
         instantMesh.rotation.y = Math.PI;
         instantMesh.rotation.z = 0;
@@ -10669,9 +10709,9 @@ function rebuildHangarSceneObjects(){
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
                 shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(0.72);
+                shipMesh.scale.setScalar(1.42);
                 shipMesh.userData.appearStartedAt = performance.now();
-                shipMesh.userData.appearTargetScale = 1.18;
+                shipMesh.userData.appearTargetScale = 1.72;
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
@@ -10705,9 +10745,9 @@ function rebuildHangarSceneObjects(){
                 try{ pad.remove(placeholder); }catch(_){ }
                 sideMesh.position.set(0, 1.06, 0.05);
                 sideMesh.rotation.set(0, Math.PI, 0);
-                sideMesh.scale.setScalar(1.02);
+                sideMesh.scale.setScalar(1.58);
                 sideMesh.userData.hangarDockIndex = dockIndex;
-                sideMesh.userData.baseScale = 1.02;
+                sideMesh.userData.baseScale = 1.58;
                 sideMesh.userData.shipId = shipId;
                 pad.add(sideMesh);
                 hangarState.supportShipMeshes.push(sideMesh);
@@ -11067,6 +11107,22 @@ function ensureHangarRenderer(){
             hangarState.camera.position.lerp(desiredPos, 0.28);
             hangarState.camera.lookAt(focus);
         }
+        const floatingSellBtn = document.getElementById('hangar-platform-sell');
+        const stageRect = stage.getBoundingClientRect();
+        if(floatingSellBtn && hangarState.camera){
+            const hoverIndex = Number(hangarState.hoverDockIndex);
+            const hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+            if(hoverShip){
+                const worldPos = getHangarDockWorldPosition(hoverIndex).clone();
+                worldPos.y += 0.35;
+                const projected = worldPos.project(hangarState.camera);
+                const screenX = ((projected.x + 1) * 0.5) * stageRect.width;
+                const screenY = ((-projected.y + 1) * 0.5) * stageRect.height;
+                floatingSellBtn.style.left = `${screenX}px`;
+                floatingSellBtn.style.top = `${screenY + 56}px`;
+                floatingSellBtn.style.transform = 'translate(-50%, -50%)';
+            }
+        }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
     };
@@ -11087,6 +11143,7 @@ function bindHangarStageInteraction(){
         const rect = stage.getBoundingClientRect();
         if(clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom){
             hangarState.hoverDockIndex = -1;
+            updateHangarPlatformPrompt();
             return;
         }
         mouse.x = ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
@@ -11109,6 +11166,7 @@ function bindHangarStageInteraction(){
             }
         }
         hangarState.hoverDockIndex = hoverIndex;
+        updateHangarPlatformPrompt();
         if(activateClick && hoverIndex >= 0){
             const nextShip = getHangarDockShipByIndex(hoverIndex);
             if(nextShip){
@@ -11141,6 +11199,7 @@ function bindHangarStageInteraction(){
         });
         stage.addEventListener('mouseleave', () => {
             hangarState.hoverDockIndex = -1;
+            updateHangarPlatformPrompt();
         });
         stage.addEventListener('click', (event) => {
             updateDockHover(event.clientX, event.clientY, true);
@@ -11218,6 +11277,7 @@ function bindHangarRuntimeUI(){
     const moduleSellBtn = document.getElementById('hangar-module-sell');
     const shipActionBtn = document.getElementById('hangar-ship-action');
     const shipSellBtn = document.getElementById('hangar-ship-sell');
+    const floatingShipSellBtn = document.getElementById('hangar-platform-sell');
     const classButtons = document.querySelectorAll('.hangar-class-chip[data-hangar-class]');
     const moduleButtons = document.querySelectorAll('.hangar-module-chip[data-hangar-module-type]');
 
@@ -11304,6 +11364,18 @@ function bindHangarRuntimeUI(){
             const ship = getForcedHangarDisplayShip();
             if(!ship) return;
             sellHullFromHangar?.(ship.id);
+            fillHangarText();
+            rebuildHangarSceneObjects();
+        });
+    }
+    if(floatingShipSellBtn && !floatingShipSellBtn.dataset.boundHangarRuntime){
+        floatingShipSellBtn.dataset.boundHangarRuntime = '1';
+        floatingShipSellBtn.addEventListener('click', () => {
+            const shipId = String(floatingShipSellBtn.dataset.shipId || '').trim();
+            if(!shipId) return;
+            sellHullFromHangar?.(shipId);
+            hangarState.hoverDockIndex = -1;
+            updateHangarPlatformPrompt();
             fillHangarText();
             rebuildHangarSceneObjects();
         });
@@ -11396,23 +11468,21 @@ function renderHangarCosmic(forceSyncToSelected = true){
               <div class="hangar-stage">
                 <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
                 <div class="hangar-runtime-fade"></div>
-                <div class="hangar-stage-overlay">
-                  <div class="hangar-ship-card">
-                    <div id="hangar-ship-tier" class="hangar-ship-tier">Корпус</div>
-                    <div id="hangar-ship-name" class="hangar-ship-name">Cargo Drone</div>
-                    <div id="hangar-ship-subtitle" class="hangar-ship-subtitle">Центральная платформа показывает корпус.</div>
-                    <div id="hangar-ship-desc" class="hangar-ship-desc"></div>
-                    <div id="hangar-ship-price-row" class="hangar-ship-price-row">
-                      <span class="hangar-price-chip">🪙 <b id="hangar-ship-price-coins">0</b></span>
-                      <span class="hangar-price-chip">💎 <b id="hangar-ship-price-diamonds">0</b></span>
-                    </div>
-                    <div class="hangar-footer-actions" style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px; pointer-events:auto;">
-                      <button id="hangar-ship-action" class="hangar-main-btn ready" type="button">Выбрать</button>
-                      <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button">Продать</button>
-                    </div>
+                <div class="hangar-stage-overlay" style="pointer-events:none;">
+                  <div id="hangar-platform-hint" style="position:absolute;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 16px;border-radius:14px;background:rgba(4,10,22,0.76);border:1px solid rgba(98,216,255,0.25);box-shadow:0 0 18px rgba(0,180,255,0.16);font-size:14px;color:#dff7ff;pointer-events:none;white-space:nowrap;">Наведи на боковой корабль и нажми E, чтобы выбрать его.</div>
+                  <button id="hangar-platform-sell" class="hangar-main-btn hangar-sell-btn" type="button" style="position:absolute;display:none;min-width:170px;pointer-events:auto;z-index:6;">Продать</button>
+                  <div id="hangar-ship-tier" style="display:none;">Корпус</div>
+                  <div id="hangar-ship-name" style="display:none;">Cargo Drone</div>
+                  <div id="hangar-ship-subtitle" style="display:none;">Центральная платформа показывает корпус.</div>
+                  <div id="hangar-ship-desc" style="display:none;"></div>
+                  <div id="hangar-ship-price-row" style="display:none;">
+                    <span class="hangar-price-chip">🪙 <b id="hangar-ship-price-coins">0</b></span>
+                    <span class="hangar-price-chip">💎 <b id="hangar-ship-price-diamonds">0</b></span>
                   </div>
-                  <div id="hangar-ship-stats" class="hangar-stats-grid"></div>
-                  <div class="hangar-footer-row">
+                  <button id="hangar-ship-action" class="hangar-main-btn ready" type="button" style="display:none;">Выбрать</button>
+                  <button id="hangar-ship-sell" class="hangar-main-btn hangar-sell-btn" type="button" style="display:none;">Продать</button>
+                  <div id="hangar-ship-stats" class="hangar-stats-grid" style="display:none;"></div>
+                  <div class="hangar-footer-row" style="display:none;">
                     <div id="hangar-ship-position" class="hangar-position-label">0 / 0</div>
                   </div>
                 </div>
