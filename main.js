@@ -10080,23 +10080,30 @@ function hideHangarShipPriceRow(){
 function updateHangarPlatformPrompt(){
     const hint = document.getElementById('hangar-platform-hint');
     const sellBtn = document.getElementById('hangar-platform-sell');
-    let hoverIndex = Number(hangarState?.hoverDockIndex);
-    let hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+    const astronautPos = hangarState?.astronautPivot?.position || null;
+    const candidates = getHangarSupportShips()
+        .map((ship, idx) => ({ ship, idx, pad:getHangarDockPadByIndex(idx) }))
+        .filter(item => item.ship && item.pad);
 
-    if(!hoverShip){
-        const astronautPos = hangarState?.astronautPivot?.position || null;
-        const candidates = getHangarSupportShips().map((ship, idx) => ({ ship, idx, pad:getHangarDockPadByIndex(idx) })).filter(item => item.ship && item.pad);
-        if(astronautPos && candidates.length){
-            candidates.sort((a,b) => {
-                const ap = new THREE.Vector3();
-                const bp = new THREE.Vector3();
-                try{ a.pad.getWorldPosition(ap); }catch(_){ ap.set(9999,9999,9999); }
-                try{ b.pad.getWorldPosition(bp); }catch(_){ bp.set(9999,9999,9999); }
-                return astronautPos.distanceTo(ap) - astronautPos.distanceTo(bp);
-            });
-            hoverIndex = Number(candidates[0]?.idx ?? -1);
-            hoverShip = candidates[0]?.ship || null;
+    let activeCandidate = null;
+    const hoverIndex = Number(hangarState?.hoverDockIndex);
+    if(Number.isFinite(hoverIndex) && hoverIndex >= 0){
+        const hovered = candidates.find(item => item.idx === hoverIndex) || null;
+        if(hovered && canSellHull(hovered.ship?.id)){
+            activeCandidate = hovered;
         }
+    }
+
+    if(!activeCandidate && astronautPos && candidates.length){
+        const sellableCandidates = candidates.filter(item => canSellHull(item.ship?.id));
+        sellableCandidates.sort((a,b) => {
+            const ap = new THREE.Vector3();
+            const bp = new THREE.Vector3();
+            try{ a.pad.getWorldPosition(ap); }catch(_){ ap.set(9999,9999,9999); }
+            try{ b.pad.getWorldPosition(bp); }catch(_){ bp.set(9999,9999,9999); }
+            return astronautPos.distanceTo(ap) - astronautPos.distanceTo(bp);
+        });
+        activeCandidate = sellableCandidates[0] || null;
     }
 
     if(hint){
@@ -10104,22 +10111,38 @@ function updateHangarPlatformPrompt(){
         hint.textContent = '';
     }
 
-    if(!sellBtn) return;
-    if(!hoverShip){
+    if(!sellBtn){
+        return;
+    }
+
+    if(!activeCandidate){
         sellBtn.style.display = 'none';
         sellBtn.disabled = true;
         sellBtn.dataset.shipId = '';
         sellBtn.dataset.dockIndex = '';
+        sellBtn.textContent = 'Продать';
+        sellBtn.classList.remove('locked');
         return;
     }
 
-    const sellableShip = canSellHull(hoverShip.id);
+    const targetShip = activeCandidate.ship || null;
+    const safeShipId = String(targetShip?.id || '').trim();
+    if(!safeShipId || !canSellHull(safeShipId)){
+        sellBtn.style.display = 'none';
+        sellBtn.disabled = true;
+        sellBtn.dataset.shipId = '';
+        sellBtn.dataset.dockIndex = '';
+        sellBtn.textContent = 'Продать';
+        sellBtn.classList.remove('locked');
+        return;
+    }
+
     sellBtn.style.display = 'flex';
-    sellBtn.disabled = !sellableShip;
-    sellBtn.dataset.shipId = String(hoverShip.id || '').trim();
-    sellBtn.dataset.dockIndex = String(hoverIndex);
-    sellBtn.textContent = sellableShip ? getSellActionLabel('ship', hoverShip.id) : 'Стартовый корпус';
-    sellBtn.classList.toggle('locked', !sellableShip);
+    sellBtn.disabled = false;
+    sellBtn.dataset.shipId = safeShipId;
+    sellBtn.dataset.dockIndex = String(activeCandidate.idx);
+    sellBtn.textContent = getSellActionLabel('ship', safeShipId);
+    sellBtn.classList.remove('locked');
 }
 
 
