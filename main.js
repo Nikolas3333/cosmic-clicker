@@ -9656,13 +9656,31 @@ function bindHangarMovementControls(){
         }
         if(e.code === 'KeyE' && !e.repeat){
             const hoverIndex = Number(hangarState.hoverDockIndex);
-            const hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+            let hoverShip = Number.isFinite(hoverIndex) && hoverIndex >= 0 ? getHangarDockShipByIndex(hoverIndex) : null;
+            if(!hoverShip){
+                const astronautPos = hangarState?.astronautPivot?.position || null;
+                if(astronautPos){
+                    const candidates = getHangarSupportShips().map((ship, idx) => ({ ship, idx, pad:getHangarDockPadByIndex(idx) })).filter(item => item.ship && item.pad);
+                    candidates.sort((a,b) => {
+                        const ap = new THREE.Vector3();
+                        const bp = new THREE.Vector3();
+                        try{ a.pad.getWorldPosition(ap); }catch(_){ ap.set(9999,9999,9999); }
+                        try{ b.pad.getWorldPosition(bp); }catch(_){ bp.set(9999,9999,9999); }
+                        return astronautPos.distanceTo(ap) - astronautPos.distanceTo(bp);
+                    });
+                    hoverShip = candidates[0]?.ship || null;
+                }
+            }
             if(hoverShip){
                 e.preventDefault();
-                hangarState.shipIndex = hoverIndex;
-                fillHangarText();
-                rebuildHangarSceneObjects();
-                selectCurrentHangarShip?.();
+                const allShips = getAllOwnedHangarShips();
+                const nextIndex = allShips.findIndex(item => String(item?.id || '').trim() === String(hoverShip?.id || '').trim());
+                if(nextIndex >= 0){
+                    hangarState.shipIndex = nextIndex;
+                    fillHangarText();
+                    rebuildHangarSceneObjects();
+                    selectCurrentHangarShip?.();
+                }
             }
         }
     });
@@ -10048,14 +10066,8 @@ function updateHangarButtons(){
     }
 
     if(actionBtn){
-        const currentShip = ships[hangarState.shipIndex];
-        const isSelected = !!currentShip && String(player.selectedShipId || '') === String(currentShip.id || '');
-        actionBtn.textContent = isSelected ? 'Выбран' : 'Выбрать';
-        actionBtn.classList.toggle('equipped', isSelected);
-        actionBtn.classList.toggle('locked', !ships.length);
-        actionBtn.classList.toggle('ready', !!ships.length && !isSelected);
-        actionBtn.disabled = !ships.length;
-        actionBtn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        actionBtn.style.display = 'none';
+        actionBtn.disabled = true;
     }
 }
 
@@ -10190,10 +10202,8 @@ function fillHangarText(){
 
     const shipSellBtn = document.getElementById('hangar-ship-sell');
     if(shipSellBtn){
-        const sellableShip = !!ship && canSellHull(ship.id);
-        shipSellBtn.disabled = !sellableShip;
-        shipSellBtn.textContent = !ship ? 'Нет корпуса' : (sellableShip ? getSellActionLabel('ship', ship.id) : 'Стартовый корпус');
-        shipSellBtn.classList.toggle('locked', !sellableShip);
+        shipSellBtn.style.display = 'none';
+        shipSellBtn.disabled = true;
     }
 
     const shipSlotMap = getEquippedModuleTypesForShip(ship?.id || '');
@@ -10203,20 +10213,24 @@ function fillHangarText(){
 
     const statsWrap = document.getElementById('hangar-ship-stats');
     if(statsWrap){
-        const weaponLabel = weaponInstalled?.name || 'Нет';
-        const shieldLabel = shieldInstalled?.name || 'Нет';
-        const boosterLabel = boosterInstalled?.name || 'Нет';
-        const compactHandling = battleStatsView.handlingLabel || 'Стандарт';
-        const stats = [
-            ['Скорость', battleStatsView.maxSpeed.toFixed(2)],
-            ['Броня', battleStatsView.hp],
-            ['Урон', battleStatsView.weaponDamage],
-            ['Энергия', battleStatsView.clipSize],
-            ['Пушка', weaponLabel],
-            ['Щит', shieldLabel],
-            ['Ускоритель', boosterLabel],
-            ['Управление', compactHandling]
-        ];
+        statsWrap.innerHTML = '';
+        statsWrap.style.display = 'none';
+    }
+    const weaponLabel = weaponInstalled?.name || 'Нет';
+    const shieldLabel = shieldInstalled?.name || 'Нет';
+    const boosterLabel = boosterInstalled?.name || 'Нет';
+    const compactHandling = battleStatsView.handlingLabel || 'Стандарт';
+    const stats = [
+        ['Скорость', battleStatsView.maxSpeed.toFixed(2)],
+        ['Броня', battleStatsView.hp],
+        ['Урон', battleStatsView.weaponDamage],
+        ['Энергия', battleStatsView.clipSize],
+        ['Пушка', weaponLabel],
+        ['Щит', shieldLabel],
+        ['Ускоритель', boosterLabel],
+        ['Управление', compactHandling]
+    ];
+    if(false){
         statsWrap.innerHTML = stats.map(([key, value]) => `
             <div class="hangar-stat-box">
               <div class="hangar-stat-label">${key}</div>
@@ -10678,9 +10692,9 @@ function rebuildHangarSceneObjects(){
 
         const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
         instantMesh.position.set(0, 0.18, 0);
-        instantMesh.scale.setScalar(2.35);
+        instantMesh.scale.setScalar(1.45);
         instantMesh.userData.appearStartedAt = performance.now();
-        instantMesh.userData.appearTargetScale = 3.25;
+        instantMesh.userData.appearTargetScale = 1.75;
         instantMesh.rotation.x = 0;
         instantMesh.rotation.y = Math.PI;
         instantMesh.rotation.z = 0;
@@ -10709,9 +10723,9 @@ function rebuildHangarSceneObjects(){
                 if(buildToken !== hangarBuildToken || !shipMesh || !showcaseGroup) return;
                 while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
                 shipMesh.position.set(0, 0.18, 0);
-                shipMesh.scale.setScalar(1.42);
+                shipMesh.scale.setScalar(1.08);
                 shipMesh.userData.appearStartedAt = performance.now();
-                shipMesh.userData.appearTargetScale = 1.72;
+                shipMesh.userData.appearTargetScale = 1.22;
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
@@ -10745,9 +10759,9 @@ function rebuildHangarSceneObjects(){
                 try{ pad.remove(placeholder); }catch(_){ }
                 sideMesh.position.set(0, 1.06, 0.05);
                 sideMesh.rotation.set(0, Math.PI, 0);
-                sideMesh.scale.setScalar(1.58);
+                sideMesh.scale.setScalar(1.12);
                 sideMesh.userData.hangarDockIndex = dockIndex;
-                sideMesh.userData.baseScale = 1.58;
+                sideMesh.userData.baseScale = 1.12;
                 sideMesh.userData.shipId = shipId;
                 pad.add(sideMesh);
                 hangarState.supportShipMeshes.push(sideMesh);
