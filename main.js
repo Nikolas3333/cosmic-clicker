@@ -8162,6 +8162,92 @@ function getModuleSellPrice(moduleId){
     return Math.max(0, Math.floor((Number(mod?.price || 0) || 0) * 0.5));
 }
 
+
+function isOwnedShip(itemOrId){
+    try{ ensureShopOwnershipDefaults?.(); }catch(_){ }
+    const shipId = typeof itemOrId === 'string'
+        ? String(itemOrId || '').trim()
+        : String(itemOrId?.id || '').trim();
+    return !!shipId && Array.isArray(player?.ownedShipIds) && player.ownedShipIds.includes(shipId);
+}
+
+function isHangarWindowOpen(){
+    const win = document.getElementById('hangar-window');
+    return !!(win && !win.classList.contains('hidden'));
+}
+
+function renderHangarIfOpen(forceSyncToSelected = true){
+    if(!isHangarWindowOpen()) return;
+    renderHangarCosmic?.(forceSyncToSelected);
+}
+
+function ensurePremiumCurrencyUi(){
+    if(typeof document === 'undefined') return;
+    if(!document.getElementById('premium-currency-ui-style')){
+        const style = document.createElement('style');
+        style.id = 'premium-currency-ui-style';
+        style.textContent = `
+          #premium-account-info .premium-item.currency-item{ position:relative; padding-right:18px; }
+          .premium-plus-btn{
+            margin-left:6px; width:18px; height:18px; border:none; border-radius:3px; cursor:pointer;
+            display:inline-flex; align-items:center; justify-content:center; font-weight:900; font-size:16px; line-height:1;
+            color:#fff; background:linear-gradient(180deg,#2d2d2d,#0d0d0d); box-shadow:0 0 8px rgba(0,0,0,0.35);
+          }
+          .premium-plus-btn:hover{ transform:translateY(-1px); box-shadow:0 0 12px rgba(120,220,255,0.35); }
+          .premium-currency-float{
+            position:absolute; right:0; top:-18px; pointer-events:none; font-weight:800; font-size:14px; opacity:0;
+            transform:translateY(0) scale(0.95); transition:opacity .18s ease, transform .9s ease;
+            text-shadow:0 0 10px rgba(0,0,0,0.55);
+          }
+          .premium-currency-float.show{ opacity:1; transform:translateY(-6px) scale(1); }
+          .premium-currency-float.fade{ opacity:0; transform:translateY(-22px) scale(1.04); }
+          .premium-currency-float.minus{ color:#ff4d4d; }
+          .premium-currency-float.plus{ color:#6dff8e; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const entries = [
+        { id:'premium-coins', type:'coins', title:'Пополнить монеты' },
+        { id:'premium-crystals', type:'crystals', title:'Пополнить алмазы' }
+    ];
+    entries.forEach(({id, type, title}) => {
+        const host = document.getElementById(id);
+        if(!host) return;
+        host.classList.add('currency-item');
+        if(!host.querySelector('.premium-plus-btn')){
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'premium-plus-btn';
+            btn.dataset.currencyType = type;
+            btn.title = title;
+            btn.textContent = '+';
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                alert(type === 'crystals' ? 'Пополнение алмазов за деньги будет здесь.' : 'Пополнение монет за деньги будет здесь.');
+            });
+            host.appendChild(btn);
+        }
+    });
+}
+
+function showCurrencyDelta(kind, amount){
+    const safeKind = String(kind || '').trim().toLowerCase();
+    const targetId = safeKind === 'crystals' ? 'premium-crystals' : 'premium-coins';
+    const host = document.getElementById(targetId);
+    if(!host || !Number.isFinite(Number(amount)) || Number(amount) === 0) return;
+    ensurePremiumCurrencyUi?.();
+    const node = document.createElement('span');
+    const numeric = Number(amount);
+    node.className = `premium-currency-float ${numeric < 0 ? 'minus' : 'plus'}`;
+    node.textContent = `${numeric < 0 ? '' : '+'}${Math.trunc(numeric)}`;
+    host.appendChild(node);
+    requestAnimationFrame(() => node.classList.add('show'));
+    setTimeout(() => node.classList.add('fade'), 900);
+    setTimeout(() => node.remove(), 1800);
+}
+
 function canSellHull(hullId){
     return !!String(hullId || '').trim() && !isStarterHullId(hullId) && isOwnedShip(hullId);
 }
@@ -12553,12 +12639,6 @@ function getShipDiamondPriceLegacy(item){
     return Math.max(0, Math.round(coins / 220 + extra));
 }
 
-function isOwnedShip(itemOrId){
-    ensureShopOwnershipDefaults();
-    const shipId = typeof itemOrId === 'string' ? String(itemOrId || '').trim() : String(itemOrId?.id || '').trim();
-    return !!shipId && player.ownedShipIds.includes(shipId);
-}
-
 function buyModuleFromShop(moduleId){
     ensureModuleOwnershipDefaults();
     const module = getModuleById(moduleId);
@@ -12573,6 +12653,7 @@ function buyModuleFromShop(moduleId){
         }
         playerResources.coins = coins - modulePrice;
         player.credits = playerResources.coins;
+        showCurrencyDelta?.('coins', -modulePrice);
         player.ownedModuleIds.push(module.id);
         player.ownedModuleIds = Array.from(new Set(player.ownedModuleIds));
     }
@@ -12584,7 +12665,7 @@ function buyModuleFromShop(moduleId){
     updateUI?.();
     saveGame?.();
     renderShopScreen?.();
-    renderHangarCosmic?.();
+    renderHangarIfOpen?.();
     return true;
 }
 
@@ -12617,7 +12698,7 @@ function equipOwnedShip(shipId){
     const nextShips = getCurrentShopShips();
     shopState.selectedId = nextShips[0]?.id || '';
     renderShopScreen?.();
-    renderHangarCosmic?.();
+    renderHangarIfOpen?.();
     return true;
 }
 
@@ -12645,6 +12726,8 @@ function buyShipFromShop(shipId){
     playerResources.coins = coins - coinPrice;
     player.credits = playerResources.coins;
     playerResources.crystals = diamonds - diamondPrice;
+    if(coinPrice > 0) showCurrencyDelta?.('coins', -coinPrice);
+    if(diamondPrice > 0) showCurrencyDelta?.('crystals', -diamondPrice);
     player.ownedShipIds.push(ship.id);
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds));
     player.selectedShipId = ship.id;
@@ -12664,7 +12747,7 @@ function buyShipFromShop(shipId){
     const nextShips = getCurrentShopShips();
     shopState.selectedId = nextShips[0]?.id || '';
     renderShopScreen?.();
-    renderHangarCosmic?.();
+    renderHangarIfOpen?.();
     return true;
 }
 
@@ -14916,3 +14999,6 @@ if(previousOpenHangarWindowV188){
     };
     window.openHangarWindow = openHangarWindow;
 }
+
+
+try{ ensurePremiumCurrencyUi?.(); }catch(_){ }
