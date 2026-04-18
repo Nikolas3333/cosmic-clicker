@@ -8293,7 +8293,7 @@ function sellHullFromHangar(hullId){
     saveGame?.();
     syncHangarSelectionState?.({ forceClass:true });
     renderHangarCosmic?.();
-    renderShopScreen?.();
+    window.renderShopScreen?.();
     return true;
 }
 
@@ -8325,7 +8325,7 @@ function sellModuleFromHangar(moduleId){
     updateUI?.();
     saveGame?.();
     renderHangarCosmic?.();
-    renderShopScreen?.();
+    window.renderShopScreen?.();
     return true;
 }
 
@@ -8893,7 +8893,7 @@ function selectCurrentHangarShip(){
     saveGame?.();
     fillHangarText();
     rebuildHangarSceneObjects();
-    renderShopScreen?.();
+    window.renderShopScreen?.();
     return true;
 }
 
@@ -12845,7 +12845,7 @@ function buyModuleFromShop(moduleId){
     updateHUD?.();
     updateUI?.();
     saveGame?.();
-    renderShopScreen?.();
+    window.renderShopScreen?.();
     renderHangarIfOpen?.();
     return true;
 }
@@ -12878,7 +12878,7 @@ function equipOwnedShip(shipId){
     saveGame?.();
     const nextShips = getCurrentShopShips();
     shopState.selectedId = nextShips[0]?.id || '';
-    renderShopScreen?.();
+    window.renderShopScreen?.();
     renderHangarIfOpen?.();
     return true;
 }
@@ -12928,7 +12928,7 @@ function buyShipFromShop(shipId){
     saveGame?.();
     const nextShips = getCurrentShopShips();
     shopState.selectedId = nextShips[0]?.id || '';
-    renderShopScreen?.();
+    window.renderShopScreen?.();
     renderHangarIfOpen?.();
     return true;
 }
