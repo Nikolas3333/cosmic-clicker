@@ -9879,7 +9879,7 @@ function createHangarRoomEnvironment(){
 
         const plaqueTilt = new THREE.Group();
         plaqueTilt.position.set(x < 0 ? 4.15 : -4.15, 1.30, 0.22);
-        plaqueTilt.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2;
+        plaqueTilt.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2;
         dockGroup.add(plaqueTilt);
 
         const plaque = createHangarPlaqueBoard(4.6, 1.86);
@@ -10557,14 +10557,14 @@ function normalizeHangarShipMesh(shipMesh){
         const wrap = new THREE.Group();
         wrap.add(shipMesh);
 
-        const maxWidth = 4.2;
-        const maxHeight = 2.8;
-        const maxDepth = 4.2;
+        const maxWidth = 7.2;
+        const maxHeight = 4.8;
+        const maxDepth = 7.2;
 
         const scaleX = size.x > 0 ? maxWidth / size.x : 1;
         const scaleY = size.y > 0 ? maxHeight / size.y : 1;
         const scaleZ = size.z > 0 ? maxDepth / size.z : 1;
-        const finalScale = Math.min(scaleX, scaleY, scaleZ, 1.08);
+        const finalScale = Math.min(scaleX, scaleY, scaleZ, 1.9);
 
         shipMesh.scale.multiplyScalar(finalScale);
         shipMesh.updateMatrixWorld(true);
@@ -10576,7 +10576,7 @@ function normalizeHangarShipMesh(shipMesh){
         shipMesh.position.x -= normalizedCenter.x;
         shipMesh.position.z -= normalizedCenter.z;
         shipMesh.position.y -= normalizedBounds.min.y;
-        shipMesh.position.y += 0.02;
+        shipMesh.position.y += 0.04;
 
         wrap.userData.hangarHeight = normalizedSize.y || 0;
         wrap.userData.hangarWidth = normalizedSize.x || 0;
