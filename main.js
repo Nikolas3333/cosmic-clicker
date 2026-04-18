@@ -13,7 +13,7 @@ let player = {
   nickname: "Commander",
   level: 1,
   experience: 0,
-  credits: 500,
+  credits: 2500,
   ships: [],
   ownedShipIds: ['scout_1'],
   selectedShipId: 'scout_1',
@@ -188,6 +188,7 @@ function getShipCoinPrice(item){
 }
 
 function getShipDiamondPrice(item){
+    if(String(item?.id || '').trim() === 'xwing_1') return 0;
     const coins = getShipCoinPrice(item);
     const tier = String(item?.tier || '').toLowerCase();
     const extra = tier.includes('топ') ? 12 : (tier.includes('соврем') ? 7 : 3);
@@ -203,22 +204,32 @@ function closeShopView(){
 function ensureShopOwnershipDefaults(){
     try{
         if(!player || typeof player !== 'object') return;
-        const onlyHullId = 'scout_1';
-        player.ownedShipIds = [onlyHullId];
-        player.selectedShipId = onlyHullId;
+        const starterHullId = 'scout_1';
+        const ownedShipIds = Array.isArray(player.ownedShipIds)
+            ? player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
+            : [];
+        if(!ownedShipIds.includes(starterHullId)) ownedShipIds.unshift(starterHullId);
+        player.ownedShipIds = Array.from(new Set(ownedShipIds));
+
+        const selectedShipId = String(player.selectedShipId || '').trim();
+        player.selectedShipId = player.ownedShipIds.includes(selectedShipId)
+            ? selectedShipId
+            : starterHullId;
+
         if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object'){
             player.activeModulesByShip = {};
         }
-        const currentSetup = player.activeModulesByShip[onlyHullId] && typeof player.activeModulesByShip[onlyHullId] === 'object'
-            ? player.activeModulesByShip[onlyHullId]
-            : {};
-        player.activeModulesByShip = {
-            [onlyHullId]: {
+
+        for(const shipId of player.ownedShipIds){
+            const currentSetup = player.activeModulesByShip[shipId] && typeof player.activeModulesByShip[shipId] === 'object'
+                ? player.activeModulesByShip[shipId]
+                : {};
+            player.activeModulesByShip[shipId] = {
                 weapon: String(currentSetup.weapon || 'weapon_laser_s1').trim() || 'weapon_laser_s1',
                 shield: String(currentSetup.shield || 'shield_micro_s1').trim() || 'shield_micro_s1',
                 booster: String(currentSetup.booster || 'booster_ion_s1').trim() || 'booster_ion_s1'
-            }
-        };
+            };
+        }
     }catch(_){}
 }
 
@@ -1597,8 +1608,8 @@ const playerResources = {
   neptune_methane: 0,
   solar_energy: 0,
 
-  coins: 0,
-  crystals: 0
+  coins: 2500,
+  crystals: 50
 }
 
 const RESOURCE_SYNC_KEYS = [
@@ -9917,12 +9928,15 @@ function updateHangarButtons(){
     const actionBtn = document.getElementById('hangar-ship-action');
     const posLabel = document.getElementById('hangar-ship-position');
 
-    if(leftBtn) leftBtn.disabled = hangarState.shipIndex <= 0;
-    if(rightBtn) rightBtn.disabled = hangarState.shipIndex >= ships.length - 1;
+    if(leftBtn) leftBtn.style.display = 'none';
+    if(rightBtn) rightBtn.style.display = 'none';
     if(upBtn) upBtn.disabled = hangarState.moduleIndex <= 0;
     if(downBtn) downBtn.disabled = hangarState.moduleIndex >= modules.length - 1;
 
-    if(posLabel) posLabel.textContent = ships.length ? `${hangarState.shipIndex + 1} / ${ships.length}` : '0 / 0';
+    if(posLabel){
+        const currentShip = ships[hangarState.shipIndex] || null;
+        posLabel.textContent = currentShip ? `В ангаре: ${ships.length} • Активный: ${currentShip.name || currentShip.id || 'Корпус'}` : 'Нет корпусов';
+    }
 
     if(actionBtn){
         const currentShip = ships[hangarState.shipIndex];
@@ -11271,8 +11285,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
               </div>
             </aside>
 
-            <section class="hangar-stage-wrap full">
-              <button id="hangar-ship-left" class="hangar-arrow horizontal" type="button">◀</button>
+            <section class="hangar-stage-wrap full no-ship-arrows">
               <div class="hangar-stage">
                 <div id="hangar-runtime-stage" class="hangar-runtime-stage"></div>
                 <div class="hangar-runtime-fade"></div>
@@ -11297,7 +11310,6 @@ function renderHangarCosmic(forceSyncToSelected = true){
                   </div>
                 </div>
               </div>
-              <button id="hangar-ship-right" class="hangar-arrow horizontal" type="button">▶</button>
             </section>
           </div>
         `;
@@ -12476,11 +12488,12 @@ function limitBattleArea(){
 /* ===== V82 SHOP CLASSES ===== */
 const SHOP_DATA = {
     types: [
-        { id:'fighters', name:'Cargo Drone', subtitle:'Единственный активный корпус', badge:'Основной корпус' }
+        { id:'fighters', name:'Корпуса ангара', subtitle:'Купить корпус и отправить его в ангар', badge:'Ангар' }
     ],
     shipsByType: {
         fighters: [
-            { id:'scout_1', type:'ship', classId:'fighters', tier:'Основной корпус', name:'Cargo Drone', subtitle:'3D модель из ships/Spaceship.glb', badge:'Основной корпус', price:0, description:'Единственный доступный корпус проекта. Использует загруженную 3D модель Spaceship.glb и остаётся в ангаре всегда.', stats:[['Скорость','9.2'],['Броня','3.2'],['Манёвр','7.4'],['Энергия','5.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'external_glb', modelPath:'ships/Spaceship.glb', neon:'#76f7ff', engine:'#59c7ff', weapon:'laser', accent:'#7a8cff' }
+            { id:'scout_1', type:'ship', classId:'fighters', tier:'Основной корпус', name:'Cargo Drone', subtitle:'3D модель из ships/Spaceship.glb', badge:'Основной корпус', price:0, description:'Стартовый корпус ангара. Использует загруженную 3D модель Spaceship.glb и остаётся у игрока как базовый корабль.', stats:[['Скорость','9.2'],['Броня','3.2'],['Манёвр','7.4'],['Энергия','5.4'],['Слоты','Пушка / Щит / Ускоритель']], art:'external_glb', modelPath:'ships/Spaceship.glb', neon:'#76f7ff', engine:'#59c7ff', weapon:'laser', accent:'#7a8cff' },
+            { id:'xwing_1', type:'ship', classId:'fighters', tier:'Тестовый корпус', name:'T-65 X-Wing', subtitle:'3D модель из ships/T-65 X-Wing.glb', badge:'Тест покупки', price:900, description:'Тестовый второй корпус для проверки магазина и ангара. После покупки должен исчезнуть из магазина и появиться на боковой платформе ангара.', stats:[['Скорость','11.4'],['Броня','4.1'],['Манёвр','8.8'],['Энергия','6.2'],['Слоты','Пушка / Щит / Ускоритель']], art:'external_glb', modelPath:'ships/T-65 X-Wing.glb', neon:'#8fe6ff', engine:'#5bb7ff', weapon:'laser', accent:'#ff6b6b' }
         ],
         tanks: [],
         assault: [],
