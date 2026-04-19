@@ -9019,8 +9019,8 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
 
     const getFlightForwardAxis = (shipId) => {
         const safeShipId = String(shipId || '').trim();
-        if(safeShipId === 'scout_1') return new THREE.Vector3(0, 0, 1);
-        return new THREE.Vector3(1, 0, 0);
+        if(safeShipId === 'scout_1') return new THREE.Vector3(-1, 0, 0);
+        return new THREE.Vector3(0, 0, 1);
     };
 
     transfer.incoming = {
@@ -9634,10 +9634,10 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
     const sellTexture = new THREE.CanvasTexture(sellCanvas);
     sellTexture.colorSpace = THREE.SRGBColorSpace;
     const sellButton = new THREE.Mesh(
-        new THREE.PlaneGeometry(width * 0.30, height * 0.20),
+        new THREE.PlaneGeometry(width * 0.34, height * 0.22),
         new THREE.MeshBasicMaterial({ map:sellTexture, transparent:true, opacity:0 })
     );
-    sellButton.position.set(width * 0.27, -height * 0.29, 0.024);
+    sellButton.position.set(width * 0.19, -height * 0.27, 0.024);
     sellButton.visible = false;
     sellButton.userData = { hangarSellPlaqueButton:true, hangarDockIndex:-1, hangarSellPlaqueButtonShipId:'' };
     root.add(sellButton);
