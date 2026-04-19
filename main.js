@@ -4412,6 +4412,7 @@ const chatUnread = {
 const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
 const pmPeerRoomIds = new Map();
+const pmPeerRoomTitles = new Map();
 const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
 const localHandledChatMessageIds = new Set();
 const BATTLE_HISTORY_SEARCH_LIMIT = 80;
@@ -4574,16 +4575,19 @@ function resolvePmRoomTitleById(roomId = '') {
     const safeRoomId = String(roomId || '').trim();
     if (!safeRoomId) return '';
 
-    const cachedRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
-        .find(room => String(room?.id || room?.roomId || '').trim() == safeRoomId);
-    if (cachedRoom) {
-        return String(cachedRoom.title || cachedRoom.room_name || '').trim();
+    const explicitTitle = String(pmPeerRoomTitles.get(safeRoomId) || '').trim();
+    if (explicitTitle) return explicitTitle;
+
+    const liveRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
+        .find(room => String(room?.id || room?.roomId || '').trim() === safeRoomId);
+    if (liveRoom) {
+        return String(liveRoom.title || liveRoom.real || liveRoom.room_name || liveRoom.map || liveRoom.name || '').trim();
     }
 
     const fallbackRoom = (Array.isArray(DEFAULT_SUPABASE_BATTLE_ROOMS) ? DEFAULT_SUPABASE_BATTLE_ROOMS : [])
-        .find(room => String(room?.id || room?.roomId || '').trim() == safeRoomId);
+        .find(room => String(room?.id || room?.roomId || '').trim() === safeRoomId);
     if (fallbackRoom) {
-        return String(fallbackRoom.title || fallbackRoom.room_name || '').trim();
+        return String(fallbackRoom.title || fallbackRoom.real || fallbackRoom.room_name || fallbackRoom.map || fallbackRoom.name || '').trim();
     }
 
     return '';
@@ -4598,9 +4602,36 @@ function getPmPresenceTitle(peerId) {
 
     const roomId = String(pmPeerRoomIds.get(key) || '').trim();
     const roomTitle = resolvePmRoomTitleById(roomId);
+    return roomTitle || 'В игре';
+}
 
-    if (roomTitle) return roomTitle;
-    return 'В игре';
+async function preloadPmRoomTitles(players = []) {
+    if (!window.supabaseClient) return;
+    const roomIds = Array.from(new Set(
+        (players || [])
+            .map(row => String(row?.room_id || '').trim())
+            .filter(Boolean)
+    ));
+    if (!roomIds.length) return;
+
+    const unknownIds = roomIds.filter(roomId => !pmPeerRoomTitles.has(roomId));
+    if (!unknownIds.length) return;
+
+    try {
+        const { data, error } = await window.supabaseClient
+            .from('rooms')
+            .select('id,title,real,map,room_name')
+            .in('id', unknownIds);
+
+        if (error || !Array.isArray(data)) return;
+
+        for (const row of data) {
+            const roomId = String(row?.id || '').trim();
+            if (!roomId) continue;
+            const roomTitle = String(row?.title || row?.real || row?.room_name || row?.map || '').trim();
+            if (roomTitle) pmPeerRoomTitles.set(roomId, roomTitle);
+        }
+    } catch (_) {}
 }
 
 function saveChatUiState() {
@@ -15642,9 +15673,11 @@ function refreshPmOnlineState(players = []){
     onlinePmPeers.clear();
     inGamePmPeers.clear();
     pmPeerRoomIds.clear();
+
     for(const p of players || []){
         const targetId = p?.player_id ? String(p.player_id) : '';
         if(!targetId || !isAccountPublicId(targetId)) continue;
+
         const status = String(p.status || '').toLowerCase();
         const roomId = String(p?.room_id || '').trim();
 
@@ -15655,6 +15688,7 @@ function refreshPmOnlineState(players = []){
             if(roomId) pmPeerRoomIds.set(targetId, roomId);
         }
     }
+
     renderChatTabs();
 }
 
@@ -15664,6 +15698,7 @@ async function renderOnlinePlayers(){
 
     const players = await loadOnlinePlayersFromSupabase();
     const myId = (typeof authState !== 'undefined' && authState?.playerId) ? String(authState.playerId) : null;
+    await preloadPmRoomTitles(players);
     refreshPmOnlineState(players);
     list.innerHTML = '';
 
