@@ -8352,12 +8352,23 @@ function getEquippedModuleTypesForShip(shipId){
 function sellHullFromHangar(hullId){
     const safeId = String(hullId || '').trim();
     if(!canSellHull(safeId)) return false;
+
+    const savedAstronautPosition = hangarState?.astronautPivot?.position?.clone?.() || null;
+    const savedAstronautYaw = Number(hangarState?.astronautPivot?.rotation?.y || 0) || 0;
+    const savedCameraYaw = Number(hangarState?.cameraYaw || 0) || 0;
+    const savedCameraPitch = Number(hangarState?.cameraPitch || -0.08) || -0.08;
+    const savedSelectedDockIndex = Number.isFinite(Number(hangarState?.selectedDockIndex)) ? Number(hangarState.selectedDockIndex) : -1;
+    const savedHoverDockIndex = Number.isFinite(Number(hangarState?.hoverDockIndex)) ? Number(hangarState.hoverDockIndex) : -1;
+
     const sellPrice = getHullSellPrice(safeId);
     playerResources.coins = (Number(playerResources.coins || player.credits || 0) || 0) + sellPrice;
     player.credits = playerResources.coins;
     player.ownedShipIds = (player.ownedShipIds || []).filter(id => String(id || '').trim() !== safeId);
     if(player?.activeModulesByShip && player.activeModulesByShip[safeId]){
         delete player.activeModulesByShip[safeId];
+    }
+    if(player?.hangarDockAssignments && player.hangarDockAssignments[safeId] != null){
+        delete player.hangarDockAssignments[safeId];
     }
     if(String(player?.selectedShipId || '').trim() === safeId){
         player.selectedShipId = String(player.ownedShipIds?.[0] || 'scout_1').trim() || 'scout_1';
@@ -8367,9 +8378,25 @@ function sellHullFromHangar(hullId){
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
+    showCurrencyDelta?.('coins', sellPrice);
     saveGame?.();
     syncHangarSelectionState?.({ forceClass:true });
-    renderHangarCosmic?.();
+    renderHangarCosmic?.(false);
+    requestAnimationFrame(() => {
+        try{
+            if(savedAstronautPosition && hangarState?.astronautPivot){
+                hangarState.astronautPivot.position.copy(savedAstronautPosition);
+                hangarState.astronautPivot.rotation.y = savedAstronautYaw;
+            }
+            hangarState.cameraYaw = savedCameraYaw;
+            hangarState.cameraPitch = savedCameraPitch;
+            hangarState.cameraYawTarget = savedCameraYaw;
+            hangarState.cameraPitchTarget = savedCameraPitch;
+            hangarState.selectedDockIndex = savedSelectedDockIndex;
+            hangarState.hoverDockIndex = savedHoverDockIndex;
+            updateHangarPlatformPrompt?.();
+        }catch(_){ }
+    });
     window.renderShopScreen?.();
     return true;
 }
@@ -9851,7 +9878,7 @@ function isHangarDockWithinUseDistance(dockIndex){
     if(!astronautPos || !pad) return false;
     const padWorld = new THREE.Vector3();
     try{ pad.getWorldPosition(padWorld); }catch(_){ return false; }
-    return astronautPos.distanceTo(padWorld) <= 7.25;
+    return astronautPos.distanceTo(padWorld) <= 9.75;
 }
 
 function bindHangarMovementControls(){
@@ -9872,36 +9899,33 @@ function bindHangarMovementControls(){
             setKey(e.code, true);
         }
         if(e.code === 'KeyE' && !e.repeat){
-            const candidates = (getHangarSupportShips?.() || [])
-                .map((ship, idx) => ({ ship, idx, near: isHangarDockWithinUseDistance(idx) }))
-                .filter(item => item.ship && item.near);
+            const astronautPos = hangarState?.astronautPivot?.position || null;
+            const candidates = [];
+            const pads = Array.isArray(hangarState?.supportPlatforms) ? hangarState.supportPlatforms : [];
+            for(let idx = 0; idx < pads.length; idx++){
+                const ship = getHangarDockShipByIndex?.(idx) || null;
+                const pad = getHangarDockPadByIndex?.(idx) || pads[idx] || null;
+                if(!ship || !pad) continue;
+                const padWorld = new THREE.Vector3();
+                try{ pad.getWorldPosition(padWorld); }catch(_){ continue; }
+                const dist = astronautPos ? astronautPos.distanceTo(padWorld) : Infinity;
+                candidates.push({ ship, idx, dist, near: dist <= 9.75 });
+            }
             if(!candidates.length) return;
 
             let target = null;
             const hoverIndex = Number(hangarState.hoverDockIndex);
             if(Number.isFinite(hoverIndex) && hoverIndex >= 0){
-                target = candidates.find(item => item.idx === hoverIndex) || null;
+                target = candidates.find(item => item.idx === hoverIndex && item.near) || null;
             }
             if(!target){
-                const astronautPos = hangarState?.astronautPivot?.position || null;
-                if(astronautPos){
-                    let bestDist = Infinity;
-                    for(const item of candidates){
-                        const pad = getHangarDockPadByIndex?.(item.idx) || null;
-                        if(!pad) continue;
-                        const padWorld = new THREE.Vector3();
-                        try{ pad.getWorldPosition(padWorld); }catch(_){ continue; }
-                        const dist = astronautPos.distanceTo(padWorld);
-                        if(dist < bestDist){
-                            bestDist = dist;
-                            target = item;
-                        }
-                    }
-                }
+                candidates.sort((a,b) => a.dist - b.dist);
+                target = candidates.find(item => item.near) || null;
             }
             if(!target?.ship) return;
 
             e.preventDefault();
+            e.stopPropagation();
             hangarState.selectedDockIndex = target.idx;
             hangarState.hoverDockIndex = target.idx;
             const allShips = getAllOwnedHangarShips();
@@ -9911,8 +9935,8 @@ function bindHangarMovementControls(){
             }
             const currentId = String(player?.selectedShipId || '').trim();
             const nextId = String(target.ship?.id || '').trim();
+            fillHangarText();
             if(nextId && currentId !== nextId){
-                fillHangarText();
                 startHangarShipTransfer(currentId, nextId, target.idx);
             }
         }
