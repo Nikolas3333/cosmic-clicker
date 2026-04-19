@@ -124,6 +124,7 @@ let observerFreeCameraPosition = new THREE.Vector3(0, 18, 48);
 let battlePlanetVisualScale = 1;
 let battleShipCrash = null;
 let battlePendingRespawnAt = 0;
+let battleRespawnTimer = null;
 let battlePlanetCapture = null;
 let battleEnergyPool = 0;
 let battleEnergyCapacity = 60;
@@ -3072,6 +3073,22 @@ async function loadGame(){
     refreshOwnedShipsInventory?.();
 }
 
+
+function toSafeWholeNumber(value, fallback = 0){
+    const num = Number(value);
+    if(!Number.isFinite(num)) return Math.trunc(Number(fallback || 0)) || 0;
+    if(num >= 0) return Math.floor(num);
+    return Math.ceil(num);
+}
+
+function isTournamentRespawnMatch(){
+    return gameState === 'BATTLE' && !!(
+        currentRoom?.mode === 'TOURNAMENT' ||
+        currentRoom?.state === 'tournament' ||
+        String(currentRoom?.id || currentRoom?.roomId || '').startsWith('tournament_')
+    );
+}
+
 function buildSavePayload(){
     return {
         level: currentLevel,
@@ -3093,28 +3110,29 @@ async function saveRemoteProgress(){
     markLocalResourceDirty(6000);
     const payload = buildSavePayload();
     try{
+        const safePublicId = toSafeWholeNumber(authState.playerId, 0);
         const { error: playerUpdateError } = await window.supabaseClient.from('players').update({
             nickname: player.nickname,
-            level: player.level,
-            credits: Number(playerResources.coins || player.credits || 0),
-            mercury_ore: Number(playerResources.mercury_ore || 0),
-            venus_gas: Number(playerResources.venus_gas || 0),
-            earth_water: Number(playerResources.earth_water || 0),
-            mars_crystal: Number(playerResources.mars_crystal || 0),
-            jupiter_hydrogen: Number(playerResources.jupiter_hydrogen || 0),
-            saturn_ice: Number(playerResources.saturn_ice || 0),
-            uranus_ammonia: Number(playerResources.uranus_ammonia || 0),
-            neptune_methane: Number(playerResources.neptune_methane || 0),
-            solar_energy: Number(playerResources.solar_energy || 0),
-            crystals: Number(playerResources.crystals || 0)
-        }).eq('public_id', Number(authState.playerId) || 0);
+            level: toSafeWholeNumber(player.level, 1),
+            credits: toSafeWholeNumber(playerResources.coins || player.credits || 0, 0),
+            mercury_ore: toSafeWholeNumber(playerResources.mercury_ore || 0, 0),
+            venus_gas: toSafeWholeNumber(playerResources.venus_gas || 0, 0),
+            earth_water: toSafeWholeNumber(playerResources.earth_water || 0, 0),
+            mars_crystal: toSafeWholeNumber(playerResources.mars_crystal || 0, 0),
+            jupiter_hydrogen: toSafeWholeNumber(playerResources.jupiter_hydrogen || 0, 0),
+            saturn_ice: toSafeWholeNumber(playerResources.saturn_ice || 0, 0),
+            uranus_ammonia: toSafeWholeNumber(playerResources.uranus_ammonia || 0, 0),
+            neptune_methane: toSafeWholeNumber(playerResources.neptune_methane || 0, 0),
+            solar_energy: toSafeWholeNumber(playerResources.solar_energy || 0, 0),
+            crystals: toSafeWholeNumber(playerResources.crystals || 0, 0)
+        }).eq('public_id', safePublicId);
 
         if(playerUpdateError){
             console.warn('Не удалось обновить players:', playerUpdateError.message || playerUpdateError);
         }
 
         const { error } = await window.supabaseClient.from('player_saves').upsert({
-            player_public_id: authState.playerId,
+            player_public_id: toSafeWholeNumber(authState.playerId, 0),
             save_data: payload,
             updated_at: new Date().toISOString()
         }, { onConflict: 'player_public_id' });
@@ -3871,7 +3889,12 @@ function isBattleRespawning(){
 }
 
 function scheduleBattleRespawn(delayMs=2000){
-    battlePendingRespawnAt = Date.now() + Math.max(0, delayMs);
+    const safeDelay = Math.max(0, delayMs);
+    battlePendingRespawnAt = Date.now() + safeDelay;
+    if(battleRespawnTimer){
+        clearTimeout(battleRespawnTimer);
+        battleRespawnTimer = null;
+    }
     if(playerShip){
         playerShip.visible = false;
         playerShip.position.set(99999,99999,99999);
@@ -3880,6 +3903,18 @@ function scheduleBattleRespawn(delayMs=2000){
     battlePlanetCapture = null;
     firing = false;
     updateBattlePlayerHud();
+
+    if(isTournamentRespawnMatch()){
+        battleRespawnTimer = setTimeout(() => {
+            battleRespawnTimer = null;
+            if(!battlePendingRespawnAt) return;
+            battlePendingRespawnAt = 0;
+            playerHp = playerMaxHp;
+            battleShipCrash = null;
+            spawnPlayer();
+            updateBattlePlayerHud();
+        }, safeDelay + 30);
+    }
 }
 
 function updateBattleRespawnState(){
@@ -3891,7 +3926,12 @@ function updateBattleRespawnState(){
         return;
     }
     battlePendingRespawnAt = 0;
+    if(battleRespawnTimer){
+        clearTimeout(battleRespawnTimer);
+        battleRespawnTimer = null;
+    }
     playerHp = playerMaxHp;
+    battleShipCrash = null;
     spawnPlayer();
     updateBattlePlayerHud();
 }
