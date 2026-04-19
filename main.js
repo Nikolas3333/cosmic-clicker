@@ -1501,7 +1501,7 @@ function switchState(newState){
     if(resourceBar) resourceBar.style.display = "none";
     if(ui) ui.style.display = "none";
     if(premiumBar) premiumBar.style.display = "none";
-    setHangarChatMode(false, false);
+    __restoreHangarChatPanel();
 
     if(newState !== "BATTLE" && newState !== "OBSERVE"){
         clearBattleScene();
@@ -4396,6 +4396,48 @@ const chatTabsWrap = document.getElementById("chat-tabs");
 
 let currentChat = "global";
 
+let __hangarChatHomeParent = null;
+let __hangarChatHomeNextSibling = null;
+
+function __mountHangarChatPanel(){
+    try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        const hangarWindow = document.getElementById('hangar-window');
+        if(!chatWrapper || !hangarWindow) return;
+
+        if(!__hangarChatHomeParent){
+            __hangarChatHomeParent = chatWrapper.parentNode;
+            __hangarChatHomeNextSibling = chatWrapper.nextSibling;
+        }
+
+        if(chatWrapper.parentNode !== hangarWindow){
+            hangarWindow.appendChild(chatWrapper);
+        }
+
+        chatWrapper.classList.add('hangar-inline-mode');
+        chatWrapper.classList.remove('hangar-chat-lowered');
+    }catch(_){}
+}
+
+function __restoreHangarChatPanel(){
+    try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        if(!chatWrapper) return;
+
+        chatWrapper.classList.remove('hangar-inline-mode');
+        chatWrapper.classList.remove('hangar-chat-lowered');
+
+        if(__hangarChatHomeParent && chatWrapper.parentNode !== __hangarChatHomeParent){
+            if(__hangarChatHomeNextSibling && __hangarChatHomeNextSibling.parentNode === __hangarChatHomeParent){
+                __hangarChatHomeParent.insertBefore(chatWrapper, __hangarChatHomeNextSibling);
+            }else{
+                __hangarChatHomeParent.appendChild(chatWrapper);
+            }
+        }
+    }catch(_){}
+}
+
+
 function setHangarChatMode(active, lowered = false){
     try{
         document.body.classList.toggle('hangar-chat-mode', !!active);
@@ -4412,7 +4454,7 @@ function bindHangarChatControls(){
         upBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            setHangarChatMode(true, false);
+            try{ document.getElementById('chat-wrapper')?.classList.remove('hangar-chat-lowered'); }catch(_){}
         });
     }
 
@@ -4421,7 +4463,7 @@ function bindHangarChatControls(){
         downBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            setHangarChatMode(true, true);
+            try{ document.getElementById('chat-wrapper')?.classList.add('hangar-chat-lowered'); }catch(_){}
         });
     }
 }
@@ -4430,7 +4472,7 @@ function __syncHangarChatVisibility(){
     try{
         const hangarWindow = document.getElementById('hangar-window');
         if(!hangarWindow){
-            setHangarChatMode(false, false);
+            __restoreHangarChatPanel();
             return;
         }
 
@@ -4440,7 +4482,7 @@ function __syncHangarChatVisibility(){
             const lowered = document.body.classList.contains('hangar-chat-lowered');
             setHangarChatMode(true, lowered);
         }else{
-            setHangarChatMode(false, false);
+            __restoreHangarChatPanel();
         }
     }catch(_){}
 }
@@ -8297,9 +8339,10 @@ if (hangarTab && hangarWindow) {
         requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){} });
         profileWindow?.classList.add("hidden");
         bindHangarChatControls();
-        setHangarChatMode(true, false);
-        setTimeout(__syncHangarChatVisibility, 0);
-        setTimeout(__syncHangarChatVisibility, 120);
+        try{ document.getElementById('chat-wrapper')?.classList.remove('hangar-chat-lowered'); }catch(_){}
+        __mountHangarChatPanel();
+        setTimeout(__mountHangarChatPanel, 0);
+        setTimeout(__mountHangarChatPanel, 120);
     });
 }
 
@@ -8307,7 +8350,7 @@ if (profileTab && profileWindow) {
     profileTab.addEventListener("click", () => {
         profileWindow.classList.remove("hidden");
         hangarWindow?.classList.add("hidden");
-        setHangarChatMode(false, false);
+        __restoreHangarChatPanel();
     });
 }
 
@@ -12377,7 +12420,7 @@ function initExtraLobbyWindows(){
           win.classList.add('hidden');
           if(winId === 'hangar-window'){
             try{ disposeHangarRenderer?.(); }catch(_){}
-            setHangarChatMode(false, false);
+            __restoreHangarChatPanel();
           }
         });
       }
@@ -12392,6 +12435,13 @@ window.addEventListener('load', () => {
     bindHangarChatControls();
     __installHangarChatWatcher();
     __syncHangarChatVisibility();
+    try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        if(chatWrapper && !__hangarChatHomeParent){
+            __hangarChatHomeParent = chatWrapper.parentNode;
+            __hangarChatHomeNextSibling = chatWrapper.nextSibling;
+        }
+    }catch(_){}
 });
 
 
@@ -15971,6 +16021,8 @@ if(previousOpenHangarWindowV188){
         const result = previousOpenHangarWindowV188.apply(this, args);
         setTimeout(cleanupHangarOverlayUi, 0);
         setTimeout(cleanupHangarOverlayUi, 120);
+        setTimeout(__mountHangarChatPanel, 0);
+        setTimeout(__mountHangarChatPanel, 120);
         return result;
     };
     window.openHangarWindow = openHangarWindow;
