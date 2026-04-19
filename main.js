@@ -4412,7 +4412,6 @@ const chatUnread = {
 const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
 const pmPeerRoomIds = new Map();
-const pmPeerRoomTitles = new Map();
 const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
 const localHandledChatMessageIds = new Set();
 const BATTLE_HISTORY_SEARCH_LIMIT = 80;
@@ -4575,19 +4574,51 @@ function resolvePmRoomTitleById(roomId = '') {
     const safeRoomId = String(roomId || '').trim();
     if (!safeRoomId) return '';
 
-    const explicitTitle = String(pmPeerRoomTitles.get(safeRoomId) || '').trim();
-    if (explicitTitle) return explicitTitle;
-
-    const liveRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
-        .find(room => String(room?.id || room?.roomId || '').trim() === safeRoomId);
-    if (liveRoom) {
-        return String(liveRoom.title || liveRoom.real || liveRoom.room_name || liveRoom.map || liveRoom.name || '').trim();
+    const currentRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    if (currentRoomId && currentRoomId === safeRoomId) {
+        return String(currentRoom?.title || currentRoom?.room_name || currentRoom?.real || currentRoom?.map || '').trim();
     }
 
-    const fallbackRoom = (Array.isArray(DEFAULT_SUPABASE_BATTLE_ROOMS) ? DEFAULT_SUPABASE_BATTLE_ROOMS : [])
-        .find(room => String(room?.id || room?.roomId || '').trim() === safeRoomId);
+    const selectedRoomId = String(selectedLobbyMap?.id || selectedLobbyMap?.roomId || '').trim();
+    if (selectedRoomId && selectedRoomId === safeRoomId) {
+        return String(selectedLobbyMap?.title || selectedLobbyMap?.room_name || selectedLobbyMap?.real || selectedLobbyMap?.map || '').trim();
+    }
+
+    const cacheRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find((room) => {
+        const directId = String(room?.id || room?.roomId || '').trim();
+        const rawId = String(room?.rawRoom?.id || '').trim();
+        return (directId && directId === safeRoomId) || (rawId && rawId === safeRoomId);
+    });
+
+    if (cacheRoom) {
+        return String(
+            cacheRoom?.title ||
+            cacheRoom?.room_name ||
+            cacheRoom?.real ||
+            cacheRoom?.map ||
+            cacheRoom?.name ||
+            cacheRoom?.rawRoom?.title ||
+            cacheRoom?.rawRoom?.room_name ||
+            cacheRoom?.rawRoom?.map_name ||
+            cacheRoom?.rawRoom?.map ||
+            ''
+        ).trim();
+    }
+
+    const fallbackRoom = (Array.isArray(DEFAULT_SUPABASE_BATTLE_ROOMS) ? DEFAULT_SUPABASE_BATTLE_ROOMS : []).find((room) => {
+        const directId = String(room?.id || room?.roomId || '').trim();
+        return directId && directId === safeRoomId;
+    });
+
     if (fallbackRoom) {
-        return String(fallbackRoom.title || fallbackRoom.real || fallbackRoom.room_name || fallbackRoom.map || fallbackRoom.name || '').trim();
+        return String(
+            fallbackRoom?.title ||
+            fallbackRoom?.room_name ||
+            fallbackRoom?.real ||
+            fallbackRoom?.map ||
+            fallbackRoom?.name ||
+            ''
+        ).trim();
     }
 
     return '';
@@ -4603,35 +4634,6 @@ function getPmPresenceTitle(peerId) {
     const roomId = String(pmPeerRoomIds.get(key) || '').trim();
     const roomTitle = resolvePmRoomTitleById(roomId);
     return roomTitle || 'В игре';
-}
-
-async function preloadPmRoomTitles(players = []) {
-    if (!window.supabaseClient) return;
-    const roomIds = Array.from(new Set(
-        (players || [])
-            .map(row => String(row?.room_id || '').trim())
-            .filter(Boolean)
-    ));
-    if (!roomIds.length) return;
-
-    const unknownIds = roomIds.filter(roomId => !pmPeerRoomTitles.has(roomId));
-    if (!unknownIds.length) return;
-
-    try {
-        const { data, error } = await window.supabaseClient
-            .from('rooms')
-            .select('id,title,real,map,room_name')
-            .in('id', unknownIds);
-
-        if (error || !Array.isArray(data)) return;
-
-        for (const row of data) {
-            const roomId = String(row?.id || '').trim();
-            if (!roomId) continue;
-            const roomTitle = String(row?.title || row?.real || row?.room_name || row?.map || '').trim();
-            if (roomTitle) pmPeerRoomTitles.set(roomId, roomTitle);
-        }
-    } catch (_) {}
 }
 
 function saveChatUiState() {
@@ -15698,7 +15700,6 @@ async function renderOnlinePlayers(){
 
     const players = await loadOnlinePlayersFromSupabase();
     const myId = (typeof authState !== 'undefined' && authState?.playerId) ? String(authState.playerId) : null;
-    await preloadPmRoomTitles(players);
     refreshPmOnlineState(players);
     list.innerHTML = '';
 
