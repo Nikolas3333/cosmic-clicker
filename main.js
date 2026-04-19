@@ -4511,6 +4511,49 @@ function __initHangarEmojiPanel(){
     }catch(_){}
 }
 
+
+function __appendEmojiToChatInput(symbol){
+    try{
+        const input = document.getElementById('chat-input');
+        if(!input) return;
+        const current = String(input.value || '');
+        input.value = `${current}${current ? ' ' : ''}${symbol}`.trimStart() + ' ';
+        input.focus();
+    }catch(_){}
+}
+
+function __bindHangarEmojiClicks(){
+    try{
+        const panel = document.getElementById('hangar-emoji-panel');
+        if(!panel || panel.dataset.boundHangarEmoji === '1') return;
+        panel.dataset.boundHangarEmoji = '1';
+        panel.addEventListener('click', (e) => {
+            const target = e.target?.closest?.('.hangar-emoji-btn');
+            if(!target) return;
+            e.preventDefault();
+            e.stopPropagation();
+            __appendEmojiToChatInput(String(target.dataset.emoji || target.textContent || '').trim());
+        });
+    }catch(_){}
+}
+
+function __getTotalPmUnreadCount(){
+    try{
+        return Object.values(chatUnread?.pm || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    }catch(_){
+        return 0;
+    }
+}
+
+function __updateHangarPmNeon(){
+    try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        if(!chatWrapper) return;
+        const totalPmUnread = __getTotalPmUnreadCount();
+        chatWrapper.classList.toggle('hangar-pm-neon', totalPmUnread > 0);
+    }catch(_){}
+}
+
 function bindHangarChatControls(){
     const upBtn = document.getElementById('hangar-chat-up');
     const downBtn = document.getElementById('hangar-chat-down');
@@ -4546,7 +4589,9 @@ function __syncHangarChatVisibility(){
         if(isVisible){
             bindHangarChatControls();
             __initHangarEmojiPanel();
+            __bindHangarEmojiClicks();
             __mountHangarChatPanel();
+            __updateHangarPmNeon();
             const lowered = document.body.classList.contains('hangar-chat-lowered');
             setHangarChatMode(true, lowered);
         }else{
