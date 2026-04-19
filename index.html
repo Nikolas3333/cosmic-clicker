@@ -1765,7 +1765,7 @@ body.hangar-chat-mode #chat-panel{
 }
 
 body.hangar-chat-mode #hangar-chat-controls{
-  position:fixed !important;
+  position:absolute !important;
   right:12px !important;
   top:-42px !important;
   display:flex !important;
@@ -5826,7 +5826,7 @@ shop-main-head{
 /* ===== HANGAR CHAT FINAL TUNE ===== */
 #chat-wrapper.hangar-inline-mode{
   left:18px !important;
-  bottom:138px !important;
+  bottom:58px !important;
   width:min(590px, calc(100vw - 36px)) !important;
 }
 
@@ -5880,157 +5880,26 @@ shop-main-head{
 }
 
 
-#chat-wrapper.hangar-inline-mode.hangar-pm-neon{
-  border-color:rgba(255,72,104,0.95) !important;
-  box-shadow:
-    0 0 16px rgba(255,52,92,0.62),
-    0 0 34px rgba(255,52,92,0.36),
-    inset 0 0 18px rgba(255,42,82,0.16) !important;
-  animation:hangarPmNeonPulse 0.9s infinite alternate !important;
-}
-
-@keyframes hangarPmNeonPulse{
-  from{
-    border-color:rgba(255,72,104,0.80);
-    box-shadow:
-      0 0 10px rgba(255,52,92,0.30),
-      0 0 18px rgba(255,52,92,0.16),
-      inset 0 0 10px rgba(255,42,82,0.08);
-  }
-  to{
-    border-color:rgba(255,92,124,1);
-    box-shadow:
-      0 0 20px rgba(255,52,92,0.74),
-      0 0 38px rgba(255,52,92,0.42),
-      inset 0 0 18px rgba(255,42,82,0.20);
-  }
-}
-
-
-/* ===== HANGAR CHAT HARD OVERRIDE V282 ===== */
-#chat-wrapper.hangar-inline-mode{
-  position:absolute !important;
-  left:18px !important;
-  bottom:168px !important;
-  width:min(520px, calc(100% - 36px)) !important;
-  height:260px !important;
-  z-index:26000 !important;
-  display:flex !important;
-  visibility:visible !important;
-  opacity:1 !important;
-  background:rgba(3,12,28,0.94) !important;
-  border:1px solid rgba(90,180,255,0.38) !important;
-  border-radius:16px !important;
-  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
-  overflow:visible !important;
-  transform:none !important;
-  transition:transform 0.22s ease, opacity 0.22s ease !important;
-}
-#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
-  transform:translateY(calc(100% - 42px)) !important;
-}
-#chat-wrapper.hangar-inline-mode.hangar-pm-neon{
-  border-color:rgba(255,72,104,0.95) !important;
-  box-shadow:
-    0 0 16px rgba(255,52,92,0.62),
-    0 0 34px rgba(255,52,92,0.36),
-    inset 0 0 18px rgba(255,42,82,0.16) !important;
-  animation:hangarPmNeonPulseV282 0.9s infinite alternate !important;
-}
-@keyframes hangarPmNeonPulseV282{
-  from{
-    border-color:rgba(255,72,104,0.80);
-    box-shadow:
-      0 0 10px rgba(255,52,92,0.30),
-      0 0 18px rgba(255,52,92,0.16),
-      inset 0 0 10px rgba(255,42,82,0.08);
-  }
-  to{
-    border-color:rgba(255,92,124,1);
-    box-shadow:
-      0 0 20px rgba(255,52,92,0.74),
-      0 0 38px rgba(255,52,92,0.42),
-      inset 0 0 18px rgba(255,42,82,0.20);
-  }
-}
-#chat-wrapper.hangar-inline-mode #hangar-emoji-panel{
-  position:absolute !important;
-  left:12px !important;
-  top:-56px !important;
-  display:flex !important;
-  align-items:center !important;
-  gap:8px !important;
-  padding:6px 10px !important;
-  border-radius:12px !important;
-  background:rgba(3,12,28,0.96) !important;
-  border:1px solid rgba(90,180,255,0.30) !important;
-  box-shadow:0 0 18px rgba(0,180,255,0.18) !important;
-  z-index:5 !important;
-}
-
-
-/* ===== HANGAR CHAT FINAL POSITION V283 ===== */
-#chat-wrapper.hangar-inline-mode{
-  position:absolute !important;
-  left:18px !important;
-  bottom:380px !important;
-  width:min(520px, calc(100% - 36px)) !important;
-  height:260px !important;
-  z-index:26000 !important;
-}
-
-#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
-  transform:translateY(calc(100% - 42px)) !important;
-}
-
-#chat-wrapper.hangar-inline-mode.hangar-pm-neon{
-  border-color:rgba(255,72,104,0.98) !important;
-  box-shadow:
-    0 0 18px rgba(255,52,92,0.72),
-    0 0 36px rgba(255,52,92,0.42),
-    inset 0 0 18px rgba(255,42,82,0.16) !important;
-  animation:hangarPmNeonPulseV283 0.72s infinite alternate !important;
-}
-
-@keyframes hangarPmNeonPulseV283{
-  0%{
-    border-color:rgba(255,72,104,0.55);
-    box-shadow:
-      0 0 6px rgba(255,52,92,0.10),
-      0 0 12px rgba(255,52,92,0.06),
-      inset 0 0 6px rgba(255,42,82,0.04);
-  }
-  100%{
-    border-color:rgba(255,92,124,1);
-    box-shadow:
-      0 0 22px rgba(255,52,92,0.86),
-      0 0 44px rgba(255,52,92,0.52),
-      inset 0 0 20px rgba(255,42,82,0.20);
-  }
-}
-
-
-/* ===== FORCE CHAT TOP V287 ===== */
+/* === V288 FORCE TOP + BLINK === */
 #chat-wrapper.hangar-inline-mode{
   position:fixed !important;
   left:20px !important;
-  top:120px !important;
+  top:110px !important;
   bottom:auto !important;
   width:520px !important;
   height:260px !important;
   z-index:999999 !important;
 }
 
-/* STRONG BLINK */
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
   border:1px solid #ff2e55 !important;
-  animation:blinkV287 0.4s infinite !important;
+  animation:hangarBlinkV288 0.45s infinite !important;
 }
 
-@keyframes blinkV287{
-  0%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
-  50%{ box-shadow:0 0 30px rgba(255,0,60,1);}
-  100%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
+@keyframes hangarBlinkV288{
+  0%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
+  50%{ box-shadow:0 0 34px rgba(255,0,60,1); }
+  100%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
 }
 
 </style>
@@ -6623,27 +6492,26 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 }
 
 
-/* ===== FORCE CHAT TOP V287 ===== */
+/* === V288 FORCE TOP + BLINK === */
 #chat-wrapper.hangar-inline-mode{
   position:fixed !important;
   left:20px !important;
-  top:120px !important;
+  top:110px !important;
   bottom:auto !important;
   width:520px !important;
   height:260px !important;
   z-index:999999 !important;
 }
 
-/* STRONG BLINK */
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
   border:1px solid #ff2e55 !important;
-  animation:blinkV287 0.4s infinite !important;
+  animation:hangarBlinkV288 0.45s infinite !important;
 }
 
-@keyframes blinkV287{
-  0%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
-  50%{ box-shadow:0 0 30px rgba(255,0,60,1);}
-  100%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
+@keyframes hangarBlinkV288{
+  0%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
+  50%{ box-shadow:0 0 34px rgba(255,0,60,1); }
+  100%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
 }
 
 </style>
@@ -6714,27 +6582,26 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 }
 
 
-/* ===== FORCE CHAT TOP V287 ===== */
+/* === V288 FORCE TOP + BLINK === */
 #chat-wrapper.hangar-inline-mode{
   position:fixed !important;
   left:20px !important;
-  top:120px !important;
+  top:110px !important;
   bottom:auto !important;
   width:520px !important;
   height:260px !important;
   z-index:999999 !important;
 }
 
-/* STRONG BLINK */
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
   border:1px solid #ff2e55 !important;
-  animation:blinkV287 0.4s infinite !important;
+  animation:hangarBlinkV288 0.45s infinite !important;
 }
 
-@keyframes blinkV287{
-  0%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
-  50%{ box-shadow:0 0 30px rgba(255,0,60,1);}
-  100%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
+@keyframes hangarBlinkV288{
+  0%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
+  50%{ box-shadow:0 0 34px rgba(255,0,60,1); }
+  100%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
 }
 
 </style>
@@ -6857,27 +6724,26 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 }
 
 
-/* ===== FORCE CHAT TOP V287 ===== */
+/* === V288 FORCE TOP + BLINK === */
 #chat-wrapper.hangar-inline-mode{
   position:fixed !important;
   left:20px !important;
-  top:120px !important;
+  top:110px !important;
   bottom:auto !important;
   width:520px !important;
   height:260px !important;
   z-index:999999 !important;
 }
 
-/* STRONG BLINK */
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
   border:1px solid #ff2e55 !important;
-  animation:blinkV287 0.4s infinite !important;
+  animation:hangarBlinkV288 0.45s infinite !important;
 }
 
-@keyframes blinkV287{
-  0%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
-  50%{ box-shadow:0 0 30px rgba(255,0,60,1);}
-  100%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
+@keyframes hangarBlinkV288{
+  0%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
+  50%{ box-shadow:0 0 34px rgba(255,0,60,1); }
+  100%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
 }
 
 </style>
@@ -6951,27 +6817,26 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 }
 
 
-/* ===== FORCE CHAT TOP V287 ===== */
+/* === V288 FORCE TOP + BLINK === */
 #chat-wrapper.hangar-inline-mode{
   position:fixed !important;
   left:20px !important;
-  top:120px !important;
+  top:110px !important;
   bottom:auto !important;
   width:520px !important;
   height:260px !important;
   z-index:999999 !important;
 }
 
-/* STRONG BLINK */
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
   border:1px solid #ff2e55 !important;
-  animation:blinkV287 0.4s infinite !important;
+  animation:hangarBlinkV288 0.45s infinite !important;
 }
 
-@keyframes blinkV287{
-  0%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
-  50%{ box-shadow:0 0 30px rgba(255,0,60,1);}
-  100%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
+@keyframes hangarBlinkV288{
+  0%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
+  50%{ box-shadow:0 0 34px rgba(255,0,60,1); }
+  100%{ box-shadow:0 0 6px rgba(255,0,60,0.2); }
 }
 
 </style>
