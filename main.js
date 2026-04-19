@@ -8852,42 +8852,47 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
     const showcaseGroup = hangarState?.envGroup?.userData?.shipShowcaseGroup || hangarState?.showcaseGroup || null;
     const centerMesh = showcaseGroup?.children?.[0] || null;
     const supportMesh = (hangarState.supportShipMeshes || []).find(mesh => String(mesh?.userData?.shipId || '').trim() === safeNext) || null;
-    if(!centerMesh && !supportMesh) return;
+    if(!centerMesh || !supportMesh) return;
 
-    const detachMeshToScene = (mesh) => {
-        if(!mesh || !hangarState?.scene) return null;
+    const cloneDisplayedMeshToScene = (sourceMesh) => {
+        if(!sourceMesh || !hangarState?.scene) return null;
+        const clone = cloneObject3DDeepSafe(sourceMesh);
+        if(!clone) return null;
         const worldPos = new THREE.Vector3();
         const worldQuat = new THREE.Quaternion();
         const worldScale = new THREE.Vector3(1, 1, 1);
         try{
-            mesh.updateMatrixWorld(true);
-            mesh.getWorldPosition(worldPos);
-            mesh.getWorldQuaternion(worldQuat);
-            mesh.getWorldScale(worldScale);
+            sourceMesh.updateMatrixWorld(true);
+            sourceMesh.getWorldPosition(worldPos);
+            sourceMesh.getWorldQuaternion(worldQuat);
+            sourceMesh.getWorldScale(worldScale);
         }catch(_){ }
-        try{ mesh.parent?.remove?.(mesh); }catch(_){ }
-        hangarState.scene.add(mesh);
-        mesh.position.copy(worldPos);
-        mesh.quaternion.copy(worldQuat);
-        mesh.scale.copy(worldScale);
-        mesh.userData = mesh.userData || {};
-        mesh.userData.isActiveHangarTransferMesh = true;
-        return mesh;
+        hangarState.scene.add(clone);
+        clone.position.copy(worldPos);
+        clone.quaternion.copy(worldQuat);
+        clone.scale.copy(worldScale);
+        clone.userData = { ...(clone.userData || {}), isActiveHangarTransferMesh:true };
+        return clone;
     };
 
-    const incomingMesh = detachMeshToScene(supportMesh);
-    const outgoingMesh = detachMeshToScene(centerMesh);
-    if(!incomingMesh && !outgoingMesh) return;
+    const incomingMesh = cloneDisplayedMeshToScene(supportMesh);
+    const outgoingMesh = cloneDisplayedMeshToScene(centerMesh);
+    if(!incomingMesh || !outgoingMesh) return;
+
+    try{ supportMesh.visible = false; supportMesh.userData.hiddenForTransfer = true; }catch(_){ }
+    try{ centerMesh.visible = false; centerMesh.userData.hiddenForTransfer = true; }catch(_){ }
 
     const transfer = {
         startedAt: performance.now(),
-        duration: 5600,
+        duration: 7600,
         incoming: null,
         outgoing: null,
         clickedDockIndex: Number(clickedDockIndex || -1),
         previousShipId: safePrev,
         nextShipId: safeNext,
-        nextShipIndex: Number(clickedDockIndex || -1)
+        nextShipIndex: Number(clickedDockIndex || -1),
+        hiddenOriginalIncoming: supportMesh,
+        hiddenOriginalOutgoing: centerMesh
     };
 
     const centerPos = getHangarCenterWorldPosition();
@@ -8895,30 +8900,29 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
         ? getHangarDockWorldPosition(Number(clickedDockIndex))
         : centerPos.clone().add(new THREE.Vector3(0, 0, -4.2));
 
-    if(incomingMesh){
-        const fromPos = new THREE.Vector3();
-        try{ incomingMesh.getWorldPosition(fromPos); }catch(_){ fromPos.copy(dockPos); }
-        transfer.incoming = {
-            mesh: incomingMesh,
-            from: fromPos.clone(),
-            to: centerPos.clone(),
-            fromScale: Number(incomingMesh.scale.x || 1),
-            toScale: 1.22,
-            lift: 2.2
-        };
-    }
-    if(outgoingMesh){
-        const fromPos = new THREE.Vector3();
-        try{ outgoingMesh.getWorldPosition(fromPos); }catch(_){ fromPos.copy(centerPos); }
-        transfer.outgoing = {
-            mesh: outgoingMesh,
-            from: fromPos.clone(),
-            to: dockPos.clone(),
-            fromScale: Number(outgoingMesh.scale.x || 1),
-            toScale: 0.84,
-            lift: 1.65
-        };
-    }
+    const incomingFrom = new THREE.Vector3();
+    const outgoingFrom = new THREE.Vector3();
+    try{ incomingMesh.getWorldPosition(incomingFrom); }catch(_){ incomingFrom.copy(dockPos); }
+    try{ outgoingMesh.getWorldPosition(outgoingFrom); }catch(_){ outgoingFrom.copy(centerPos); }
+
+    transfer.incoming = {
+        mesh: incomingMesh,
+        from: incomingFrom.clone(),
+        to: centerPos.clone(),
+        fromScale: Number(incomingMesh.scale.x || 1),
+        toScale: 1.22,
+        lift: 2.6,
+        arcOffset: -0.72
+    };
+    transfer.outgoing = {
+        mesh: outgoingMesh,
+        from: outgoingFrom.clone(),
+        to: dockPos.clone(),
+        fromScale: Number(outgoingMesh.scale.x || 1),
+        toScale: 0.84,
+        lift: 2.1,
+        arcOffset: 0.72
+    };
 
     hangarState.shipTransfer = transfer;
 }
@@ -10199,14 +10203,13 @@ function ensureHangarSellTerminal(candidate){
     }
     try{ group.parent?.remove?.(group); }catch(_){}
     candidate.pad.add(group);
-    group.position.set(0.72, 0.04, -0.28);
-    group.rotation.y = -0.45;
+    group.position.set(0.66, 0.34, 0.38);
+    group.rotation.y = -0.18;
     group.visible = true;
 }
 
 function updateHangarPlatformPrompt(){
     const hint = document.getElementById('hangar-platform-hint');
-    const sellBtn = document.getElementById('hangar-platform-sell');
     const candidates = getHangarSupportShips()
         .map((ship, idx) => ({ ship, idx, pad:getHangarDockPadByIndex(idx) }))
         .filter(item => item.ship && item.pad);
@@ -10233,13 +10236,6 @@ function updateHangarPlatformPrompt(){
     }
 
     if(hint){ hint.style.display = 'none'; hint.textContent = ''; }
-    if(sellBtn){
-        sellBtn.style.display = 'none';
-        sellBtn.disabled = true;
-        sellBtn.dataset.shipId = '';
-        sellBtn.dataset.dockIndex = '';
-    }
-
     if(!activeCandidate){
         disposeHangarSellTerminal();
         return;
@@ -11183,19 +11179,22 @@ function ensureHangarRenderer(){
                 if(!entry?.mesh) return;
                 const from = entry.from.clone();
                 const to = entry.to.clone();
+                const lift = Number(entry.lift || 2.0);
                 let t = 0;
                 let y = from.y;
-                if(progress < 0.28){
+                if(progress < 0.26){
                     t = 0;
-                    y = THREE.MathUtils.lerp(from.y, from.y + Number(entry.lift || 1.8), smooth(progress / 0.28));
+                    y = THREE.MathUtils.lerp(from.y, from.y + lift, smooth(progress / 0.26));
                 }else if(progress < 0.78){
-                    t = smooth((progress - 0.28) / 0.50);
-                    y = from.y + Number(entry.lift || 1.8);
+                    t = smooth((progress - 0.26) / 0.52);
+                    y = from.y + lift;
                 }else{
                     t = 1;
-                    y = THREE.MathUtils.lerp(from.y + Number(entry.lift || 1.8), to.y, smooth((progress - 0.78) / 0.22));
+                    y = THREE.MathUtils.lerp(from.y + lift, to.y, smooth((progress - 0.78) / 0.22));
                 }
                 const pos = from.clone().lerp(to, t);
+                const arc = Math.sin(Math.PI * THREE.MathUtils.clamp((progress - 0.26) / 0.52, 0, 1)) * Number(entry.arcOffset || 0);
+                pos.z += arc;
                 pos.y = y;
                 entry.mesh.position.copy(pos);
                 const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
@@ -11211,6 +11210,8 @@ function ensureHangarRenderer(){
                     updateUI?.();
                     saveGame?.();
                 }
+                try{ if(transfer.hiddenOriginalIncoming){ transfer.hiddenOriginalIncoming.visible = true; transfer.hiddenOriginalIncoming.userData.hiddenForTransfer = false; } }catch(_){ }
+                try{ if(transfer.hiddenOriginalOutgoing){ transfer.hiddenOriginalOutgoing.visible = true; transfer.hiddenOriginalOutgoing.userData.hiddenForTransfer = false; } }catch(_){ }
                 try{ transfer.incoming?.mesh && (transfer.incoming.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
                 try{ transfer.outgoing?.mesh && (transfer.outgoing.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
                 try{ transfer.incoming?.mesh?.parent?.remove?.(transfer.incoming?.mesh); }catch(_){ }
@@ -11308,29 +11309,11 @@ function ensureHangarRenderer(){
             hangarState.camera.lookAt(focus);
         }
         const floatingSellBtn = document.getElementById('hangar-platform-sell');
-        const stageRect = stage.getBoundingClientRect();
-        if(floatingSellBtn && hangarState.camera){
-            const dockIndex = Number(floatingSellBtn.dataset.dockIndex || NaN);
-            const hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
-            if(hoverShip && Number.isFinite(dockIndex) && dockIndex >= 0 && floatingSellBtn.style.display !== 'none'){
-                const worldPos = getHangarDockWorldPosition(dockIndex).clone();
-                worldPos.y += 2.85;
-                const projected = worldPos.project(hangarState.camera);
-                if(projected.z > -1 && projected.z < 1){
-                    const screenX = ((projected.x + 1) * 0.5) * stageRect.width;
-                    const screenY = ((-projected.y + 1) * 0.5) * stageRect.height;
-                    floatingSellBtn.style.left = `${screenX}px`;
-                    floatingSellBtn.style.top = `${screenY}px`;
-                    floatingSellBtn.style.transform = 'translate(-50%, -50%)';
-                    floatingSellBtn.style.zIndex = '20';
-                }else{
-                    floatingSellBtn.style.display = 'none';
-                    floatingSellBtn.dataset.shipId = '';
-                    floatingSellBtn.dataset.dockIndex = '';
-                }
-            }else{
-                floatingSellBtn.style.display = 'none';
-            }
+        if(floatingSellBtn){
+            floatingSellBtn.style.display = 'none';
+            floatingSellBtn.disabled = true;
+            floatingSellBtn.dataset.shipId = '';
+            floatingSellBtn.dataset.dockIndex = '';
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
@@ -11701,7 +11684,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
                 <div class="hangar-runtime-fade"></div>
                 <div class="hangar-stage-overlay" style="pointer-events:none;">
                   <div id="hangar-platform-hint" style="display:none !important;position:absolute;left:50%;bottom:24px;transform:translateX(-50%);padding:10px 16px;border-radius:14px;background:rgba(4,10,22,0.76);border:1px solid rgba(98,216,255,0.25);box-shadow:0 0 18px rgba(0,180,255,0.16);font-size:14px;color:#dff7ff;pointer-events:none;white-space:nowrap;"></div>
-                  <button id="hangar-platform-sell" class="hangar-main-btn hangar-sell-btn" type="button" style="position:absolute;display:none;min-width:170px;pointer-events:auto;z-index:6;">Продать</button>
+                  <button id="hangar-platform-sell" class="hangar-main-btn hangar-sell-btn" type="button" style="position:absolute;display:none !important;min-width:170px;pointer-events:none;z-index:0;opacity:0;">Продать</button>
                   <div id="hangar-ship-tier" style="display:none;">Корпус</div>
                   <div id="hangar-ship-name" style="display:none;">Cargo Drone</div>
                   <div id="hangar-ship-subtitle" style="display:none;">Центральная платформа показывает корпус.</div>
