@@ -5770,22 +5770,12 @@ shop-main-head{
 
 
 #chat-wrapper.hangar-inline-mode{
-  position:absolute !important;
+  position:fixed !important;
   left:18px !important;
-  bottom:18px !important;
-  width:min(520px, calc(100% - 36px)) !important;
+  bottom:520px !important;
+  width:520px !important;
   height:260px !important;
-  z-index:26000 !important;
-  display:flex !important;
-  visibility:visible !important;
-  opacity:1 !important;
-  background:rgba(3,12,28,0.94) !important;
-  border:1px solid rgba(90,180,255,0.38) !important;
-  border-radius:16px !important;
-  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
-  overflow:visible !important;
-  transform:none !important;
-  transition:transform 0.22s ease, opacity 0.22s ease !important;
+  z-index:999999 !important;
 }
 #chat-wrapper.hangar-inline-mode #chat-panel{
   display:flex !important;
@@ -5881,12 +5871,12 @@ shop-main-head{
 
 
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
-  border-color:rgba(255,72,104,0.95) !important;
+  border-color:rgba(255,80,110,1) !important;
   box-shadow:
-    0 0 16px rgba(255,52,92,0.62),
-    0 0 34px rgba(255,52,92,0.36),
-    inset 0 0 18px rgba(255,42,82,0.16) !important;
-  animation:hangarPmNeonPulse 0.9s infinite alternate !important;
+    0 0 20px rgba(255,0,60,0.8),
+    0 0 40px rgba(255,0,60,0.6),
+    inset 0 0 15px rgba(255,0,60,0.4) !important;
+  animation:hangarNeonBlink 0.5s infinite alternate !important;
 }
 
 @keyframes hangarPmNeonPulse{
