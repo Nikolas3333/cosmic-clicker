@@ -4525,7 +4525,13 @@ function __updateHangarPmNeon(){
     try{
         const chatWrapper = document.getElementById('chat-wrapper');
         if(!chatWrapper) return;
-        chatWrapper.classList.toggle('hangar-pm-neon', __getTotalPmUnreadCount() > 0);
+
+        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered') || document.body.classList.contains('hangar-chat-lowered');
+        const activeScope = parseChatScope(currentChat);
+        const activePmUnread = activeScope.channel === 'pm' ? getUnreadCount(currentChat) : 0;
+        const shouldGlow = !!(isLowered && activeScope.channel === 'pm' && activePmUnread > 0);
+
+        chatWrapper.classList.toggle('hangar-pm-neon', shouldGlow);
     }catch(_){}
 }
 
@@ -5396,6 +5402,7 @@ function setUnreadForScope(scopeName, state = true) {
 
 function clearUnreadForCurrentScope() {
     setUnreadCount(currentChat, 0);
+    __updateHangarPmNeon?.();
 }
 
 function ensurePmTab(peerId, label = null) {
@@ -5760,6 +5767,7 @@ function renderChatTabs() {
             clearUnreadForCurrentScope();
 
             renderChatTabs();
+            __updateHangarPmNeon?.();
             saveChatUiState();
             await loadChatHistory(currentChat);
             renderLobbyMessages();
@@ -6171,10 +6179,17 @@ async function handleIncomingRealtimeMessage(msg) {
 
         ensurePmTab(peerId, getPeerLabelFromPmMessage(msg, peerId));
         syncPrivateTabFromScope(scope.key);
-        if (currentChat !== scope.key) incrementUnread(scope.key);
+
+        const isHangarLowered = document.body.classList.contains('hangar-chat-lowered') || document.getElementById('chat-wrapper')?.classList.contains('hangar-chat-lowered');
+        if (currentChat !== scope.key) {
+            incrementUnread(scope.key);
+        } else if (isHangarLowered) {
+            incrementUnread(scope.key);
+        }
 
         if (currentChat === scope.key) renderLobbyMessages();
         renderChatTabs();
+        __updateHangarPmNeon?.();
     }
 }
 
