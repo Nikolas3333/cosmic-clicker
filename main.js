@@ -8131,7 +8131,8 @@ const hangarState = {
     selectedDockIndex: -1,
     shipAppearStartedAt: 0,
     supportShipMeshes: [],
-    shipTransfer: null
+    shipTransfer: null,
+    sellTerminalGroup: null
 };
 
 const STARTER_HULL_IDS = ['scout_1'];
@@ -8880,10 +8881,13 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
 
     const transfer = {
         startedAt: performance.now(),
-        duration: 3250,
+        duration: 5600,
         incoming: null,
         outgoing: null,
-        clickedDockIndex: Number(clickedDockIndex || -1)
+        clickedDockIndex: Number(clickedDockIndex || -1),
+        previousShipId: safePrev,
+        nextShipId: safeNext,
+        nextShipIndex: Number(clickedDockIndex || -1)
     };
 
     const centerPos = getHangarCenterWorldPosition();
@@ -8933,18 +8937,11 @@ function selectCurrentHangarShip(){
         rebuildHangarSceneObjects();
         return true;
     }
-    player.selectedShipId = nextShipId;
-    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     syncHangarDockSelection();
     setHangarTransition?.(hangarState.shipIndex >= previousIndex ? 1 : -1);
     hangarState.shipAppearStartedAt = performance.now();
     startHangarShipTransfer(previousShipId, nextShipId, hangarState.shipIndex);
-    updatePremiumAccountInfo?.();
-    updateHUD?.();
-    updateUI?.();
-    saveGame?.();
     fillHangarText();
-    window.renderShopScreen?.();
     return true;
 }
 
@@ -10068,6 +10065,7 @@ function disposeHangarRenderer(){
     hangarState.supportPlatforms = [];
     hangarState.supportShipMeshes = [];
     hangarState.infoBoards = [];
+    disposeHangarSellTerminal?.();
     if(hangarState.shipTransfer){
         try{ hangarState.shipTransfer.incoming?.mesh?.parent?.remove?.(hangarState.shipTransfer.incoming?.mesh); }catch(_){ }
         try{ hangarState.shipTransfer.outgoing?.mesh?.parent?.remove?.(hangarState.shipTransfer.outgoing?.mesh); }catch(_){ }
@@ -10128,6 +10126,84 @@ function hideHangarShipPriceRow(){
     if(row) row.style.display = 'none';
 }
 
+function disposeHangarSellTerminal(){
+    const terminal = hangarState?.sellTerminalGroup || null;
+    if(terminal){
+        try{ terminal.parent?.remove?.(terminal); }catch(_){}
+    }
+    hangarState.sellTerminalGroup = null;
+}
+
+function buildHangarSellTerminalLabel(textLabel){
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if(ctx){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = 'rgba(4,14,24,0.92)';
+        ctx.strokeStyle = 'rgba(64,240,255,0.95)';
+        ctx.lineWidth = 6;
+        ctx.fillRect(8,8,canvas.width-16,canvas.height-16);
+        ctx.strokeRect(8,8,canvas.width-16,canvas.height-16);
+        ctx.fillStyle = '#9ffbff';
+        ctx.font = 'bold 30px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(textLabel || 'ПРОДАТЬ', canvas.width/2, 44);
+        ctx.fillStyle = '#e9ffff';
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText('TERMINAL', canvas.width/2, 86);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function ensureHangarSellTerminal(candidate){
+    if(!candidate?.pad || !candidate?.ship) { disposeHangarSellTerminal(); return; }
+    const shipId = String(candidate.ship?.id || '').trim();
+    if(!shipId){ disposeHangarSellTerminal(); return; }
+    let group = hangarState.sellTerminalGroup;
+    if(!group){
+        group = new THREE.Group();
+        group.name = 'HangarSellTerminal';
+        const base = new THREE.Mesh(
+            new THREE.BoxGeometry(0.42, 0.16, 0.32),
+            new THREE.MeshStandardMaterial({ color:0x0d1622, emissive:0x123347, emissiveIntensity:0.28, metalness:0.55, roughness:0.42 })
+        );
+        base.position.set(0, 0.08, 0);
+        group.add(base);
+        const stem = new THREE.Mesh(
+            new THREE.BoxGeometry(0.06, 0.24, 0.06),
+            new THREE.MeshStandardMaterial({ color:0x1a2938, emissive:0x0f1c2a, emissiveIntensity:0.18 })
+        );
+        stem.position.set(0, 0.24, -0.02);
+        group.add(stem);
+        const screenMat = new THREE.MeshBasicMaterial({ map: buildHangarSellTerminalLabel('ПРОДАТЬ'), transparent:true });
+        const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.32), screenMat);
+        screen.position.set(0, 0.46, -0.02);
+        screen.rotation.x = -0.55;
+        screen.userData = { hangarSellTerminal:true };
+        group.add(screen);
+        group.userData = { hangarSellTerminal:true, hangarSellTerminalShipId: shipId, dockIndex: Number(candidate.idx || 0) || 0 };
+        hangarState.sellTerminalGroup = group;
+    }
+    group.userData = { ...(group.userData || {}), hangarSellTerminal:true, hangarSellTerminalShipId: shipId, dockIndex: Number(candidate.idx || 0) || 0 };
+    const label = getSellActionLabel('ship', shipId).replace(/^Продать\s*/i,'ПРОДАТЬ ');
+    const screen = group.children.find(child => child.isMesh && child.geometry?.type === 'PlaneGeometry');
+    if(screen?.material){
+        if(screen.material.map) screen.material.map.dispose?.();
+        screen.material.map = buildHangarSellTerminalLabel(label);
+        screen.material.needsUpdate = true;
+    }
+    try{ group.parent?.remove?.(group); }catch(_){}
+    candidate.pad.add(group);
+    group.position.set(0.72, 0.04, -0.28);
+    group.rotation.y = -0.45;
+    group.visible = true;
+}
+
 function updateHangarPlatformPrompt(){
     const hint = document.getElementById('hangar-platform-hint');
     const sellBtn = document.getElementById('hangar-platform-sell');
@@ -10156,43 +10232,27 @@ function updateHangarPlatformPrompt(){
         activeCandidate = candidates.find(item => canSellHull(item.ship?.id)) || null;
     }
 
-    if(hint){
-        hint.style.display = 'none';
-        hint.textContent = '';
-    }
-
-    if(!sellBtn){
-        return;
-    }
-
-    if(!activeCandidate){
+    if(hint){ hint.style.display = 'none'; hint.textContent = ''; }
+    if(sellBtn){
         sellBtn.style.display = 'none';
         sellBtn.disabled = true;
         sellBtn.dataset.shipId = '';
         sellBtn.dataset.dockIndex = '';
-        sellBtn.textContent = 'Продать';
-        sellBtn.classList.remove('locked');
+    }
+
+    if(!activeCandidate){
+        disposeHangarSellTerminal();
         return;
     }
 
     const targetShip = activeCandidate.ship || null;
     const safeShipId = String(targetShip?.id || '').trim();
     if(!safeShipId || !canSellHull(safeShipId)){
-        sellBtn.style.display = 'none';
-        sellBtn.disabled = true;
-        sellBtn.dataset.shipId = '';
-        sellBtn.dataset.dockIndex = '';
-        sellBtn.textContent = 'Продать';
-        sellBtn.classList.remove('locked');
+        disposeHangarSellTerminal();
         return;
     }
 
-    sellBtn.style.display = 'flex';
-    sellBtn.disabled = false;
-    sellBtn.dataset.shipId = safeShipId;
-    sellBtn.dataset.dockIndex = String(activeCandidate.idx);
-    sellBtn.textContent = getSellActionLabel('ship', safeShipId);
-    sellBtn.classList.remove('locked');
+    ensureHangarSellTerminal(activeCandidate);
 }
 
 
@@ -11125,15 +11185,15 @@ function ensureHangarRenderer(){
                 const to = entry.to.clone();
                 let t = 0;
                 let y = from.y;
-                if(progress < 0.32){
+                if(progress < 0.28){
                     t = 0;
-                    y = THREE.MathUtils.lerp(from.y, from.y + Number(entry.lift || 1.8), smooth(progress / 0.25));
-                }else if(progress < 0.84){
-                    t = smooth((progress - 0.32) / 0.52);
+                    y = THREE.MathUtils.lerp(from.y, from.y + Number(entry.lift || 1.8), smooth(progress / 0.28));
+                }else if(progress < 0.78){
+                    t = smooth((progress - 0.28) / 0.50);
                     y = from.y + Number(entry.lift || 1.8);
                 }else{
                     t = 1;
-                    y = THREE.MathUtils.lerp(from.y + Number(entry.lift || 1.8), to.y, smooth((progress - 0.84) / 0.16));
+                    y = THREE.MathUtils.lerp(from.y + Number(entry.lift || 1.8), to.y, smooth((progress - 0.78) / 0.22));
                 }
                 const pos = from.clone().lerp(to, t);
                 pos.y = y;
@@ -11142,6 +11202,15 @@ function ensureHangarRenderer(){
                 entry.mesh.scale.setScalar(scaleValue);
             });
             if(progress >= 1){
+                const finalShipId = String(transfer.nextShipId || '').trim();
+                if(finalShipId){
+                    player.selectedShipId = finalShipId;
+                    currentBattleShipStats = computeShipBattleStats(finalShipId);
+                    updatePremiumAccountInfo?.();
+                    updateHUD?.();
+                    updateUI?.();
+                    saveGame?.();
+                }
                 try{ transfer.incoming?.mesh && (transfer.incoming.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
                 try{ transfer.outgoing?.mesh && (transfer.outgoing.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
                 try{ transfer.incoming?.mesh?.parent?.remove?.(transfer.incoming?.mesh); }catch(_){ }
@@ -11150,6 +11219,7 @@ function ensureHangarRenderer(){
                 hangarState.hoverDockIndex = -1;
                 hangarState.selectedDockIndex = -1;
                 rebuildHangarSceneObjects();
+                fillHangarText();
             }
         }
 
@@ -11289,23 +11359,39 @@ function bindHangarStageInteraction(){
         mouse.y = -(((clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1);
         raycaster.setFromCamera(mouse, hangarState.camera);
         const pads = (hangarState.supportPlatforms || []).filter(Boolean);
+        const terminal = hangarState.sellTerminalGroup || null;
         const targets = pads.flatMap(pad => {
             const nodes = [];
             if(pad) nodes.push(pad);
             try{ pad?.traverse?.(child => { if(child?.isMesh) nodes.push(child); }); }catch(_){}
             return nodes;
         });
+        if(terminal){
+            try{ terminal.traverse?.(child => { if(child?.isMesh) targets.push(child); }); }catch(_){}
+        }
         const hits = raycaster.intersectObjects(targets, false);
         let hoverIndex = -1;
+        let terminalShipId = '';
         if(hits.length){
             let obj = hits[0].object;
-            while(obj && hoverIndex < 0){
+            while(obj && hoverIndex < 0 && !terminalShipId){
+                if(obj?.userData?.hangarSellTerminalShipId) terminalShipId = String(obj.userData.hangarSellTerminalShipId || '').trim();
+                if(obj?.userData?.hangarSellTerminal && obj?.parent?.userData?.hangarSellTerminalShipId) terminalShipId = String(obj.parent.userData.hangarSellTerminalShipId || '').trim();
                 if(Number.isFinite(obj?.userData?.hangarDockIndex)) hoverIndex = Number(obj.userData.hangarDockIndex);
                 obj = obj.parent;
             }
         }
         hangarState.hoverDockIndex = hoverIndex;
         updateHangarPlatformPrompt();
+        if(activateClick && terminalShipId && !hangarState.shipTransfer){
+            sellHullFromHangar?.(terminalShipId);
+            hangarState.hoverDockIndex = -1;
+            hangarState.selectedDockIndex = -1;
+            updateHangarPlatformPrompt();
+            fillHangarText();
+            rebuildHangarSceneObjects();
+            return;
+        }
         if(activateClick && hoverIndex >= 0 && !hangarState.shipTransfer){
             hangarState.selectedDockIndex = hoverIndex;
             updateHangarPlatformPrompt();
