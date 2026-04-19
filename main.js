@@ -5750,6 +5750,7 @@ function renderChatTabs() {
     });
 
     chatTabsWrap.innerHTML = html;
+    __updateHangarPmNeon?.();
 
     chatTabsWrap.querySelectorAll(".chat-tab").forEach((tab) => {
         tab.addEventListener("click", async (e) => {
@@ -12524,6 +12525,7 @@ window.addEventListener('load', () => {
     renderLeadersWindow();
     bindHangarChatControls();
     __installHangarChatWatcher();
+    __updateHangarPmNeon?.();
     __syncHangarChatVisibility();
     
     try{
