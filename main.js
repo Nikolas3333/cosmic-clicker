@@ -10686,7 +10686,7 @@ function getBattleShipVisualConfig(shipId){
         return {
             scale: 2.05,
             fallbackScale: 0.48,
-            visualYaw: -Math.PI / 2,
+            visualYaw: Math.PI,
             cameraDistance: 16.5,
             cameraHeight: 5.5
         };
