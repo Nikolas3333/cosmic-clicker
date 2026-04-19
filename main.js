@@ -4574,20 +4574,20 @@ function resolvePmRoomTitleById(roomId = '') {
     const safeRoomId = String(roomId || '').trim();
     if (!safeRoomId) return '';
 
-    const currentRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
-    if (currentRoomId && currentRoomId === safeRoomId) {
+    const currentId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    if (currentId && currentId === safeRoomId) {
         return String(currentRoom?.title || currentRoom?.room_name || currentRoom?.real || currentRoom?.map || '').trim();
     }
 
-    const selectedRoomId = String(selectedLobbyMap?.id || selectedLobbyMap?.roomId || '').trim();
-    if (selectedRoomId && selectedRoomId === safeRoomId) {
+    const selectedId = String(selectedLobbyMap?.id || selectedLobbyMap?.roomId || '').trim();
+    if (selectedId && selectedId === safeRoomId) {
         return String(selectedLobbyMap?.title || selectedLobbyMap?.room_name || selectedLobbyMap?.real || selectedLobbyMap?.map || '').trim();
     }
 
-    const cacheRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find((room) => {
+    const cacheRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find(room => {
         const directId = String(room?.id || room?.roomId || '').trim();
         const rawId = String(room?.rawRoom?.id || '').trim();
-        return (directId && directId === safeRoomId) || (rawId && rawId === safeRoomId);
+        return directId === safeRoomId || rawId === safeRoomId;
     });
 
     if (cacheRoom) {
@@ -4597,26 +4597,10 @@ function resolvePmRoomTitleById(roomId = '') {
             cacheRoom?.real ||
             cacheRoom?.map ||
             cacheRoom?.name ||
-            cacheRoom?.rawRoom?.title ||
             cacheRoom?.rawRoom?.room_name ||
+            cacheRoom?.rawRoom?.title ||
             cacheRoom?.rawRoom?.map_name ||
             cacheRoom?.rawRoom?.map ||
-            ''
-        ).trim();
-    }
-
-    const fallbackRoom = (Array.isArray(DEFAULT_SUPABASE_BATTLE_ROOMS) ? DEFAULT_SUPABASE_BATTLE_ROOMS : []).find((room) => {
-        const directId = String(room?.id || room?.roomId || '').trim();
-        return directId && directId === safeRoomId;
-    });
-
-    if (fallbackRoom) {
-        return String(
-            fallbackRoom?.title ||
-            fallbackRoom?.room_name ||
-            fallbackRoom?.real ||
-            fallbackRoom?.map ||
-            fallbackRoom?.name ||
             ''
         ).trim();
     }
@@ -15685,18 +15669,21 @@ function refreshPmOnlineState(players = []){
 
         if (status === 'lobby') {
             onlinePmPeers.add(targetId);
-        } else if (status === 'in-game') {
+        } else {
             inGamePmPeers.add(targetId);
             if(roomId) pmPeerRoomIds.set(targetId, roomId);
         }
     }
-
     renderChatTabs();
 }
 
 async function renderOnlinePlayers(){
     const list = document.getElementById('online-list');
     if(!list) return;
+
+    try{
+        if(typeof loadRoomsFromSupabase === 'function') await loadRoomsFromSupabase();
+    }catch(_){}
 
     const players = await loadOnlinePlayersFromSupabase();
     const myId = (typeof authState !== 'undefined' && authState?.playerId) ? String(authState.playerId) : null;
