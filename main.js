@@ -7350,64 +7350,110 @@ async function fetchCurrentRoomLivePlayers(){
         return cachedRoomPlayersRows;
     }
 
-    const rows = [];
-    const myId = getSelfBattlePlayerId();
-    if(gameState === "BATTLE" && playerShip && myId){
-        rows.push({
-            player_id: myId,
-            nickname: player?.nickname || "Commander",
-            joined_at: new Date(now).toISOString(),
-            team: getBattleRoomPlayerTeam(myId),
-            level: Number(player?.level || 1) || 1,
-            ping: Number(getBattlePingValue() || 0) || 0,
-            position: {
-                x: Number(playerShip.position.x || 0),
-                y: Number(playerShip.position.y || 0),
-                z: Number(playerShip.position.z || 0)
-            },
-            rotation: {
-                x: Number(playerShip.quaternion.x || 0),
-                y: Number(playerShip.quaternion.y || 0),
-                z: Number(playerShip.quaternion.z || 0),
-                w: Number(playerShip.quaternion.w || 1)
-            },
-            updated_at: new Date(now).toISOString()
-        });
+    if(roomPlayersFetchInFlight) return null;
+
+    const roomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    if(!window.supabaseClient || !roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')){
+        return [];
     }
 
-    if(remoteBattleShips instanceof Map){
-        let index = 0;
-        remoteBattleShips.forEach((entry, entryId) => {
-            if(!entryId) return;
-            const pos = entry?.targetPosition || entry?.mesh?.position || {};
-            const quat = entry?.targetQuaternion || entry?.mesh?.quaternion || {};
-            rows.push({
-                player_id: String(entryId),
-                nickname: entry?.nickname || `Pilot ${index + 1}`,
-                joined_at: new Date(Number(entry?.lastSeenAt || now)).toISOString(),
-                team: entry?.team || getBattleRoomPlayerTeam(entryId),
-                level: Number(entry?.level || 1) || 1,
-                ping: Number(entry?.ping || 0) || 0,
-                position: {
-                    x: Number(pos?.x || 0),
-                    y: Number(pos?.y || 0),
-                    z: Number(pos?.z || 0)
-                },
-                rotation: {
-                    x: Number(quat?.x || 0),
-                    y: Number(quat?.y || 0),
-                    z: Number(quat?.z || 0),
-                    w: Number(quat?.w || 1)
-                },
-                updated_at: new Date(Number(entry?.lastSeenAt || now)).toISOString()
+    roomPlayersFetchInFlight = true;
+
+    return (async () => {
+        try{
+            const { data, error } = await window.supabaseClient
+                .from('room_players')
+                .select('player_id,nickname,joined_at,team,level,ping,position,rotation,updated_at')
+                .eq('room_id', roomId)
+                .order('joined_at', { ascending: true });
+
+            if(error){
+                roomPlayersFetchInFlight = false;
+                return null;
+            }
+
+            const mergedRows = new Map();
+
+            (Array.isArray(data) ? data : []).forEach((item, index) => {
+                const entryId = item?.player_id ? String(item.player_id) : `guest_${index}`;
+                mergedRows.set(entryId, {
+                    player_id: entryId,
+                    nickname: item?.nickname || `Pilot ${index + 1}`,
+                    joined_at: item?.joined_at || null,
+                    team: item?.team || getBattleRoomPlayerTeam(entryId),
+                    level: Number(item?.level || 1) || 1,
+                    ping: Number(item?.ping || 0) || 0,
+                    position: item?.position || null,
+                    rotation: item?.rotation || null,
+                    updated_at: item?.updated_at || item?.joined_at || null
+                });
             });
-            index += 1;
-        });
-    }
 
-    cachedRoomPlayersFetchedAt = now;
-    cachedRoomPlayersRows = rows.filter(item => isFreshRoomPlayerRow(item));
-    return cachedRoomPlayersRows;
+            const myId = getSelfBattlePlayerId();
+            if(gameState === "BATTLE" && playerShip && myId){
+                mergedRows.set(myId, {
+                    player_id: myId,
+                    nickname: player?.nickname || "Commander",
+                    joined_at: new Date(now).toISOString(),
+                    team: getBattleRoomPlayerTeam(myId),
+                    level: Number(player?.level || 1) || 1,
+                    ping: Number(getBattlePingValue() || 0) || 0,
+                    position: {
+                        x: Number(playerShip.position.x || 0),
+                        y: Number(playerShip.position.y || 0),
+                        z: Number(playerShip.position.z || 0)
+                    },
+                    rotation: {
+                        x: Number(playerShip.quaternion.x || 0),
+                        y: Number(playerShip.quaternion.y || 0),
+                        z: Number(playerShip.quaternion.z || 0),
+                        w: Number(playerShip.quaternion.w || 1)
+                    },
+                    updated_at: new Date(now).toISOString()
+                });
+            }
+
+            if(remoteBattleShips instanceof Map){
+                let index = 0;
+                remoteBattleShips.forEach((entry, entryId) => {
+                    if(!entryId) return;
+                    const safeId = String(entryId);
+                    if(mergedRows.has(safeId)) return;
+                    const pos = entry?.targetPosition || entry?.mesh?.position || {};
+                    const quat = entry?.targetQuaternion || entry?.mesh?.quaternion || {};
+                    mergedRows.set(safeId, {
+                        player_id: safeId,
+                        nickname: entry?.nickname || `Pilot ${index + 1}`,
+                        joined_at: new Date(Number(entry?.lastSeenAt || now)).toISOString(),
+                        team: entry?.team || getBattleRoomPlayerTeam(safeId),
+                        level: Number(entry?.level || 1) || 1,
+                        ping: Number(entry?.ping || 0) || 0,
+                        position: {
+                            x: Number(pos?.x || 0),
+                            y: Number(pos?.y || 0),
+                            z: Number(pos?.z || 0)
+                        },
+                        rotation: {
+                            x: Number(quat?.x || 0),
+                            y: Number(quat?.y || 0),
+                            z: Number(quat?.z || 0),
+                            w: Number(quat?.w || 1)
+                        },
+                        updated_at: new Date(Number(entry?.lastSeenAt || now)).toISOString()
+                    });
+                    index += 1;
+                });
+            }
+
+            cachedRoomPlayersFetchedAt = now;
+            cachedRoomPlayersRows = Array.from(mergedRows.values()).filter(item => isFreshRoomPlayerRow(item));
+            roomPlayersFetchInFlight = false;
+            return cachedRoomPlayersRows;
+        }catch(_){
+            roomPlayersFetchInFlight = false;
+            return null;
+        }
+    })();
 }
 
 async function syncLiveBattlePlayers(){
