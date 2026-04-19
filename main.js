@@ -10310,17 +10310,18 @@ function ensureHangarSellTerminal(candidate){
         screen.material.map = buildHangarSellTerminalLabel(label);
         screen.material.needsUpdate = true;
     }
-    try{ group.parent?.remove?.(group); }catch(_){}
+    try{ group.parent?.remove?.(group); }catch(_){ }
     candidate.pad.add(group);
-    group.position.set(1.58, 0.22, 1.04);
-    group.rotation.y = -Math.PI * 0.18;
+    group.position.set(1.92, 0.28, 0.02);
+    group.rotation.y = -Math.PI * 0.5;
     group.visible = true;
 }
 
+
 function updateHangarPlatformPrompt(){
     const hint = document.getElementById('hangar-platform-hint');
-    const candidates = getHangarSupportShips()
-        .map((ship, idx) => ({ ship, idx, pad:getHangarDockPadByIndex(idx) }))
+    const candidates = (Array.isArray(hangarState?.supportPlatforms) ? hangarState.supportPlatforms : [])
+        .map((pad, dockIndex) => ({ ship:getHangarDockShipByIndex(dockIndex), idx:dockIndex, pad }))
         .filter(item => item.ship && item.pad);
 
     let activeCandidate = null;
@@ -11300,11 +11301,11 @@ function ensureHangarRenderer(){
                 entry.mesh.position.copy(pos);
                 const moveDir = to.clone().sub(from);
                 if(moveDir.lengthSq() > 0.0001){
-                    const faceTarget = pos.clone().add(moveDir.clone().setY(0).normalize());
-                    entry.mesh.lookAt(faceTarget);
-                    entry.mesh.rotation.x = 0;
-                    entry.mesh.rotation.z = 0;
-                    entry.mesh.rotation.y += Math.PI;
+                    const flatDir = moveDir.clone().setY(0);
+                    if(flatDir.lengthSq() > 0.0001){
+                        const yaw = Math.atan2(flatDir.z, flatDir.x);
+                        entry.mesh.rotation.set(0, -yaw + Math.PI * 0.5, 0);
+                    }
                 }
                 const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
                 entry.mesh.scale.setScalar(scaleValue);
