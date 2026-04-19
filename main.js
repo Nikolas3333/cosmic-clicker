@@ -4525,21 +4525,18 @@ function __getTotalPmUnreadCount(){
 
 function __updateHangarPmNeon(){
     try{
-        const chatWrapper = document.getElementById('chat-wrapper');
-        if(!chatWrapper) return;
+        const el = document.getElementById('chat-wrapper');
+        if(!el) return;
+        const lowered = el.classList.contains('hangar-chat-lowered');
+        const unread = __getTotalPmUnreadCount() > 0;
 
-        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered') || document.body.classList.contains('hangar-chat-lowered');
-        const activeScope = parseChatScope(currentChat);
-        const hasAnyUnreadPm = __getTotalPmUnreadCount() > 0;
-        const hasRecentActivePmPulse = Date.now() < Number(__hangarPmPulseUntil || 0);
-        const shouldGlow = !!(isLowered && (hasAnyUnreadPm || (activeScope.channel === 'pm' && hasRecentActivePmPulse)));
-
-        if(shouldGlow){
-            chatWrapper.classList.add('hangar-pm-neon');
+        if(lowered && unread){
+            el.classList.add('hangar-pm-neon');
         }else{
-            chatWrapper.classList.remove('hangar-pm-neon');
+            el.classList.remove('hangar-pm-neon');
         }
-    }catch(_){}
+    }catch(e){}
+}catch(_){}
 }
 
 function bindHangarChatControls(){
@@ -6191,8 +6188,7 @@ async function handleIncomingRealtimeMessage(msg) {
         if (currentChat !== scope.key) {
             incrementUnread(scope.key);
         } else if (isHangarLowered) {
-            __hangarPmPulseUntil = Date.now() + 10000;
-            __updateHangarPmNeon?.();
+            __hangarPmPulseUntil = Date.now() + 5000;
         }
 
         if (currentChat === scope.key) renderLobbyMessages();
@@ -16146,3 +16142,5 @@ if(previousOpenHangarWindowV188){
 
 
 try{ ensurePremiumCurrencyUi?.(); }catch(_){ }
+
+setInterval(__updateHangarPmNeon,300);
