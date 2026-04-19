@@ -8250,7 +8250,17 @@ function showCurrencyDelta(kind, amount){
 }
 
 function canSellHull(hullId){
-    return !!String(hullId || '').trim() && !isStarterHullId(hullId) && isOwnedShip(hullId);
+    const safeId = String(hullId || '').trim();
+    if(!safeId) return false;
+    if(isStarterHullId(safeId)) return false;
+    if(!isOwnedShip(safeId)) return false;
+    const ownedCount = Array.isArray(player?.ownedShipIds)
+        ? player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean).length
+        : 0;
+    if(ownedCount <= 1) return false;
+    const equippedShipId = String(player?.selectedShipId || '').trim();
+    if(equippedShipId && equippedShipId === safeId) return false;
+    return true;
 }
 
 function canSellModule(moduleId){
@@ -11174,16 +11184,30 @@ function ensureHangarRenderer(){
                 hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
             }
             if(hoverShip && Number.isFinite(dockIndex) && dockIndex >= 0){
-                const worldPos = getHangarDockWorldPosition(dockIndex).clone();
-                worldPos.y += 0.58;
-                worldPos.z += 0.42;
+                let worldPos = null;
+                const liveMesh = (hangarState.supportShipMeshes || []).find(mesh => String(mesh?.userData?.shipId || '').trim() === String(hoverShip?.id || '').trim());
+                if(liveMesh){
+                    const anchor = new THREE.Vector3();
+                    try{
+                        liveMesh.getWorldPosition(anchor);
+                        worldPos = anchor;
+                    }catch(_){
+                        worldPos = null;
+                    }
+                }
+                if(!worldPos){
+                    worldPos = getHangarDockWorldPosition(dockIndex).clone();
+                }
+                worldPos.y += 2.1;
                 const projected = worldPos.project(hangarState.camera);
-                const screenX = ((projected.x + 1) * 0.5) * stageRect.width;
-                const screenY = ((-projected.y + 1) * 0.5) * stageRect.height;
-                floatingSellBtn.style.left = `${screenX}px`;
-                floatingSellBtn.style.top = `${screenY + 42}px`;
-                floatingSellBtn.style.transform = 'translate(-50%, -50%)';
-                floatingSellBtn.style.zIndex = '12';
+                if(projected.z > -1 && projected.z < 1){
+                    const screenX = ((projected.x + 1) * 0.5) * stageRect.width;
+                    const screenY = ((-projected.y + 1) * 0.5) * stageRect.height;
+                    floatingSellBtn.style.left = `${screenX}px`;
+                    floatingSellBtn.style.top = `${screenY}px`;
+                    floatingSellBtn.style.transform = 'translate(-50%, -100%)';
+                    floatingSellBtn.style.zIndex = '12';
+                }
             }
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
