@@ -19,6 +19,7 @@ let player = {
   selectedShipId: 'scout_1',
   ownedModuleIds: ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'],
   activeModulesByShip: { scout_1: { weapon: 'weapon_laser_s1', shield: 'shield_micro_s1', booster: 'booster_ion_s1' } },
+  hangarDockAssignments: { scout_1: 0 },
   staff_role: 'player'
 };
 
@@ -239,6 +240,71 @@ function refreshOwnedShipsInventory(){
         ensureModuleOwnershipDefaults();
         if(!Array.isArray(player.ships)) player.ships = [];
     }catch(_){}
+}
+
+function getHangarDockCapacity(){
+    const pads = Array.isArray(hangarState?.supportPlatforms) ? hangarState.supportPlatforms.filter(Boolean).length : 0;
+    return Math.max(1, pads || 20);
+}
+
+function ensureHangarDockAssignments(){
+    try{
+        if(!player || typeof player !== 'object') return {};
+        const ownedIds = Array.isArray(player.ownedShipIds)
+            ? player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
+            : [];
+        if(!player.hangarDockAssignments || typeof player.hangarDockAssignments !== 'object'){
+            player.hangarDockAssignments = {};
+        }
+        const assignments = player.hangarDockAssignments;
+        const capacity = getHangarDockCapacity();
+        Object.keys(assignments).forEach(shipId => {
+            if(!ownedIds.includes(String(shipId || '').trim())){
+                delete assignments[shipId];
+            }
+        });
+
+        const used = new Set();
+        ownedIds.forEach(shipId => {
+            const rawIdx = Number(assignments[shipId]);
+            if(Number.isFinite(rawIdx) && rawIdx >= 0 && rawIdx < capacity && !used.has(rawIdx)){
+                used.add(rawIdx);
+            }else{
+                delete assignments[shipId];
+            }
+        });
+
+        const nextFreeDock = () => {
+            for(let i = 0; i < capacity; i++){
+                if(!used.has(i)) return i;
+            }
+            return used.size;
+        };
+
+        ownedIds.forEach(shipId => {
+            if(!Object.prototype.hasOwnProperty.call(assignments, shipId)){
+                const idx = nextFreeDock();
+                assignments[shipId] = idx;
+                used.add(idx);
+            }
+        });
+
+        if(ownedIds[0] && !Object.prototype.hasOwnProperty.call(assignments, ownedIds[0])){
+            assignments[ownedIds[0]] = 0;
+        }
+
+        return assignments;
+    }catch(_){
+        return player?.hangarDockAssignments || {};
+    }
+}
+
+function getHangarDockAssignment(shipId){
+    const safeId = String(shipId || '').trim();
+    if(!safeId) return -1;
+    const assignments = ensureHangarDockAssignments();
+    const idx = Number(assignments?.[safeId]);
+    return Number.isFinite(idx) ? idx : -1;
 }
 
 
@@ -8773,7 +8839,10 @@ function getSelectedHangarShipIndex(){
 
 function getHangarSupportShips(){
     const selectedId = String(player?.selectedShipId || '').trim();
-    return getOwnedHangarShips().filter(item => String(item?.id || '').trim() !== selectedId);
+    ensureHangarDockAssignments();
+    return getOwnedHangarShips()
+        .filter(item => String(item?.id || '').trim() !== selectedId)
+        .sort((a, b) => getHangarDockAssignment(a?.id) - getHangarDockAssignment(b?.id));
 }
 
 function syncHangarDockSelection(){
@@ -8786,9 +8855,9 @@ function syncHangarDockSelection(){
 }
 
 function getHangarDockShipByIndex(dockIndex){
-    const ships = getHangarSupportShips();
     const safeIndex = Number(dockIndex || 0);
-    return ships[safeIndex] || null;
+    if(!Number.isFinite(safeIndex) || safeIndex < 0) return null;
+    return getHangarSupportShips().find(item => getHangarDockAssignment(item?.id) === safeIndex) || null;
 }
 
 
@@ -8892,6 +8961,9 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
     try{ supportMesh.visible = false; supportMesh.userData.hiddenForTransfer = true; }catch(_){ }
     try{ centerMesh.visible = false; centerMesh.userData.hiddenForTransfer = true; }catch(_){ }
 
+    const previousDockIndex = getHangarDockAssignment(safePrev);
+    const nextDockIndex = getHangarDockAssignment(safeNext);
+
     const transfer = {
         startedAt: performance.now(),
         duration: 7600,
@@ -8900,19 +8972,23 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
         clickedDockIndex: Number(clickedDockIndex || -1),
         previousShipId: safePrev,
         nextShipId: safeNext,
-        nextShipIndex: Number(clickedDockIndex || -1),
+        previousDockIndex,
+        nextDockIndex,
         hiddenOriginalIncoming: supportMesh,
         hiddenOriginalOutgoing: centerMesh
     };
 
     const centerPos = getHangarCenterWorldPosition();
-    const dockPos = Number.isFinite(Number(clickedDockIndex)) && Number(clickedDockIndex) >= 0
-        ? getHangarDockWorldPosition(Number(clickedDockIndex))
+    const outgoingDockPos = Number.isFinite(previousDockIndex) && previousDockIndex >= 0
+        ? getHangarDockWorldPosition(previousDockIndex)
+        : centerPos.clone().add(new THREE.Vector3(0, 0, -4.2));
+    const incomingDockPos = Number.isFinite(nextDockIndex) && nextDockIndex >= 0
+        ? getHangarDockWorldPosition(nextDockIndex)
         : centerPos.clone().add(new THREE.Vector3(0, 0, -4.2));
 
     const incomingFrom = new THREE.Vector3();
     const outgoingFrom = new THREE.Vector3();
-    try{ incomingMesh.getWorldPosition(incomingFrom); }catch(_){ incomingFrom.copy(dockPos); }
+    try{ incomingMesh.getWorldPosition(incomingFrom); }catch(_){ incomingFrom.copy(incomingDockPos); }
     try{ outgoingMesh.getWorldPosition(outgoingFrom); }catch(_){ outgoingFrom.copy(centerPos); }
 
     transfer.incoming = {
@@ -8927,7 +9003,7 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
     transfer.outgoing = {
         mesh: outgoingMesh,
         from: outgoingFrom.clone(),
-        to: dockPos.clone(),
+        to: outgoingDockPos.clone(),
         fromScale: Number(outgoingMesh.scale.x || 1),
         toScale: 0.84,
         lift: 2.1,
@@ -10236,8 +10312,8 @@ function ensureHangarSellTerminal(candidate){
     }
     try{ group.parent?.remove?.(group); }catch(_){}
     candidate.pad.add(group);
-    group.position.set(0.84, 0.30, 0.14);
-    group.rotation.y = -Math.PI * 0.5;
+    group.position.set(1.58, 0.22, 1.04);
+    group.rotation.y = -Math.PI * 0.18;
     group.visible = true;
 }
 
@@ -10930,25 +11006,17 @@ function rebuildHangarSceneObjects(){
             });
     }
 
-    const dockShips = getHangarSupportShips();
-    (hangarState.supportPlatforms || []).forEach((pad) => {
+    (hangarState.supportPlatforms || []).forEach((pad, dockIndex) => {
         if(!pad) return;
-        const removable = [];
-        pad.children.forEach((child) => {
-            if(child?.userData?.shipId || child?.userData?.isNoShipPlaceholder){ removable.push(child); }
-        });
-        removable.forEach((child) => { try{ pad.remove(child); }catch(_){} });
-    });
-    dockShips.forEach((ship, dockIndex) => {
-        const shipId = String(ship?.id || '').trim();
+        const dockShip = getHangarDockShipByIndex(dockIndex);
+        if(!dockShip) return;
+        const shipId = String(dockShip?.id || '').trim();
         if(!shipId) return;
-        const pad = getHangarDockPadByIndex(dockIndex);
-        if(!pad) return;
         const placeholder = createHangarNoShipPlaceholder();
         placeholder.position.set(0, 0.96, 0.02);
         placeholder.userData.isNoShipPlaceholder = true;
         pad.add(placeholder);
-        buildHangarShipMeshAsync(ship)
+        buildHangarShipMeshAsync(dockShip)
             .then((sideMesh) => {
                 if(buildToken !== hangarBuildToken || !pad || !sideMesh) return;
                 try{ pad.remove(placeholder); }catch(_){ }
@@ -11232,8 +11300,11 @@ function ensureHangarRenderer(){
                 entry.mesh.position.copy(pos);
                 const moveDir = to.clone().sub(from);
                 if(moveDir.lengthSq() > 0.0001){
-                    const yaw = -Math.atan2(moveDir.z, moveDir.x);
-                    entry.mesh.rotation.y = yaw;
+                    const faceTarget = pos.clone().add(moveDir.clone().setY(0).normalize());
+                    entry.mesh.lookAt(faceTarget);
+                    entry.mesh.rotation.x = 0;
+                    entry.mesh.rotation.z = 0;
+                    entry.mesh.rotation.y += Math.PI;
                 }
                 const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
                 entry.mesh.scale.setScalar(scaleValue);
@@ -13095,6 +13166,8 @@ function buyShipFromShop(shipId){
     if(diamondPrice > 0) showCurrencyDelta?.('crystals', -diamondPrice);
     player.ownedShipIds.push(ship.id);
     player.ownedShipIds = Array.from(new Set(player.ownedShipIds));
+    ensureHangarDockAssignments?.();
+
     const previousSelectedShipId = String(player.selectedShipId || 'scout_1').trim() || 'scout_1';
     player.selectedShipId = previousSelectedShipId;
     if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object') player.activeModulesByShip = {};
