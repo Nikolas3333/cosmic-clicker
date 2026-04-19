@@ -8880,7 +8880,7 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
 
     const transfer = {
         startedAt: performance.now(),
-        duration: 1550,
+        duration: 3250,
         incoming: null,
         outgoing: null,
         clickedDockIndex: Number(clickedDockIndex || -1)
@@ -10152,6 +10152,9 @@ function updateHangarPlatformPrompt(){
             }
         }
     }
+    if(!activeCandidate){
+        activeCandidate = candidates.find(item => canSellHull(item.ship?.id)) || null;
+    }
 
     if(hint){
         hint.style.display = 'none';
@@ -10780,17 +10783,6 @@ function rebuildHangarSceneObjects(){
             accent: String((liveItem || currentShip)?.accent || '#7a8cff').trim() || '#7a8cff'
         };
 
-        const instantMesh = normalizeHangarShipMesh(createHangarShipMesh(directShipData));
-        instantMesh.position.set(0, 0.18, 0);
-        instantMesh.scale.setScalar(1.45);
-        instantMesh.userData.appearStartedAt = performance.now();
-        instantMesh.userData.appearTargetScale = 1.75;
-        instantMesh.rotation.x = 0;
-        instantMesh.rotation.y = Math.PI;
-        instantMesh.rotation.z = 0;
-        instantMesh.userData.isHangarInstantShip = true;
-        showcaseGroup.add(instantMesh);
-
         if(centerPlaque){
             drawHangarPlaque(centerPlaque, {
                 title: String(directShipData?.name || 'Cargo Drone').trim() || 'Cargo Drone',
@@ -10806,7 +10798,21 @@ function rebuildHangarSceneObjects(){
             }
         }
 
-        hangarState.isShipLoading = true;
+        const cachedCenterMesh = liveItem ? hangarShipMeshCache.get(String(liveItem.id || '').trim()) : null;
+        if(cachedCenterMesh){
+            const readyMesh = cloneObject3DDeepSafe(cachedCenterMesh);
+            readyMesh.position.set(0, 0.18, 0);
+            readyMesh.scale.setScalar(1.08);
+            readyMesh.userData.appearStartedAt = performance.now();
+            readyMesh.userData.appearTargetScale = 1.22;
+            readyMesh.rotation.x = 0;
+            readyMesh.rotation.y = Math.PI;
+            readyMesh.rotation.z = 0;
+            showcaseGroup.add(readyMesh);
+            hangarState.isShipLoading = false;
+        }else{
+            hangarState.isShipLoading = true;
+        }
 
         buildHangarShipMeshAsync(liveItem || currentShip)
             .then((shipMesh) => {
@@ -10819,8 +10825,10 @@ function rebuildHangarSceneObjects(){
                 shipMesh.rotation.x = 0;
                 shipMesh.rotation.y = Math.PI;
                 shipMesh.rotation.z = 0;
-                shipMesh.userData.isHangarInstantShip = true;
                 showcaseGroup.add(shipMesh);
+                if(liveItem){
+                    hangarShipMeshCache.set(String(liveItem.id || '').trim(), cloneObject3DDeepSafe(shipMesh));
+                }
             })
             .catch(() => {
                 if(buildToken !== hangarBuildToken || !showcaseGroup) return;
@@ -11117,15 +11125,15 @@ function ensureHangarRenderer(){
                 const to = entry.to.clone();
                 let t = 0;
                 let y = from.y;
-                if(progress < 0.25){
+                if(progress < 0.32){
                     t = 0;
                     y = THREE.MathUtils.lerp(from.y, from.y + Number(entry.lift || 1.8), smooth(progress / 0.25));
-                }else if(progress < 0.78){
-                    t = smooth((progress - 0.25) / 0.53);
+                }else if(progress < 0.84){
+                    t = smooth((progress - 0.32) / 0.52);
                     y = from.y + Number(entry.lift || 1.8);
                 }else{
                     t = 1;
-                    y = THREE.MathUtils.lerp(from.y + Number(entry.lift || 1.8), to.y, smooth((progress - 0.78) / 0.22));
+                    y = THREE.MathUtils.lerp(from.y + Number(entry.lift || 1.8), to.y, smooth((progress - 0.84) / 0.16));
                 }
                 const pos = from.clone().lerp(to, t);
                 pos.y = y;
