@@ -4479,14 +4479,6 @@ function setHangarChatMode(active, lowered = false){
 }
 
 
-function __appendEmojiToChatInput(symbol){
-    try{
-        const input = document.getElementById('chat-input');
-        if(!input) return;
-        const current = String(input.value || '');
-        input.value = `${current}${current ? ' ' : ''}${symbol}`.trimStart() + ' ';
-        input.focus();
-    }catch(_){}
 }
 
 function __initHangarEmojiPanel(){
@@ -4512,14 +4504,6 @@ function __initHangarEmojiPanel(){
 }
 
 
-function __appendEmojiToChatInput(symbol){
-    try{
-        const input = document.getElementById('chat-input');
-        if(!input) return;
-        const current = String(input.value || '');
-        input.value = `${current}${current ? ' ' : ''}${symbol}`.trimStart() + ' ';
-        input.focus();
-    }catch(_){}
 }
 
 function __bindHangarEmojiClicks(){
@@ -4553,6 +4537,15 @@ function __updateHangarPmNeon(){
         chatWrapper.classList.toggle('hangar-pm-neon', totalPmUnread > 0);
     }catch(_){}
 }
+
+function __appendEmojiToChatInput(symbol){
+    try{
+        const input = document.getElementById('chat-input');
+        if(!input) return;
+        const current = String(input.value || '');
+        input.value = `${current}${current ? ' ' : ''}${symbol}`.trimStart() + ' ';
+        input.focus();
+    }catch(_){}
 
 function bindHangarChatControls(){
     const upBtn = document.getElementById('hangar-chat-up');
