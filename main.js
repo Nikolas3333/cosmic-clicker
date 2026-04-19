@@ -7218,8 +7218,8 @@ function applyIncomingBattleHit(payload = {}){
         spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
     }
     pushKillFeed(`${attackerName} уничтожил ${player?.nickname || 'Commander'}`, 'kill');
-    updateBattleScoreboard?.();
     scheduleBattleRespawn(2000);
+    updateBattleScoreboard?.();
 
     if(attackerId){
         insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander').catch(() => {});
@@ -7247,8 +7247,28 @@ function handleIncomingBattleKill(payload = {}){
     if(attackerId){
         applyBattleScoreDelta(attackerId, { killsDelta: 1 });
     }
+    const remoteDeadUntil = Date.now() + 2000;
+
     if(victimId){
         applyBattleScoreDelta(victimId, { deathsDelta: 1 });
+
+        const victimRemoteState = remoteBattleShips.get(victimId);
+        if(victimRemoteState){
+            victimRemoteState.deadUntil = remoteDeadUntil;
+        }
+
+        const roomLists = [
+            ...(Array.isArray(currentRoom?.currentPlayers) ? [currentRoom.currentPlayers] : []),
+            ...(Array.isArray(currentRoom?.players) ? [currentRoom.players] : [])
+        ];
+        roomLists.forEach(list => {
+            list.forEach(row => {
+                const rowId = String(row?.public_id || row?.player_public_id || row?.player_id || row?.id || '').trim();
+                if(rowId && rowId === victimId){
+                    row.deadUntil = remoteDeadUntil;
+                }
+            });
+        });
     }
     if(isSelfAttacker){
         awardBattleKillRewards(victimName);
@@ -7776,7 +7796,7 @@ function updateBattleScoreboard(){
             deaths: Number(remoteState?.deaths || entry?.deaths || 0) || 0,
             id: entryId,
             ping: Number(remoteState?.ping || entry?.ping || 0) || 0,
-            deadUntil: Number(remoteState?.deadUntil || entry?.deadUntil || 0) || 0,
+            deadUntil: Number(entry?.deadUntil || remoteState?.deadUntil || 0) || 0,
             team
         });
     });
