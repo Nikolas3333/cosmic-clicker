@@ -8319,7 +8319,6 @@ function showCurrencyDelta(kind, amount){
 function canSellHull(hullId){
     const safeId = String(hullId || '').trim();
     if(!safeId) return false;
-    if(isStarterHullId(safeId)) return false;
     if(!isOwnedShip(safeId)) return false;
     const ownedCount = Array.isArray(player?.ownedShipIds)
         ? player.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean).length
@@ -9018,6 +9017,12 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
     try{ incomingMesh.getWorldPosition(incomingFrom); }catch(_){ incomingFrom.copy(incomingDockPos); }
     try{ outgoingMesh.getWorldPosition(outgoingFrom); }catch(_){ outgoingFrom.copy(centerPos); }
 
+    const getFlightForwardAxis = (shipId) => {
+        const safeShipId = String(shipId || '').trim();
+        if(safeShipId === 'scout_1') return new THREE.Vector3(0, 0, 1);
+        return new THREE.Vector3(1, 0, 0);
+    };
+
     transfer.incoming = {
         mesh: incomingMesh,
         from: incomingFrom.clone(),
@@ -9025,7 +9030,8 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
         fromScale: Number(incomingMesh.scale.x || 1),
         toScale: 1.22,
         lift: 2.6,
-        arcOffset: -0.72
+        arcOffset: -0.72,
+        forwardAxis: getFlightForwardAxis(safeNext)
     };
     transfer.outgoing = {
         mesh: outgoingMesh,
@@ -9034,7 +9040,8 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
         fromScale: Number(outgoingMesh.scale.x || 1),
         toScale: 0.84,
         lift: 2.1,
-        arcOffset: 0.72
+        arcOffset: 0.72,
+        forwardAxis: getFlightForwardAxis(safePrev)
     };
 
     hangarState.shipTransfer = transfer;
@@ -11373,8 +11380,12 @@ function ensureHangarRenderer(){
                 if(moveDir.lengthSq() > 0.0001){
                     const flatDir = moveDir.clone().setY(0);
                     if(flatDir.lengthSq() > 0.0001){
-                        const yaw = Math.atan2(flatDir.z, flatDir.x);
-                        entry.mesh.rotation.set(0, -yaw, 0);
+                        const direction = flatDir.normalize();
+                        const forwardAxis = entry.forwardAxis instanceof THREE.Vector3
+                            ? entry.forwardAxis.clone().normalize()
+                            : new THREE.Vector3(1, 0, 0);
+                        const targetQuat = new THREE.Quaternion().setFromUnitVectors(forwardAxis, direction);
+                        entry.mesh.quaternion.slerp(targetQuat, 0.22);
                     }
                 }
                 const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
