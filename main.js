@@ -9593,7 +9593,73 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
     root.userData.texture = texture;
     root.userData.width = width;
     root.userData.height = height;
+
+    const sellCanvas = document.createElement('canvas');
+    sellCanvas.width = 360;
+    sellCanvas.height = 120;
+    const sellTexture = new THREE.CanvasTexture(sellCanvas);
+    sellTexture.colorSpace = THREE.SRGBColorSpace;
+    const sellButton = new THREE.Mesh(
+        new THREE.PlaneGeometry(width * 0.30, height * 0.20),
+        new THREE.MeshBasicMaterial({ map:sellTexture, transparent:true, opacity:0 })
+    );
+    sellButton.position.set(width * 0.27, -height * 0.29, 0.024);
+    sellButton.visible = false;
+    sellButton.userData = { hangarSellPlaqueButton:true, hangarDockIndex:-1, hangarSellPlaqueButtonShipId:'' };
+    root.add(sellButton);
+    root.userData.sellCanvas = sellCanvas;
+    root.userData.sellTexture = sellTexture;
+    root.userData.sellButton = sellButton;
     return root;
+}
+
+function updateHangarPlaqueSellButton(plaque, sellable, shipId, dockIndex){
+    const button = plaque?.userData?.sellButton || null;
+    const canvas = plaque?.userData?.sellCanvas || null;
+    const texture = plaque?.userData?.sellTexture || null;
+    if(!button || !canvas || !texture) return;
+
+    const safeShipId = String(shipId || '').trim();
+    const canShow = !!sellable && !!safeShipId;
+    button.visible = canShow;
+    button.material.opacity = canShow ? 1 : 0;
+    button.userData.hangarSellPlaqueButtonShipId = canShow ? safeShipId : '';
+    button.userData.hangarDockIndex = Number.isFinite(Number(dockIndex)) ? Number(dockIndex) : -1;
+
+    const ctx = canvas.getContext('2d');
+    if(!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if(!canShow){
+        texture.needsUpdate = true;
+        return;
+    }
+
+    const label = getSellActionLabel('ship', safeShipId);
+    const w = canvas.width;
+    const h = canvas.height;
+    const r = 24;
+    ctx.fillStyle = 'rgba(28,170,92,0.96)';
+    ctx.strokeStyle = 'rgba(170,255,210,0.95)';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(r, 6);
+    ctx.lineTo(w-r, 6);
+    ctx.quadraticCurveTo(w-6, 6, w-6, r);
+    ctx.lineTo(w-6, h-r);
+    ctx.quadraticCurveTo(w-6, h-6, w-r, h-6);
+    ctx.lineTo(r, h-6);
+    ctx.quadraticCurveTo(6, h-6, 6, h-r);
+    ctx.lineTo(6, r);
+    ctx.quadraticCurveTo(6, 6, r, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#f4fff8';
+    ctx.font = 'bold 38px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, w/2, h/2 + 2);
+    texture.needsUpdate = true;
 }
 
 function drawHangarPlaque(plaque, options = {}){
@@ -9692,8 +9758,10 @@ function refreshHangarInfoBoards(){
                 title: String(dockShip?.name || 'Свободный док').trim() || 'Свободный док',
                 lines: dockShip ? getHangarDisplayShipStats(dockShip) : ['Пустая платформа']
             });
+            updateHangarPlaqueSellButton(plaque, !!dockShip && canSellHull(dockShip.id), dockShip?.id || '', Number(entry?.dockIndex ?? -1));
         }else{
             drawHangarPlaque(plaque, {});
+            updateHangarPlaqueSellButton(plaque, false, '', -1);
         }
     });
 }
@@ -9840,8 +9908,12 @@ function bindHangarMovementControls(){
             const nextIndex = allShips.findIndex(item => String(item?.id || '').trim() === String(target.ship?.id || '').trim());
             if(nextIndex >= 0){
                 hangarState.shipIndex = nextIndex;
+            }
+            const currentId = String(player?.selectedShipId || '').trim();
+            const nextId = String(target.ship?.id || '').trim();
+            if(nextId && currentId !== nextId){
                 fillHangarText();
-                selectCurrentHangarShip?.();
+                startHangarShipTransfer(currentId, nextId, target.idx);
             }
         }
     });
@@ -10240,11 +10312,7 @@ function hideHangarShipPriceRow(){
 }
 
 function disposeHangarSellTerminal(){
-    const terminal = hangarState?.sellTerminalGroup || null;
-    if(terminal){
-        try{ terminal.parent?.remove?.(terminal); }catch(_){}
-    }
-    hangarState.sellTerminalGroup = null;
+    disposeHangarSellTerminal();
 }
 
 function buildHangarSellTerminalLabel(textLabel){
@@ -10274,47 +10342,8 @@ function buildHangarSellTerminalLabel(textLabel){
 }
 
 function ensureHangarSellTerminal(candidate){
-    if(!candidate?.pad || !candidate?.ship) { disposeHangarSellTerminal(); return; }
-    const shipId = String(candidate.ship?.id || '').trim();
-    if(!shipId){ disposeHangarSellTerminal(); return; }
-    let group = hangarState.sellTerminalGroup;
-    if(!group){
-        group = new THREE.Group();
-        group.name = 'HangarSellTerminal';
-        const base = new THREE.Mesh(
-            new THREE.BoxGeometry(0.42, 0.16, 0.32),
-            new THREE.MeshStandardMaterial({ color:0x0d1622, emissive:0x123347, emissiveIntensity:0.28, metalness:0.55, roughness:0.42 })
-        );
-        base.position.set(0, 0.08, 0);
-        group.add(base);
-        const stem = new THREE.Mesh(
-            new THREE.BoxGeometry(0.06, 0.24, 0.06),
-            new THREE.MeshStandardMaterial({ color:0x1a2938, emissive:0x0f1c2a, emissiveIntensity:0.18 })
-        );
-        stem.position.set(0, 0.24, -0.02);
-        group.add(stem);
-        const screenMat = new THREE.MeshBasicMaterial({ map: buildHangarSellTerminalLabel('ПРОДАТЬ'), transparent:true });
-        const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.32), screenMat);
-        screen.position.set(0, 0.46, -0.02);
-        screen.rotation.x = -0.55;
-        screen.userData = { hangarSellTerminal:true };
-        group.add(screen);
-        group.userData = { hangarSellTerminal:true, hangarSellTerminalShipId: shipId, dockIndex: Number(candidate.idx || 0) || 0 };
-        hangarState.sellTerminalGroup = group;
-    }
-    group.userData = { ...(group.userData || {}), hangarSellTerminal:true, hangarSellTerminalShipId: shipId, dockIndex: Number(candidate.idx || 0) || 0 };
-    const label = getSellActionLabel('ship', shipId).replace(/^Продать\s*/i,'ПРОДАТЬ ');
-    const screen = group.children.find(child => child.isMesh && child.geometry?.type === 'PlaneGeometry');
-    if(screen?.material){
-        if(screen.material.map) screen.material.map.dispose?.();
-        screen.material.map = buildHangarSellTerminalLabel(label);
-        screen.material.needsUpdate = true;
-    }
-    try{ group.parent?.remove?.(group); }catch(_){ }
-    candidate.pad.add(group);
-    group.position.set(1.92, 0.28, 0.02);
-    group.rotation.y = -Math.PI * 0.5;
-    group.visible = true;
+    disposeHangarSellTerminal();
+    return;
 }
 
 
@@ -11143,7 +11172,7 @@ function ensureHangarRenderer(){
             { kind:'center_ship', plaque: hangarState?.envGroup?.userData?.shipDockPlaque || null },
             ...dockOrder.map((entry, dockIdx) => {
                 const source = entry.side === 'left' ? leftDockSlots[entry.idx] : rightDockSlots[entry.idx];
-                return { kind:'dock_ship', plaque: source?.plaque || null, ship: getHangarDockShipByIndex(dockIdx) };
+                return { kind:'dock_ship', plaque: source?.plaque || null, ship: getHangarDockShipByIndex(dockIdx), dockIndex:dockIdx };
             })
         ];
 
@@ -11452,31 +11481,30 @@ function bindHangarStageInteraction(){
         mouse.y = -(((clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1);
         raycaster.setFromCamera(mouse, hangarState.camera);
         const pads = (hangarState.supportPlatforms || []).filter(Boolean);
-        const terminal = hangarState.sellTerminalGroup || null;
+        const terminal = null;
+        const plaques = (Array.isArray(hangarState?.infoBoards) ? hangarState.infoBoards : []).map(item => item?.plaque).filter(Boolean);
         const targets = pads.flatMap(pad => {
             const nodes = [];
             if(pad) nodes.push(pad);
             try{ pad?.traverse?.(child => { if(child?.isMesh) nodes.push(child); }); }catch(_){}
             return nodes;
         });
-        if(terminal){
-            try{ terminal.traverse?.(child => { if(child?.isMesh) targets.push(child); }); }catch(_){}
-        }
+        plaques.forEach(plaque => { try{ plaque?.traverse?.(child => { if(child?.isMesh) targets.push(child); }); }catch(_){} });
         const hits = raycaster.intersectObjects(targets, false);
         let hoverIndex = -1;
         let terminalShipId = '';
         if(hits.length){
             let obj = hits[0].object;
             while(obj && hoverIndex < 0 && !terminalShipId){
-                if(obj?.userData?.hangarSellTerminalShipId) terminalShipId = String(obj.userData.hangarSellTerminalShipId || '').trim();
-                if(obj?.userData?.hangarSellTerminal && obj?.parent?.userData?.hangarSellTerminalShipId) terminalShipId = String(obj.parent.userData.hangarSellTerminalShipId || '').trim();
+                if(obj?.userData?.hangarSellPlaqueButtonShipId) terminalShipId = String(obj.userData.hangarSellPlaqueButtonShipId || '').trim();
+                if(obj?.userData?.hangarSellPlaqueButton && Number.isFinite(obj?.userData?.hangarDockIndex)) hoverIndex = Number(obj.userData.hangarDockIndex);
                 if(Number.isFinite(obj?.userData?.hangarDockIndex)) hoverIndex = Number(obj.userData.hangarDockIndex);
                 obj = obj.parent;
             }
         }
         hangarState.hoverDockIndex = hoverIndex;
         updateHangarPlatformPrompt();
-        if(activateClick && terminalShipId && !hangarState.shipTransfer && isHangarDockWithinUseDistance(hoverIndex >= 0 ? hoverIndex : Number(terminal?.userData?.dockIndex || -1))){
+        if(activateClick && terminalShipId && !hangarState.shipTransfer && canSellHull(terminalShipId) && isHangarDockWithinUseDistance(hoverIndex)){
             sellHullFromHangar?.(terminalShipId);
             hangarState.hoverDockIndex = -1;
             hangarState.selectedDockIndex = -1;
@@ -11490,12 +11518,14 @@ function bindHangarStageInteraction(){
             updateHangarPlatformPrompt();
             const nextShip = getHangarDockShipByIndex(hoverIndex);
             if(nextShip){
-                const ownedShips = getOwnedHangarShips();
-                const nextIndex = ownedShips.findIndex(item => String(item?.id || '').trim() === String(nextShip?.id || '').trim());
-                if(nextIndex >= 0){
-                    hangarState.shipIndex = nextIndex;
+                const allShips = getAllOwnedHangarShips();
+                const nextIndex = allShips.findIndex(item => String(item?.id || '').trim() === String(nextShip?.id || '').trim());
+                if(nextIndex >= 0) hangarState.shipIndex = nextIndex;
+                const currentId = String(player?.selectedShipId || '').trim();
+                const nextId = String(nextShip?.id || '').trim();
+                if(nextId && currentId !== nextId){
                     fillHangarText();
-                    selectCurrentHangarShip?.();
+                    startHangarShipTransfer(currentId, nextId, hoverIndex);
                 }
             }
         }
