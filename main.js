@@ -4398,10 +4398,13 @@ let currentChat = "global";
 
 let __hangarChatHomeParent = null;
 let __hangarChatHomeNextSibling = null;
+let __hangarEmojiHomeParent = null;
+let __hangarEmojiHomeNextSibling = null;
 
 function __mountHangarChatPanel(){
     try{
         const chatWrapper = document.getElementById('chat-wrapper');
+        const emojiPanel = document.getElementById('emoji-panel');
         const hangarWindow = document.getElementById('hangar-window');
         if(!chatWrapper || !hangarWindow) return;
 
@@ -4410,28 +4413,53 @@ function __mountHangarChatPanel(){
             __hangarChatHomeNextSibling = chatWrapper.nextSibling;
         }
 
+        if(emojiPanel && !__hangarEmojiHomeParent){
+            __hangarEmojiHomeParent = emojiPanel.parentNode;
+            __hangarEmojiHomeNextSibling = emojiPanel.nextSibling;
+        }
+
         if(chatWrapper.parentNode !== hangarWindow){
             hangarWindow.appendChild(chatWrapper);
         }
 
+        if(emojiPanel && emojiPanel.parentNode !== hangarWindow){
+            hangarWindow.appendChild(emojiPanel);
+        }
+
         chatWrapper.classList.add('hangar-inline-mode');
-        chatWrapper.classList.remove('hangar-chat-lowered');
+        if(emojiPanel) emojiPanel.classList.add('hangar-emoji-inline-mode');
     }catch(_){}
 }
 
 function __restoreHangarChatPanel(){
     try{
         const chatWrapper = document.getElementById('chat-wrapper');
-        if(!chatWrapper) return;
+        const emojiPanel = document.getElementById('emoji-panel');
 
-        chatWrapper.classList.remove('hangar-inline-mode');
-        chatWrapper.classList.remove('hangar-chat-lowered');
+        if(chatWrapper){
+            chatWrapper.classList.remove('hangar-inline-mode');
+            chatWrapper.classList.remove('hangar-chat-lowered');
+            chatWrapper.classList.remove('has-hangar-pm-alert');
 
-        if(__hangarChatHomeParent && chatWrapper.parentNode !== __hangarChatHomeParent){
-            if(__hangarChatHomeNextSibling && __hangarChatHomeNextSibling.parentNode === __hangarChatHomeParent){
-                __hangarChatHomeParent.insertBefore(chatWrapper, __hangarChatHomeNextSibling);
-            }else{
-                __hangarChatHomeParent.appendChild(chatWrapper);
+            if(__hangarChatHomeParent && chatWrapper.parentNode !== __hangarChatHomeParent){
+                if(__hangarChatHomeNextSibling && __hangarChatHomeNextSibling.parentNode === __hangarChatHomeParent){
+                    __hangarChatHomeParent.insertBefore(chatWrapper, __hangarChatHomeNextSibling);
+                }else{
+                    __hangarChatHomeParent.appendChild(chatWrapper);
+                }
+            }
+        }
+
+        if(emojiPanel){
+            emojiPanel.classList.remove('hangar-emoji-inline-mode');
+            emojiPanel.classList.remove('hangar-chat-lowered');
+
+            if(__hangarEmojiHomeParent && emojiPanel.parentNode !== __hangarEmojiHomeParent){
+                if(__hangarEmojiHomeNextSibling && __hangarEmojiHomeNextSibling.parentNode === __hangarEmojiHomeParent){
+                    __hangarEmojiHomeParent.insertBefore(emojiPanel, __hangarEmojiHomeNextSibling);
+                }else{
+                    __hangarEmojiHomeParent.appendChild(emojiPanel);
+                }
             }
         }
     }catch(_){}
@@ -4440,8 +4468,13 @@ function __restoreHangarChatPanel(){
 
 function setHangarChatMode(active, lowered = false){
     try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        const emojiPanel = document.getElementById('emoji-panel');
         document.body.classList.toggle('hangar-chat-mode', !!active);
         document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+        if(chatWrapper) chatWrapper.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+        if(emojiPanel) emojiPanel.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+        __updateHangarPmAlert?.();
     }catch(_){}
 }
 
@@ -4454,7 +4487,7 @@ function bindHangarChatControls(){
         upBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            try{ document.getElementById('chat-wrapper')?.classList.remove('hangar-chat-lowered'); }catch(_){}
+            setHangarChatMode(true, false)
         });
     }
 
@@ -4463,7 +4496,7 @@ function bindHangarChatControls(){
         downBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            try{ document.getElementById('chat-wrapper')?.classList.add('hangar-chat-lowered'); }catch(_){}
+            setHangarChatMode(true, true)
         });
     }
 }
@@ -4479,6 +4512,7 @@ function __syncHangarChatVisibility(){
         const isVisible = !hangarWindow.classList.contains('hidden') && hangarWindow.style.display !== 'none';
         if(isVisible){
             bindHangarChatControls();
+            __mountHangarChatPanel();
             const lowered = document.body.classList.contains('hangar-chat-lowered');
             setHangarChatMode(true, lowered);
         }else{
@@ -5035,10 +5069,34 @@ function setUnreadCount(scopeName, count = 0) {
     } else {
         chatUnread.global = safeCount;
     }
+    __updateHangarPmAlert?.();
 }
 
 function incrementUnread(scopeName, amount = 1) {
     setUnreadCount(scopeName, getUnreadCount(scopeName) + Math.max(1, Number(amount) || 1));
+    __updateHangarPmAlert?.();
+}
+
+function __getTotalPmUnread(){
+    try{
+        return Object.values(chatUnread?.pm || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    }catch(_){
+        return 0;
+    }
+}
+
+function __updateHangarPmAlert(){
+    try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        const badge = document.getElementById('hangar-chat-alert');
+        if(!chatWrapper || !badge){
+            return;
+        }
+        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered');
+        const totalPmUnread = __getTotalPmUnread();
+        badge.textContent = String(totalPmUnread > 99 ? '99+' : totalPmUnread);
+        chatWrapper.classList.toggle('has-hangar-pm-alert', !!(isLowered && totalPmUnread > 0));
+    }catch(_){}
 }
 
 function getLastMessagePreview(scopeName) {
@@ -12435,6 +12493,7 @@ window.addEventListener('load', () => {
     bindHangarChatControls();
     __installHangarChatWatcher();
     __syncHangarChatVisibility();
+    __updateHangarPmAlert?.();
     try{
         const chatWrapper = document.getElementById('chat-wrapper');
         if(chatWrapper && !__hangarChatHomeParent){
