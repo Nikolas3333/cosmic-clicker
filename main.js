@@ -51,6 +51,7 @@ function persistBattleChatRoomId(roomId) {
     activeBattleChatRoomId = safeRoomId;
     window.currentRoomId = safeRoomId;
     try { localStorage.setItem('cosmicLastBattleChatRoomId', safeRoomId); } catch (_) {}
+}
 
 function getPersistedBattleChatRoomId() {
     const direct = String(activeBattleChatRoomId || window.currentRoomId || '').trim();
@@ -60,6 +61,7 @@ function getPersistedBattleChatRoomId() {
         if (saved && String(saved).trim()) return String(saved).trim();
     } catch (_) {}
     return '';
+}
 
 let playerShip = null;
 let keys = {
@@ -145,6 +147,7 @@ const authState = {
 function getDisplayPlayerTag(){
     const safeNickname = (player?.nickname || 'Commander').trim() || 'Commander';
     return safeNickname;
+}
 
 function getActiveSaveKey(){
     if(authState.mode === 'account'){
