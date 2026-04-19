@@ -10312,7 +10312,22 @@ function hideHangarShipPriceRow(){
 }
 
 function disposeHangarSellTerminal(){
-    disposeHangarSellTerminal();
+    const group = hangarState?.sellTerminalGroup || null;
+    if(!group) return;
+    try{ group.parent?.remove?.(group); }catch(_){ }
+    try{
+        group.traverse?.((child) => {
+            try{ child.geometry?.dispose?.(); }catch(_){ }
+            try{
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.filter(Boolean).forEach((mat) => {
+                    try{ mat.map?.dispose?.(); }catch(_){ }
+                    try{ mat.dispose?.(); }catch(_){ }
+                });
+            }catch(_){ }
+        });
+    }catch(_){ }
+    hangarState.sellTerminalGroup = null;
 }
 
 function buildHangarSellTerminalLabel(textLabel){
