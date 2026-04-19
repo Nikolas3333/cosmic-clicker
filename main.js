@@ -868,6 +868,78 @@ function getThrottledPresencePing(now = Date.now()){
     return Number(lastPresencePingValue || 0) || 0;
 }
 
+
+function getJoinedLobbyRoomId(){
+    const currentId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    if(currentId) return currentId;
+    const selectedId = String(selectedLobbyMap?.id || selectedLobbyMap?.roomId || '').trim();
+    const isBaseMap = !!selectedLobbyMap?.isBaseMap;
+    if(selectedId && !isBaseMap) return selectedId;
+    return '';
+}
+
+async function touchJoinedLobbyRoomPresence(force = false){
+    if(!window.supabaseReady || !window.supabaseClient) return;
+    if(gameState !== 'LOBBY') return;
+    const roomId = getJoinedLobbyRoomId();
+    const identity = getCurrentPlayerIdentity?.();
+    const playerId = String(identity?.playerId || '').trim();
+    if(!roomId || !playerId) return;
+    if(lobbyRoomPresenceInFlight) return;
+
+    const now = Date.now();
+    if(!force && (now - lastLobbyRoomPresenceAt) < 2500) return;
+
+    lobbyRoomPresenceInFlight = true;
+    try{
+        const heartbeatPayload = {
+            nickname: identity?.displayName || player?.nickname || 'Commander',
+            updated_at: new Date(now).toISOString(),
+            team: getBattleRoomPlayerTeam(playerId),
+            level: Number(player?.level || 1) || 1,
+            ping: Number(getBattlePingValue() || 0) || 0
+        };
+
+        const { data: updatedRows, error: updateError } = await window.supabaseClient
+            .from('room_players')
+            .update(heartbeatPayload)
+            .eq('room_id', roomId)
+            .eq('player_id', playerId)
+            .select('id')
+            .limit(1);
+
+        const noUpdatedRows = !Array.isArray(updatedRows) || updatedRows.length <= 0;
+        if(updateError || noUpdatedRows){
+            const insertPayload = {
+                id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+                    ? globalThis.crypto.randomUUID()
+                    : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                room_id: roomId,
+                player_id: playerId,
+                nickname: heartbeatPayload.nickname,
+                joined_at: heartbeatPayload.updated_at,
+                updated_at: heartbeatPayload.updated_at,
+                team: heartbeatPayload.team,
+                level: heartbeatPayload.level,
+                ping: heartbeatPayload.ping
+            };
+
+            await window.supabaseClient
+                .from('room_players')
+                .insert([insertPayload]);
+        }
+
+        lastLobbyRoomPresenceAt = now;
+        try{
+            cachedRoomPlayersFetchedAt = 0;
+            lastRoomPlayersFetchAt = 0;
+        }catch(_){}
+    }catch(_){
+    }finally{
+        lobbyRoomPresenceInFlight = false;
+    }
+}
+
 function ensureSelfRoomPlayerState(){
     if(!window.supabaseClient || roomPlayerStateUpsertInFlight) return;
     const roomId = getBattleRoomIdSafe();
@@ -3021,10 +3093,9 @@ async function saveRemoteProgress(){
     markLocalResourceDirty(6000);
     const payload = buildSavePayload();
     try{
-        await window.supabaseClient.from('players').update({
+        const { error: playerUpdateError } = await window.supabaseClient.from('players').update({
             nickname: player.nickname,
             level: player.level,
-            experience: Number(player.experience || 0),
             credits: Number(playerResources.coins || player.credits || 0),
             mercury_ore: Number(playerResources.mercury_ore || 0),
             venus_gas: Number(playerResources.venus_gas || 0),
@@ -3036,7 +3107,11 @@ async function saveRemoteProgress(){
             neptune_methane: Number(playerResources.neptune_methane || 0),
             solar_energy: Number(playerResources.solar_energy || 0),
             crystals: Number(playerResources.crystals || 0)
-        }).eq('public_id', authState.playerId);
+        }).eq('public_id', Number(authState.playerId) || 0);
+
+        if(playerUpdateError){
+            console.warn('Не удалось обновить players:', playerUpdateError.message || playerUpdateError);
+        }
 
         const { error } = await window.supabaseClient.from('player_saves').upsert({
             player_public_id: authState.playerId,
@@ -3062,6 +3137,12 @@ function saveGame(){
 setInterval(() => {
     if(authState?.isAuthenticated) saveGame();
 }, 20000);
+
+setInterval(() => {
+    if(authState?.isAuthenticated && gameState === 'LOBBY'){
+        touchJoinedLobbyRoomPresence();
+    }
+}, 2500);
 
 window.addEventListener('beforeunload', () => {
     try{ saveGame(); }catch(_e){}
@@ -6552,6 +6633,8 @@ var lastRoomPlayerPingValue = 0;
 var lastRoomPlayerPingAt = 0;
 var lastPresencePingValue = 0;
 var lastPresencePingAt = 0;
+var lobbyRoomPresenceInFlight = false;
+var lastLobbyRoomPresenceAt = 0;
 const ROOM_PLAYER_FETCH_CACHE_MS = 8000;
 const ROOM_PLAYER_PING_UPDATE_MS = 9000;
 const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
@@ -7330,6 +7413,9 @@ async function fetchCurrentRoomLivePlayers(){
 async function syncLiveBattlePlayers(){
     if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
+    if(gameState === 'BATTLE' && playerShip){
+        ensureSelfRoomPlayerState();
+    }
 
     const livePlayers = await fetchCurrentRoomLivePlayers();
     if(livePlayers === null) return;
