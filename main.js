@@ -9728,19 +9728,44 @@ function bindHangarMovementControls(){
             setKey(e.code, true);
         }
         if(e.code === 'KeyE' && !e.repeat){
+            const candidates = (getHangarSupportShips?.() || [])
+                .map((ship, idx) => ({ ship, idx, near: isHangarDockWithinUseDistance(idx) }))
+                .filter(item => item.ship && item.near);
+            if(!candidates.length) return;
+
+            let target = null;
             const hoverIndex = Number(hangarState.hoverDockIndex);
-            if(!Number.isFinite(hoverIndex) || hoverIndex < 0) return;
-            if(!isHangarDockWithinUseDistance(hoverIndex)) return;
-            const hoverShip = getHangarDockShipByIndex(hoverIndex);
-            if(hoverShip){
-                e.preventDefault();
-                const allShips = getAllOwnedHangarShips();
-                const nextIndex = allShips.findIndex(item => String(item?.id || '').trim() === String(hoverShip?.id || '').trim());
-                if(nextIndex >= 0){
-                    hangarState.shipIndex = nextIndex;
-                    fillHangarText();
-                    selectCurrentHangarShip?.();
+            if(Number.isFinite(hoverIndex) && hoverIndex >= 0){
+                target = candidates.find(item => item.idx === hoverIndex) || null;
+            }
+            if(!target){
+                const astronautPos = hangarState?.astronautPivot?.position || null;
+                if(astronautPos){
+                    let bestDist = Infinity;
+                    for(const item of candidates){
+                        const pad = getHangarDockPadByIndex?.(item.idx) || null;
+                        if(!pad) continue;
+                        const padWorld = new THREE.Vector3();
+                        try{ pad.getWorldPosition(padWorld); }catch(_){ continue; }
+                        const dist = astronautPos.distanceTo(padWorld);
+                        if(dist < bestDist){
+                            bestDist = dist;
+                            target = item;
+                        }
+                    }
                 }
+            }
+            if(!target?.ship) return;
+
+            e.preventDefault();
+            hangarState.selectedDockIndex = target.idx;
+            hangarState.hoverDockIndex = target.idx;
+            const allShips = getAllOwnedHangarShips();
+            const nextIndex = allShips.findIndex(item => String(item?.id || '').trim() === String(target.ship?.id || '').trim());
+            if(nextIndex >= 0){
+                hangarState.shipIndex = nextIndex;
+                fillHangarText();
+                selectCurrentHangarShip?.();
             }
         }
     });
@@ -10211,7 +10236,7 @@ function ensureHangarSellTerminal(candidate){
     }
     try{ group.parent?.remove?.(group); }catch(_){}
     candidate.pad.add(group);
-    group.position.set(0.74, 0.78, 0.34);
+    group.position.set(0.0, 0.28, 0.72);
     group.rotation.y = -0.18;
     group.visible = true;
 }
