@@ -4396,14 +4396,14 @@ const chatTabsWrap = document.getElementById("chat-tabs");
 
 let currentChat = "global";
 
-function setHangarChatMode(active, lowered = false){
+if(typeof setHangarChatMode==='undefined') function setHangarChatMode(active, lowered = false){
     try{
         document.body.classList.toggle('hangar-chat-mode', !!active);
         document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
     }catch(_){}
 }
 
-function bindHangarChatControls(){
+if(typeof bindHangarChatControls==='undefined') function bindHangarChatControls(){
     const upBtn = document.getElementById('hangar-chat-up');
     const downBtn = document.getElementById('hangar-chat-down');
 
@@ -4426,7 +4426,7 @@ function bindHangarChatControls(){
     }
 }
 
-function syncHangarChatVisibility(){
+if(typeof syncHangarChatVisibility==='undefined') function syncHangarChatVisibility(){
     try{
         const hangarWindow = document.getElementById('hangar-window');
         if(!hangarWindow){
@@ -4444,7 +4444,7 @@ function syncHangarChatVisibility(){
     }catch(_){}
 }
 
-function installHangarChatWatcher(){
+if(typeof installHangarChatWatcher==='undefined') function installHangarChatWatcher(){
     if(window.__hangarChatWatcherInstalled) return;
     window.__hangarChatWatcherInstalled = true;
 
@@ -4492,14 +4492,14 @@ function installHangarChatWatcher(){
 }
 
 
-function setHangarChatMode(active, lowered = false){
+if(typeof setHangarChatMode==='undefined') function setHangarChatMode(active, lowered = false){
     try{
         document.body.classList.toggle('hangar-chat-mode', !!active);
         document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
     }catch(_){}
 }
 
-function bindHangarChatControls(){
+if(typeof bindHangarChatControls==='undefined') function bindHangarChatControls(){
     const upBtn = document.getElementById('hangar-chat-up');
     const downBtn = document.getElementById('hangar-chat-down');
 
