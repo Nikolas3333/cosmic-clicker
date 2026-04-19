@@ -5826,7 +5826,7 @@ shop-main-head{
 /* ===== HANGAR CHAT FINAL TUNE ===== */
 #chat-wrapper.hangar-inline-mode{
   left:18px !important;
-  bottom:58px !important;
+  bottom:138px !important;
   width:min(590px, calc(100vw - 36px)) !important;
 }
 
@@ -5880,81 +5880,29 @@ shop-main-head{
 }
 
 
-/* ===== HANGAR CHAT V277 ===== */
-#chat-wrapper.hangar-inline-mode{
-  left:18px !important;
-  bottom:108px !important;
-  width:min(590px, calc(100vw - 36px)) !important;
-  z-index:26000 !important;
-}
-
-#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
-  transform:translateY(calc(100% - 64px)) !important;
-}
-
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
-  border-color:rgba(255,64,96,0.95) !important;
+  border-color:rgba(255,72,104,0.95) !important;
   box-shadow:
-    0 0 14px rgba(255,50,90,0.55),
-    0 0 28px rgba(255,50,90,0.35),
-    inset 0 0 18px rgba(255,40,80,0.16) !important;
+    0 0 16px rgba(255,52,92,0.62),
+    0 0 34px rgba(255,52,92,0.36),
+    inset 0 0 18px rgba(255,42,82,0.16) !important;
   animation:hangarPmNeonPulse 0.9s infinite alternate !important;
-}
-
-#hangar-chat-alert{
-  display:none !important;
-}
-
-#hangar-emoji-panel{
-  display:none;
-}
-
-#chat-wrapper.hangar-inline-mode #hangar-emoji-panel{
-  position:absolute !important;
-  left:12px !important;
-  top:-56px !important;
-  display:flex !important;
-  align-items:center !important;
-  gap:8px !important;
-  padding:6px 10px !important;
-  border-radius:12px !important;
-  background:rgba(3,12,28,0.96) !important;
-  border:1px solid rgba(90,180,255,0.30) !important;
-  box-shadow:0 0 18px rgba(0,180,255,0.18) !important;
-  z-index:5 !important;
-}
-
-#chat-wrapper.hangar-inline-mode #hangar-emoji-panel .hangar-emoji-btn{
-  width:28px !important;
-  height:28px !important;
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  border-radius:8px !important;
-  background:rgba(255,255,255,0.05) !important;
-  cursor:pointer !important;
-  user-select:none !important;
-  font-size:17px !important;
-}
-
-#chat-wrapper.hangar-inline-mode #hangar-emoji-panel .hangar-emoji-btn:hover{
-  background:rgba(0,255,200,0.18) !important;
-  transform:scale(1.08) !important;
-}
-
-#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #hangar-emoji-panel{
-  transform:translateY(calc(100% + 252px)) !important;
-  opacity:0.18 !important;
 }
 
 @keyframes hangarPmNeonPulse{
   from{
-    border-color:rgba(255,72,104,0.82);
-    box-shadow:0 0 10px rgba(255,50,90,0.35), 0 0 18px rgba(255,50,90,0.18), inset 0 0 10px rgba(255,40,80,0.08);
+    border-color:rgba(255,72,104,0.80);
+    box-shadow:
+      0 0 10px rgba(255,52,92,0.30),
+      0 0 18px rgba(255,52,92,0.16),
+      inset 0 0 10px rgba(255,42,82,0.08);
   }
   to{
-    border-color:rgba(255,88,120,1);
-    box-shadow:0 0 20px rgba(255,50,90,0.72), 0 0 34px rgba(255,50,90,0.42), inset 0 0 18px rgba(255,40,80,0.18);
+    border-color:rgba(255,92,124,1);
+    box-shadow:
+      0 0 20px rgba(255,52,92,0.74),
+      0 0 38px rgba(255,52,92,0.42),
+      inset 0 0 18px rgba(255,42,82,0.20);
   }
 }
 
@@ -6076,16 +6024,7 @@ shop-main-head{
 
     <!-- CHAT WRAPPER -->
     <div id="chat-wrapper">
-      <div id="hangar-emoji-panel">
-        <div class="hangar-emoji-btn" data-emoji="😀" title="😀">😀</div>
-        <div class="hangar-emoji-btn" data-emoji="🚀" title="🚀">🚀</div>
-        <div class="hangar-emoji-btn" data-emoji="🔥" title="🔥">🔥</div>
-        <div class="hangar-emoji-btn" data-emoji="😎" title="😎">😎</div>
-        <div class="hangar-emoji-btn" data-emoji="💀" title="💀">💀</div>
-        <div class="hangar-emoji-btn" data-emoji="🪐" title="🪐">🪐</div>
-        <div class="hangar-emoji-btn" data-emoji="✴️" title="✴️">✴️</div>
-        <div class="hangar-emoji-btn" data-emoji="⚔️" title="⚔️">⚔️</div>
-      </div>
+      <div id="hangar-emoji-panel"></div>
       <div id="hangar-chat-controls">
         <button id="hangar-chat-up" type="button" title="Поднять чат">▲</button>
         <button id="hangar-chat-down" type="button" title="Опустить чат">▼</button>
