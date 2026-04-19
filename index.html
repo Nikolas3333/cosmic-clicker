@@ -5770,12 +5770,22 @@ shop-main-head{
 
 
 #chat-wrapper.hangar-inline-mode{
-  position:fixed !important;
+  position:absolute !important;
   left:18px !important;
-  bottom:520px !important;
-  width:520px !important;
+  bottom:18px !important;
+  width:min(520px, calc(100% - 36px)) !important;
   height:260px !important;
-  z-index:999999 !important;
+  z-index:26000 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  background:rgba(3,12,28,0.94) !important;
+  border:1px solid rgba(90,180,255,0.38) !important;
+  border-radius:16px !important;
+  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
+  overflow:visible !important;
+  transform:none !important;
+  transition:transform 0.22s ease, opacity 0.22s ease !important;
 }
 #chat-wrapper.hangar-inline-mode #chat-panel{
   display:flex !important;
@@ -5871,12 +5881,12 @@ shop-main-head{
 
 
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
-  border-color:rgba(255,80,110,1) !important;
+  border-color:rgba(255,72,104,0.95) !important;
   box-shadow:
-    0 0 20px rgba(255,0,60,0.8),
-    0 0 40px rgba(255,0,60,0.6),
-    inset 0 0 15px rgba(255,0,60,0.4) !important;
-  animation:hangarNeonBlink 0.5s infinite alternate !important;
+    0 0 16px rgba(255,52,92,0.62),
+    0 0 34px rgba(255,52,92,0.36),
+    inset 0 0 18px rgba(255,42,82,0.16) !important;
+  animation:hangarPmNeonPulse 0.9s infinite alternate !important;
 }
 
 @keyframes hangarPmNeonPulse{
@@ -5959,14 +5969,17 @@ shop-main-head{
 }
 
 
-/* ===== HANGAR CHAT FINAL POSITION V283 ===== */
+/* ===== HANGAR CHAT FINAL POSITION V286 ===== */
 #chat-wrapper.hangar-inline-mode{
-  position:absolute !important;
+  position:fixed !important;
   left:18px !important;
-  bottom:380px !important;
-  width:min(520px, calc(100% - 36px)) !important;
+  bottom:620px !important;
+  width:520px !important;
   height:260px !important;
-  z-index:26000 !important;
+  z-index:999999 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
 }
 
 #chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
@@ -5974,31 +5987,37 @@ shop-main-head{
 }
 
 #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
-  border-color:rgba(255,72,104,0.98) !important;
+  border-color:#ff3458 !important;
   box-shadow:
-    0 0 18px rgba(255,52,92,0.72),
-    0 0 36px rgba(255,52,92,0.42),
-    inset 0 0 18px rgba(255,42,82,0.16) !important;
-  animation:hangarPmNeonPulseV283 0.72s infinite alternate !important;
+    0 0 8px rgba(255,0,70,0.18),
+    0 0 18px rgba(255,0,70,0.14),
+    inset 0 0 6px rgba(255,0,70,0.10) !important;
+  animation:hangarPmBlinkV286 0.42s linear infinite !important;
 }
 
-@keyframes hangarPmNeonPulseV283{
+@keyframes hangarPmBlinkV286{
   0%{
-    border-color:rgba(255,72,104,0.55);
+    border-color:rgba(255,40,80,0.35);
     box-shadow:
-      0 0 6px rgba(255,52,92,0.10),
-      0 0 12px rgba(255,52,92,0.06),
-      inset 0 0 6px rgba(255,42,82,0.04);
+      0 0 3px rgba(255,0,70,0.04),
+      0 0 8px rgba(255,0,70,0.02),
+      inset 0 0 2px rgba(255,0,70,0.02);
+  }
+  50%{
+    border-color:rgba(255,72,108,1);
+    box-shadow:
+      0 0 18px rgba(255,0,70,0.85),
+      0 0 40px rgba(255,0,70,0.68),
+      inset 0 0 12px rgba(255,0,70,0.30);
   }
   100%{
-    border-color:rgba(255,92,124,1);
+    border-color:rgba(255,40,80,0.35);
     box-shadow:
-      0 0 22px rgba(255,52,92,0.86),
-      0 0 44px rgba(255,52,92,0.52),
-      inset 0 0 20px rgba(255,42,82,0.20);
+      0 0 3px rgba(255,0,70,0.04),
+      0 0 8px rgba(255,0,70,0.02),
+      inset 0 0 2px rgba(255,0,70,0.02);
   }
 }
-
 </style>
 </head>
 
