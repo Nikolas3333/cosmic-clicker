@@ -10090,7 +10090,6 @@ function hideHangarShipPriceRow(){
 function updateHangarPlatformPrompt(){
     const hint = document.getElementById('hangar-platform-hint');
     const sellBtn = document.getElementById('hangar-platform-sell');
-    const astronautPos = hangarState?.astronautPivot?.position || null;
     const candidates = getHangarSupportShips()
         .map((ship, idx) => ({ ship, idx, pad:getHangarDockPadByIndex(idx) }))
         .filter(item => item.ship && item.pad);
@@ -10102,18 +10101,6 @@ function updateHangarPlatformPrompt(){
         if(hovered && canSellHull(hovered.ship?.id)){
             activeCandidate = hovered;
         }
-    }
-
-    if(!activeCandidate && astronautPos && candidates.length){
-        const sellableCandidates = candidates.filter(item => canSellHull(item.ship?.id));
-        sellableCandidates.sort((a,b) => {
-            const ap = new THREE.Vector3();
-            const bp = new THREE.Vector3();
-            try{ a.pad.getWorldPosition(ap); }catch(_){ ap.set(9999,9999,9999); }
-            try{ b.pad.getWorldPosition(bp); }catch(_){ bp.set(9999,9999,9999); }
-            return astronautPos.distanceTo(ap) - astronautPos.distanceTo(bp);
-        });
-        activeCandidate = sellableCandidates[0] || null;
     }
 
     if(hint){
@@ -11179,11 +11166,7 @@ function ensureHangarRenderer(){
         if(floatingSellBtn && hangarState.camera){
             let dockIndex = Number(floatingSellBtn.dataset.dockIndex || NaN);
             let hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
-            if(!hoverShip){
-                dockIndex = Number(hangarState.hoverDockIndex);
-                hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
-            }
-            if(hoverShip && Number.isFinite(dockIndex) && dockIndex >= 0){
+            if(hoverShip && Number.isFinite(dockIndex) && dockIndex >= 0 && floatingSellBtn.style.display !== 'none'){
                 let worldPos = null;
                 const liveMesh = (hangarState.supportShipMeshes || []).find(mesh => String(mesh?.userData?.shipId || '').trim() === String(hoverShip?.id || '').trim());
                 if(liveMesh){
@@ -11198,16 +11181,22 @@ function ensureHangarRenderer(){
                 if(!worldPos){
                     worldPos = getHangarDockWorldPosition(dockIndex).clone();
                 }
-                worldPos.y += 2.1;
+                worldPos.y += 1.15;
                 const projected = worldPos.project(hangarState.camera);
                 if(projected.z > -1 && projected.z < 1){
                     const screenX = ((projected.x + 1) * 0.5) * stageRect.width;
                     const screenY = ((-projected.y + 1) * 0.5) * stageRect.height;
                     floatingSellBtn.style.left = `${screenX}px`;
                     floatingSellBtn.style.top = `${screenY}px`;
-                    floatingSellBtn.style.transform = 'translate(-50%, -100%)';
+                    floatingSellBtn.style.transform = 'translate(-50%, -115%)';
                     floatingSellBtn.style.zIndex = '12';
+                }else{
+                    floatingSellBtn.style.display = 'none';
+                    floatingSellBtn.dataset.shipId = '';
+                    floatingSellBtn.dataset.dockIndex = '';
                 }
+            }else{
+                floatingSellBtn.style.display = 'none';
             }
         }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
