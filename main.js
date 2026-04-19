@@ -1501,6 +1501,7 @@ function switchState(newState){
     if(resourceBar) resourceBar.style.display = "none";
     if(ui) ui.style.display = "none";
     if(premiumBar) premiumBar.style.display = "none";
+    setHangarChatMode(false, false);
 
     if(newState !== "BATTLE" && newState !== "OBSERVE"){
         clearBattleScene();
@@ -4394,6 +4395,37 @@ const chatMessages = document.getElementById("chat-messages");
 const chatTabsWrap = document.getElementById("chat-tabs");
 
 let currentChat = "global";
+
+function setHangarChatMode(active, lowered = false){
+    try{
+        document.body.classList.toggle('hangar-chat-mode', !!active);
+        document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+    }catch(_){}
+}
+
+function bindHangarChatControls(){
+    const upBtn = document.getElementById('hangar-chat-up');
+    const downBtn = document.getElementById('hangar-chat-down');
+
+    if(upBtn && !upBtn.dataset.boundHangarChat){
+        upBtn.dataset.boundHangarChat = '1';
+        upBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setHangarChatMode(true, false);
+        });
+    }
+
+    if(downBtn && !downBtn.dataset.boundHangarChat){
+        downBtn.dataset.boundHangarChat = '1';
+        downBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setHangarChatMode(true, true);
+        });
+    }
+}
+
 let chatRealtimeChannel = null;
 const CHAT_MESSAGE_LIMIT = 50;
 const chatCache = {
@@ -8196,6 +8228,8 @@ if (hangarTab && hangarWindow) {
         hangarWindow.classList.remove("hidden"); hangarWindow.style.display='flex';
         requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){} });
         profileWindow?.classList.add("hidden");
+        bindHangarChatControls();
+        setHangarChatMode(true, false);
     });
 }
 
@@ -8203,6 +8237,7 @@ if (profileTab && profileWindow) {
     profileTab.addEventListener("click", () => {
         profileWindow.classList.remove("hidden");
         hangarWindow?.classList.add("hidden");
+        setHangarChatMode(false, false);
     });
 }
 
@@ -12268,7 +12303,13 @@ function initExtraLobbyWindows(){
       const win = document.getElementById(winId);
       if(btn && win && !btn.dataset.boundExtra){
         btn.dataset.boundExtra = '1';
-        btn.addEventListener('click', () => { win.classList.add('hidden'); if(winId === 'hangar-window'){ try{ disposeHangarRenderer?.(); }catch(_){} } });
+        btn.addEventListener('click', () => {
+          win.classList.add('hidden');
+          if(winId === 'hangar-window'){
+            try{ disposeHangarRenderer?.(); }catch(_){}
+            setHangarChatMode(false, false);
+          }
+        });
       }
     });
 }
@@ -12278,6 +12319,7 @@ window.addEventListener('load', () => {
     renderProfileStats();
     renderClansWindow();
     renderLeadersWindow();
+    bindHangarChatControls();
 });
 
 
