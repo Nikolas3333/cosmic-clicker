@@ -8954,7 +8954,7 @@ function selectCurrentHangarShip(){
     syncHangarDockSelection();
     setHangarTransition?.(hangarState.shipIndex >= previousIndex ? 1 : -1);
     hangarState.shipAppearStartedAt = performance.now();
-    startHangarShipTransfer(previousShipId, nextShipId, hangarState.shipIndex);
+    startHangarShipTransfer(previousShipId, nextShipId, hangarState.selectedDockIndex);
     fillHangarText();
     return true;
 }
@@ -10236,8 +10236,8 @@ function ensureHangarSellTerminal(candidate){
     }
     try{ group.parent?.remove?.(group); }catch(_){}
     candidate.pad.add(group);
-    group.position.set(0.0, 0.28, 0.72);
-    group.rotation.y = -0.18;
+    group.position.set(0.84, 0.30, 0.14);
+    group.rotation.y = -Math.PI * 0.5;
     group.visible = true;
 }
 
@@ -11230,6 +11230,11 @@ function ensureHangarRenderer(){
                 pos.z += arc;
                 pos.y = y;
                 entry.mesh.position.copy(pos);
+                const moveDir = to.clone().sub(from);
+                if(moveDir.lengthSq() > 0.0001){
+                    const yaw = -Math.atan2(moveDir.z, moveDir.x);
+                    entry.mesh.rotation.y = yaw;
+                }
                 const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
                 entry.mesh.scale.setScalar(scaleValue);
             });
