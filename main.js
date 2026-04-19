@@ -4400,6 +4400,7 @@ let __hangarChatHomeParent = null;
 let __hangarChatHomeNextSibling = null;
 let __hangarEmojiHomeParent = null;
 let __hangarEmojiHomeNextSibling = null;
+let __hangarPmPulseUntil = 0;
 
 function __mountHangarChatPanel(){
     try{
@@ -4508,6 +4509,32 @@ function __initHangarEmojiPanel(){
             });
             panel.appendChild(btn);
         });
+    }catch(_){}
+}
+
+
+function __getTotalPmUnreadCount(){
+    try{
+        return Object.values(chatUnread?.pm || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    }catch(_){
+        return 0;
+    }
+}
+
+function __updateHangarPmNeon(){
+    try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        if(!chatWrapper) return;
+
+        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered') || document.body.classList.contains('hangar-chat-lowered');
+        const hasUnreadPm = __getTotalPmUnreadCount() > 0;
+        const hasPulse = Date.now() < Number(__hangarPmPulseUntil || 0);
+
+        if(isLowered && (hasUnreadPm || hasPulse)){
+            chatWrapper.classList.add('hangar-pm-neon');
+        }else{
+            chatWrapper.classList.remove('hangar-pm-neon');
+        }
     }catch(_){}
 }
 
@@ -5377,6 +5404,7 @@ function setUnreadForScope(scopeName, state = true) {
 
 function clearUnreadForCurrentScope() {
     setUnreadCount(currentChat, 0);
+    __updateHangarPmNeon?.();
 }
 
 function ensurePmTab(peerId, label = null) {
@@ -6151,10 +6179,17 @@ async function handleIncomingRealtimeMessage(msg) {
 
         ensurePmTab(peerId, getPeerLabelFromPmMessage(msg, peerId));
         syncPrivateTabFromScope(scope.key);
-        if (currentChat !== scope.key) incrementUnread(scope.key);
+
+        const isHangarLowered = document.body.classList.contains('hangar-chat-lowered') || document.getElementById('chat-wrapper')?.classList.contains('hangar-chat-lowered');
+        if (currentChat !== scope.key) {
+            incrementUnread(scope.key);
+        } else if (isHangarLowered) {
+            __hangarPmPulseUntil = Date.now() + 5000;
+        }
 
         if (currentChat === scope.key) renderLobbyMessages();
         renderChatTabs();
+        __updateHangarPmNeon?.();
     }
 }
 
@@ -16102,3 +16137,10 @@ if(previousOpenHangarWindowV188){
 
 
 try{ ensurePremiumCurrencyUi?.(); }catch(_){ }
+
+
+if(!window.__hangarPmNeonTicker){
+    window.__hangarPmNeonTicker = setInterval(() => {
+        try{ __updateHangarPmNeon?.(); }catch(_){}
+    }, 250);
+}
