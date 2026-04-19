@@ -43,6 +43,7 @@ player.ships.push({
 let gameState = "AUTH";
 let currentRoom = null;
 let activeBattleChatRoomId = null;
+const GLOBAL_BATTLE_ARCHIVE_ROOM_ID = '__global_battle_archive__';
 
 function persistBattleChatRoomId(roomId) {
     const safeRoomId = String(roomId || '').trim();
@@ -1193,7 +1194,7 @@ async function sendSceneMapMessage(text, options = {}) {
     if (mirrorToBattle) {
         payloads.push({
             channel: "battle",
-            room_id: 'global_battle',
+            room_id: GLOBAL_BATTLE_ARCHIVE_ROOM_ID,
             player_id: scenePayload.player_id,
             player_public_id: scenePayload.player_public_id,
             recipient_public_id: null,
@@ -5717,11 +5718,14 @@ async function loadChatHistory(scopeName = currentChat) {
 
     if (scope.channel === "battle") {
         const battleRoomId = String(getBattleChatRoomId() || '').trim();
+        const battleRoomFilters = [
+            `room_id.eq.${GLOBAL_BATTLE_ARCHIVE_ROOM_ID}`,
+            'room_id.eq.__all__'
+        ];
         if (battleRoomId) {
-            query = query.or(`room_id.eq.${battleRoomId},room_id.eq.__all__`);
-        } else {
-            query = query.eq('room_id', '__all__');
+            battleRoomFilters.push(`room_id.eq.${battleRoomId}`);
         }
+        query = query.or(battleRoomFilters.join(','));
     }
 
     if (scope.channel === "pm") {
@@ -5770,13 +5774,20 @@ async function loadChatHistory(scopeName = currentChat) {
 async function refreshBattleFeedFromDb() {
     if (!window.supabaseClient) return;
     const roomId = String(getBattleChatRoomId() || '').trim();
-    if (!roomId) return;
+
+    const battleRoomFilters = [
+        `room_id.eq.${GLOBAL_BATTLE_ARCHIVE_ROOM_ID}`,
+        'room_id.eq.__all__'
+    ];
+    if (roomId) {
+        battleRoomFilters.push(`room_id.eq.${roomId}`);
+    }
 
     const { data, error } = await window.supabaseClient
         .from("chat_messages")
         .select("*")
         .eq("channel", "battle")
-        .or(`room_id.eq.${roomId},room_id.eq.__all__`)
+        .or(battleRoomFilters.join(','))
         .order("created_at", { ascending: true })
         .limit(CHAT_MESSAGE_LIMIT);
 
@@ -5796,9 +5807,7 @@ async function refreshBattleFeedFromDb() {
     });
     roomList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-    const otherRooms = chatCache.battle.filter(msg => String(msg?.room_id || '') !== roomId);
     chatCache.battle.length = 0;
-    otherRooms.forEach(msg => chatCache.battle.push(msg));
     roomList.forEach(msg => pushChatToCache(scope, msg));
 
     renderBattleMessages();
@@ -5837,7 +5846,10 @@ async function handleIncomingRealtimeMessage(msg) {
     if (msg.channel === "battle") {
         const activeBattleRoomId = String(getBattleChatRoomId() || '').trim();
         const incomingRoomId = String(msg.room_id || '').trim();
-        if (activeBattleRoomId && incomingRoomId !== activeBattleRoomId && incomingRoomId !== '__all__') {
+        const isGlobalBattleArchiveMessage = incomingRoomId === GLOBAL_BATTLE_ARCHIVE_ROOM_ID;
+        const isGlobalBattleAnnouncement = incomingRoomId === '__all__';
+        const isActiveRoomBattleMessage = !!activeBattleRoomId && incomingRoomId === activeBattleRoomId;
+        if (!isGlobalBattleArchiveMessage && !isGlobalBattleAnnouncement && !isActiveRoomBattleMessage) {
             return;
         }
         const scope = { key: 'battle', channel: 'battle' };
