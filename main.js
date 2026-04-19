@@ -4411,6 +4411,7 @@ const chatUnread = {
 };
 const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
+const pmPeerRoomIds = new Map();
 const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
 const localHandledChatMessageIds = new Set();
 const BATTLE_HISTORY_SEARCH_LIMIT = 80;
@@ -4567,6 +4568,39 @@ function getPmPresenceState(peerId) {
     if (inGamePmPeers.has(key)) return 'in-game';
     if (onlinePmPeers.has(key)) return 'online';
     return 'offline';
+}
+
+function resolvePmRoomTitleById(roomId = '') {
+    const safeRoomId = String(roomId || '').trim();
+    if (!safeRoomId) return '';
+
+    const cachedRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
+        .find(room => String(room?.id || room?.roomId || '').trim() == safeRoomId);
+    if (cachedRoom) {
+        return String(cachedRoom.title || cachedRoom.room_name || '').trim();
+    }
+
+    const fallbackRoom = (Array.isArray(DEFAULT_SUPABASE_BATTLE_ROOMS) ? DEFAULT_SUPABASE_BATTLE_ROOMS : [])
+        .find(room => String(room?.id || room?.roomId || '').trim() == safeRoomId);
+    if (fallbackRoom) {
+        return String(fallbackRoom.title || fallbackRoom.room_name || '').trim();
+    }
+
+    return '';
+}
+
+function getPmPresenceTitle(peerId) {
+    const key = String(peerId || '').trim();
+    const presenceState = getPmPresenceState(key);
+
+    if (presenceState === 'online') return 'Онлайн';
+    if (presenceState !== 'in-game') return 'Оффлайн';
+
+    const roomId = String(pmPeerRoomIds.get(key) || '').trim();
+    const roomTitle = resolvePmRoomTitleById(roomId);
+
+    if (roomTitle) return roomTitle;
+    return 'В игре';
 }
 
 function saveChatUiState() {
@@ -5448,7 +5482,7 @@ function renderChatTabs() {
         const pinClass = meta?.pinned ? ' pinned' : '';
         const presenceState = getPmPresenceState(peerId);
         const presenceClass = presenceState === 'in-game' ? ' in-game' : (presenceState === 'online' ? ' online' : '');
-        const presenceTitle = presenceState === 'in-game' ? 'В игре' : (presenceState === 'online' ? 'Онлайн' : 'Оффлайн');
+        const presenceTitle = getPmPresenceTitle(peerId);
         html += `
           <button class="chat-tab pm-tab${currentChat === scope ? " active" : ""}${notify}${pinClass}${presenceClass}" data-scope="${scope}" type="button">
             <span class="pm-online-dot" title="${presenceTitle}"></span>
@@ -5518,6 +5552,7 @@ function renderChatTabs() {
             delete chatUnread.pm[peerId];
             onlinePmPeers.delete(String(peerId));
             inGamePmPeers.delete(String(peerId));
+            pmPeerRoomIds.delete(String(peerId));
             deletePmHistoryWithPeer(peerId);
             saveChatUiState();
 
@@ -15606,11 +15641,19 @@ async function loadOnlinePlayersFromSupabase(){
 function refreshPmOnlineState(players = []){
     onlinePmPeers.clear();
     inGamePmPeers.clear();
+    pmPeerRoomIds.clear();
     for(const p of players || []){
         const targetId = p?.player_id ? String(p.player_id) : '';
         if(!targetId || !isAccountPublicId(targetId)) continue;
-        if (String(p.status || '').toLowerCase() === 'lobby') onlinePmPeers.add(targetId);
-        else inGamePmPeers.add(targetId);
+        const status = String(p.status || '').toLowerCase();
+        const roomId = String(p?.room_id || '').trim();
+
+        if (status === 'lobby') {
+            onlinePmPeers.add(targetId);
+        } else if (status === 'in-game') {
+            inGamePmPeers.add(targetId);
+            if(roomId) pmPeerRoomIds.set(targetId, roomId);
+        }
     }
     renderChatTabs();
 }
