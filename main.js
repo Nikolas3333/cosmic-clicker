@@ -6831,7 +6831,6 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         playerId: '',
         kills: 0,
         deaths: 0,
-        deadUntil: 0,
         team
     };
 }
@@ -6866,7 +6865,6 @@ function upsertRemoteBattlePresence(payload = {}){
     entry.ping = ping;
     entry.kills = Math.max(0, Number(payload.kills || scoreSnapshot.kills || entry.kills || 0) || 0);
     entry.deaths = Math.max(0, Number(payload.deaths || scoreSnapshot.deaths || entry.deaths || 0) || 0);
-    entry.deadUntil = Math.max(0, Number(payload.deadUntil || entry.deadUntil || 0) || 0);
     entry.team = team;
     entry.lastSeenAt = Date.now();
 
@@ -7329,7 +7327,6 @@ async function broadcastSelfBattleState(){
         ping: getThrottledPresencePing(now),
         kills: Number(battleStats.playerKills || 0) || 0,
         deaths: Number(battleStats.playerDeaths || 0) || 0,
-        deadUntil: Number(battlePendingRespawnAt || 0) || 0,
         x: Number(playerShip.position.x || 0),
         y: Number(playerShip.position.y || 0),
         z: Number(playerShip.position.z || 0),
@@ -7353,8 +7350,7 @@ async function broadcastSelfBattleState(){
         || previousPayload.team !== payload.team
         || (presencePingWindowPassed && Number(previousPayload.ping || 0) !== Number(payload.ping || 0))
         || Number(previousPayload.kills || 0) !== Number(payload.kills || 0)
-        || Number(previousPayload.deaths || 0) !== Number(payload.deaths || 0)
-        || Number(previousPayload.deadUntil || 0) !== Number(payload.deadUntil || 0);
+        || Number(previousPayload.deaths || 0) !== Number(payload.deaths || 0);
     const changedPosition = !previousPayload || hasMeaningfulBattleVectorDelta(previousPayload, payload, BATTLE_PRESENCE_POSITION_EPSILON);
     const changedRotation = !previousPayload || hasMeaningfulBattleQuaternionDelta(
         { x: previousPayload?.qx, y: previousPayload?.qy, z: previousPayload?.qz, w: previousPayload?.qw },
@@ -7604,7 +7600,6 @@ async function syncLiveBattlePlayers(){
             kills: Number(remoteState?.kills || 0) || 0,
             id: entryId,
             ping: Number(entry?.ping || remoteState?.ping || 0) || 0,
-            deadUntil: Number(entry?.deadUntil || remoteState?.deadUntil || 0) || 0,
             team
         });
     });
@@ -7628,7 +7623,6 @@ async function syncLiveBattlePlayers(){
             deaths: Number(battleStats.playerDeaths || 0) || 0,
             id: myId,
             ping: Number(getBattlePingValue() || 0) || 0,
-            deadUntil: Number(battlePendingRespawnAt || 0) || 0,
             team: getBattleRoomPlayerTeam(myId)
         };
 
@@ -7819,7 +7813,7 @@ function updateBattleScoreboard(){
       const pingValue = Number.isFinite(pingValueRaw) && pingValueRaw > 0 ? Math.round(pingValueRaw) : '—';
       const deadUntil = Math.max(0, Number(isYou ? battlePendingRespawnAt : entry?.deadUntil) || 0);
       const isDead = deadUntil > Date.now();
-      const nickColor = isDead ? '#ffffff' : (team === 'red' ? '#ff8f8f' : '#8fd8ff');
+      const nickColor = team === 'red' ? '#ff8f8f' : '#8fd8ff';
       const displayName = isDead ? `💀 ${safeName}` : safeName;
       return `
       <div class="battle-scoreboard-row ${team === 'red' ? 'enemy' : 'player'}">
