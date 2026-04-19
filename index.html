@@ -5968,6 +5968,47 @@ shop-main-head{
   z-index:5 !important;
 }
 
+
+/* ===== HANGAR CHAT FINAL POSITION V283 ===== */
+#chat-wrapper.hangar-inline-mode{
+  position:absolute !important;
+  left:18px !important;
+  bottom:248px !important;
+  width:min(520px, calc(100% - 36px)) !important;
+  height:260px !important;
+  z-index:26000 !important;
+}
+
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+
+#chat-wrapper.hangar-inline-mode.hangar-pm-neon{
+  border-color:rgba(255,72,104,0.98) !important;
+  box-shadow:
+    0 0 18px rgba(255,52,92,0.72),
+    0 0 36px rgba(255,52,92,0.42),
+    inset 0 0 18px rgba(255,42,82,0.16) !important;
+  animation:hangarPmNeonPulseV283 0.72s infinite alternate !important;
+}
+
+@keyframes hangarPmNeonPulseV283{
+  0%{
+    border-color:rgba(255,72,104,0.55);
+    box-shadow:
+      0 0 6px rgba(255,52,92,0.10),
+      0 0 12px rgba(255,52,92,0.06),
+      inset 0 0 6px rgba(255,42,82,0.04);
+  }
+  100%{
+    border-color:rgba(255,92,124,1);
+    box-shadow:
+      0 0 22px rgba(255,52,92,0.86),
+      0 0 44px rgba(255,52,92,0.52),
+      inset 0 0 20px rgba(255,42,82,0.20);
+  }
+}
+
 </style>
 </head>
 
