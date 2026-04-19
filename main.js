@@ -1175,7 +1175,7 @@ async function sendSceneMapMessage(text, options = {}) {
     if (!roomId) return false;
     persistBattleChatRoomId(roomId);
 
-    const mirrorToBattle = options?.mirrorToBattle !== false && (gameState === 'BATTLE' || gameState === 'OBSERVE');
+    const mirrorToBattle = options?.mirrorToBattle !== false;
 
     const scenePayload = {
         channel: "scene",
@@ -1193,7 +1193,7 @@ async function sendSceneMapMessage(text, options = {}) {
     if (mirrorToBattle) {
         payloads.push({
             channel: "battle",
-            room_id: scenePayload.room_id,
+            room_id: 'global_battle',
             player_id: scenePayload.player_id,
             player_public_id: scenePayload.player_public_id,
             recipient_public_id: null,
