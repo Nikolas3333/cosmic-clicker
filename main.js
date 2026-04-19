@@ -4528,17 +4528,18 @@ function __updateHangarPmNeon(){
         const chatWrapper = document.getElementById('chat-wrapper');
         if(!chatWrapper) return;
 
-        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered');
-        const hasUnread = __getTotalPmUnreadCount() > 0;
+        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered') || document.body.classList.contains('hangar-chat-lowered');
+        const activeScope = parseChatScope(currentChat);
+        const hasAnyUnreadPm = __getTotalPmUnreadCount() > 0;
+        const hasRecentActivePmPulse = Date.now() < Number(__hangarPmPulseUntil || 0);
+        const shouldGlow = !!(isLowered && (hasAnyUnreadPm || (activeScope.channel === 'pm' && hasRecentActivePmPulse)));
 
-        if(isLowered && hasUnread){
+        if(shouldGlow){
             chatWrapper.classList.add('hangar-pm-neon');
         }else{
             chatWrapper.classList.remove('hangar-pm-neon');
         }
-
     }catch(_){}
-}catch(_){}
 }
 
 function bindHangarChatControls(){
@@ -6190,7 +6191,8 @@ async function handleIncomingRealtimeMessage(msg) {
         if (currentChat !== scope.key) {
             incrementUnread(scope.key);
         } else if (isHangarLowered) {
-            __hangarPmPulseUntil = Date.now() + 5000;
+            __hangarPmPulseUntil = Date.now() + 10000;
+            __updateHangarPmNeon?.();
         }
 
         if (currentChat === scope.key) renderLobbyMessages();
