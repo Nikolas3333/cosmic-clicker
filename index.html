@@ -1735,7 +1735,70 @@ color:#ffd700;
   border: 2px solid #00f0ff;
   padding: 12px;
   overflow-y: auto;
+  position: relative;
 }
+
+#hangar-chat-controls{
+  display:none;
+}
+
+body.hangar-chat-mode #chat-wrapper{
+  position:fixed !important;
+  left:18px !important;
+  bottom:18px !important;
+  width:min(520px, calc(100vw - 36px)) !important;
+  height:260px !important;
+  z-index:22050 !important;
+  background:rgba(3,12,28,0.88) !important;
+  border:1px solid rgba(90,180,255,0.38) !important;
+  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
+  overflow:visible !important;
+  transition:transform 0.22s ease, opacity 0.22s ease !important;
+}
+
+body.hangar-chat-mode #chat-panel{
+  height:100% !important;
+}
+
+body.hangar-chat-mode #hangar-chat-controls{
+  position:absolute !important;
+  right:12px !important;
+  top:-42px !important;
+  display:flex !important;
+  gap:8px !important;
+  z-index:1 !important;
+}
+
+body.hangar-chat-mode #hangar-chat-controls button{
+  width:34px !important;
+  height:34px !important;
+  border-radius:10px !important;
+  border:1px solid rgba(90,180,255,0.35) !important;
+  background:rgba(5,18,36,0.94) !important;
+  color:#9fe8ff !important;
+  cursor:pointer !important;
+  font-size:16px !important;
+  box-shadow:0 0 12px rgba(0,180,255,0.16) !important;
+}
+
+body.hangar-chat-mode #hangar-chat-controls button:hover{
+  background:rgba(10,34,62,0.98) !important;
+}
+
+body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+
+body.hangar-chat-mode.hangar-chat-lowered #chat-panel{
+  pointer-events:none !important;
+}
+
+body.hangar-chat-mode.hangar-chat-lowered #chat-input-area,
+body.hangar-chat-mode.hangar-chat-lowered #chat-tabs,
+body.hangar-chat-mode.hangar-chat-lowered #chat-messages{
+  opacity:0.12 !important;
+}
+
 
 /* EMOJI PANEL */
 #emoji-panel {
@@ -5819,6 +5882,10 @@ shop-main-head{
 
     <!-- CHAT WRAPPER -->
     <div id="chat-wrapper">
+      <div id="hangar-chat-controls">
+        <button id="hangar-chat-up" type="button" title="Поднять чат">▲</button>
+        <button id="hangar-chat-down" type="button" title="Опустить чат">▼</button>
+      </div>
       <div id="chat-panel">
         <div id="chat-tabs">
           <button class="chat-tab active" data-scope="global" type="button">Global</button>
