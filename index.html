@@ -5768,6 +5768,60 @@ shop-main-head{
 #hangar-window .hangar-module-list-name{font-weight:800;}
 #hangar-window .hangar-module-list-sub{font-size:12px; opacity:0.78;}
 
+
+#chat-wrapper.hangar-inline-mode{
+  position:absolute !important;
+  left:18px !important;
+  bottom:18px !important;
+  width:min(520px, calc(100% - 36px)) !important;
+  height:260px !important;
+  z-index:26000 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  background:rgba(3,12,28,0.94) !important;
+  border:1px solid rgba(90,180,255,0.38) !important;
+  border-radius:16px !important;
+  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
+  overflow:visible !important;
+  transform:none !important;
+  transition:transform 0.22s ease, opacity 0.22s ease !important;
+}
+#chat-wrapper.hangar-inline-mode #chat-panel{
+  display:flex !important;
+  height:100% !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls{
+  position:absolute !important;
+  right:12px !important;
+  top:-42px !important;
+  display:flex !important;
+  gap:8px !important;
+  z-index:3 !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls button{
+  width:34px !important;
+  height:34px !important;
+  border-radius:10px !important;
+  border:1px solid rgba(90,180,255,0.35) !important;
+  background:rgba(5,18,36,0.94) !important;
+  color:#9fe8ff !important;
+  cursor:pointer !important;
+  font-size:16px !important;
+  box-shadow:0 0 12px rgba(0,180,255,0.16) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-panel{
+  pointer-events:none !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-input-area,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-tabs,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-messages{
+  opacity:0.12 !important;
+}
+
 </style>
 </head>
 
@@ -6302,6 +6356,60 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 #hangar-window .hangar-stage-name-badge{display:flex !important;}
 #premium-account-info .premium-item.currency-item{display:inline-flex !important; align-items:center !important; gap:6px !important;}
 #premium-account-info .premium-currency-text{display:inline-flex !important; align-items:center !important;}
+
+#chat-wrapper.hangar-inline-mode{
+  position:absolute !important;
+  left:18px !important;
+  bottom:18px !important;
+  width:min(520px, calc(100% - 36px)) !important;
+  height:260px !important;
+  z-index:26000 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  background:rgba(3,12,28,0.94) !important;
+  border:1px solid rgba(90,180,255,0.38) !important;
+  border-radius:16px !important;
+  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
+  overflow:visible !important;
+  transform:none !important;
+  transition:transform 0.22s ease, opacity 0.22s ease !important;
+}
+#chat-wrapper.hangar-inline-mode #chat-panel{
+  display:flex !important;
+  height:100% !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls{
+  position:absolute !important;
+  right:12px !important;
+  top:-42px !important;
+  display:flex !important;
+  gap:8px !important;
+  z-index:3 !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls button{
+  width:34px !important;
+  height:34px !important;
+  border-radius:10px !important;
+  border:1px solid rgba(90,180,255,0.35) !important;
+  background:rgba(5,18,36,0.94) !important;
+  color:#9fe8ff !important;
+  cursor:pointer !important;
+  font-size:16px !important;
+  box-shadow:0 0 12px rgba(0,180,255,0.16) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-panel{
+  pointer-events:none !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-input-area,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-tabs,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-messages{
+  opacity:0.12 !important;
+}
+
 </style>
 
 </body>
@@ -6315,6 +6423,60 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 #hangar-window .hangar-ship-card,
 #hangar-window .hangar-footer-row,
 #hangar-window .hangar-stage-name-badge{display:none !important;}
+
+#chat-wrapper.hangar-inline-mode{
+  position:absolute !important;
+  left:18px !important;
+  bottom:18px !important;
+  width:min(520px, calc(100% - 36px)) !important;
+  height:260px !important;
+  z-index:26000 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  background:rgba(3,12,28,0.94) !important;
+  border:1px solid rgba(90,180,255,0.38) !important;
+  border-radius:16px !important;
+  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
+  overflow:visible !important;
+  transform:none !important;
+  transition:transform 0.22s ease, opacity 0.22s ease !important;
+}
+#chat-wrapper.hangar-inline-mode #chat-panel{
+  display:flex !important;
+  height:100% !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls{
+  position:absolute !important;
+  right:12px !important;
+  top:-42px !important;
+  display:flex !important;
+  gap:8px !important;
+  z-index:3 !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls button{
+  width:34px !important;
+  height:34px !important;
+  border-radius:10px !important;
+  border:1px solid rgba(90,180,255,0.35) !important;
+  background:rgba(5,18,36,0.94) !important;
+  color:#9fe8ff !important;
+  cursor:pointer !important;
+  font-size:16px !important;
+  box-shadow:0 0 12px rgba(0,180,255,0.16) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-panel{
+  pointer-events:none !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-input-area,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-tabs,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-messages{
+  opacity:0.12 !important;
+}
+
 </style>
 
 
@@ -6380,6 +6542,60 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 #hangar-window .hangar-main-btn{
   min-width:170px;
 }
+
+#chat-wrapper.hangar-inline-mode{
+  position:absolute !important;
+  left:18px !important;
+  bottom:18px !important;
+  width:min(520px, calc(100% - 36px)) !important;
+  height:260px !important;
+  z-index:26000 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  background:rgba(3,12,28,0.94) !important;
+  border:1px solid rgba(90,180,255,0.38) !important;
+  border-radius:16px !important;
+  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
+  overflow:visible !important;
+  transform:none !important;
+  transition:transform 0.22s ease, opacity 0.22s ease !important;
+}
+#chat-wrapper.hangar-inline-mode #chat-panel{
+  display:flex !important;
+  height:100% !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls{
+  position:absolute !important;
+  right:12px !important;
+  top:-42px !important;
+  display:flex !important;
+  gap:8px !important;
+  z-index:3 !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls button{
+  width:34px !important;
+  height:34px !important;
+  border-radius:10px !important;
+  border:1px solid rgba(90,180,255,0.35) !important;
+  background:rgba(5,18,36,0.94) !important;
+  color:#9fe8ff !important;
+  cursor:pointer !important;
+  font-size:16px !important;
+  box-shadow:0 0 12px rgba(0,180,255,0.16) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-panel{
+  pointer-events:none !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-input-area,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-tabs,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-messages{
+  opacity:0.12 !important;
+}
+
 </style>
 
 
@@ -6396,4 +6612,58 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 #hangar-window .hangar-footer-row{display:none !important; opacity:0 !important; visibility:hidden !important; pointer-events:none !important;}
 #hangar-window #hangar-platform-hint{position:absolute !important; left:50% !important; bottom:24px !important; transform:translateX(-50%) !important; pointer-events:none !important;}
 #hangar-window #hangar-platform-sell{display:none !important; pointer-events:none !important; z-index:60 !important; position:absolute !important;}
+
+#chat-wrapper.hangar-inline-mode{
+  position:absolute !important;
+  left:18px !important;
+  bottom:18px !important;
+  width:min(520px, calc(100% - 36px)) !important;
+  height:260px !important;
+  z-index:26000 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  background:rgba(3,12,28,0.94) !important;
+  border:1px solid rgba(90,180,255,0.38) !important;
+  border-radius:16px !important;
+  box-shadow:0 0 18px rgba(0,180,255,0.22) !important;
+  overflow:visible !important;
+  transform:none !important;
+  transition:transform 0.22s ease, opacity 0.22s ease !important;
+}
+#chat-wrapper.hangar-inline-mode #chat-panel{
+  display:flex !important;
+  height:100% !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls{
+  position:absolute !important;
+  right:12px !important;
+  top:-42px !important;
+  display:flex !important;
+  gap:8px !important;
+  z-index:3 !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls button{
+  width:34px !important;
+  height:34px !important;
+  border-radius:10px !important;
+  border:1px solid rgba(90,180,255,0.35) !important;
+  background:rgba(5,18,36,0.94) !important;
+  color:#9fe8ff !important;
+  cursor:pointer !important;
+  font-size:16px !important;
+  box-shadow:0 0 12px rgba(0,180,255,0.16) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-panel{
+  pointer-events:none !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-input-area,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-tabs,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-messages{
+  opacity:0.12 !important;
+}
+
 </style>
