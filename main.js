@@ -3480,9 +3480,11 @@ if (gameState === "BATTLE" && playerShip) {
     }
 
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
+    const followDistance = Number(playerShip?.userData?.cameraDistance || 16) || 16;
+    const followHeight = Number(playerShip?.userData?.cameraHeight || 5.5) || 5.5;
     const desiredPosition = playerShip.position.clone()
-        .add(direction.clone().multiplyScalar(-16))
-        .add(new THREE.Vector3(0, 5.5, 0));
+        .add(direction.clone().multiplyScalar(-followDistance))
+        .add(new THREE.Vector3(0, followHeight, 0));
 
     camera.position.lerp(desiredPosition, 0.10);
     camera.lookAt(playerShip.position.clone().add(direction.clone().multiplyScalar(35)));
@@ -7653,6 +7655,7 @@ function spawnPlayer() {
     playerShip.position.copy(spawn);
     playerShip.visible = true;
     playerShip.lookAt(lookTarget);
+    const battleVisualConfig = getBattleShipVisualConfig(currentBattleShipStats?.ship?.id || player?.selectedShipId || '');
     playerShip.userData = {
         ...(playerShip.userData || {}),
         hp: currentBattleShipStats.hp,
@@ -7660,7 +7663,9 @@ function spawnPlayer() {
         speed: currentBattleShipStats.maxSpeed,
         handling: currentBattleShipStats.handlingLabel,
         fireCooldown: currentBattleShipStats.fireCooldown,
-        modules: currentBattleShipStats.installedModules
+        modules: currentBattleShipStats.installedModules,
+        cameraDistance: Number(battleVisualConfig?.cameraDistance || 16) || 16,
+        cameraHeight: Number(battleVisualConfig?.cameraHeight || 5.5) || 5.5
     };
 
     playerControl.yaw = playerShip.rotation.y;
@@ -10665,14 +10670,46 @@ function buildHangarShipMeshAsync(item){
     return Promise.resolve(normalizeHangarShipMesh(createHangarShipMesh(item)));
 }
 
+
+function getBattleShipVisualConfig(shipId){
+    const safeShipId = String(shipId || '').trim();
+    if(safeShipId === 'scout_1'){
+        return {
+            scale: 1.72,
+            fallbackScale: 0.40,
+            visualYaw: 0,
+            cameraDistance: 20.5,
+            cameraHeight: 6.2
+        };
+    }
+    if(safeShipId === 'xwing_1'){
+        return {
+            scale: 2.05,
+            fallbackScale: 0.48,
+            visualYaw: -Math.PI / 2,
+            cameraDistance: 16.5,
+            cameraHeight: 5.5
+        };
+    }
+    return {
+        scale: 2.2,
+        fallbackScale: 0.52,
+        visualYaw: 0,
+        cameraDistance: 16,
+        cameraHeight: 5.5
+    };
+}
+
 function buildBattleShipVisualAsync(item, team = 'blue'){
+    const safeShipId = String(item?.id || '').trim();
     const externalPath = String(item?.modelPath || '').trim();
     const tint = new THREE.Color(getBattleShipColorHex(team));
+    const visualConfig = getBattleShipVisualConfig(safeShipId);
 
     const applyBattleVisualTweaks = (root) => {
         if(!root) return root;
         root.rotation.order = 'YXZ';
-        root.rotation.y = 0;
+        root.rotation.y = Number(visualConfig?.visualYaw || 0) || 0;
         root.traverse?.((child) => {
             if(child?.isMesh){
                 child.castShadow = true;
@@ -10699,19 +10736,19 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
             .then((raw) => {
                 const normalized = normalizeHangarShipMesh(raw);
                 if(normalized?.scale?.multiplyScalar){
-                    normalized.scale.multiplyScalar(2.35);
+                    normalized.scale.multiplyScalar(Number(visualConfig?.scale || 2.2) || 2.2);
                 }
                 return applyBattleVisualTweaks(normalized);
             })
             .catch(() => {
                 const fallback = createHangarShipMesh(item);
-                fallback.scale.multiplyScalar(0.52);
+                fallback.scale.multiplyScalar(Number(visualConfig?.fallbackScale || 0.52) || 0.52);
                 return applyBattleVisualTweaks(fallback);
             });
     }
 
     const procedural = createHangarShipMesh(item);
-    procedural.scale.multiplyScalar(0.52);
+    procedural.scale.multiplyScalar(Number(visualConfig?.fallbackScale || 0.52) || 0.52);
     return Promise.resolve(applyBattleVisualTweaks(procedural));
 }
 
