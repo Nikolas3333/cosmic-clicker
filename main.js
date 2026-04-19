@@ -9019,7 +9019,8 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
 
     const getFlightForwardAxis = (shipId) => {
         const safeShipId = String(shipId || '').trim();
-        if(safeShipId === 'scout_1') return new THREE.Vector3(-1, 0, 0);
+        if(safeShipId === 'scout_1') return new THREE.Vector3(0, 0, 1);
+        if(safeShipId === 'xwing_1') return new THREE.Vector3(-1, 0, 0);
         return new THREE.Vector3(0, 0, 1);
     };
 
