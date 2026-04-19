@@ -3077,8 +3077,7 @@ async function loadGame(){
 function toSafeWholeNumber(value, fallback = 0){
     const num = Number(value);
     if(!Number.isFinite(num)) return Math.trunc(Number(fallback || 0)) || 0;
-    if(num >= 0) return Math.floor(num);
-    return Math.ceil(num);
+    return num >= 0 ? Math.floor(num) : Math.ceil(num);
 }
 
 function isTournamentRespawnMatch(){
@@ -3087,6 +3086,10 @@ function isTournamentRespawnMatch(){
         currentRoom?.state === 'tournament' ||
         String(currentRoom?.id || currentRoom?.roomId || '').startsWith('tournament_')
     );
+}
+
+function sleep(ms = 0){
+    return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
 }
 
 function buildSavePayload(){
@@ -14846,6 +14849,9 @@ async function ensureDefaultBattleRoomsInSupabase() {
 async function joinRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return false;
 
+  const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+  if(!normalizedRoomId) return false;
+
   const identity = getCurrentPlayerIdentity();
   if (!identity.playerId) {
     console.error('Ошибка входа в room_players: пустой playerId', identity);
@@ -14855,7 +14861,7 @@ async function joinRoomPlayers(roomId) {
   const { data: existingRows, error: existingError } = await window.supabaseClient
     .from('room_players')
     .select('id,room_id,player_id,nickname')
-    .eq('room_id', roomId)
+    .eq('room_id', normalizedRoomId)
     .eq('player_id', identity.playerId)
     .limit(1);
 
@@ -14875,11 +14881,32 @@ try {
 return true;
   }
 
+  let roomExists = false;
+  for(const waitMs of [0, 120, 260, 420]){
+    if(waitMs > 0) await sleep(waitMs);
+    try{
+      const { data: roomProbe } = await window.supabaseClient
+        .from('rooms')
+        .select('id')
+        .eq('id', normalizedRoomId)
+        .limit(1);
+      if(Array.isArray(roomProbe) && roomProbe.length > 0){
+        roomExists = true;
+        break;
+      }
+    }catch(_){}
+  }
+
+  if(!roomExists){
+    console.error('Ошибка входа в room_players: комната ещё не подтверждена в rooms', normalizedRoomId);
+    return false;
+  }
+
   const insertPayload = {
     id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
       ? globalThis.crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    room_id: roomId,
+    room_id: normalizedRoomId,
     player_id: identity.playerId,
     nickname: identity.displayName,
     joined_at: new Date().toISOString(),
