@@ -4400,7 +4400,6 @@ let __hangarChatHomeParent = null;
 let __hangarChatHomeNextSibling = null;
 let __hangarEmojiHomeParent = null;
 let __hangarEmojiHomeNextSibling = null;
-let __hangarPmPulseUntil = 0;
 
 function __mountHangarChatPanel(){
     try{
@@ -4475,8 +4474,6 @@ function setHangarChatMode(active, lowered = false){
         document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         if(chatWrapper) chatWrapper.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         if(emojiPanel) emojiPanel.classList.toggle('hangar-chat-lowered', !!(active && lowered));
-        __updateHangarPmNeon?.();
-    setInterval(() => { __updateHangarPmNeon?.(); }, 400);
         
     }catch(_){}
 }
@@ -4512,31 +4509,6 @@ function __initHangarEmojiPanel(){
             panel.appendChild(btn);
         });
     }catch(_){}
-}
-
-
-function __getTotalPmUnreadCount(){
-    try{
-        return Object.values(chatUnread?.pm || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
-    }catch(_){
-        return 0;
-    }
-}
-
-function __updateHangarPmNeon(){
-    try{
-        const el = document.getElementById('chat-wrapper');
-        if(!el) return;
-        const lowered = el.classList.contains('hangar-chat-lowered');
-        const unread = __getTotalPmUnreadCount() > 0;
-
-        if(lowered && unread){
-            el.classList.add('hangar-pm-neon');
-        }else{
-            el.classList.remove('hangar-pm-neon');
-        }
-    }catch(e){}
-}catch(_){}
 }
 
 function bindHangarChatControls(){
@@ -4577,7 +4549,6 @@ function __syncHangarChatVisibility(){
             __mountHangarChatPanel();
             const lowered = document.body.classList.contains('hangar-chat-lowered');
             setHangarChatMode(true, lowered);
-            __updateHangarPmNeon?.();
         }else{
             __restoreHangarChatPanel();
         }
@@ -5406,7 +5377,6 @@ function setUnreadForScope(scopeName, state = true) {
 
 function clearUnreadForCurrentScope() {
     setUnreadCount(currentChat, 0);
-    __updateHangarPmNeon?.();
 }
 
 function ensurePmTab(peerId, label = null) {
@@ -5761,7 +5731,6 @@ function renderChatTabs() {
     });
 
     chatTabsWrap.innerHTML = html;
-    __updateHangarPmNeon?.();
 
     chatTabsWrap.querySelectorAll(".chat-tab").forEach((tab) => {
         tab.addEventListener("click", async (e) => {
@@ -5771,7 +5740,6 @@ function renderChatTabs() {
             clearUnreadForCurrentScope();
 
             renderChatTabs();
-            __updateHangarPmNeon?.();
             saveChatUiState();
             await loadChatHistory(currentChat);
             renderLobbyMessages();
@@ -6183,17 +6151,10 @@ async function handleIncomingRealtimeMessage(msg) {
 
         ensurePmTab(peerId, getPeerLabelFromPmMessage(msg, peerId));
         syncPrivateTabFromScope(scope.key);
-
-        const isHangarLowered = document.body.classList.contains('hangar-chat-lowered') || document.getElementById('chat-wrapper')?.classList.contains('hangar-chat-lowered');
-        if (currentChat !== scope.key) {
-            incrementUnread(scope.key);
-        } else if (isHangarLowered) {
-            __hangarPmPulseUntil = Date.now() + 5000;
-        }
+        if (currentChat !== scope.key) incrementUnread(scope.key);
 
         if (currentChat === scope.key) renderLobbyMessages();
         renderChatTabs();
-        __updateHangarPmNeon?.();
     }
 }
 
@@ -12544,7 +12505,6 @@ window.addEventListener('load', () => {
     renderLeadersWindow();
     bindHangarChatControls();
     __installHangarChatWatcher();
-    __updateHangarPmNeon?.();
     __syncHangarChatVisibility();
     
     try{
@@ -16142,5 +16102,3 @@ if(previousOpenHangarWindowV188){
 
 
 try{ ensurePremiumCurrencyUi?.(); }catch(_){ }
-
-setInterval(__updateHangarPmNeon,300);
