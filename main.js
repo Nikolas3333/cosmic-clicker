@@ -4396,14 +4396,14 @@ const chatTabsWrap = document.getElementById("chat-tabs");
 
 let currentChat = "global";
 
-if(typeof setHangarChatMode==='undefined') function setHangarChatMode(active, lowered = false){
+function setHangarChatMode(active, lowered = false){
     try{
         document.body.classList.toggle('hangar-chat-mode', !!active);
         document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
     }catch(_){}
 }
 
-if(typeof bindHangarChatControls==='undefined') function bindHangarChatControls(){
+function bindHangarChatControls(){
     const upBtn = document.getElementById('hangar-chat-up');
     const downBtn = document.getElementById('hangar-chat-down');
 
@@ -4426,13 +4426,14 @@ if(typeof bindHangarChatControls==='undefined') function bindHangarChatControls(
     }
 }
 
-if(typeof syncHangarChatVisibility==='undefined') function syncHangarChatVisibility(){
+function __syncHangarChatVisibility(){
     try{
         const hangarWindow = document.getElementById('hangar-window');
         if(!hangarWindow){
             setHangarChatMode(false, false);
             return;
         }
+
         const isVisible = !hangarWindow.classList.contains('hidden') && hangarWindow.style.display !== 'none';
         if(isVisible){
             bindHangarChatControls();
@@ -4444,83 +4445,54 @@ if(typeof syncHangarChatVisibility==='undefined') function syncHangarChatVisibil
     }catch(_){}
 }
 
-if(typeof installHangarChatWatcher==='undefined') function installHangarChatWatcher(){
+function __installHangarChatWatcher(){
     if(window.__hangarChatWatcherInstalled) return;
     window.__hangarChatWatcherInstalled = true;
 
-    const tryAttach = () => {
+    const attach = () => {
         const hangarWindow = document.getElementById('hangar-window');
         if(!hangarWindow) return false;
 
         bindHangarChatControls();
-        syncHangarChatVisibility();
+        __syncHangarChatVisibility();
 
         const observer = new MutationObserver(() => {
-            syncHangarChatVisibility();
+            __syncHangarChatVisibility();
         });
         observer.observe(hangarWindow, { attributes:true, attributeFilter:['class','style'] });
 
         const hangarTab = document.getElementById('hangar-tab');
-        if(hangarTab && !hangarTab.dataset.boundHangarChatOpen){
-            hangarTab.dataset.boundHangarChatOpen = '1';
+        if(hangarTab && !hangarTab.dataset.boundHangarWatcher){
+            hangarTab.dataset.boundHangarWatcher = '1';
             hangarTab.addEventListener('click', () => {
-                setTimeout(syncHangarChatVisibility, 0);
-                setTimeout(syncHangarChatVisibility, 120);
+                setTimeout(__syncHangarChatVisibility, 0);
+                setTimeout(__syncHangarChatVisibility, 120);
+                setTimeout(__syncHangarChatVisibility, 320);
             });
         }
 
         document.querySelectorAll('#hangar-window .hangar-close-btn, #hangar-window .close-window').forEach(btn => {
-            if(btn.dataset.boundHangarChatClose) return;
-            btn.dataset.boundHangarChatClose = '1';
+            if(btn.dataset.boundHangarWatcherClose) return;
+            btn.dataset.boundHangarWatcherClose = '1';
             btn.addEventListener('click', () => {
-                setTimeout(syncHangarChatVisibility, 0);
+                setTimeout(__syncHangarChatVisibility, 0);
             });
         });
 
         return true;
     };
 
-    if(!tryAttach()){
-        let attempts = 0;
+    if(!attach()){
+        let tries = 0;
         const timer = setInterval(() => {
-            attempts += 1;
-            if(tryAttach() || attempts > 40){
+            tries += 1;
+            if(attach() || tries > 40){
                 clearInterval(timer);
             }
         }, 250);
     }
 }
 
-
-if(typeof setHangarChatMode==='undefined') function setHangarChatMode(active, lowered = false){
-    try{
-        document.body.classList.toggle('hangar-chat-mode', !!active);
-        document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
-    }catch(_){}
-}
-
-if(typeof bindHangarChatControls==='undefined') function bindHangarChatControls(){
-    const upBtn = document.getElementById('hangar-chat-up');
-    const downBtn = document.getElementById('hangar-chat-down');
-
-    if(upBtn && !upBtn.dataset.boundHangarChat){
-        upBtn.dataset.boundHangarChat = '1';
-        upBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setHangarChatMode(true, false);
-        });
-    }
-
-    if(downBtn && !downBtn.dataset.boundHangarChat){
-        downBtn.dataset.boundHangarChat = '1';
-        downBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setHangarChatMode(true, true);
-        });
-    }
-}
 
 let chatRealtimeChannel = null;
 const CHAT_MESSAGE_LIMIT = 50;
@@ -6457,9 +6429,6 @@ document.querySelectorAll(".emoji").forEach(e=>{
 // ===============================
 
 window.addEventListener("DOMContentLoaded", () => {
-installHangarChatWatcher();
-bindHangarChatControls();
-syncHangarChatVisibility();
 
 const hangarBtn = document.getElementById("hangar-tab");
 const hangarWindow = document.getElementById("hangar-window");
@@ -8329,6 +8298,8 @@ if (hangarTab && hangarWindow) {
         profileWindow?.classList.add("hidden");
         bindHangarChatControls();
         setHangarChatMode(true, false);
+        setTimeout(__syncHangarChatVisibility, 0);
+        setTimeout(__syncHangarChatVisibility, 120);
     });
 }
 
@@ -12418,10 +12389,9 @@ window.addEventListener('load', () => {
     renderProfileStats();
     renderClansWindow();
     renderLeadersWindow();
-    installHangarChatWatcher();
     bindHangarChatControls();
-    syncHangarChatVisibility();
-    bindHangarChatControls();
+    __installHangarChatWatcher();
+    __syncHangarChatVisibility();
 });
 
 
