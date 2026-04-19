@@ -18,7 +18,7 @@ let player = {
   ownedShipIds: ['scout_1'],
   selectedShipId: 'scout_1',
   ownedModuleIds: ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'],
-  activeModulesByShip: { scout_1: { weapon: 'weapon_laser_s1', shield: 'shield_micro_s1', booster: 'booster_ion_s1' },
+  activeModulesByShip: { scout_1: { weapon: 'weapon_laser_s1', shield: 'shield_micro_s1', booster: 'booster_ion_s1' } },
   hangarDockAssignments: { scout_1: 0 },
   staff_role: 'player'
 };
@@ -62,7 +62,6 @@ function getPersistedBattleChatRoomId() {
     } catch (_) {}
     return '';
 }
-
 let playerShip = null;
 let keys = {
     w: false,
@@ -149,17 +148,20 @@ function getDisplayPlayerTag(){
     return safeNickname;
 }
 
+
 function getActiveSaveKey(){
     if(authState.mode === 'account'){
         const accountKey = authState.playerId ? String(authState.playerId) : (authState.email || '').trim().toLowerCase();
         if(accountKey) return `galaxySave:${accountKey}`;
-
+    }
     return null;
+}
 
 let inventory = {
     syncFromPlayerResources(){},
     render(){},
-    addResource(){};
+    addResource(){}
+};
 
 
 // ===== EARLY SHOP HELPERS =====
@@ -171,6 +173,8 @@ function getAllShopShips(){
         return Object.values(source?.shipsByType || {}).flat();
     }catch(_){
         return [];
+    }
+}
 
 function getShopShipById(shipId){
     try{
@@ -179,9 +183,12 @@ function getShopShipById(shipId){
         return getAllShopShips().find(item => String(item?.id || '').trim() === safeId) || null;
     }catch(_){
         return null;
+    }
+}
 
 function getShipCoinPrice(item){
     return Math.max(0, Number(item?.price || 0) || 0);
+}
 
 function getShipDiamondPrice(item){
     if(String(item?.id || '').trim() === 'xwing_1') return 0;
@@ -189,11 +196,13 @@ function getShipDiamondPrice(item){
     const tier = String(item?.tier || '').toLowerCase();
     const extra = tier.includes('топ') ? 12 : (tier.includes('соврем') ? 7 : 3);
     return Math.max(0, Math.round(coins / 220 + extra));
+}
 
 // ===== EARLY SHOP SAFETY =====
 function closeShopView(){
     const shopWindow = document.getElementById('shop-window');
     if(shopWindow) shopWindow.classList.add('hidden');
+}
 
 function ensureShopOwnershipDefaults(){
     try{
@@ -212,6 +221,7 @@ function ensureShopOwnershipDefaults(){
 
         if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object'){
             player.activeModulesByShip = {};
+        }
 
         for(const shipId of player.ownedShipIds){
             const currentSetup = player.activeModulesByShip[shipId] && typeof player.activeModulesByShip[shipId] === 'object'
@@ -222,7 +232,9 @@ function ensureShopOwnershipDefaults(){
                 shield: String(currentSetup.shield || 'shield_micro_s1').trim() || 'shield_micro_s1',
                 booster: String(currentSetup.booster || 'booster_ion_s1').trim() || 'booster_ion_s1'
             };
-        }catch(_){}
+        }
+    }catch(_){}
+}
 
 function refreshOwnedShipsInventory(){
     try{
@@ -230,10 +242,12 @@ function refreshOwnedShipsInventory(){
         ensureModuleOwnershipDefaults();
         if(!Array.isArray(player.ships)) player.ships = [];
     }catch(_){}
+}
 
 function getHangarDockCapacity(){
     const pads = Array.isArray(hangarState?.supportPlatforms) ? hangarState.supportPlatforms.filter(Boolean).length : 0;
     return Math.max(1, pads || 20);
+}
 
 function ensureHangarDockAssignments(){
     try{
@@ -243,13 +257,14 @@ function ensureHangarDockAssignments(){
             : [];
         if(!player.hangarDockAssignments || typeof player.hangarDockAssignments !== 'object'){
             player.hangarDockAssignments = {};
-
+        }
         const assignments = player.hangarDockAssignments;
         const capacity = getHangarDockCapacity();
         Object.keys(assignments).forEach(shipId => {
             if(!ownedIds.includes(String(shipId || '').trim())){
                 delete assignments[shipId];
-            });
+            }
+        });
 
         const used = new Set();
         ownedIds.forEach(shipId => {
@@ -258,12 +273,13 @@ function ensureHangarDockAssignments(){
                 used.add(rawIdx);
             }else{
                 delete assignments[shipId];
-            });
+            }
+        });
 
         const nextFreeDock = () => {
             for(let i = 0; i < capacity; i++){
                 if(!used.has(i)) return i;
-
+            }
             return used.size;
         };
 
@@ -272,14 +288,18 @@ function ensureHangarDockAssignments(){
                 const idx = nextFreeDock();
                 assignments[shipId] = idx;
                 used.add(idx);
-            });
+            }
+        });
 
         if(ownedIds[0] && !Object.prototype.hasOwnProperty.call(assignments, ownedIds[0])){
             assignments[ownedIds[0]] = 0;
+        }
 
         return assignments;
     }catch(_){
         return player?.hangarDockAssignments || {};
+    }
+}
 
 function getHangarDockAssignment(shipId){
     const safeId = String(shipId || '').trim();
@@ -287,6 +307,8 @@ function getHangarDockAssignment(shipId){
     const assignments = ensureHangarDockAssignments();
     const idx = Number(assignments?.[safeId]);
     return Number.isFinite(idx) ? idx : -1;
+}
+
 
 let lobbyModeV27 = (typeof window !== 'undefined' && window.lobbyModeV27) ? window.lobbyModeV27 : 'battle';
 
@@ -294,6 +316,7 @@ function getLobbyModeSafe(){
     const safeMode = String((typeof window !== 'undefined' && window.lobbyModeV27) || lobbyModeV27 || 'battle').trim();
     if(safeMode === 'solo' || safeMode === 'tournament' || safeMode === 'battle') return safeMode;
     return 'battle';
+}
 
 function ensureSunStable(){
     try{
@@ -302,6 +325,7 @@ function ensureSunStable(){
         if(!solarSystem.children.includes(sun)) solarSystem.add(sun);
         sun.position.set(0,0,0);
     }catch(_){}
+}
 
 function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
     const ownerId = String(entry?.owner_id || entry?.host_id || entry?.creator_id || entry?.player_id || '').trim();
@@ -314,9 +338,11 @@ function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
     }else if(rawPlayer && typeof rawPlayer === 'object'){
         id = String(rawPlayer.public_id || rawPlayer.player_id || rawPlayer.id || rawPlayer.user_id || '').trim();
         nickname = String(rawPlayer.nickname || rawPlayer.name || rawPlayer.player_nickname || rawPlayer.display_name || '').trim();
+    }
 
     if(!nickname){
         nickname = `Игрок ${index + 1}`;
+    }
 
     const isOwner = !!(
         (ownerId && id && ownerId === id) ||
@@ -325,6 +351,7 @@ function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
     );
 
     return { id, nickname, isOwner };
+}
 
 window.renderPlayersOnPlanet = function(entry = {}){
     const overlay = document.getElementById('map-player-overlay');
@@ -350,6 +377,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
             crown.className = 'map-player-owner';
             crown.textContent = '👑';
             chip.appendChild(crown);
+        }
 
         const name = document.createElement('span');
         name.className = 'map-player-name';
@@ -360,13 +388,17 @@ window.renderPlayersOnPlanet = function(entry = {}){
             event.stopPropagation();
             if(typeof openPlayerProfile === 'function'){
                 await openPlayerProfile(playerMeta.id || '', playerMeta.nickname);
-            });
+            }
+        });
 
         overlay.appendChild(chip);
-    };
+    }
+};
 
 function renderPlayersOnPlanet(entry = {}){
     return window.renderPlayersOnPlanet(entry);
+}
+
 
 function resetPlayerProgress(){
     points = 0;
@@ -383,7 +415,7 @@ function resetPlayerProgress(){
     if(typeof sunOrbitData !== 'undefined'){
         sunOrbitData.currentResourceAmount = sunOrbitData.maxResourceAmount;
         sunOrbitData.lastResourceRegenAt = null;
-
+    }
     selectedPlanet = null;
     isPlanetFocused = false;
     battleStats.playerKills = 0;
@@ -400,10 +432,12 @@ function resetPlayerProgress(){
     updateHUD?.();
     updateUI?.();
     updateBattlePlayerHud?.();
+}
 
 function showAuthMessage(text){
     const authMessage = document.getElementById('auth-message');
     if(authMessage) authMessage.textContent = text || '';
+}
 
 const battleWeapon = {
     clipSize: 50,
@@ -422,6 +456,7 @@ const killFeedMessages = [];
 function isBattleTyping(){
     const input = document.getElementById('battle-chat-input');
     return battleChatOpen && input && document.activeElement === input;
+}
 
 function resetBattleInputState(){
     keys.w = false;
@@ -433,17 +468,21 @@ function resetBattleInputState(){
     firing = false;
     mouseDeltaX = 0;
     mouseDeltaY = 0;
+}
 
 function isSettingsWindowOpen(){
     const settingsWindow = document.getElementById('settings-window');
     return !!(settingsWindow && !settingsWindow.classList.contains('hidden'));
+}
 
 function isBattleMenuOpen(){
     const pauseMenu = document.getElementById('battle-pause-menu');
     return !!((pauseMenu && !pauseMenu.classList.contains('hidden')) || isSettingsWindowOpen());
+}
 
 function isBattlePlanetCaptureActive(){
     return !!(battlePlanetCapture && !isBattleRespawning() && !battleShipCrash);
+}
 
 function startBattlePlanetCapture(){
     if(!playerShip || !battleMapPlanet || battleShipCrash || isBattleRespawning() || battlePlanetCapture) return;
@@ -458,8 +497,9 @@ function startBattlePlanetCapture(){
     };
     if(!Number.isFinite(battlePlanetCapture.normal.x) || battlePlanetCapture.normal.lengthSq() === 0){
         battlePlanetCapture.normal.set(0, 1, 0);
-
+    }
     resetBattleInputState();
+}
 
 function distancePointToSegment(point, segmentStart, segmentEnd){
     const ab = segmentEnd.clone().sub(segmentStart);
@@ -468,12 +508,14 @@ function distancePointToSegment(point, segmentStart, segmentEnd){
     const t = THREE.MathUtils.clamp(point.clone().sub(segmentStart).dot(ab) / abLenSq, 0, 1);
     const closest = segmentStart.clone().add(ab.multiplyScalar(t));
     return point.distanceTo(closest);
+}
 
 function getRemoteShipHitDistance(entry, segmentStart, segmentEnd){
     if(!entry?.mesh) return Infinity;
     const targetCenter = entry.targetPosition?.clone?.() || entry.mesh.position.clone();
     const radius = Math.max(2.8, Number(entry?.mesh?.userData?.hitRadius || entry?.hitRadius || 0) || 0, 2.8);
     return distancePointToSegment(targetCenter, segmentStart, segmentEnd) - radius;
+}
 
 function updateBattlePlanetCapture(){
     if(!battlePlanetCapture || !playerShip || !battleMapPlanet) return;
@@ -487,6 +529,10 @@ function updateBattlePlanetCapture(){
     camera.lookAt(battlePlanetCapture.freezeCameraLookAt);
     if(progress >= 1){
         startShipCrashAnimation();
+    }
+}
+
+
 
 document.addEventListener("mousedown", (event) => {
     if(event.button !== 0) return;
@@ -516,6 +562,7 @@ const canvas = document.querySelector("canvas");
         observerCameraPitch += event.movementY * 0.0026 * gameSettings.mouseSensitivity * invertFactor;
         observerCameraPitch = THREE.MathUtils.clamp(observerCameraPitch, -1.15, 1.15);
         return;
+    }
 
    mouseDeltaX += event.movementX;
    mouseDeltaY += event.movementY;
@@ -549,6 +596,9 @@ document.addEventListener("keydown", (e) => {
         safeRequestPointerLock(canvas);
         }else{
             document.exitPointerLock();
+        }
+
+    }
 
 });
 
@@ -573,7 +623,9 @@ function safeRequestPointerLock(targetCanvas){
         const result = canvas.requestPointerLock?.();
         if(result && typeof result.catch === 'function'){
             result.catch(() => {});
-        }catch(_){ }
+        }
+    }catch(_){ }
+}
 
 
 
@@ -591,6 +643,7 @@ function getBattleRoomDisplayName(){
         selectedLobbyMap?.name ||
         'Комната'
     ).trim() || 'Комната';
+}
 
 function formatBattleHudDateTime(now = new Date()){
     const day = String(now.getDate()).padStart(2, '0');
@@ -599,18 +652,21 @@ function formatBattleHudDateTime(now = new Date()){
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
 
 function updateBattleHudMeta(){
     const roomName = document.getElementById('battle-room-name');
     const roomDatetime = document.getElementById('battle-room-datetime');
     if(roomName) roomName.textContent = getBattleRoomDisplayName();
     if(roomDatetime) roomDatetime.textContent = formatBattleHudDateTime(new Date());
+}
 
 function getBattlePingValue(){
     const browserPing = Number(navigator?.connection?.rtt || 0);
     if(Number.isFinite(window.__battlePingMs) && window.__battlePingMs > 0) return Math.round(window.__battlePingMs);
     if(Number.isFinite(browserPing) && browserPing > 0) return Math.round(browserPing);
     return 0;
+}
 
 async function measureBattlePing(){
     try{
@@ -641,13 +697,16 @@ async function measureBattlePing(){
             updateBattleScoreboard?.();
             refreshLobbyPingForCurrentPlayer?.();
             return window.__battlePingMs;
-
+        }
         return 0;
+    }
+}
 
 function updateBattleHudPing(){
     const pingValue = document.getElementById('battle-ping-value');
     const value = getBattlePingValue();
     if(pingValue) pingValue.textContent = String(value > 0 ? value : '—');
+}
 
 function updateBattleSoundButtonState(){
     const btn = document.getElementById('battle-sound-btn');
@@ -655,6 +714,7 @@ function updateBattleSoundButtonState(){
     const muted = !gameSettings.soundEnabled && !gameSettings.musicEnabled;
     btn.classList.toggle('muted', muted);
     btn.textContent = muted ? '🔇' : '🔊';
+}
 
 function startBattleHudLoops(){
     stopBattleHudLoops();
@@ -667,15 +727,18 @@ function startBattleHudLoops(){
         updateBattleHudPing();
         measureBattlePing?.();
     }, 4000);
+}
 
 function stopBattleHudLoops(){
     if(battleHudClockTimer){
         clearInterval(battleHudClockTimer);
         battleHudClockTimer = null;
-
+    }
     if(battleHudPingTimer){
         clearInterval(battleHudPingTimer);
         battleHudPingTimer = null;
+    }
+}
 
 function initBattleHudControls(){
     const fsBtn = document.getElementById('battle-fullscreen-btn');
@@ -689,8 +752,10 @@ function initBattleHudControls(){
                     await document.exitFullscreen();
                 }else{
                     await document.documentElement.requestFullscreen?.();
-                }catch(_){});
-
+                }
+            }catch(_){}
+        });
+    }
     if(soundBtn && !soundBtn.dataset.bound){
         soundBtn.dataset.bound = '1';
         soundBtn.addEventListener('click', () => {
@@ -701,7 +766,7 @@ function initBattleHudControls(){
             saveGameSettings();
             updateBattleSoundButtonState();
         });
-
+    }
     if(settingsBtn && !settingsBtn.dataset.bound){
         settingsBtn.dataset.bound = '1';
         settingsBtn.addEventListener('click', () => {
@@ -709,12 +774,16 @@ function initBattleHudControls(){
             if(settingsWindow){
                 settingsWindow.classList.remove('hidden');
                 updateNicknameSettingsState?.();
-            });
+            }
+        });
+    }
+}
 
 function updateBattlePlayerWorldName(){
     const label = document.getElementById('battle-player-world-name');
     if(!label) return;
     label.classList.add('hidden');
+}
 
 function refreshLobbyPingForCurrentPlayer(){
     const pingValue = getBattlePingValue();
@@ -722,22 +791,28 @@ function refreshLobbyPingForCurrentPlayer(){
     labels.forEach(label => {
         label.textContent = pingValue > 0 ? String(pingValue) : '—';
     });
+}
+
 
 function getSelfBattlePlayerId(){
     return String(authState?.playerId || player?.id || '').trim();
+}
 
 function getBattleRoomIdSafe(){
     return String(currentRoom?.id || currentRoom?.roomId || '').trim();
+}
 
 function getBattleRoomPlayerTeam(entryId = ''){
     const key = String(entryId || '').trim();
     if(!key) return 'blue';
     return String(key).slice(-1).charCodeAt(0) % 2 === 0 ? 'blue' : 'red';
+}
 
 const ROOM_PLAYER_STALE_MS = 12000;
 
 function getRoomPlayerFreshCutoffIso(){
     return new Date(Date.now() - ROOM_PLAYER_STALE_MS).toISOString();
+}
 
 function isFreshRoomPlayerRow(row = {}){
     const stamp = row?.updated_at || row?.joined_at || null;
@@ -745,12 +820,15 @@ function isFreshRoomPlayerRow(row = {}){
     const time = new Date(stamp).getTime();
     if(!Number.isFinite(time)) return false;
     return (Date.now() - time) <= ROOM_PLAYER_STALE_MS;
+}
 
 function getBattleShipColorHex(team = 'blue'){
     return String(team || '').trim().toLowerCase() === 'red' ? 0xff6b6b : 0x7ee7ff;
+}
 
 function getRemoteShipLabelColor(team = 'blue'){
     return String(team || '').trim().toLowerCase() === 'red' ? '#ff9a9a' : '#8deaff';
+}
 
 function tryApplyRemoteShipTeamVisual(entry){
     const mesh = entry?.mesh;
@@ -759,32 +837,39 @@ function tryApplyRemoteShipTeamVisual(entry){
     mesh.traverse?.((child) => {
         if(child?.isMesh && child.material && 'color' in child.material){
             try{ child.material.color.setHex(colorHex); }catch(_){}
+        }
     });
+}
 
 function hasMeaningfulBattleVectorDelta(prev = {}, next = {}, epsilon = 0.1){
     return Math.abs(Number(prev?.x || 0) - Number(next?.x || 0)) > epsilon
         || Math.abs(Number(prev?.y || 0) - Number(next?.y || 0)) > epsilon
         || Math.abs(Number(prev?.z || 0) - Number(next?.z || 0)) > epsilon;
+}
 
 function hasMeaningfulBattleQuaternionDelta(prev = {}, next = {}, epsilon = 0.01){
     return Math.abs(Number(prev?.x || 0) - Number(next?.x || 0)) > epsilon
         || Math.abs(Number(prev?.y || 0) - Number(next?.y || 0)) > epsilon
         || Math.abs(Number(prev?.z || 0) - Number(next?.z || 0)) > epsilon
         || Math.abs(Number(prev?.w || 1) - Number(next?.w || 1)) > epsilon;
+}
 
 function getThrottledRoomPlayerPing(now = Date.now()){
     if((now - lastRoomPlayerPingAt) >= ROOM_PLAYER_PING_UPDATE_MS || !Number.isFinite(lastRoomPlayerPingValue) || lastRoomPlayerPingValue <= 0){
         lastRoomPlayerPingValue = Number(getBattlePingValue() || 0) || 0;
         lastRoomPlayerPingAt = now;
-
+    }
     return Number(lastRoomPlayerPingValue || 0) || 0;
+}
 
 function getThrottledPresencePing(now = Date.now()){
     if((now - lastPresencePingAt) >= BATTLE_PRESENCE_PING_UPDATE_MS || !Number.isFinite(lastPresencePingValue) || lastPresencePingValue <= 0){
         lastPresencePingValue = Number(getBattlePingValue() || 0) || 0;
         lastPresencePingAt = now;
-
+    }
     return Number(lastPresencePingValue || 0) || 0;
+}
+
 
 function getJoinedLobbyRoomId(){
     const currentId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
@@ -793,6 +878,7 @@ function getJoinedLobbyRoomId(){
     const isBaseMap = !!selectedLobbyMap?.isBaseMap;
     if(selectedId && !isBaseMap) return selectedId;
     return '';
+}
 
 async function touchJoinedLobbyRoomPresence(force = false){
     if(!window.supabaseReady || !window.supabaseClient) return;
@@ -843,14 +929,18 @@ async function touchJoinedLobbyRoomPresence(force = false){
             await window.supabaseClient
                 .from('room_players')
                 .insert([insertPayload]);
+        }
 
         lastLobbyRoomPresenceAt = now;
         try{
             cachedRoomPlayersFetchedAt = 0;
             lastRoomPlayersFetchAt = 0;
-        }catch(_){}catch(_){
+        }catch(_){}
+    }catch(_){
     }finally{
         lobbyRoomPresenceInFlight = false;
+    }
+}
 
 function ensureSelfRoomPlayerState(){
     if(!window.supabaseClient || roomPlayerStateUpsertInFlight) return;
@@ -884,6 +974,7 @@ function ensureSelfRoomPlayerState(){
     let previousPayload = null;
     if(lastSelfRoomPlayerStatePayload){
         try{ previousPayload = JSON.parse(lastSelfRoomPlayerStatePayload); }catch(_){ previousPayload = null; }
+    }
 
     const needsForceSend = (now - lastSelfRoomPlayerStateSentAt) >= ROOM_PLAYER_STATE_FORCE_INTERVAL_MS;
     const pingWindowPassed = (now - lastRoomPlayerPingAt) <= 60 || (now - lastRoomPlayerPingAt) >= ROOM_PLAYER_PING_UPDATE_MS;
@@ -899,6 +990,7 @@ function ensureSelfRoomPlayerState(){
 
     if(!needsForceSend && !changedMeta && !changedPosition && !changedRotation){
         return;
+    }
 
     roomPlayerStateUpsertInFlight = true;
 
@@ -929,6 +1021,7 @@ function ensureSelfRoomPlayerState(){
                     .eq('id', selfRoomPlayerRowId)
                     .select('id')
                     .limit(1);
+            }
 
             const { data: updatedRows, error: updateError } = await updateQuery;
 
@@ -936,6 +1029,7 @@ function ensureSelfRoomPlayerState(){
             if(Array.isArray(updatedRows) && updatedRows[0]?.id){
                 activeRowId = String(updatedRows[0].id);
                 selfRoomPlayerRowId = activeRowId;
+            }
 
             const noUpdatedRows = !Array.isArray(updatedRows) || updatedRows.length <= 0;
             if(updateError || noUpdatedRows){
@@ -963,9 +1057,11 @@ function ensureSelfRoomPlayerState(){
 
                 if(insertError){
                     return;
-
+                }
                 if(Array.isArray(insertedRows) && insertedRows[0]?.id){
                     selfRoomPlayerRowId = String(insertedRows[0].id);
+                }
+            }
 
             lastSelfRoomPlayerStatePayload = JSON.stringify(payload);
             lastSelfRoomPlayerStateSentAt = now;
@@ -973,7 +1069,10 @@ function ensureSelfRoomPlayerState(){
         }catch(_){
         }finally{
             roomPlayerStateUpsertInFlight = false;
-        })();
+        }
+    })();
+}
+
 
 function pushKillFeed(text, type='kill'){
     const feed = document.getElementById('kill-feed');
@@ -984,8 +1083,9 @@ function pushKillFeed(text, type='kill'){
     feed.prepend(item);
     while(feed.children.length > 8){
         feed.removeChild(feed.lastChild);
-
+    }
     setTimeout(() => item.remove(), type === 'chat' ? 9000 : 7000);
+}
 
 function showBattleFloatingReward(expValue = 0, coinValue = 0, worldPosition = null){
     if(gameState !== 'BATTLE') return;
@@ -1010,6 +1110,7 @@ function showBattleFloatingReward(expValue = 0, coinValue = 0, worldPosition = n
     requestAnimationFrame(() => node.classList.add('show'));
     setTimeout(() => node.classList.add('fade'), 1100);
     setTimeout(() => node.remove(), 2100);
+}
 
 function pushBattleChatMessage(author, text){
     const log = document.getElementById('battle-chat-log');
@@ -1024,8 +1125,10 @@ function pushBattleChatMessage(author, text){
         log.scrollTop = log.scrollHeight;
         while(log.children.length > 20){
             log.removeChild(log.firstChild);
-
+        }
+    }
     pushKillFeed(`${author}: ${text}`, 'chat');
+}
 
 function setBattleChatOpen(open){
     battleChatOpen = open;
@@ -1037,18 +1140,21 @@ function setBattleChatOpen(open){
     if(box){
         box.classList.toggle('hidden', !open);
         box.classList.toggle('input-only', !!open && inputOnlyMode);
+    }
 
     if(open){
         resetBattleInputState();
         if(document.pointerLockElement) document.exitPointerLock();
-
+    }
     if(input){
         if(open){
             input.value = '';
             setTimeout(() => input.focus(), 0);
         }else{
             input.blur();
-
+        }
+    }
+}
 
 async function sendSceneMapMessage(text, options = {}) {
     if (!window.supabaseClient) return false;
@@ -1096,6 +1202,7 @@ async function sendSceneMapMessage(text, options = {}) {
             staff_role: scenePayload.staff_role,
             message: cleanText
         });
+    }
 
     const { data, error } = await window.supabaseClient
         .from("chat_messages")
@@ -1105,6 +1212,7 @@ async function sendSceneMapMessage(text, options = {}) {
     if (error) {
         console.error("❌ Ошибка отправки scene сообщения:", error);
         return false;
+    }
 
     const insertedRows = Array.isArray(data) ? data : [];
     const insertedScene = insertedRows.find(row => row?.channel === 'scene');
@@ -1113,6 +1221,7 @@ async function sendSceneMapMessage(text, options = {}) {
     if (insertedScene) {
         markLocalHandledChatMessage(insertedScene.id);
         showSceneMapMessageInActiveScene(insertedScene);
+    }
 
     if (insertedBattle) {
         markLocalHandledChatMessage(insertedBattle.id);
@@ -1122,6 +1231,7 @@ async function sendSceneMapMessage(text, options = {}) {
         renderBattleMessages();
         if (currentChat === 'battle') renderLobbyMessages();
         renderChatTabs();
+    }
 
     try {
         renderBattleMessages?.();
@@ -1130,6 +1240,7 @@ async function sendSceneMapMessage(text, options = {}) {
     } catch (_) {}
 
     return true;
+}
 
 function initBattleChat(){
     const input = document.getElementById('battle-chat-input');
@@ -1148,7 +1259,7 @@ function initBattleChat(){
                     e.preventDefault();
                     pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                     return;
-
+                }
                 e.preventDefault();
                 setBattleChatOpen(true);
             }else{
@@ -1159,6 +1270,7 @@ function initBattleChat(){
                     pushKillFeed('🔇 Мут активен. Сообщение не отправлено.', 'chat');
                     setBattleChatOpen(false);
                     return;
+                }
 
                 if(text){
                     let sent = false;
@@ -1170,15 +1282,20 @@ function initBattleChat(){
                             pushKillFeed('🚫 В режиме наблюдения писать может только staff.', 'chat');
                         } else {
                             sent = await sendSceneMapMessage(text, { mirrorToBattle:true });
+                        }
+                    }
 
                     if(sent) input.value = '';
-
+                }
                 setBattleChatOpen(false);
                 setTimeout(() => setBattleChatOpen(false), 0);
-            } else if(e.key === 'Escape' && battleChatOpen){
+            }
+        } else if(e.key === 'Escape' && battleChatOpen){
             setBattleChatOpen(false);
             setTimeout(() => setBattleChatOpen(false), 0);
-        });
+        }
+    });
+}
 
 // ===== LOBBY STATIC BACKGROUNDS + LIGHT PARALLAX =====
 const lobbyBackgrounds = [
@@ -1201,6 +1318,7 @@ function initLobbyBackground(){
     function applyLobbyBackground(index){
         currentLobbyBg = (index + lobbyBackgrounds.length) % lobbyBackgrounds.length;
         lobbyBg.style.backgroundImage = `url(${lobbyBackgrounds[currentLobbyBg]})`;
+    }
 
     applyLobbyBackground(Math.floor(Math.random() * lobbyBackgrounds.length));
 
@@ -1208,7 +1326,8 @@ function initLobbyBackground(){
     lobbyBgTimer = setInterval(() => {
         if(gameState === 'LOBBY'){
             applyLobbyBackground(currentLobbyBg + 1);
-        }, 12000);
+        }
+    }, 12000);
 
     if(!lobbyScreen.dataset.parallaxBound){
         lobbyScreen.dataset.parallaxBound = '1';
@@ -1222,6 +1341,9 @@ function initLobbyBackground(){
             lobbyParallaxTargetX = 0;
             lobbyParallaxTargetY = 0;
         });
+    }
+}
+
 
 function resetOrbitView(forcePlanetReset=false){
     camera.position.set(0, 60, 140);
@@ -1231,6 +1353,7 @@ function resetOrbitView(forcePlanetReset=false){
     mouseDeltaY = 0;
     if(typeof shipVelocity !== "undefined" && shipVelocity){
         shipVelocity.set(0, 0, 0);
+    }
 
     if(forcePlanetReset){
         if(selectedPlanet){
@@ -1238,21 +1361,27 @@ function resetOrbitView(forcePlanetReset=false){
 
             if(scene.children.includes(selectedPlanet.mesh)){
                 scene.remove(selectedPlanet.mesh);
+            }
 
             if(selectedPlanet.orbitPivot && !selectedPlanet.orbitPivot.children.includes(selectedPlanet.mesh)){
                 selectedPlanet.orbitPivot.add(selectedPlanet.mesh);
+            }
 
             if(selectedPlanet.originalLocalPosition){
                 selectedPlanet.mesh.position.copy(selectedPlanet.originalLocalPosition);
             }else{
                 selectedPlanet.mesh.position.set(selectedPlanet.orbitRadius || 0, 0, 0);
+            }
 
             selectedPlanet.mesh.scale.set(1, 1, 1);
+        }
 
         selectedPlanet = null;
         isPlanetFocused = false;
         solarSystem.position.set(0, 0, 0);
         solarSystem.rotation.set(0.22, 0, 0);
+    }
+}
 
 function clearBattleScene(){
     resetBattleInputState();
@@ -1269,32 +1398,38 @@ function clearBattleScene(){
     if(playerShip){
         scene.remove(playerShip);
         playerShip = null;
+    }
 
     if(enemyBot){
         scene.remove(enemyBot);
         enemyBot = null;
+    }
 
     if(Array.isArray(activeLasers)){
         activeLasers.forEach(laser => {
             if(laser && laser.mesh) scene.remove(laser.mesh);
         });
         activeLasers = [];
+    }
 
     if(Array.isArray(enemyLasers)){
         enemyLasers.forEach(laser => {
             if(laser && laser.mesh) scene.remove(laser.mesh);
         });
         enemyLasers = [];
+    }
 
     if(Array.isArray(battleObjects)){
         battleObjects.forEach(obj => {
             if(obj) scene.remove(obj);
         });
         battleObjects = [];
+    }
 
     if(battleMapPlanet){
         scene.remove(battleMapPlanet);
         battleMapPlanet = null;
+    }
 
     shipVelocity.set(0, 0, 0);
     shipRotationVelocity.set(0, 0, 0);
@@ -1332,15 +1467,18 @@ function clearBattleScene(){
     setBattleChatOpen(false);
     const feed = document.getElementById('kill-feed'); if(feed) feed.innerHTML = "";
     const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = "";
+}
 
 function switchState(newState){
     const prevState = gameState;
 
     if(document.pointerLockElement){
         document.exitPointerLock();
+    }
 
     if((prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE"){
         cleanupBattleRoomSilently();
+    }
 
     gameState = newState;
 
@@ -1368,6 +1506,7 @@ function switchState(newState){
     if(newState !== "BATTLE" && newState !== "OBSERVE"){
         clearBattleScene();
         stopBattleHudLoops();
+    }
 
     const windows = [
         document.getElementById("profile-window"),
@@ -1384,6 +1523,7 @@ function switchState(newState){
 
     if(gameState === "AUTH"){
         if(authScreen) authScreen.style.display = "flex";
+    }
 
     if(gameState === "LOBBY"){
         if(lobby) lobby.style.display = "flex";
@@ -1392,6 +1532,8 @@ function switchState(newState){
         if(premiumBar) premiumBar.style.display = "flex";
         if(typeof renderRoomsInLobby === 'function'){
             renderRoomsInLobby();
+        }
+    }
 
     if(gameState === "ORBIT"){
         if(canvas) canvas.style.display = "block";
@@ -1401,12 +1543,15 @@ function switchState(newState){
 
         if(typeof scene !== "undefined" && typeof solarSystem !== "undefined" && !scene.children.includes(solarSystem)){
             scene.add(solarSystem);
+        }
 
         resetOrbitView(true);
         updateHUD();
+    }
 
    if(gameState === "COMBAT"){
     alert("⚔ Combat Mode (в разработке)");
+}
 
 if(gameState === "BATTLE"){
     if(battleScreen) battleScreen.style.display = "block";
@@ -1420,9 +1565,11 @@ if(gameState === "BATTLE"){
         setTimeout(() => {
             safeRequestPointerLock(canvas);
         }, 100);
+    }
 
     if(typeof scene !== "undefined" && typeof solarSystem !== "undefined" && scene.children.includes(solarSystem)){
         scene.remove(solarSystem);
+    }
 
     const targetMap = currentRoom?.real || selectedLobbyMap?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
     battleObserverMode = false;
@@ -1438,10 +1585,12 @@ if(gameState === "BATTLE"){
     } else {
         const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'block';
         spawnPlayer();
-        setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){}, 80);
+        setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
         updateEnemyHud();
         updateBattleScoreboard();
         startLiveBattleSync();
+    }
+}
 
 if(gameState === "OBSERVE"){
     battleObserverMode = true;
@@ -1454,10 +1603,10 @@ if(gameState === "OBSERVE"){
         setTimeout(() => {
             safeRequestPointerLock(canvas);
         }, 100);
-
+    }
     if(typeof scene !== "undefined" && typeof solarSystem !== "undefined" && scene.children.includes(solarSystem)){
         scene.remove(solarSystem);
-
+    }
     const targetMap = currentRoom?.real || selectedLobbyMap?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || "Земля";
     setupObserverBattle(targetMap);
     const hud = document.getElementById('enemy-hud'); if(hud) hud.style.display = 'none';
@@ -1465,14 +1614,18 @@ if(gameState === "OBSERVE"){
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
     const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = '';
     startLiveBattleSync();
+}
 
 if(gameState === "INVENTORY"){
     alert("📦 Inventory (в разработке)");
+}
 
 stopLiveRoomsRefresh();
 
 setTimeout(() => {
-    try{ handleChatStateChange?.(); }catch(_){ }, 0);
+    try{ handleChatStateChange?.(); }catch(_){ }
+}, 0);
+}
 
 /* ================= CREATE MATCH LOGIC ================= */
 
@@ -1486,14 +1639,22 @@ if (createMatchBtn) {
         if(createWindow){
             createWindow.classList.remove("hidden");
             
-        });
+        }
+
+    });
+}
 
 if(cancelCreate){
     cancelCreate.addEventListener("click", () => {
 
         if(createWindow){
             createWindow.classList.add("hidden");
-        });
+        }
+
+    });
+}
+
+
 
 window.switchState = switchState;
 
@@ -1535,6 +1696,7 @@ function formatRegenTime(ms){
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 
 const PLANETS = {
 
@@ -1548,7 +1710,8 @@ const PLANETS = {
     dropChances: {
       coins: 0.05,      // 5%
       crystals: 0.005   // 0.5%
-    },
+    }
+  },
 
   mars: {
     name: "Mars",
@@ -1556,7 +1719,8 @@ const PLANETS = {
     dropChances: {
       coins: 0.06,
       crystals: 0.01
-    },
+    }
+  },
 
   outer: {
     name: "OuterPlanets",
@@ -1564,6 +1728,10 @@ const PLANETS = {
     dropChances: {
       coins: 0.04,
       crystals: 0.02
+    }
+  }
+
+}
 
 // ===============================
 // PLAYER RESOURCES (GLOBAL)
@@ -1583,6 +1751,7 @@ const playerResources = {
 
   coins: 2500,
   crystals: 50
+}
 
 const RESOURCE_SYNC_KEYS = [
   'mercury_ore',
@@ -1602,9 +1771,11 @@ let localResourceDirtyUntil = 0;
 
 function markLocalResourceDirty(ms = 6000){
   localResourceDirtyUntil = Math.max(localResourceDirtyUntil || 0, Date.now() + ms);
+}
 
 function hasRecentLocalResourceChanges(){
   return Number(localResourceDirtyUntil || 0) > Date.now();
+}
 
 function applyPlayerResourcesFromRow(row = {}) {
   if(!row || typeof row !== 'object') return;
@@ -1612,27 +1783,33 @@ function applyPlayerResourcesFromRow(row = {}) {
   RESOURCE_SYNC_KEYS.forEach(key => {
     if(typeof row[key] !== 'undefined' && row[key] !== null){
       playerResources[key] = Number(row[key]) || 0;
-    });
+    }
+  });
 
   if(typeof row.credits !== 'undefined' && row.credits !== null){
     const creditsValue = Number(row.credits) || 0;
     player.credits = creditsValue;
     playerResources.coins = creditsValue;
+  }
 
   if(typeof row.level !== 'undefined' && row.level !== null){
     player.level = Number(row.level) || 1;
+  }
 
   if(typeof row.experience !== 'undefined' && row.experience !== null){
     player.experience = Number(row.experience) || 0;
+  }
 
   updatePremiumAccountInfo?.();
   updateHUD?.();
   updateUI?.();
   inventory.syncFromPlayerResources?.();
   inventory.render?.();
+}
 
 function getPlayerResourceColumnsSelect(){
   return ['credits', 'level', 'experience', ...RESOURCE_SYNC_KEYS, 'staff_role', 'is_banned', 'ban_reason', 'ban_until', 'is_muted', 'mute_reason', 'mute_until'].join(',');
+}
 
 async function loadPlayerResourcesFromSupabase(){
   if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return null;
@@ -1647,12 +1824,13 @@ async function loadPlayerResourcesFromSupabase(){
     if(error){
       console.warn('Не удалось загрузить ресурсы игрока:', error.message);
       return null;
+    }
 
     if(data){
       applyPlayerIdentityRow(data);
       if(!hasRecentLocalResourceChanges()){
         applyPlayerResourcesFromRow(data);
-
+      }
       const isMutedNow = !!data.is_muted && (!data.mute_until || new Date(data.mute_until).getTime() > Date.now());
       window.playerMuted = isMutedNow;
       player.isMuted = isMutedNow;
@@ -1663,11 +1841,15 @@ async function loadPlayerResourcesFromSupabase(){
         stopRemotePlayerSync();
         showAuthMessage?.('Аккаунт заблокирован: ' + (data.ban_reason || 'без причины'));
         setTimeout(() => logoutToAuth('Аккаунт заблокирован: ' + (data.ban_reason || 'без причины')), 50);
+      }
+    }
 
     return data || null;
   }catch(error){
     console.warn('Ошибка загрузки ресурсов игрока:', error?.message || error);
     return null;
+  }
+}
 
 function startRemotePlayerSync(){
   if(remotePlayerSyncTimer) clearInterval(remotePlayerSyncTimer);
@@ -1675,11 +1857,14 @@ function startRemotePlayerSync(){
   remotePlayerSyncTimer = setInterval(() => {
     loadPlayerResourcesFromSupabase();
   }, 3000);
+}
 
 function stopRemotePlayerSync(){
   if(remotePlayerSyncTimer){
     clearInterval(remotePlayerSyncTimer);
     remotePlayerSyncTimer = null;
+  }
+}
 
 // Active planet (стартуем с Меркурия)
 let activePlanet = PLANETS.mercury
@@ -1706,6 +1891,7 @@ for(let i=0;i<starCount;i++){
         (Math.random()-0.5)*2000,
         (Math.random()-0.5)*2000
     );
+}
 
 starGeometry.setAttribute(
     'position',
@@ -1739,6 +1925,7 @@ function createNebulaSpriteTexture(coreColor = 'rgba(255,255,255,0.30)', edgeCol
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     return texture;
+}
 
 function createOrbitNebula(){
     const spritePalettes = [
@@ -1768,6 +1955,7 @@ function createOrbitNebula(){
         sprite.scale.set(scale, scale * (0.56 + Math.random() * 0.35), 1);
         sprite.material.rotation = Math.random() * Math.PI * 2;
         orbitNebulaGroup.add(sprite);
+    }
 
     const gasGeometry = new THREE.BufferGeometry();
     const gasCount = 3000;
@@ -1778,7 +1966,7 @@ function createOrbitNebula(){
             (Math.random() - 0.5) * 1000,
             -900 - Math.random() * 1200
         );
-
+    }
     gasGeometry.setAttribute('position', new THREE.Float32BufferAttribute(gasPositions, 3));
 
     const gasMaterial = new THREE.PointsMaterial({
@@ -1792,6 +1980,7 @@ function createOrbitNebula(){
 
     const gasPoints = new THREE.Points(gasGeometry, gasMaterial);
     orbitNebulaGroup.add(gasPoints);
+}
 
 createOrbitNebula();
 
@@ -1818,6 +2007,7 @@ bgMusic.volume = 0.4;
 
 function saveGameSettings(){
     localStorage.setItem("cosmicGameSettings", JSON.stringify(gameSettings));
+}
 
 function loadGameSettings(){
     try{
@@ -1832,6 +2022,8 @@ function loadGameSettings(){
         if(typeof saved.musicVolume === "number") gameSettings.musicVolume = saved.musicVolume;
     }catch(error){
         console.warn("Не удалось загрузить настройки:", error);
+    }
+}
 
 function updateSettingsLabels(){
     const mouseValue = document.getElementById("mouse-sensitivity-value");
@@ -1841,6 +2033,7 @@ function updateSettingsLabels(){
     if(mouseValue) mouseValue.textContent = gameSettings.mouseSensitivity.toFixed(2) + "x";
     if(soundValue) soundValue.textContent = Math.round(gameSettings.soundVolume * 100) + "%";
     if(musicValue) musicValue.textContent = Math.round(gameSettings.musicVolume * 100) + "%";
+}
 
 function applyAudioSettings(){
     mouseSensitivity = 0.004 * gameSettings.mouseSensitivity;
@@ -1850,11 +2043,13 @@ function applyAudioSettings(){
 
     if(typeof clickSound !== "undefined" && clickSound.buffer){
         clickSound.setVolume(gameSettings.soundEnabled ? gameSettings.soundVolume : 0);
+    }
 
     if(typeof bossMusic !== "undefined" && bossMusic.buffer){
         bossMusic.setVolume(gameSettings.musicEnabled ? gameSettings.musicVolume : 0);
-
+    }
     updateBattleSoundButtonState?.();
+}
 
 function initSettingsUI(){
     loadGameSettings();
@@ -1888,6 +2083,7 @@ function initSettingsUI(){
             settingsWindow.classList.remove("hidden");
             updateNicknameSettingsState();
         });
+    }
 
     if(closeSettings && settingsWindow && !closeSettings.dataset.bound){
         closeSettings.dataset.bound = '1';
@@ -1898,19 +2094,24 @@ function initSettingsUI(){
                 switchState('LOBBY');
                 if(typeof renderRoomsInLobby === 'function'){
                     await renderRoomsInLobby(true);
-
+                }
                 return;
-
+            }
             settingsWindow.classList.add("hidden");
         });
+    }
+
 
     if(saveNicknameBtn && !saveNicknameBtn.dataset.bound){
         saveNicknameBtn.dataset.bound = '1';
         saveNicknameBtn.addEventListener('click', saveNicknameFromSettings);
+    }
 
     if(premiumLogoutBtn && !premiumLogoutBtn.dataset.bound){
         premiumLogoutBtn.dataset.bound = '1';
         premiumLogoutBtn.addEventListener('click', () => logoutToAuth('Выход выполнен. Теперь можно сменить аккаунт или сервер.'));
+    }
+
 
     const battleSettingsSaveBtn = document.getElementById('battle-settings-save-btn');
     if(battleSettingsSaveBtn && !battleSettingsSaveBtn.dataset.bound){
@@ -1923,7 +2124,9 @@ function initSettingsUI(){
             if((gameState === 'BATTLE' || gameState === 'OBSERVE') && !battleObserverMode){
                 const canvas = document.querySelector('canvas');
                 if(canvas) setTimeout(() => safeRequestPointerLock(canvas), 40);
-            });
+            }
+        });
+    }
 
     if(mouseInput){
         mouseInput.addEventListener("input", () => {
@@ -1932,12 +2135,14 @@ function initSettingsUI(){
             applyAudioSettings();
             saveGameSettings();
         });
+    }
 
     if(invertY){
         invertY.addEventListener("change", () => {
             gameSettings.invertY = invertY.checked;
             saveGameSettings();
         });
+    }
 
     if(soundEnabled){
         soundEnabled.addEventListener("change", () => {
@@ -1945,6 +2150,7 @@ function initSettingsUI(){
             applyAudioSettings();
             saveGameSettings();
         });
+    }
 
     if(soundVolume){
         soundVolume.addEventListener("input", () => {
@@ -1953,6 +2159,7 @@ function initSettingsUI(){
             applyAudioSettings();
             saveGameSettings();
         });
+    }
 
     if(musicEnabled){
         musicEnabled.addEventListener("change", () => {
@@ -1960,6 +2167,7 @@ function initSettingsUI(){
             applyAudioSettings();
             saveGameSettings();
         });
+    }
 
     if(musicVolume){
         musicVolume.addEventListener("input", () => {
@@ -1968,6 +2176,8 @@ function initSettingsUI(){
             applyAudioSettings();
             saveGameSettings();
         });
+    }
+}
 
 /* ================= SIMPLE SOUND ================= */
 
@@ -2036,6 +2246,8 @@ this.radius = 0;
 this.mesh = this.createMesh();
 this.resourceLabel = this.createResourceLabel();
 
+}
+
 /* ================= ORBIT + MESH ================= */
 
 createMesh(){
@@ -2076,6 +2288,7 @@ if(this.isBoss){
 }else{
     const key = PLANET_NAME_MAP[this.name];
     radius = PLANET_SIZES[key] || 4;
+}
 
 this.radius = radius;
 
@@ -2124,6 +2337,9 @@ if(this.name === "Земля"){
     this.cloudMesh = new THREE.Mesh(cloudGeometry, cloudMaterial);
 
     this.mesh.add(this.cloudMesh);
+}
+
+
 
 // ===============================
 // SATURN RING (GAME REALISTIC)
@@ -2156,6 +2372,7 @@ if (this.name === "Сатурн") {
         const shade = 1.0 - t * 0.5;
 
         colors.push(shade, shade * 0.9, shade * 0.8);
+    }
 
     ringGeometry.setAttribute(
         "color",
@@ -2179,11 +2396,15 @@ if (this.name === "Сатурн") {
     ring.rotation.z = THREE.MathUtils.degToRad(27);
 
     this.mesh.add(ring);
+}
+
+
 
 /* сохраняем правильную позицию для возврата */
 this.originalLocalPosition = this.mesh.position.clone();
 
 return this.mesh;
+}
 
 /* ================= RESOURCE LABEL ================= */
 
@@ -2214,17 +2435,20 @@ this.resourceLabel = sprite;
 this.updateResourceLabelPosition(false);
 
 return sprite;
+}
 
 updateResourceLabelPosition(isFocused = false){
 if(!this.resourceLabel) return;
 const currentScale = this.mesh?.scale?.y || 1;
 const baseOffset = (this.radius || 4) * (isFocused ? currentScale : 1) + (isFocused ? 6.5 : 4.2);
 this.resourceLabel.position.set(0, -baseOffset, 0);
+}
 
 getNextRegenRemainingMs(){
 if(this.currentResourceAmount >= this.maxResourceAmount || !this.lastResourceRegenAt) return 0;
 const elapsed = Date.now() - this.lastResourceRegenAt;
 return Math.max(0, this.resourceRegenTime - elapsed);
+}
 
 updateResourceLabel(){
 
@@ -2251,9 +2475,11 @@ if(this.currentResourceAmount < this.maxResourceAmount && this.lastResourceRegen
 const remaining = this.getNextRegenRemainingMs();
 ctx.font = "28px Arial";
 ctx.fillText(`+1 через ${formatRegenTime(remaining)}`, canvas.width/2, 110);
+}
 
 this.updateResourceLabelPosition(selectedPlanet === this);
 this.resourceTexture.needsUpdate = true;
+}
 
 updateResourceSystem(){
 
@@ -2266,16 +2492,24 @@ if(this.currentResourceAmount >= this.maxResourceAmount){
 this.lastResourceRegenAt = null;
 }else{
 this.lastResourceRegenAt += steps * this.resourceRegenTime;
-
+}
 updateUI?.();
 updateHUD?.();
+}
+}
 
 this.updateResourceLabel();
+
+}
 
 updateOrbit(){
 
 // вращаем pivot (орбиту)
 this.orbitPivot.rotation.y += this.orbitSpeed;
+
+}
+
+}
 
 /* ================= SUN ================= */
 
@@ -2336,7 +2570,8 @@ sunOrbitData.updateOrbit = function(){
         orbitGlow.material.opacity = 0.15 + Math.sin(t * 1.6) * 0.04;
         const scale = 1 + Math.sin(t * 1.2) * 0.015;
         orbitGlow.scale.setScalar(scale);
-    };
+    }
+};
 sunOrbitData.createResourceLabel();
 
 /* ================= LIGHTING ================= */
@@ -2413,7 +2648,9 @@ const resourceInfo = {
 "solar_energy": { icon: "⚡", name: "Энергия" },
 
 "coins": { icon: "🪙", name: "Монеты" },
-"crystals": { icon: "💎", name: "Кристаллы" };
+"crystals": { icon: "💎", name: "Кристаллы" }
+
+};
 
 const planets = [];
 
@@ -2431,6 +2668,8 @@ planetResources[name]
 )
 );
 
+}
+
 let currentLevel = 1;
 let damage = 1;
 
@@ -2439,6 +2678,7 @@ let isPlanetFocused = false;
 
 function getCurrentPlanet(){
 return planets[currentLevel-1];
+}
 
 /* ================= UI ================= */
 
@@ -2482,7 +2722,12 @@ formatRegenTime(planet.getNextRegenRemainingMs());
 row.innerText =
 "Ресурсы полные";
 
+}
+
 structuresUIEl.appendChild(row);
+
+}
+
 
 /* ================= CAMERA ================= */
 
@@ -2505,6 +2750,9 @@ function updateCamera(){
         camera.position.z += Math.cos(time) * 0.01;
 
         camera.lookAt(0, 0, 0);
+    }
+
+}
 
 function toggleObservationMode(){
 
@@ -2518,6 +2766,9 @@ function toggleObservationMode(){
         // Возврат в игровой режим
         cameraTargetPosition.set(0, 40, 90);
         cameraTargetLookAt.set(0, 0, 0);
+    }
+
+}
 
 window.addEventListener("keydown",(e)=>{
 
@@ -2548,6 +2799,10 @@ window.addEventListener("keydown",(e)=>{
 
             toggleObservationMode();
 
+        }
+
+    }
+
 });
 
 /* ================= CLICK SYSTEM ================= */
@@ -2559,6 +2814,7 @@ window.addEventListener("click",(event)=>{
 
     if (bgMusic.paused && gameSettings.musicEnabled) {
         bgMusic.play().catch(() => {});
+    }
 
     mouse.x = (event.clientX / window.innerWidth)*2 -1;
     mouse.y = -(event.clientY / window.innerHeight)*2 +1;
@@ -2589,6 +2845,8 @@ window.addEventListener("click",(event)=>{
     if (typeof planet.takeDamage === "function") {
         if (planet.takeDamage(damage)) {
             tryPremiumDrop();
+        }
+    }
 
     /* ===== ДОБЫЧА РЕСУРСА ===== */
 if(planet.currentResourceAmount > 0){
@@ -2607,21 +2865,26 @@ if(planet.currentResourceAmount > 0){
 
         playerResources[randomResource] += damage;
         inventory.addResource(randomResource, damage, planet.name);
+    }
 
     playEffectSound(clickSound);
 
     if(!planet.lastResourceRegenAt){
         planet.lastResourceRegenAt = Date.now();
+    }
 
     updateUI();
     updateHUD();
     if(authState?.isAuthenticated){
         markLocalResourceDirty(6000);
         saveGame();
+    }
+}
 
 /* ===== ФОКУС ===== */
 if(selectedPlanet === planet){
     return;
+}
 
 if(selectedPlanet){
 
@@ -2630,6 +2893,7 @@ if(selectedPlanet){
     selectedPlanet.orbitPivot.add(selectedPlanet.mesh);
     selectedPlanet.mesh.scale.set(1,1,1);
     selectedPlanet.updateResourceLabelPosition?.(false);
+}
 
 selectedPlanet = planet;
 isPlanetFocused = true;
@@ -2679,6 +2943,7 @@ function handlePlanetDestroyed(){
 
             // Щиты удалены — вызов убираем
             // planets[nextIndex].createShield();
+        }
 
         planet.updateResourceLabelPosition?.(false);
         selectedPlanet = null;
@@ -2688,6 +2953,7 @@ function handlePlanetDestroyed(){
 
     },800);
 
+}
 /* ================= DEBUG MENU ================= */
 
 function createDebugMenu(){
@@ -2734,6 +3000,8 @@ damage*=10;
 updateUI();
 };
 
+}
+
 // createDebugMenu();
 
 /* ================= SAVE SYSTEM ================= */
@@ -2750,17 +3018,18 @@ function applySaveData(save){
     if(save.playerResources){
         for(const key in playerResources){
             if(typeof save.playerResources[key] === 'number') playerResources[key] = save.playerResources[key];
-
+        }
+    }
     if(Array.isArray(save.ownedShipIds) && save.ownedShipIds.length){
         player.ownedShipIds = Array.from(new Set(save.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)));
-
+    }
     if(save.selectedShipId) player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId;
     if(Array.isArray(save.ownedModuleIds)){
         player.ownedModuleIds = Array.from(new Set(save.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean)));
-
+    }
     if(save.activeModulesByShip && typeof save.activeModulesByShip === 'object'){
         player.activeModulesByShip = save.activeModulesByShip;
-
+    }
     ensureShopOwnershipDefaults?.();
     ensureModuleOwnershipDefaults?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
@@ -2768,6 +3037,7 @@ function applySaveData(save){
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
+}
 
 async function loadRemoteSaveFromSupabase(){
     if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return null;
@@ -2780,11 +3050,13 @@ async function loadRemoteSaveFromSupabase(){
         if(error){
             console.warn('Не удалось загрузить remote save:', error.message);
             return null;
-
+        }
         return data?.save_data || null;
     }catch(error){
         console.warn('Remote save load error:', error?.message || error);
         return null;
+    }
+}
 
 async function loadGame(){
     ensureShopOwnershipDefaults?.();
@@ -2793,18 +3065,22 @@ async function loadGame(){
         const localData = localStorage.getItem(saveKey);
         if(localData){
             try{ applySaveData(JSON.parse(localData)); }catch(error){ console.warn('Ошибка чтения local save:', error); }
-
+        }
+    }
     const remoteSave = await loadRemoteSaveFromSupabase();
     if(remoteSave) applySaveData(remoteSave);
     ensureShopOwnershipDefaults?.();
     ensureModuleOwnershipDefaults?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     refreshOwnedShipsInventory?.();
+}
+
 
 function toSafeWholeNumber(value, fallback = 0){
     const num = Number(value);
     if(!Number.isFinite(num)) return Math.trunc(Number(fallback || 0)) || 0;
     return num >= 0 ? Math.floor(num) : Math.ceil(num);
+}
 
 function isTournamentRespawnMatch(){
     return gameState === 'BATTLE' && !!(
@@ -2812,9 +3088,11 @@ function isTournamentRespawnMatch(){
         currentRoom?.state === 'tournament' ||
         String(currentRoom?.id || currentRoom?.roomId || '').startsWith('tournament_')
     );
+}
 
 function sleep(ms = 0){
     return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
+}
 
 function buildSavePayload(){
     return {
@@ -2828,7 +3106,9 @@ function buildSavePayload(){
         ownedShipIds: Array.isArray(player.ownedShipIds) ? [...player.ownedShipIds] : ['scout_1'],
         selectedShipId: player.selectedShipId || 'scout_1',
         ownedModuleIds: Array.isArray(player.ownedModuleIds) ? [...player.ownedModuleIds] : [],
-        activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {};
+        activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {}
+    };
+}
 
 async function saveRemoteProgress(){
     if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return;
@@ -2854,6 +3134,7 @@ async function saveRemoteProgress(){
 
         if(playerUpdateError){
             console.warn('Не удалось обновить players:', playerUpdateError.message || playerUpdateError);
+        }
 
         const { error } = await window.supabaseClient.from('player_saves').upsert({
             player_public_id: toSafeWholeNumber(authState.playerId, 0),
@@ -2864,14 +3145,17 @@ async function saveRemoteProgress(){
         else localResourceDirtyUntil = 0;
     }catch(error){
         console.warn('Remote progress save error:', error?.message || error);
+    }
+}
 
 function saveGame(){
     const saveKey = getActiveSaveKey();
     const payload = buildSavePayload();
     if(saveKey){
         localStorage.setItem(saveKey, JSON.stringify(payload));
-
+    }
     saveRemoteProgress();
+}
 
 setInterval(() => {
     if(authState?.isAuthenticated) saveGame();
@@ -2880,10 +3164,12 @@ setInterval(() => {
 setInterval(() => {
     if(authState?.isAuthenticated && gameState === 'LOBBY'){
         touchJoinedLobbyRoomPresence();
-    }, 2500);
+    }
+}, 2500);
 
 window.addEventListener('beforeunload', () => {
-    try{ saveGame(); }catch(_e){});
+    try{ saveGame(); }catch(_e){}
+});
 
 /* ================= ZOOM ================= */
 
@@ -2918,6 +3204,8 @@ renderer.domElement.addEventListener("mousedown",(e)=>{
     if(gameState !== "BATTLE"){
         if(document.pointerLockElement){
             document.exitPointerLock();
+        }
+    }
 
     if(gameState !== "ORBIT") return;
 
@@ -2945,7 +3233,8 @@ renderer.domElement.addEventListener("mousemove",(e)=>{
     } else {
         velocityX = -deltaX * 0.005;
         velocityY = -deltaY * 0.005;
-    });
+    }
+});
 
 // ОТПУСКАНИЕ
 renderer.domElement.addEventListener("mouseup",()=>{
@@ -2960,12 +3249,14 @@ renderer.domElement.addEventListener("mouseleave",()=>{
 window.addEventListener("keydown",(e)=>{
     if(e.key === "Shift"){
         isMoveMode = true;
-    });
+    }
+});
 
 window.addEventListener("keyup",(e)=>{
     if(e.key === "Shift"){
         isMoveMode = false;
-    });
+    }
+});
 
 /* ================= RESIZE ================= */
 
@@ -2981,6 +3272,8 @@ renderer.setSize(window.innerWidth,window.innerHeight);
 function animate(){
     if (typeof battleMapPlanet !== 'undefined' && battleMapPlanet) {
         battleMapPlanet.rotation.y += 0.0025;
+    }
+
 
     requestAnimationFrame(animate);
 
@@ -2988,16 +3281,18 @@ function animate(){
     planets.forEach(p => {
         if(p.cloudMesh){
             p.cloudMesh.rotation.y += 0.002;
-        });
+        }
+    });
 
     // фон
     if(stars){
         stars.rotation.y += 0.0005;
-
+    }
     if(orbitNebulaGroup){
         orbitNebulaGroup.visible = gameState === "ORBIT";
         orbitNebulaGroup.rotation.y += 0.00008;
         orbitNebulaGroup.position.x = Math.sin(Date.now() * 0.00008) * 24;
+    }
 
     // лёгкий parallax у лобби-фона
     const lobbyBg = document.getElementById("lobby-bg");
@@ -3005,12 +3300,14 @@ function animate(){
         lobbyParallaxCurrentX += (lobbyParallaxTargetX - lobbyParallaxCurrentX) * 0.06;
         lobbyParallaxCurrentY += (lobbyParallaxTargetY - lobbyParallaxCurrentY) * 0.06;
         lobbyBg.style.transform = `translate3d(${lobbyParallaxCurrentX}px, ${lobbyParallaxCurrentY}px, 0) scale(1.05)`;
+    }
 
     // режим наблюдения
     if(isObservationMode){
         const time = Date.now() * 0.00001;
         camera.position.x += Math.sin(time) * 0.01;
         camera.position.z += Math.cos(time) * 0.01;
+    }
 
     // обновляем орбиты
     planets.forEach(p=>{
@@ -3020,6 +3317,14 @@ function animate(){
     if(typeof sunOrbitData !== 'undefined'){
         sunOrbitData.updateOrbit();
         sunOrbitData.updateResourceSystem();
+    }
+
+
+
+
+
+
+
 
     // ================= ROTATION SYSTEM =================
 
@@ -3030,6 +3335,7 @@ function animate(){
             solarSystem.rotation.y += velocityX;
             solarSystem.rotation.x += velocityY;
 
+        }
         else{
 
             solarSystem.rotation.y += autoRotateSpeed;
@@ -3039,6 +3345,8 @@ function animate(){
 
             velocityX *= 0.95;
             velocityY *= 0.95;
+        }
+    }
 
     // ограничение наклона
     solarSystem.rotation.x = Math.max(
@@ -3063,11 +3371,13 @@ function animate(){
 
         selectedPlanet.updateResourceLabelPosition?.(true);
 
+    }
     else{
 
         solarSystem.position.z += (0 - solarSystem.position.z) * 0.04;
         planets.forEach(p => p.updateResourceLabelPosition?.(false));
         sunOrbitData.updateResourceLabelPosition?.(false);
+    }
 
     // ================= SHIP MOVEMENT =================
 
@@ -3101,10 +3411,10 @@ if (gameState === "BATTLE" && playerShip) {
     const hasMoveInput = !!(keys.w || keys.s || keys.a || keys.d);
     if(!Number.isFinite(battleEnergyCapacity) || battleEnergyCapacity <= 0){
         battleEnergyCapacity = Math.max(20, Number(currentBattleShipStats?.energyCapacity || 60) || 60);
-
+    }
     if(!Number.isFinite(battleEnergyPool) || battleEnergyPool < 0){
         battleEnergyPool = Math.min(Math.max(0, Number(playerResources?.solar_energy || 0) || 0), battleEnergyCapacity);
-
+    }
     const boostDrain = 0.0045;
     const boostActive = !!(keys.shift && hasMoveInput && battleEnergyPool > boostDrain);
     if(boostActive){
@@ -3115,6 +3425,7 @@ if (gameState === "BATTLE" && playerShip) {
         damping = Math.min(0.992, damping + 0.004);
         battleEnergyPool = Math.max(0, battleEnergyPool - boostDrain);
         playerResources.solar_energy = Math.max(0, Number(playerResources?.solar_energy || 0) - boostDrain);
+    }
 
     playerControl.yaw -= mouseDeltaX * yawStep * 0.62;
     playerControl.pitch += mouseDeltaY * pitchStep * invertFactor * 0.62;
@@ -3143,6 +3454,7 @@ if (gameState === "BATTLE" && playerShip) {
     handleBattleCollisions(playerShip, shipVelocity);
     updateBattlePlanetEffects();
     shipVelocity.multiplyScalar(damping);
+    }
 
     mouseDeltaX = 0;
     mouseDeltaY = 0;
@@ -3169,8 +3481,9 @@ if (gameState === "BATTLE" && playerShip) {
                 updateEnemyHud();
                 updateBattleScoreboard();
                 // live PvP: bot respawn отключен
-
+            }
             continue;
+        }
 
         const segmentEnd = laser.mesh.position.clone();
         let hitRemoteShip = false;
@@ -3184,19 +3497,23 @@ if (gameState === "BATTLE" && playerShip) {
                 bestRemoteDistance = hitDistance;
                 bestRemoteId = String(entryId || '').trim();
                 bestRemoteEntry = entry;
-            });
+            }
+        });
         if(bestRemoteId && bestRemoteEntry){
             hitRemoteShip = true;
             broadcastBattleHit(bestRemoteId, laser.damage, bestRemoteEntry?.nickname || bestRemoteEntry?.mesh?.userData?.pilotName || 'Pilot');
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
-
+        }
         if(hitRemoteShip){
             continue;
+        }
 
         if (laser.life <= 0) {
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
+        }
+    }
 
     for (let i = enemyLasers.length - 1; i >= 0; i--) {
         const laser = enemyLasers[i];
@@ -3208,6 +3525,7 @@ if (gameState === "BATTLE" && playerShip) {
             let hitObserver = null;
             for (const bot of observerBots) {
                 if(bot && bot.userData.alive && (!laser.shooter || laser.shooter !== bot) && laser.mesh.position.distanceTo(bot.position) < 2.0){ hitObserver = bot; break; }
+            }
             if(hitObserver){
                 hitObserver.userData.hp = Math.max(0, hitObserver.userData.hp - laser.damage);
                 if(hitObserver.userData.hp <= 0){
@@ -3216,10 +3534,12 @@ if (gameState === "BATTLE" && playerShip) {
                     hitObserver.userData.respawnAt = Date.now() + 3000;
                     pushKillFeed(`${laser.shooter?.userData?.name || 'Drone'} уничтожил ${hitObserver.userData.name}`, 'kill');
                     hitObserver.visible = false;
-
+                }
                 scene.remove(laser.mesh);
                 enemyLasers.splice(i, 1);
                 continue;
+            }
+        }
 
         if (playerShip && laser.mesh.position.distanceTo(playerShip.position) < 2.1) {
             playerHp = Math.max(0, playerHp - laser.damage);
@@ -3230,16 +3550,19 @@ if (gameState === "BATTLE" && playerShip) {
                 updateBattleScoreboard();
                 if(playerShip){
                     spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
-
+                }
                 scheduleBattleRespawn(2000);
-
+            }
             scene.remove(laser.mesh);
             enemyLasers.splice(i, 1);
             continue;
+        }
 
         if (laser.life <= 0) {
             scene.remove(laser.mesh);
             enemyLasers.splice(i, 1);
+        }
+    }
 
     if (enemyBot && playerShip) {
         enemyBot.userData.strafePhase += 0.025;
@@ -3257,6 +3580,8 @@ if (gameState === "BATTLE" && playerShip) {
         if (Date.now() - lastBotShotAt > botShotCooldown) {
             lastBotShotAt = Date.now();
             fireBotLaser();
+        }
+    }
 
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
     const followDistance = Number(playerShip?.userData?.cameraDistance || 16) || 16;
@@ -3267,14 +3592,17 @@ if (gameState === "BATTLE" && playerShip) {
 
     camera.position.lerp(desiredPosition, 0.10);
     camera.lookAt(playerShip.position.clone().add(direction.clone().multiplyScalar(35)));
+}
 
 updateDebrisPieces();
 if((gameState === "BATTLE" || gameState === "OBSERVE") && battleObserverMode){
     updateObserverBattle();
-
+}
 limitBattleArea();
 updateBattlePlayerHud();
 renderer.render(scene,camera);
+}
+
 
 function playEffectSound(sound){
     if(!gameSettings.soundEnabled) return;
@@ -3282,6 +3610,8 @@ function playEffectSound(sound){
 
     if(sound.isPlaying) sound.stop();
     sound.play();
+}
+
 
 function createProjectileVisual(weaponType, options = {}){
     const group = new THREE.Group();
@@ -3432,8 +3762,10 @@ function createProjectileVisual(weaponType, options = {}){
         group.add(halo, shell, core);
         group.userData.visualType = 'laser';
         group.userData.halo = halo;
+    }
 
     return group;
+}
 
 function updateProjectileVisual(laser){
     const mesh = laser?.mesh;
@@ -3446,25 +3778,26 @@ function updateProjectileVisual(laser){
         const flame = mesh.userData.flame;
         flame.scale.setScalar(0.88 + Math.sin(Date.now() * 0.06) * 0.18);
         flame.material.opacity = 0.72 + Math.sin(Date.now() * 0.08) * 0.18;
-
+    }
     if(mesh.userData.ring){
         mesh.userData.ring.rotation.z += 0.22;
         mesh.scale.setScalar(0.96 + (1 - lifeRatio) * 0.12 + (pulse - 0.8) * 0.2);
-
+    }
     if(mesh.userData.ringA){
         mesh.userData.ringA.rotation.z += 0.18;
-
+    }
     if(mesh.userData.ringB){
         mesh.userData.ringB.rotation.x += 0.16;
-
+    }
     if(mesh.userData.sideA){
         mesh.userData.sideA.rotation.z += 0.22;
-
+    }
     if(mesh.userData.sideB){
         mesh.userData.sideB.rotation.z -= 0.18;
-
+    }
     if(mesh.userData.halo?.material){
         mesh.userData.halo.material.opacity = Math.max(0.08, 0.18 + (pulse - 0.8) * 0.18) * (0.55 + lifeRatio * 0.45);
+    }
 
     if(visualType === 'beam'){
         mesh.scale.z = 1 + (pulse - 0.8) * 0.18;
@@ -3474,6 +3807,9 @@ function updateProjectileVisual(laser){
         mesh.rotation.y += 0.12;
     }else if(visualType === 'pulse'){
         mesh.rotation.z += 0.08;
+    }
+}
+
 
 function tryFireLaser(){
     const now = Date.now();
@@ -3483,6 +3819,7 @@ function tryFireLaser(){
     if(battleWeapon.ammoInClip <= 0){
         startBattleReload();
         return;
+    }
 
     lastLaserShotAt = now;
     battleWeapon.ammoInClip = Math.max(0, battleWeapon.ammoInClip - 1);
@@ -3535,18 +3872,26 @@ function tryFireLaser(){
         for(let i = 0; i < burstCount; i++){
             const offsetIndex = i - midIndex;
             spawnProjectile(offsetIndex * projectileOffset, offsetIndex * spread);
+        }
+    }
 
     if(battleWeapon.ammoInClip <= 0){
         startBattleReload();
-
+    }
     updateBattlePlayerHud();
     playEffectSound(clickSound);
+}
+
+
+
 
 function formatAmmoReserve(){
     return battleWeapon.reserveAmmo === Infinity ? '∞' : String(battleWeapon.reserveAmmo);
+}
 
 function isBattleRespawning(){
     return battlePendingRespawnAt && Date.now() < battlePendingRespawnAt;
+}
 
 function scheduleBattleRespawn(delayMs=2000){
     const safeDelay = Math.max(0, delayMs);
@@ -3554,11 +3899,11 @@ function scheduleBattleRespawn(delayMs=2000){
     if(battleRespawnTimer){
         clearTimeout(battleRespawnTimer);
         battleRespawnTimer = null;
-
+    }
     if(playerShip){
         playerShip.visible = false;
         playerShip.position.set(99999,99999,99999);
-
+    }
     shipVelocity.set(0,0,0);
     battlePlanetCapture = null;
     firing = false;
@@ -3574,6 +3919,8 @@ function scheduleBattleRespawn(delayMs=2000){
             spawnPlayer();
             updateBattlePlayerHud();
         }, safeDelay + 30);
+    }
+}
 
 function updateBattleRespawnState(){
     if(!battlePendingRespawnAt) return;
@@ -3582,16 +3929,17 @@ function updateBattleRespawnState(){
         const reloadText = document.getElementById('battle-reload-text');
         if(reloadText) reloadText.textContent = `Респавн через ${(remain / 1000).toFixed(1)}с`;
         return;
-
+    }
     battlePendingRespawnAt = 0;
     if(battleRespawnTimer){
         clearTimeout(battleRespawnTimer);
         battleRespawnTimer = null;
-
+    }
     playerHp = playerMaxHp;
     battleShipCrash = null;
     spawnPlayer();
     updateBattlePlayerHud();
+}
 
 function updateBattlePlayerWorldHp(){
     const wrap = document.getElementById('battle-player-world-hp');
@@ -3604,6 +3952,7 @@ function updateBattlePlayerWorldHp(){
     const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
     fill.style.width = hpPercent + '%';
     if(text) text.textContent = `${Math.round(playerHp)} / ${playerMaxHp}`;
+}
 
 function updateBattlePlayerHud(){
     const hud = document.getElementById('battle-player-hud');
@@ -3623,7 +3972,7 @@ function updateBattlePlayerHud(){
     if(hudTitle){
         const currentShipName = String(currentBattleShipStats?.ship?.name || getSelectedShipItem?.()?.name || player?.ships?.[0]?.name || 'Cargo Drone').trim() || 'Cargo Drone';
         hudTitle.textContent = currentShipName;
-
+    }
     const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
     hpFill.style.width = hpPercent + '%';
     hpText.textContent = `HP: ${Math.round(playerHp)} / ${playerMaxHp}`;
@@ -3634,7 +3983,7 @@ function updateBattlePlayerHud(){
     battleEnergyCapacity = energyCap;
     if(!Number.isFinite(battleEnergyPool) || battleEnergyPool < 0){
         battleEnergyPool = Math.min(Math.max(0, Number(playerResources?.solar_energy || 0) || 0), energyCap);
-
+    }
     const currentEnergy = THREE.MathUtils.clamp(battleEnergyPool, 0, energyCap);
     energyFill.style.display = 'none';
     energyFill.style.width = '0%';
@@ -3649,6 +3998,8 @@ function updateBattlePlayerHud(){
         reloadText.textContent = `Перезарядка: ${(remain / 1000).toFixed(1)}с`;
     }else{
         reloadText.textContent = 'R — перезарядка';
+    }
+}
 
 function startBattleReload(force=false){
     if(gameState !== 'BATTLE' || !playerShip || battleShipCrash || isBattleRespawning()) return;
@@ -3657,6 +4008,7 @@ function startBattleReload(force=false){
     battleWeapon.isReloading = true;
     battleWeapon.reloadEndsAt = Date.now() + battleWeapon.reloadTime;
     updateBattlePlayerHud();
+}
 
 function updateBattleReloadState(){
     if(!battleWeapon.isReloading) return;
@@ -3664,6 +4016,7 @@ function updateBattleReloadState(){
     battleWeapon.isReloading = false;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
     updateBattlePlayerHud();
+}
 
 function startShipCrashAnimation(){
     if(!playerShip || !battleMapPlanet || battleShipCrash || isBattleRespawning()) return;
@@ -3673,11 +4026,14 @@ function startShipCrashAnimation(){
     updateBattleScoreboard();
     pushKillFeed(`${player?.nickname || 'Commander'} разбился о планету`, 'kill');
     scheduleBattleRespawn(2000);
+}
 
 function updateShipCrashAnimation(){
     if(!battleShipCrash) return;
     if(Date.now() - battleShipCrash.startAt >= battleShipCrash.duration){
         battleShipCrash = null;
+    }
+}
 
 function startSunProminenceDeath(){
     if(!playerShip || battleShipCrash || isBattleRespawning()) return;
@@ -3686,6 +4042,7 @@ function startSunProminenceDeath(){
     updateBattleScoreboard();
     pushKillFeed(`${player?.nickname || 'Commander'} сгорел в протуберанце`, 'kill');
     scheduleBattleRespawn(2000);
+}
 
 function updateBattlePlanetEffects(){
     if(!battleMapPlanet || !playerShip || battleObserverMode) return;
@@ -3705,6 +4062,7 @@ function updateBattlePlanetEffects(){
 
     if(isSunMap){
         battleMapPlanet.rotation.y += 0.0015;
+    }
 
     const towardPlanet = toPlanet.clone().normalize();
     if(!Number.isFinite(towardPlanet.x) || towardPlanet.lengthSq() === 0) return;
@@ -3714,15 +4072,17 @@ function updateBattlePlanetEffects(){
         shipVelocity.set(0, 0, 0);
         startShipCrashAnimation();
         return;
+    }
 
     if(distance <= captureRadius){
         if(!battlePlanetCapture){
             startBattlePlanetCapture();
-
+        }
         const lockDistance = Math.max(crashRadius, radius + 10);
         playerShip.position.copy(battleMapPlanet.position.clone().sub(towardPlanet.clone().multiplyScalar(lockDistance)));
         shipVelocity.set(0, 0, 0);
         return;
+    }
 
     if(distance < atmosphereRadius){
         const gravityStrength = THREE.MathUtils.clamp((atmosphereRadius - distance) / Math.max(1, atmosphereRadius - radius), 0, 1);
@@ -3730,8 +4090,9 @@ function updateBattlePlanetEffects(){
 
         if(distance < nearSurfaceRadius){
             shipVelocity.multiplyScalar(isSunMap ? 0.90 : 0.92);
-
-
+        }
+    }
+}
 // ===== POINTER LOCK =====
 const canvas = renderer.domElement;
 
@@ -3744,10 +4105,13 @@ document.addEventListener("pointerlockchange", () => {
             if(hangarCanvas && document.pointerLockElement === hangarCanvas){
                 hangarCanvas.style.cursor = 'none';
                 document.body.style.cursor = 'none';
-            } else {
+            }
+        } else {
             if(hangarCanvas) hangarCanvas.style.cursor = 'auto';
             document.body.style.cursor = 'auto';
-        }catch(_){ });
+        }
+    }catch(_){ }
+});
 
 
 
@@ -3782,8 +4146,10 @@ function updateHUD(){
                     <span class="tooltip">${info.name}</span>
                 </div>
             `;
+        }
 
         html += `</div>`;
+    }
 
     bar.innerHTML = html;
     inventory.syncFromPlayerResources?.();
@@ -3795,9 +4161,11 @@ function updateHUD(){
     if(crystalsEl || coinsEl){
         updatePremiumAccountInfo();
         ensurePremiumCurrencyUi?.();
-
+    }
     if(premiumBar){
         premiumBar.style.display = gameState === 'LOBBY' ? 'flex' : 'none';
+    }
+}
 
 /* ================= PREMIUM DROP SYSTEM ================= */
 
@@ -3811,13 +4179,17 @@ function tryPremiumDrop() {
     if (Math.random() < coinChance) {
         playerResources.coins += 1;
         dropped = true;
+    }
 
     if (Math.random() < crystalChance) {
         playerResources.crystals += 1;
         dropped = true;
+    }
 
     if (dropped) {
         updateHUD();
+    }
+}
 
 initSettingsUI();
 initLobbyBackground();
@@ -3832,6 +4204,7 @@ animate();
 class InventoryManager {
   constructor() {
     this.items = [];
+  }
 
   render(items = this.items) {
     const container = document.getElementById("inventory");
@@ -3848,12 +4221,14 @@ class InventoryManager {
       `;
       container.appendChild(div);
     });
+  }
 
   addResource(resourceId, amount = 1, planetName = "") {
     const config = resourceInfo[resourceId];
     if (!config) {
       console.warn("Unknown resource:", resourceId);
       return;
+    }
 
     let existing = this.items.find(r => r.id === resourceId);
     if (existing) {
@@ -3866,9 +4241,11 @@ class InventoryManager {
         planet: planetName,
         amount
       });
+    }
 
     this.items.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     this.render();
+  }
 
   syncFromPlayerResources() {
     this.items = [];
@@ -3883,9 +4260,12 @@ class InventoryManager {
           planet: '',
           amount
         });
-      });
+      }
+    });
     this.items.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     this.render();
+  }
+}
 
 inventory = new InventoryManager();
 inventory.syncFromPlayerResources();
@@ -3900,12 +4280,13 @@ if(inventoryButton && inventoryWindow){
   inventoryButton.addEventListener("click", () => {
     inventoryWindow.classList.toggle("hidden");
   });
+}
 
 if(closeInventory && inventoryWindow){
   closeInventory.addEventListener("click", () => {
     inventoryWindow.classList.add("hidden");
   });
-
+}
 window.switchState = switchState;
 // старт только через AUTH
 
@@ -3986,17 +4367,21 @@ function updateMap(){
     if(mapImage) mapImage.src = map.img;
     if(mapName) mapName.textContent = map.name;
 
+}
+
 if(prevBtn){
     prevBtn.onclick = () => {
         currentMapIndex = (currentMapIndex - 1 + MAPS.length) % MAPS.length;
         updateMap();
     };
+}
 
 if(nextBtn){
     nextBtn.onclick = () => {
         currentMapIndex = (currentMapIndex + 1) % MAPS.length;
         updateMap();
     };
+}
 
 updateMap();
 
@@ -4026,20 +4411,25 @@ function __mountHangarChatPanel(){
         if(!__hangarChatHomeParent){
             __hangarChatHomeParent = chatWrapper.parentNode;
             __hangarChatHomeNextSibling = chatWrapper.nextSibling;
+        }
 
         if(emojiPanel && !__hangarEmojiHomeParent){
             __hangarEmojiHomeParent = emojiPanel.parentNode;
             __hangarEmojiHomeNextSibling = emojiPanel.nextSibling;
+        }
 
         if(chatWrapper.parentNode !== hangarWindow){
             hangarWindow.appendChild(chatWrapper);
+        }
 
         if(emojiPanel && emojiPanel.parentNode !== hangarWindow){
             hangarWindow.appendChild(emojiPanel);
+        }
 
         chatWrapper.classList.add('hangar-inline-mode');
         if(emojiPanel) emojiPanel.classList.add('hangar-emoji-inline-mode');
     }catch(_){}
+}
 
 function __restoreHangarChatPanel(){
     try{
@@ -4056,7 +4446,9 @@ function __restoreHangarChatPanel(){
                     __hangarChatHomeParent.insertBefore(chatWrapper, __hangarChatHomeNextSibling);
                 }else{
                     __hangarChatHomeParent.appendChild(chatWrapper);
-
+                }
+            }
+        }
 
         if(emojiPanel){
             emojiPanel.classList.remove('hangar-emoji-inline-mode');
@@ -4067,8 +4459,11 @@ function __restoreHangarChatPanel(){
                     __hangarEmojiHomeParent.insertBefore(emojiPanel, __hangarEmojiHomeNextSibling);
                 }else{
                     __hangarEmojiHomeParent.appendChild(emojiPanel);
-
-        }catch(_){}
+                }
+            }
+        }
+    }catch(_){}
+}
 
 
 function setHangarChatMode(active, lowered = false){
@@ -4079,8 +4474,21 @@ function setHangarChatMode(active, lowered = false){
         document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         if(chatWrapper) chatWrapper.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         if(emojiPanel) emojiPanel.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+        __updateHangarPmNeon?.();
         
     }catch(_){}
+}
+
+
+function __appendEmojiToChatInput(symbol){
+    try{
+        const input = document.getElementById('chat-input');
+        if(!input) return;
+        const current = String(input.value || '');
+        input.value = `${current}${current ? ' ' : ''}${symbol}`.trimStart() + ' ';
+        input.focus();
+    }catch(_){}
+}
 
 function __initHangarEmojiPanel(){
     try{
@@ -4102,43 +4510,24 @@ function __initHangarEmojiPanel(){
             panel.appendChild(btn);
         });
     }catch(_){}
+}
 
-function __bindHangarEmojiClicks(){
-    try{
-        const panel = document.getElementById('hangar-emoji-panel');
-        if(!panel || panel.dataset.boundHangarEmoji === '1') return;
-        panel.dataset.boundHangarEmoji = '1';
-        panel.addEventListener('click', (e) => {
-            const target = e.target?.closest?.('.hangar-emoji-btn');
-            if(!target) return;
-            e.preventDefault();
-            e.stopPropagation();
-            __appendEmojiToChatInput(String(target.dataset.emoji || target.textContent || '').trim());
-        });
-    }catch(_){}
 
 function __getTotalPmUnreadCount(){
     try{
         return Object.values(chatUnread?.pm || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
     }catch(_){
         return 0;
+    }
+}
 
 function __updateHangarPmNeon(){
     try{
         const chatWrapper = document.getElementById('chat-wrapper');
         if(!chatWrapper) return;
-        const totalPmUnread = __getTotalPmUnreadCount();
-        chatWrapper.classList.toggle('hangar-pm-neon', totalPmUnread > 0);
+        chatWrapper.classList.toggle('hangar-pm-neon', __getTotalPmUnreadCount() > 0);
     }catch(_){}
-
-function __appendEmojiToChatInput(symbol){
-    try{
-        const input = document.getElementById('chat-input');
-        if(!input) return;
-        const current = String(input.value || '');
-        input.value = `${current}${current ? ' ' : ''}${symbol}`.trimStart() + ' ';
-        input.focus();
-    }catch(_){}
+}
 
 function bindHangarChatControls(){
     const upBtn = document.getElementById('hangar-chat-up');
@@ -4151,6 +4540,7 @@ function bindHangarChatControls(){
             e.stopPropagation();
             setHangarChatMode(true, false)
         });
+    }
 
     if(downBtn && !downBtn.dataset.boundHangarChat){
         downBtn.dataset.boundHangarChat = '1';
@@ -4159,6 +4549,8 @@ function bindHangarChatControls(){
             e.stopPropagation();
             setHangarChatMode(true, true)
         });
+    }
+}
 
 function __syncHangarChatVisibility(){
     try{
@@ -4166,19 +4558,21 @@ function __syncHangarChatVisibility(){
         if(!hangarWindow){
             __restoreHangarChatPanel();
             return;
+        }
 
         const isVisible = !hangarWindow.classList.contains('hidden') && hangarWindow.style.display !== 'none';
         if(isVisible){
             bindHangarChatControls();
             __initHangarEmojiPanel();
-            __bindHangarEmojiClicks();
             __mountHangarChatPanel();
-            __updateHangarPmNeon();
             const lowered = document.body.classList.contains('hangar-chat-lowered');
             setHangarChatMode(true, lowered);
+            __updateHangarPmNeon?.();
         }else{
             __restoreHangarChatPanel();
-        }catch(_){}
+        }
+    }catch(_){}
+}
 
 function __installHangarChatWatcher(){
     if(window.__hangarChatWatcherInstalled) return;
@@ -4204,6 +4598,7 @@ function __installHangarChatWatcher(){
                 setTimeout(__syncHangarChatVisibility, 120);
                 setTimeout(__syncHangarChatVisibility, 320);
             });
+        }
 
         document.querySelectorAll('#hangar-window .hangar-close-btn, #hangar-window .close-window').forEach(btn => {
             if(btn.dataset.boundHangarWatcherClose) return;
@@ -4222,7 +4617,11 @@ function __installHangarChatWatcher(){
             tries += 1;
             if(attach() || tries > 40){
                 clearInterval(timer);
-            }, 250);
+            }
+        }, 250);
+    }
+}
+
 
 let chatRealtimeChannel = null;
 const CHAT_MESSAGE_LIMIT = 50;
@@ -4230,13 +4629,15 @@ const chatCache = {
     global: [],
     clan: [],
     battle: [],
-    pm: {};
+    pm: {}
+};
 const privateChatTabs = {};
 const chatUnread = {
     global: 0,
     clan: 0,
     battle: 0,
-    pm: {};
+    pm: {}
+};
 const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
 const pmPeerRoomIds = new Map();
@@ -4258,46 +4659,56 @@ const STAFF_ROLE_META = {
     player: { short: "", label: "Игрок", color: "#9fd7ff" },
     mod: { short: "mod", label: "Moderator", color: "#ff2a2a" },
     adm: { short: "adm", label: "Admin", color: "#ff8a1c" },
-    owr: { short: "owr", label: "Owner", color: "#ffd400" };
+    owr: { short: "owr", label: "Owner", color: "#ffd400" }
+};
 
 function normalizeStaffRole(role = "player") {
     const value = String(role || "player").trim().toLowerCase();
     if (value === "mod" || value === "adm" || value === "owr") return value;
     return "player";
+}
 
 function getStaffRoleMeta(role = "player") {
     return STAFF_ROLE_META[normalizeStaffRole(role)] || STAFF_ROLE_META.player;
+}
 
 function setCachedStaffRole(publicId, role = "player") {
     const key = String(publicId || "").trim();
     if (!key) return;
     playerStaffRoleCache[key] = normalizeStaffRole(role);
+}
 
 function getCachedStaffRole(publicId) {
     const key = String(publicId || "").trim();
     if (!key) return "player";
     if (authState?.playerId && key === String(authState.playerId)) {
         return normalizeStaffRole(player?.staff_role || "player");
-
+    }
     return normalizeStaffRole(playerStaffRoleCache[key] || "player");
+}
 
 function getOwnStaffRole() {
     return normalizeStaffRole(player?.staff_role || "player");
+}
 
 function isStaffRole(role = "player") {
     const normalized = normalizeStaffRole(role);
     return normalized === "mod" || normalized === "adm" || normalized === "owr";
+}
 
 function canWriteInObserverChat() {
     return isStaffRole(getOwnStaffRole());
+}
 
 function canWriteBattleAnnouncementChat() {
     const role = getOwnStaffRole();
     return role === "adm" || role === "owr";
+}
 
 function canWriteBattleAnnouncementChatByRole(role = "player") {
     const normalizedRole = normalizeStaffRole(role);
     return normalizedRole === "adm" || normalizedRole === "owr";
+}
 
 function getSharedBattleChatRoomId() {
     const mapName = String(
@@ -4313,18 +4724,21 @@ function getSharedBattleChatRoomId() {
     if (!mapName) return '';
 
     return `public_${mapName}`;
+}
 
 function getSceneChatRoomId() {
     const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
     if (sharedBattleRoomId) {
         persistBattleChatRoomId(sharedBattleRoomId);
         return sharedBattleRoomId;
+    }
 
     const fromCurrentRoom = currentRoom?.id || currentRoom?.roomId || null;
     if (fromCurrentRoom) {
         const currentRoomId = String(fromCurrentRoom).trim();
         persistBattleChatRoomId(currentRoomId);
         return currentRoomId;
+    }
 
     const rememberedRoomId = getPersistedBattleChatRoomId();
     if (rememberedRoomId) return rememberedRoomId;
@@ -4333,42 +4747,49 @@ function getSceneChatRoomId() {
     const fallbackRoomId = String(`scene_${String(fallbackMap).toLowerCase()}`);
     persistBattleChatRoomId(fallbackRoomId);
     return fallbackRoomId;
+}
 
 function getBattleChatRoomId() {
     const sharedBattleRoomId = String(getSharedBattleChatRoomId() || '').trim();
     if (sharedBattleRoomId) {
         persistBattleChatRoomId(sharedBattleRoomId);
         return sharedBattleRoomId;
+    }
 
     const sceneRoomId = String(getSceneChatRoomId() || '').trim();
     if (sceneRoomId) {
         persistBattleChatRoomId(sceneRoomId);
         return sceneRoomId;
-
+    }
     return getPersistedBattleChatRoomId();
+}
 
 function canWriteSceneMapChat() {
     if (gameState === "BATTLE") return true;
     if (gameState === "OBSERVE") return canWriteInObserverChat();
     return false;
+}
 
 function getPlayerClanChatId() {
     const directClanId = player?.clan_id || player?.clanId || authState?.clanId || null;
     if (directClanId !== null && typeof directClanId !== 'undefined' && String(directClanId).trim()) {
         return String(directClanId).trim();
-
+    }
     try {
         const saved = localStorage.getItem('cosmicClanChatId');
         if (saved && String(saved).trim()) return String(saved).trim();
     } catch (_) {}
     return null;
+}
 
 function canUseClanChat() {
     return !!getPlayerClanChatId();
+}
 
 function getClanChatRoomId() {
     const clanId = getPlayerClanChatId();
     return clanId ? `clan_${clanId}` : null;
+}
 
 function getPmPresenceState(peerId) {
     const key = String(peerId || '').trim();
@@ -4376,6 +4797,7 @@ function getPmPresenceState(peerId) {
     if (inGamePmPeers.has(key)) return 'in-game';
     if (onlinePmPeers.has(key)) return 'online';
     return 'offline';
+}
 
 function resolvePmRoomTitleById(roomId = '') {
     const safeRoomId = String(roomId || '').trim();
@@ -4384,10 +4806,12 @@ function resolvePmRoomTitleById(roomId = '') {
     const currentId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
     if (currentId && currentId === safeRoomId) {
         return String(currentRoom?.title || currentRoom?.room_name || currentRoom?.real || currentRoom?.map || '').trim();
+    }
 
     const selectedId = String(selectedLobbyMap?.id || selectedLobbyMap?.roomId || '').trim();
     if (selectedId && selectedId === safeRoomId) {
         return String(selectedLobbyMap?.title || selectedLobbyMap?.room_name || selectedLobbyMap?.real || selectedLobbyMap?.map || '').trim();
+    }
 
     const cacheRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find(room => {
         const directId = String(room?.id || room?.roomId || '').trim();
@@ -4408,8 +4832,10 @@ function resolvePmRoomTitleById(roomId = '') {
             cacheRoom?.rawRoom?.map ||
             ''
         ).trim();
+    }
 
     return '';
+}
 
 function getPmPresenceTitle(peerId) {
     const key = String(peerId || '').trim();
@@ -4421,6 +4847,7 @@ function getPmPresenceTitle(peerId) {
     const roomId = String(pmPeerRoomIds.get(key) || '').trim();
     const roomTitle = resolvePmRoomTitleById(roomId);
     return roomTitle || 'В игре';
+}
 
 function saveChatUiState() {
     try {
@@ -4431,6 +4858,8 @@ function saveChatUiState() {
         }));
     } catch (error) {
         console.warn('Не удалось сохранить состояние чата:', error);
+    }
+}
 
 function restoreChatUiState() {
     try {
@@ -4452,8 +4881,11 @@ function restoreChatUiState() {
         const savedCurrent = String(state?.currentChat || 'global');
         if (savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')) {
             currentChat = savedCurrent;
-        } catch (error) {
+        }
+    } catch (error) {
         console.warn('Не удалось восстановить состояние чата:', error);
+    }
+}
 
 const chatRateLimitState = {
     lastSentAt: 0,
@@ -4462,13 +4894,16 @@ const chatRateLimitState = {
 
 function canBypassChatRateLimit() {
     return isStaffRole(getOwnStaffRole());
+}
 
 function getChatCooldownRemainingMs() {
     if (canBypassChatRateLimit()) return 0;
     return Math.max(0, chatRateLimitState.cooldownMs - (Date.now() - chatRateLimitState.lastSentAt));
+}
 
 function markChatMessageSentNow() {
     chatRateLimitState.lastSentAt = Date.now();
+}
 
 function getChatRoleCssClassByRole(role = "player") {
     const normalized = normalizeStaffRole(role);
@@ -4476,37 +4911,46 @@ function getChatRoleCssClassByRole(role = "player") {
     if (normalized === "adm") return "role-adm";
     if (normalized === "owr") return "role-owr";
     return "";
+}
 
 function getChatRoleCssClassByPublicId(publicId) {
     return getChatRoleCssClassByRole(getCachedStaffRole(publicId));
+}
 
 function getChatRoleBadgeHtmlByRole(role = "player") {
     const meta = getStaffRoleMeta(role);
     const roleClass = getChatRoleCssClassByRole(role);
     if (!meta.short) return "";
     return `<span class="chat-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
+}
 
 function getResolvedStaffRole(publicId, explicitRole = "") {
     const directRole = String(explicitRole || "").trim().toLowerCase();
     if (directRole) return directRole;
     return String(getCachedStaffRole(publicId) || "").trim().toLowerCase();
+}
 
 function getChatRoleBadgeHtmlByPublicId(publicId, explicitRole = "") {
     return getChatRoleBadgeHtmlByRole(getResolvedStaffRole(publicId, explicitRole));
+}
 
 function getChatRoleCssClassByPublicIdOrRole(publicId, explicitRole = "") {
     return getChatRoleCssClassByRole(getResolvedStaffRole(publicId, explicitRole));
+}
 
 function shouldHideStaffIdentityInScene(publicId, explicitRole = "") {
     const role = getResolvedStaffRole(publicId, explicitRole);
     const safeId = String(publicId || '').trim();
     return isStaffRole(role) && !safeId;
+}
 
 function shouldHideStaffIdentityInObserve(publicId, explicitRole = "") {
     return shouldHideStaffIdentityInScene(publicId, explicitRole);
+}
 
 function shouldShowSceneRoleBadgeInCurrentMode(publicId = "", explicitRole = "") {
     return gameState === 'OBSERVE' || shouldHideStaffIdentityInScene(publicId, explicitRole);
+}
 
 function getSceneRoleBadgeHtml(publicId, explicitRole = "") {
     const role = getResolvedStaffRole(publicId, explicitRole);
@@ -4514,6 +4958,7 @@ function getSceneRoleBadgeHtml(publicId, explicitRole = "") {
     const roleClass = getChatRoleCssClassByRole(role);
     if (!meta || !meta.short) return "";
     return `<span class="scene-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
+}
 
 function getForcedSceneRoleBadgeHtml(explicitRole = "") {
     const role = normalizeStaffRole(explicitRole);
@@ -4521,6 +4966,7 @@ function getForcedSceneRoleBadgeHtml(explicitRole = "") {
     const roleClass = getChatRoleCssClassByRole(role);
     if (!meta || !meta.short || role === "player") return "";
     return `<span class="scene-role-badge ${roleClass}">[${escapeChatHtml(meta.short)}]</span>`;
+}
 
 function applyPlayerIdentityRow(row = {}) {
     if (!row || typeof row !== "object") return;
@@ -4530,8 +4976,11 @@ function applyPlayerIdentityRow(row = {}) {
             setCachedStaffRole(String(row.public_id), player.staff_role);
         } else if (authState?.playerId) {
             setCachedStaffRole(String(authState.playerId), player.staff_role);
-        } else if (!player.staff_role) {
+        }
+    } else if (!player.staff_role) {
         player.staff_role = "player";
+    }
+}
 
 async function hydrateStaffRolesForMessages(messages = []) {
     if (!window.supabaseClient || !Array.isArray(messages) || !messages.length) return;
@@ -4556,11 +5005,14 @@ async function hydrateStaffRolesForMessages(messages = []) {
     if (error) {
         console.warn('Не удалось загрузить staff_role для чата:', error.message || error);
         return;
+    }
 
     (data || []).forEach(row => {
         if (row?.public_id) {
             setCachedStaffRole(String(row.public_id), row.staff_role || 'player');
-        });
+        }
+    });
+}
 
 function escapeChatHtml(text = "") {
     return String(text)
@@ -4569,20 +5021,24 @@ function escapeChatHtml(text = "") {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
 
 function canUsePrivateChat() {
     return !!(typeof authState !== "undefined" && authState?.mode === "account" && authState?.playerId);
+}
 
 function getOwnPublicChatId() {
     if (canUsePrivateChat()) {
         return String(authState.playerId);
-
+    }
     return null;
+}
 
 function getOwnChatLabel() {
     return typeof getDisplayPlayerTag === "function"
         ? getDisplayPlayerTag()
         : (player?.nickname || "Commander");
+}
 
 function getObserveStaffChatIdentity() {
     const role = getOwnStaffRole();
@@ -4594,6 +5050,7 @@ function getObserveStaffChatIdentity() {
         nickname: isObserveStaff ? (meta?.label || 'Staff') : getOwnChatLabel(),
         staffRole: role
     };
+}
 
 function getValidChatPlayerId(){
     const rawId = player?.id ?? null;
@@ -4602,6 +5059,7 @@ function getValidChatPlayerId(){
     const value = String(rawId).trim();
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(value) ? value : null;
+}
 
 function sanitizeOnlineRoomId(roomId) {
     if (roomId === null || typeof roomId === 'undefined') return null;
@@ -4609,17 +5067,19 @@ function sanitizeOnlineRoomId(roomId) {
     if (!value) return null;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(value) ? value : null;
+}
 
 function getPrivateScopeKey(peerId) {
     return `pm:${String(peerId)}`;
+}
 
 function parseChatScope(scopeName = currentChat) {
     if (scopeName === "clan") {
         return { key: "clan", channel: "clan", roomId: getClanChatRoomId() };
-
+    }
     if (scopeName === "battle") {
         return { key: "battle", channel: "battle" };
-
+    }
     if (scopeName && String(scopeName).startsWith("pm:")) {
         const peerId = String(scopeName).slice(3);
         return {
@@ -4627,8 +5087,9 @@ function parseChatScope(scopeName = currentChat) {
             channel: "pm",
             peerId
         };
-
+    }
     return { key: "global", channel: "global" };
+}
 
 function getChatCacheList(scope) {
     if (scope.channel === "clan") return chatCache.clan;
@@ -4637,8 +5098,9 @@ function getChatCacheList(scope) {
         const peerId = String(scope.peerId || "");
         if (!chatCache.pm[peerId]) chatCache.pm[peerId] = [];
         return chatCache.pm[peerId];
-
+    }
     return chatCache.global;
+}
 
 function getUnreadCount(scopeName) {
     const scope = parseChatScope(scopeName);
@@ -4646,6 +5108,7 @@ function getUnreadCount(scopeName) {
     if (scope.channel === "battle") return Number(chatUnread.battle || 0);
     if (scope.channel === "pm") return Number(chatUnread.pm[String(scope.peerId)] || 0);
     return Number(chatUnread.global || 0);
+}
 
 function setUnreadCount(scopeName, count = 0) {
     const safeCount = Math.max(0, Number(count) || 0);
@@ -4658,9 +5121,15 @@ function setUnreadCount(scopeName, count = 0) {
         chatUnread.pm[String(scope.peerId)] = safeCount;
     } else {
         chatUnread.global = safeCount;
+    }
+    
+}
 
 function incrementUnread(scopeName, amount = 1) {
     setUnreadCount(scopeName, getUnreadCount(scopeName) + Math.max(1, Number(amount) || 1));
+    
+}
+
 
 function getLastMessagePreview(scopeName) {
     const scope = parseChatScope(scopeName);
@@ -4670,18 +5139,21 @@ function getLastMessagePreview(scopeName) {
     const trimmed = String(last.message).replace(/\s+/g, ' ').trim();
     if (!trimmed) return "";
     return trimmed.length > 32 ? trimmed.slice(0, 32) + '…' : trimmed;
+}
 
 function setPrivateTabPreview(peerId, preview = "") {
     const key = String(peerId || "").trim();
     if (!key) return;
     if (!privateChatTabs[key]) {
         privateChatTabs[key] = { label: `ID ${key}`, updatedAt: Date.now(), pinned: false, preview: "" };
-
+    }
     privateChatTabs[key].preview = preview || "";
     saveChatUiState();
+}
 
 function isPmPeerOnline(peerId) {
     return onlinePmPeers.has(String(peerId || ""));
+}
 
 function syncPrivateTabFromScope(scopeName) {
     const scope = parseChatScope(scopeName);
@@ -4689,12 +5161,16 @@ function syncPrivateTabFromScope(scopeName) {
     setPrivateTabPreview(scope.peerId, getLastMessagePreview(scopeName));
     if (privateChatTabs[String(scope.peerId)]) {
         privateChatTabs[String(scope.peerId)].updatedAt = Date.now();
+    }
+}
+
 
 function markLocalHandledChatMessage(id) {
     const key = String(id || '').trim();
     if (!key) return;
     localHandledChatMessageIds.add(key);
     setTimeout(() => localHandledChatMessageIds.delete(key), 15000);
+}
 
 function wasLocalHandledChatMessage(id) {
     const key = String(id || '').trim();
@@ -4709,6 +5185,7 @@ try {
 } catch(e){}
 
 return true;
+}
 
 function pushChatToCache(scope, msg) {
     const list = getChatCacheList(scope);
@@ -4718,6 +5195,7 @@ function pushChatToCache(scope, msg) {
         const sourceSceneId = String(msg?.source_scene_id || '').trim();
         if (sourceSceneId && list.some(item => String(item?.source_scene_id || '') === sourceSceneId || String(item?.id || '') === sourceSceneId)) {
             return false;
+        }
 
         const msgText = String(msg?.message || '').trim();
         const msgRoom = String(msg?.room_id || '').trim();
@@ -4734,6 +5212,8 @@ function pushChatToCache(scope, msg) {
                 return itemText === msgText && itemRoom === msgRoom && itemAuthor === msgAuthor && Math.abs(itemTime - msgTime) < 2500;
             });
             if (nearDuplicate) return false;
+        }
+    }
 
     list.push(msg);
     list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -4746,10 +5226,12 @@ try {
 } catch(e){}
 
 return true;
+}
 
 function formatChatTime(dateStr) {
     const d = new Date(dateStr || Date.now());
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
     const author = escapeChatHtml(msg.player_nickname || "Unknown");
@@ -4790,6 +5272,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
         prefix = '<span class="chat-sep">⚔</span> ';
     } else if (scope.channel === "pm" && ownId && recipientId && ownId === recipientId) {
         prefix = '<span class="chat-sep">→</span> ';
+    }
 
     if (isGlobalStaffAnnouncement || isObserveHiddenStaff) {
         return `
@@ -4799,6 +5282,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
             <span class="chat-text">${text}</span>
           </div>
         `;
+    }
 
     const idHtml = publicId ? `<span class="chat-id">[${safePublicId}]</span>` : '';
     return `
@@ -4810,6 +5294,7 @@ function buildLobbyChatMessageHtml(msg, scope = parseChatScope(currentChat)) {
         <span class="chat-text">${text}</span>
       </div>
     `;
+}
 
 function buildBattleChatMessageHtml(msg) {
     const author = escapeChatHtml(msg.player_nickname || "Unknown");
@@ -4829,9 +5314,11 @@ function buildBattleChatMessageHtml(msg) {
 
     if (shouldHideStaffIdentityInObserve(publicId, msg.staff_role) || isGlobalStaffAnnouncement) {
         return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+    }
 
     const idHtml = publicId ? ` <span class="chat-id">[${safePublicId}]</span>` : '';
     return `<div class="${lineClass}" data-message-id="${msg.id}">${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml} <span class="chat-time">[${time}]</span> <span class="chat-text">${text}</span></div>`;
+}
 
 function addSystemLobbyChatMessage(text) {
     if (!chatMessages) return;
@@ -4841,8 +5328,9 @@ function addSystemLobbyChatMessage(text) {
     chatMessages.appendChild(row);
     while (chatMessages.children.length > CHAT_MESSAGE_LIMIT) {
         chatMessages.removeChild(chatMessages.firstChild);
-
+    }
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 
 function addSystemBattleChatMessage(text) {
     const battleLog = document.getElementById("battle-chat-log");
@@ -4852,6 +5340,7 @@ function addSystemBattleChatMessage(text) {
     row.textContent = text;
     battleLog.appendChild(row);
     battleLog.scrollTop = battleLog.scrollHeight;
+}
 
 function resetPrivateChatState() {
     Object.keys(privateChatTabs).forEach(key => delete privateChatTabs[key]);
@@ -4861,6 +5350,7 @@ function resetPrivateChatState() {
     inGamePmPeers.clear();
     currentChat = "global";
     saveChatUiState();
+}
 
 async function deletePmHistoryWithPeer(peerId) {
     if (!window.supabaseClient) return;
@@ -4876,6 +5366,8 @@ async function deletePmHistoryWithPeer(peerId) {
 
     if (error) {
         console.warn('Не удалось удалить историю PM:', error);
+    }
+}
 
 async function deleteAllOwnPmHistory() {
     if (!window.supabaseClient) return;
@@ -4890,17 +5382,21 @@ async function deleteAllOwnPmHistory() {
 
     if (error) {
         console.warn('Не удалось удалить всю историю PM:', error);
+    }
+}
 
 function setUnreadForScope(scopeName, state = true) {
     if (typeof state === 'number') {
         setUnreadCount(scopeName, state);
         return;
-
+    }
     if (state) incrementUnread(scopeName);
     else setUnreadCount(scopeName, 0);
+}
 
 function clearUnreadForCurrentScope() {
     setUnreadCount(currentChat, 0);
+}
 
 function ensurePmTab(peerId, label = null) {
     const key = String(peerId || "").trim();
@@ -4915,6 +5411,7 @@ function ensurePmTab(peerId, label = null) {
     };
     saveChatUiState();
     renderChatTabs();
+}
 
 function getPeerIdFromPmMessage(msg) {
     const ownId = getOwnPublicChatId();
@@ -4925,20 +5422,24 @@ function getPeerIdFromPmMessage(msg) {
     if (senderId === ownId) return recipientId;
     if (recipientId === ownId) return senderId;
     return null;
+}
 
 function getPeerLabelFromPmMessage(msg, peerId) {
     const ownId = getOwnPublicChatId();
     const senderId = msg?.player_public_id ? String(msg.player_public_id) : null;
     if (senderId && senderId !== ownId) {
         return msg.player_nickname || `ID ${peerId}`;
-
+    }
     return privateChatTabs[String(peerId)]?.label || `ID ${peerId}`;
+}
+
 
 function formatBattleHistoryDateTime(dateStr) {
     const d = new Date(dateStr || Date.now());
     const date = d.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "numeric" });
     const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     return `${date} ${time}`;
+}
 
 function buildBattleHistoryMessageHtml(msg) {
     const author = escapeChatHtml(msg.player_nickname || "Unknown");
@@ -4959,6 +5460,7 @@ function buildBattleHistoryMessageHtml(msg) {
         <span class="chat-text">${text}</span>
       </div>
     `;
+}
 
 function ensureBattleHistorySearchUi() {
     const panel = document.getElementById('chat-panel');
@@ -5009,6 +5511,7 @@ function ensureBattleHistorySearchUi() {
                 battleHistorySearchState.keywordQuery = String(e.target?.value || '').trim();
                 renderBattleHistorySearchUi();
             });
+        }
 
         wrap.querySelector('#battle-history-search-btn')?.addEventListener('click', () => {
             runBattleHistorySearch();
@@ -5017,9 +5520,11 @@ function ensureBattleHistorySearchUi() {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 runBattleHistorySearch();
-            });
-
+            }
+        });
+    }
     return wrap;
+}
 
 function closeBattleHistorySearchModal() {
     battleHistorySearchState.messages = [];
@@ -5029,6 +5534,7 @@ function closeBattleHistorySearchModal() {
     battleHistorySearchState.dateQuery = '';
     battleHistorySearchState.keywordQuery = '';
     renderBattleHistorySearchUi();
+}
 
 function normalizeBattleHistoryDateStrings(createdAt) {
     if (!createdAt) return [];
@@ -5042,6 +5548,7 @@ function normalizeBattleHistoryDateStrings(createdAt) {
         `${yyyy}-${mm}-${dd}`,
         `${dd}/${mm}/${yyyy}`
     ];
+}
 
 function getFilteredBattleHistoryMessages() {
     const dateQuery = String(battleHistorySearchState.dateQuery || '').trim().toLowerCase();
@@ -5053,6 +5560,7 @@ function getFilteredBattleHistoryMessages() {
         const matchesDate = !dateQuery || dateStrings.some(v => v.includes(dateQuery));
         return matchesKeyword && matchesDate;
     });
+}
 
 function renderBattleHistorySearchUi() {
     const wrap = ensureBattleHistorySearchUi();
@@ -5072,12 +5580,13 @@ function renderBattleHistorySearchUi() {
 
     if (document.activeElement !== input) {
         input.value = battleHistorySearchState.playerId || '';
-
+    }
     if (document.activeElement !== dateFilterInput) {
         dateFilterInput.value = battleHistorySearchState.dateQuery || '';
-
+    }
     if (document.activeElement !== keywordFilterInput) {
         keywordFilterInput.value = battleHistorySearchState.keywordQuery || '';
+    }
 
     searchBtn.disabled = !!battleHistorySearchState.loading;
     searchBtn.textContent = battleHistorySearchState.loading ? '…' : '🔎';
@@ -5089,6 +5598,7 @@ function renderBattleHistorySearchUi() {
     if (!hasVisiblePanel || !shouldShowToolbar) {
         results.innerHTML = '';
         return;
+    }
 
     const safePlayerId = escapeChatHtml(battleHistorySearchState.playerId || '');
     const safeLabel = escapeChatHtml(battleHistorySearchState.playerLabel || '');
@@ -5097,18 +5607,22 @@ function renderBattleHistorySearchUi() {
     if (battleHistorySearchState.loading) {
         results.innerHTML = '<div class="chat-line system">Загрузка истории battle...</div>';
         return;
+    }
 
     if (battleHistorySearchState.error) {
         results.innerHTML = `<div class="chat-line system">${escapeChatHtml(battleHistorySearchState.error)}</div>`;
         return;
+    }
 
     if (!battleHistorySearchState.messages.length) {
         results.innerHTML = '<div class="chat-line system">Сообщения battle для этого ID не найдены.</div>';
         return;
+    }
 
     if (!filteredMessages.length) {
         results.innerHTML = '<div class="chat-line system">По выбранным фильтрам ничего не найдено.</div>';
         return;
+    }
 
     const previousTop = results.scrollTop;
     const shouldStickToBottom = (results.scrollHeight - results.scrollTop - results.clientHeight) <= 28;
@@ -5120,6 +5634,8 @@ function renderBattleHistorySearchUi() {
         results.scrollTop = results.scrollHeight;
     } else {
         results.scrollTop = previousTop;
+    }
+}
 
 async function runBattleHistorySearch(forcedPlayerId = null) {
     if (!window.supabaseClient) {
@@ -5127,6 +5643,7 @@ async function runBattleHistorySearch(forcedPlayerId = null) {
         battleHistorySearchState.messages = [];
         renderBattleHistorySearchUi();
         return;
+    }
 
     const input = document.getElementById('battle-history-player-id');
     const safePlayerId = String(forcedPlayerId ?? input?.value ?? battleHistorySearchState.playerId ?? '').trim();
@@ -5137,6 +5654,7 @@ async function runBattleHistorySearch(forcedPlayerId = null) {
         battleHistorySearchState.playerLabel = '';
         renderBattleHistorySearchUi();
         return;
+    }
 
     battleHistorySearchState.playerId = safePlayerId;
     battleHistorySearchState.loading = true;
@@ -5161,6 +5679,7 @@ async function runBattleHistorySearch(forcedPlayerId = null) {
         battleHistorySearchState.messages = [];
         renderBattleHistorySearchUi();
         return;
+    }
 
     const messages = (data || []).slice().reverse();
     await hydrateStaffRolesForMessages(messages);
@@ -5173,8 +5692,9 @@ async function runBattleHistorySearch(forcedPlayerId = null) {
         battleHistorySearchState.playerLabel = nick ? `${nick} [${safePlayerId}]` : `ID ${safePlayerId}`;
     } else {
         battleHistorySearchState.playerLabel = `ID ${safePlayerId}`;
-
+    }
     renderBattleHistorySearchUi();
+}
 
 function renderChatTabs() {
     if (!chatTabsWrap) return;
@@ -5289,6 +5809,7 @@ function renderChatTabs() {
                 currentChat = "global";
                 await loadChatHistory("global");
                 renderLobbyMessages();
+            }
 
             renderChatTabs();
         });
@@ -5296,6 +5817,7 @@ function renderChatTabs() {
 
     saveChatUiState();
     renderBattleHistorySearchUi();
+}
 
 function renderLobbyMessages() {
     if (!chatMessages) return;
@@ -5304,11 +5826,12 @@ function renderLobbyMessages() {
         chatMessages.innerHTML = '<div class="chat-line system">👥 Клановый чат готов, но для него нужен clan_id игрока/клана из базы.</div>';
         chatMessages.scrollTop = chatMessages.scrollHeight;
         return;
-
+    }
     const list = getChatCacheList(scope);
     chatMessages.innerHTML = list.map(msg => buildLobbyChatMessageHtml(msg, scope)).join("");
     chatMessages.scrollTop = chatMessages.scrollHeight;
     renderBattleHistorySearchUi();
+}
 
 function updateLobbyChatComposerVisibility() {
     const chatInputAreaEl = document.getElementById("chat-input-area");
@@ -5323,10 +5846,12 @@ function updateLobbyChatComposerVisibility() {
         if (chatInputEl) {
             chatInputEl.value = "";
             chatInputEl.blur();
-
+        }
         if (chatSendEl) {
             chatSendEl.blur();
-
+        }
+    }
+}
 
 if (chatMessages && !chatMessages.dataset.playerActionsBound) {
     chatMessages.dataset.playerActionsBound = '1';
@@ -5340,9 +5865,10 @@ if (chatMessages && !chatMessages.dataset.playerActionsBound) {
         if (!targetId) {
             await openPlayerProfile('', nickname);
             return;
-
+        }
         showPlayerActionMenu(nickBtn, targetId, nickname);
     });
+}
 
 function renderBattleMessages() {
     const battleLog = document.getElementById("battle-chat-log");
@@ -5365,6 +5891,8 @@ function renderBattleMessages() {
         battleLog.scrollTop = battleLog.scrollHeight;
     } else {
         battleLog.scrollTop = prevScrollTop;
+    }
+}
 
 function showBattleAnnouncementInActiveScene(msg) {
     if (!msg) return;
@@ -5397,12 +5925,14 @@ function showBattleAnnouncementInActiveScene(msg) {
 
     while (feed.children.length > 8) {
         feed.removeChild(feed.lastChild);
+    }
 
     setTimeout(() => {
         item.remove();
     }, 9000);
 
     renderBattleMessages?.();
+}
 
 function showSceneMapMessageInActiveScene(msg) {
     if (!msg) return;
@@ -5437,14 +5967,16 @@ function showSceneMapMessageInActiveScene(msg) {
     } else {
         const idHtml = publicId ? ` <span class="chat-id">(${safePublicId})</span>` : '';
         item.innerHTML = `${roleBadge}<span class="chat-nick-static">${author}</span>${idHtml}<span class="chat-sep">:</span> <span class="chat-text">${text}</span>`;
+    }
 
     feed.prepend(item);
     while (feed.children.length > 8) {
         feed.removeChild(feed.lastChild);
-
+    }
     setTimeout(() => {
         item.remove();
     }, 9000);
+}
 
 async function loadChatHistory(scopeName = currentChat) {
     if (!window.supabaseClient) return;
@@ -5464,8 +5996,9 @@ async function loadChatHistory(scopeName = currentChat) {
             list.length = 0;
             if (currentChat === scopeName) renderLobbyMessages();
             return;
-
+        }
         query = query.eq('room_id', scope.roomId);
+    }
 
     if (scope.channel === "battle") {
         const battleRoomId = String(getBattleChatRoomId() || '').trim();
@@ -5475,16 +6008,18 @@ async function loadChatHistory(scopeName = currentChat) {
         ];
         if (battleRoomId) {
             battleRoomFilters.push(`room_id.eq.${battleRoomId}`);
-
+        }
         query = query.or(battleRoomFilters.join(','));
+    }
 
     if (scope.channel === "pm") {
         const ownId = getOwnPublicChatId();
         if (!ownId || !scope.peerId) {
             if (currentChat === scopeName) renderLobbyMessages();
             return;
-
+        }
         query = query.or(`and(player_public_id.eq.${ownId},recipient_public_id.eq.${scope.peerId}),and(player_public_id.eq.${scope.peerId},recipient_public_id.eq.${ownId})`);
+    }
 
     const { data, error } = await query;
 
@@ -5493,6 +6028,7 @@ async function loadChatHistory(scopeName = currentChat) {
         if (scope.channel === "battle") addSystemBattleChatMessage("Ошибка загрузки боевого чата");
         else addSystemLobbyChatMessage("Ошибка загрузки чата");
         return;
+    }
 
     await hydrateStaffRolesForMessages(data || []);
 
@@ -5507,12 +6043,17 @@ async function loadChatHistory(scopeName = currentChat) {
             ensurePmTab(peerId, getPeerLabelFromPmMessage(sample, peerId));
             setPrivateTabPreview(peerId, getLastMessagePreview(scopeName));
             deletePmHistoryWithPeer(peerId);
+        }
+    }
 
     if (scopeName === currentChat) clearUnreadForCurrentScope();
 
     if (currentChat === scopeName) renderLobbyMessages();
     if (scope.channel === "battle" && (gameState === "BATTLE" || gameState === "OBSERVE" || currentChat === "battle")) {
         renderBattleMessages();
+    }
+}
+
 
 async function refreshBattleFeedFromDb() {
     if (!window.supabaseClient) return;
@@ -5524,6 +6065,7 @@ async function refreshBattleFeedFromDb() {
     ];
     if (roomId) {
         battleRoomFilters.push(`room_id.eq.${roomId}`);
+    }
 
     const { data, error } = await window.supabaseClient
         .from("chat_messages")
@@ -5536,6 +6078,7 @@ async function refreshBattleFeedFromDb() {
     if (error) {
         console.error('❌ Ошибка обновления battle потока:', error);
         return;
+    }
 
     await hydrateStaffRolesForMessages(data || []);
 
@@ -5544,7 +6087,8 @@ async function refreshBattleFeedFromDb() {
     (data || []).forEach(msg => {
         if (!roomList.some(item => String(item?.id || '') === String(msg?.id || ''))) {
             roomList.push(msg);
-        });
+        }
+    });
     roomList.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
     chatCache.battle.length = 0;
@@ -5553,6 +6097,7 @@ async function refreshBattleFeedFromDb() {
     renderBattleMessages();
     if (currentChat === 'battle') renderLobbyMessages();
     renderChatTabs();
+}
 
 async function handleIncomingRealtimeMessage(msg) {
     if (!msg || !msg.channel) return;
@@ -5565,9 +6110,11 @@ async function handleIncomingRealtimeMessage(msg) {
         if (currentChat === "global") renderLobbyMessages();
         renderChatTabs();
         return;
+    }
 
     if (msg.player_public_id && msg.staff_role) {
         setCachedStaffRole(String(msg.player_public_id), String(msg.staff_role).toLowerCase());
+    }
 
     if (msg.channel === "clan") {
         const activeClanRoomId = getClanChatRoomId();
@@ -5578,6 +6125,7 @@ async function handleIncomingRealtimeMessage(msg) {
         if (currentChat === 'clan') renderLobbyMessages();
         renderChatTabs();
         return;
+    }
 
     if (msg.channel === "battle") {
         const activeBattleRoomId = String(getBattleChatRoomId() || '').trim();
@@ -5587,16 +6135,17 @@ async function handleIncomingRealtimeMessage(msg) {
         const isActiveRoomBattleMessage = !!activeBattleRoomId && incomingRoomId === activeBattleRoomId;
         if (!isGlobalBattleArchiveMessage && !isGlobalBattleAnnouncement && !isActiveRoomBattleMessage) {
             return;
-
+        }
         const scope = { key: 'battle', channel: 'battle' };
         if (!pushChatToCache(scope, msg)) {
             return;
-
+        }
         if (currentChat !== "battle") incrementUnread("battle");
         renderBattleMessages();
         if (currentChat === 'battle') renderLobbyMessages();
         renderChatTabs();
         return;
+    }
 
     if (msg.channel === "scene") {
         const activeSceneRoomId = String(getSceneChatRoomId() || '').trim();
@@ -5605,8 +6154,10 @@ async function handleIncomingRealtimeMessage(msg) {
 
         if (!wasLocalHandledChatMessage(msg.id)) {
             showSceneMapMessageInActiveScene(msg);
+        }
 
         return;
+    }
 
     if (msg.channel === "pm") {
         const ownId = getOwnPublicChatId();
@@ -5623,6 +6174,8 @@ async function handleIncomingRealtimeMessage(msg) {
 
         if (currentChat === scope.key) renderLobbyMessages();
         renderChatTabs();
+    }
+}
 
 function startRealtimeChat() {
     if (!window.supabaseClient) return;
@@ -5635,23 +6188,26 @@ function startRealtimeChat() {
             { event: "INSERT", schema: "public", table: "chat_messages" },
             async (payload) => {
                 await handleIncomingRealtimeMessage(payload.new);
-
+            }
         )
         .subscribe((status) => {
         });
+}
 
 async function sendMessage(forcedScopeName = null, explicitText = null) {
     if (!window.supabaseClient) {
         addSystemLobbyChatMessage("Supabase ещё не готов для чата.");
         return false;
+    }
 
     if (window.playerMuted || player.isMuted) {
         if ((forcedScopeName || currentChat) === "battle") {
             addSystemBattleChatMessage("🔇 Мут активен. Сообщение не отправлено.");
         } else {
             addSystemLobbyChatMessage("🔇 Мут активен. Вы не можете писать в чат.");
-
+        }
         return false;
+    }
 
     const text = (typeof explicitText === "string" ? explicitText : (chatInput?.value || "")).trim();
     if (!text) return false;
@@ -5663,6 +6219,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         if (forcedScopeName === "battle" || currentChat === "battle") addSystemBattleChatMessage(spamText);
         else addSystemLobbyChatMessage(spamText);
         return false;
+    }
 
     const scopeName = forcedScopeName || currentChat;
     const scope = parseChatScope(scopeName);
@@ -5671,19 +6228,23 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     if (scope.channel === "pm" && !canUsePrivateChat()) {
         addSystemLobbyChatMessage("⚠ ЛС доступны только для аккаунтов, не для гостя.");
         return false;
+    }
 
     if (scope.channel === "clan" && !canUseClanChat()) {
         addSystemLobbyChatMessage('⚠ Клановый чат пока недоступен: у игрока нет clan_id.');
         return false;
+    }
 
     if (scope.channel === "battle") {
         if (battleObserverMode && !canWriteInObserverChat()) {
             return false;
-
+        }
         if (!battleObserverMode && !canWriteBattleAnnouncementChat()) {
             addSystemLobbyChatMessage("⚠ У вас нет прав писать в Battle чат.");
             updateLobbyChatComposerVisibility?.();
             return false;
+        }
+    }
 
     const payload = {
         channel: scope.channel,
@@ -5700,10 +6261,13 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     };
     if (scope.channel === 'battle' && canWriteBattleAnnouncementChat() && !battleObserverMode) {
         payload.room_id = '__all__';
+    }
 
     if (scope.channel === 'battle' && !payload.room_id) {
         addSystemBattleChatMessage("⚠ Не найден battle room_id для отправки сообщения.");
         return false;
+    }
+
 
     console.log('📤 SEND MESSAGE:', {
         scopeName,
@@ -5723,10 +6287,12 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
     if (scope.channel === 'clan' && !payload.room_id) {
         addSystemLobbyChatMessage('⚠ Не найден room_id клана для отправки сообщения.');
         return false;
+    }
 
     if (scope.channel === "pm" && !payload.recipient_public_id) {
         addSystemLobbyChatMessage("⚠ Не выбран получатель для личного сообщения.");
         return false;
+    }
 
     const payloadsToInsert = [payload];
 
@@ -5741,6 +6307,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
             staff_role: getOwnStaffRole(),
             message: text
         });
+    }
 
     const { data, error } = await window.supabaseClient
         .from("chat_messages")
@@ -5752,6 +6319,7 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         if (scope.channel === "battle") addSystemBattleChatMessage("Ошибка отправки сообщения");
         else addSystemLobbyChatMessage("Ошибка отправки сообщения");
         return false;
+    }
 
     const insertedRows = Array.isArray(data) ? data : [];
     const insertedBattle = insertedRows.find(row => row?.channel === "battle");
@@ -5759,9 +6327,10 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
 
     if (insertedBattle) {
         markLocalHandledChatMessage(insertedBattle.id);
-
+    }
     if (insertedScene) {
         markLocalHandledChatMessage(insertedScene.id);
+    }
 
     markChatMessageSentNow();
 
@@ -5779,29 +6348,36 @@ async function sendMessage(forcedScopeName = null, explicitText = null) {
         pushChatToCache(scope, battleMessage);
         if (currentChat === "battle") {
             renderLobbyMessages();
-
+        }
         renderBattleMessages?.();
+    }
 
     if (insertedScene) {
         showSceneMapMessageInActiveScene(insertedScene);
+    }
 
     if (scope.channel === "battle") {
         try {
             await loadChatHistory("battle");
             if (currentChat === "battle") {
                 renderLobbyMessages();
-
+            }
             renderBattleMessages?.();
         } catch (e) {
             console.warn("⚠ Не удалось сразу обновить battle-чат:", e);
+        }
+    }
 
     if (scope.channel === "global" || scope.channel === "pm" || scope.channel === "clan") {
         try {
             await loadChatHistory(scope.key);
             if (currentChat === scope.key) {
                 renderLobbyMessages();
-            } catch (e) {
+            }
+        } catch (e) {
             console.warn("⚠ Не удалось сразу обновить лобби-чат:", e);
+        }
+    }
 
     if (!forcedScopeName && chatInput) chatInput.value = "";
     
@@ -5812,16 +6388,19 @@ try {
 } catch(e){}
 
 return true;
+}
 
 function openPrivateChat(peerId, label = null) {
     if (!canUsePrivateChat()) {
         addSystemLobbyChatMessage("⚠ ЛС доступны только после входа в аккаунт.");
         return;
+    }
 
     const safePeerId = String(peerId || "").trim();
     if (!safePeerId || !/^\d+$/.test(safePeerId)) {
         addSystemLobbyChatMessage("⚠ Для гостя ЛС недоступны.");
         return;
+    }
 
     const ownId = getOwnPublicChatId();
     if (ownId && ownId === safePeerId) return;
@@ -5837,9 +6416,11 @@ function openPrivateChat(peerId, label = null) {
         renderLobbyMessages();
         renderChatTabs();
     });
+}
 
 if(chatSend){
     chatSend.addEventListener("click", () => sendMessage());
+}
 
 if(chatInput){
     chatInput.addEventListener("focus", () => {
@@ -5855,11 +6436,14 @@ if(chatInput){
         if(e.key === "Enter"){
             e.preventDefault();
             sendMessage();
-        });
+        }
+    });
+}
 
 async function handleChatStateChange() {
     if (!canUsePrivateChat()) {
         resetPrivateChatState();
+    }
 
     if (gameState === "BATTLE") {
         currentChat = "battle";
@@ -5869,6 +6453,7 @@ async function handleChatStateChange() {
         await loadChatHistory("battle");
         renderBattleMessages();
         return;
+    }
 
     if (gameState === "OBSERVE") {
         if (currentChat === "battle") clearUnreadForCurrentScope();
@@ -5877,6 +6462,7 @@ async function handleChatStateChange() {
         await loadChatHistory("battle");
         renderBattleMessages();
         return;
+    }
 
     if (currentChat === "battle") currentChat = "global";
     if (currentChat === 'clan' && !canUseClanChat()) currentChat = 'global';
@@ -5885,10 +6471,12 @@ async function handleChatStateChange() {
     updateLobbyChatComposerVisibility();
     await loadChatHistory(currentChat);
     renderLobbyMessages();
+}
 
 async function initRealtimeChat() {
     if (!canUsePrivateChat()) {
         resetPrivateChatState();
+    }
 
     await deleteAllOwnPmHistory();
     resetPrivateChatState();
@@ -5903,6 +6491,7 @@ async function initRealtimeChat() {
     if (canUseClanChat()) await loadChatHistory("clan");
     if (currentChat !== 'battle') renderLobbyMessages();
     saveChatUiState();
+}
 
 window.openPrivateChat = openPrivateChat;
 
@@ -5913,7 +6502,7 @@ window.testChatNotify = function(scope = 'global'){
         incrementUnread(scope);
     }else{
         incrementUnread('global');
-
+    }
     renderChatTabs();
 };
 
@@ -5946,8 +6535,15 @@ function receiveMessage(chatType, author, text){
             tabs[0].classList.add("notify");
         } else {
             tabs[1].classList.add("notify");
-        } else {
+        }
+
+    } else {
         renderMessages();
+    }
+}
+
+
+
 
 // ===== EMOJI CLICK SYSTEM =====
 
@@ -5979,6 +6575,7 @@ function updateHangarUI() {
   if(player.ships.length === 0){
     hangarList.innerHTML = "<p>У вас нет кораблей</p>";
     return;
+  }
 
   player.ships.forEach(ship => {
     const div = document.createElement("div");
@@ -5992,20 +6589,23 @@ function updateHangarUI() {
     `;
     hangarList.appendChild(div);
   });
+}
 
 if(hangarBtn && hangarWindow){
   hangarBtn.addEventListener("click", () => {
     updateHangarUI();
     hangarWindow.classList.remove("hidden");
     hangarWindow.style.cssText = "position:fixed;inset:0;top:0;left:0;width:100vw;height:100vh;display:flex;justify-content:center;align-items:center;z-index:21000;background:rgba(0,0,0,0.82);";
-    requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){});
+    requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){} });
   });
+}
 
 if(closeHangar && hangarWindow){
   closeHangar.addEventListener("click", () => {
     hangarWindow.classList.add("hidden");
     hangarWindow.style.display='none';
   });
+}
 
 const profileBtn = document.getElementById("profile-tab");
 const profileWindow = document.getElementById("profile-window");
@@ -6021,17 +6621,21 @@ function updateProfileUI() {
     <p>Кредиты: ${player.credits}</p>
     <p>Кораблей: ${player.ships.length}</p>
   `;
+}
 
 if(profileBtn && profileWindow){
   profileBtn.addEventListener("click", () => {
     updateProfileUI();
     profileWindow.classList.remove("hidden");
   });
+}
 
 if(closeProfile && profileWindow){
   closeProfile.addEventListener("click", () => {
     profileWindow.classList.add("hidden");
   });
+}
+
 });
 
 
@@ -6073,12 +6677,14 @@ function initMapDropdown() {
 
         mapDropdown.appendChild(option);
     });
+}
 
 // открытие списка
 if (mapSelected) {
     mapSelected.addEventListener("click", () => {
         mapDropdown.classList.toggle("hidden");
     });
+}
 
 initMapDropdown();
 initCreateMatchLevels();
@@ -6086,6 +6692,9 @@ if(!selectedMap && MAPS.length){
     selectedMap = MAPS[0];
     if(mapPreview) mapPreview.src = selectedMap.img;
     if(mapSelectedName) mapSelectedName.textContent = selectedMap.name;
+}
+
+
 
 // ================= ROOM SYSTEM (FAKE SERVER) =================
 
@@ -6115,6 +6724,8 @@ function createRoom(mapName, password = null, title = null) {
 
 
     return roomId;
+}
+
 
 // ================= CREATE ROOM BUTTON =================
 
@@ -6127,6 +6738,7 @@ if (false && confirmCreateBtn) {
         if (!selectedMap) {
             alert("Выберите карту!");
             return;
+        }
 
         const roomTitleInput = document.getElementById('room-title');
         const roomTitle = roomTitleInput?.value?.trim() || `${selectedMap.name} Room`;
@@ -6139,7 +6751,7 @@ if (false && confirmCreateBtn) {
         // Закрываем окно
         if (createWindow) {
             createWindow.classList.add("hidden");
-
+        }
         const roomTitleInputEl = document.getElementById('room-title');
         if(roomTitleInputEl) roomTitleInputEl.value = '';
         addCreatedRoomToLobby(currentRoom);
@@ -6153,6 +6765,10 @@ if (false && confirmCreateBtn) {
 
     });
 
+}
+
+
+
 /* JOIN MAP BUTTON */
 
 const joinButton = document.getElementById("join-map-btn");
@@ -6164,6 +6780,8 @@ if (false && joinButton) {
         if (!selectedMap) {
             alert("Сначала выберите карту");
             return;
+        }
+
 
         loadPlanet(selectedMap);
 
@@ -6172,38 +6790,56 @@ if (false && joinButton) {
 
     };
 
+}
+
+
+
+
 /* LOAD PLANET BY MAP */
 
 function loadPlanet(map){
 
     if(map === "Mercury"){
         createPlanet(0xaaaaaa,2);
+    }
 
     if(map === "Venus"){
         createPlanet(0xffcc88,2.2);
+    }
 
     if(map === "Earth"){
         createPlanet(0x3399ff,2.3);
+    }
 
     if(map === "Mars"){
         createPlanet(0xff5533,2.1);
+    }
 
     if(map === "Jupiter"){
         createPlanet(0xffaa88,3.5);
+    }
 
     if(map === "Saturn"){
         createPlanet(0xffddaa,3);
+    }
 
     if(map === "Uranus"){
         createPlanet(0x66ffff,2.8);
+    }
 
     if(map === "Neptune"){
         createPlanet(0x3366ff,2.8);
+    }
+
+}
+
+
 
 // ================= ENTER MAP =================
 
 function enterMap(mapName) {
     enterBattleMap(mapName);
+}
 
 function normalizeBattleMapName(mapName){
     const raw = String(mapName || '').trim().toLowerCase();
@@ -6230,6 +6866,7 @@ function normalizeBattleMapName(mapName){
         'neptune':'neptune','нептун':'neptune'
     };
     return mapNames[raw] || 'earth';
+}
 
 function getBattlePlanetConfig(mapKey){
     const configs = {
@@ -6241,8 +6878,10 @@ function getBattlePlanetConfig(mapKey){
         jupiter:{ color:0xcda27f, size:96, light:0xfff0db },
         saturn:{ color:0xd9c08a, size:88, light:0xffefcc },
         uranus:{ color:0x86d8dd, size:74, light:0xe1ffff },
-        neptune:{ color:0x4469ff, size:74, light:0xdce6ff };
+        neptune:{ color:0x4469ff, size:74, light:0xdce6ff }
+    };
     return configs[mapKey] || configs.earth;
+}
 
 function enterBattleMap(mapName){
   // FIX: reset orbit leftovers
@@ -6250,10 +6889,11 @@ function enterBattleMap(mapName){
     if (window.selectedPlanet) {
       if (window.selectedPlanet.mesh && window.selectedPlanet.mesh.parent) {
         window.selectedPlanet.mesh.parent.remove(window.selectedPlanet.mesh);
-
+      }
       if (window.selectedPlanet.resourceLabel && window.selectedPlanet.resourceLabel.parent) {
         window.selectedPlanet.resourceLabel.parent.remove(window.selectedPlanet.resourceLabel);
-
+      }
+    }
     window.selectedPlanet = null;
   } catch(e){}
 
@@ -6266,6 +6906,7 @@ function enterBattleMap(mapName){
 
     if(solarSystem && scene.children.includes(solarSystem)){
         scene.remove(solarSystem);
+    }
 
     const config = getBattlePlanetConfig(mapKey);
 
@@ -6297,6 +6938,7 @@ function enterBattleMap(mapName){
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = Math.PI / 2.45;
         battleMapPlanet.add(ring);
+    }
 
     spawnPointA = new THREE.Vector3(-150, -10, 120);
     spawnPointB = new THREE.Vector3(150, 12, -140);
@@ -6306,6 +6948,7 @@ function enterBattleMap(mapName){
 
     createBattleObstacles(mapKey);
     updateBattleScoreboard();
+}
 
 var remoteBattleShips = new Map();
 var liveBattleSyncTimer = null;
@@ -6353,31 +6996,33 @@ function getBattleScoreSnapshot(playerId){
         kills: Math.max(0, Number(current.kills || 0) || 0),
         deaths: Math.max(0, Number(current.deaths || 0) || 0)
     };
+}
 
 function clearRemoteBattleShips(){
     if(!(remoteBattleShips instanceof Map)){
         remoteBattleShips = new Map();
         return;
-
+    }
     remoteBattleShips.forEach(entry => {
         if(entry?.mesh) scene.remove(entry.mesh);
         if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
     });
     remoteBattleShips.clear();
+}
 
 function stopLiveBattleSync(){
     if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
         clearInterval(liveBattleSyncTimer);
         liveBattleSyncTimer = null;
-
+    }
     if(typeof liveBattlePresencePushTimer !== 'undefined' && liveBattlePresencePushTimer){
         clearInterval(liveBattlePresencePushTimer);
         liveBattlePresencePushTimer = null;
-
+    }
     if(typeof battleHitPollTimer !== 'undefined' && battleHitPollTimer){
         clearInterval(battleHitPollTimer);
         battleHitPollTimer = null;
-
+    }
     battleHitCursorId = 0;
     battleHitSessionStartedAt = 0;
     roomPlayerStateUpsertInFlight = false;
@@ -6397,9 +7042,11 @@ function stopLiveBattleSync(){
     battleScoreState = new Map();
     if(liveBattlePresenceChannel && window.supabaseClient){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+    }
     liveBattlePresenceChannel = null;
     liveBattlePresenceChannelName = '';
     clearRemoteBattleShips();
+}
 
 function createRemotePilotLabel(name, team = 'blue'){
     const canvas = document.createElement('canvas');
@@ -6436,6 +7083,7 @@ function createRemotePilotLabel(name, team = 'blue'){
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
     return sprite;
+}
 
 function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     const shipGroup = new THREE.Group();
@@ -6481,12 +7129,14 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         deaths: 0,
         team
     };
+}
 
 function getLiveBattleChannelName(){
     const rawRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
     const roomId = sanitizeOnlineRoomId(rawRoomId);
     if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return '';
     return `cosmic-battle-room:${roomId}`;
+}
 
 function upsertRemoteBattlePresence(payload = {}){
     const entryId = String(payload.playerId || payload.player_id || payload.id || '').trim();
@@ -6502,6 +7152,7 @@ function upsertRemoteBattlePresence(payload = {}){
     if(!entry){
         entry = createRemoteBattleShipMesh(nickname, remoteBattleShips.size, team);
         remoteBattleShips.set(entryId, entry);
+    }
 
     entry.playerId = entryId;
     const scoreSnapshot = getBattleScoreSnapshot(entryId);
@@ -6516,6 +7167,7 @@ function upsertRemoteBattlePresence(payload = {}){
     if(entry.mesh?.userData){
         entry.mesh.userData.pilotName = nickname;
         entry.mesh.userData.team = team;
+    }
 
     tryApplyRemoteShipTeamVisual(entry);
 
@@ -6524,6 +7176,7 @@ function upsertRemoteBattlePresence(payload = {}){
     const z = Number(payload.z);
     if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
         entry.targetPosition.set(x, y, z);
+    }
 
     const qx = Number(payload.qx);
     const qy = Number(payload.qy);
@@ -6531,14 +7184,17 @@ function upsertRemoteBattlePresence(payload = {}){
     const qw = Number(payload.qw);
     if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
         entry.targetQuaternion.set(qx, qy, qz, qw);
+    }
 
     updateBattleScoreboard?.();
+}
 
 function getBattleSelfIdentity(){
     return {
         playerId: String(authState?.playerId || player?.id || '').trim(),
         nickname: String(player?.nickname || 'Commander').trim() || 'Commander'
     };
+}
 
 function resolveBattlePlayerNameById(playerId, fallback = 'Pilot'){
     const safeId = String(playerId || '').trim();
@@ -6546,6 +7202,7 @@ function resolveBattlePlayerNameById(playerId, fallback = 'Pilot'){
 
     if(safeId === String(authState?.playerId || player?.id || '').trim()){
         return String(player?.nickname || fallback || 'Pilot').trim() || 'Pilot';
+    }
 
     const remote = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
     const remoteName = String(remote?.nickname || remote?.mesh?.userData?.pilotName || '').trim();
@@ -6557,8 +7214,11 @@ function resolveBattlePlayerNameById(playerId, fallback = 'Pilot'){
         if(rowId && rowId === safeId){
             const rowName = String(row?.nickname || row?.name || '').trim();
             if(rowName) return rowName;
+        }
+    }
 
     return String(fallback || 'Pilot').trim() || 'Pilot';
+}
 
 function applyBattleScoreDelta(playerId, changes = {}){
     const safeId = String(playerId || '').trim();
@@ -6577,11 +7237,13 @@ function applyBattleScoreDelta(playerId, changes = {}){
     if(isSelf){
         battleStats.playerKills = nextKills;
         battleStats.playerDeaths = nextDeaths;
+    }
 
     const remoteEntry = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
     if(remoteEntry){
         remoteEntry.kills = nextKills;
         remoteEntry.deaths = nextDeaths;
+    }
 
     const lists = [];
     if(Array.isArray(currentRoom?.currentPlayers)) lists.push(currentRoom.currentPlayers);
@@ -6595,6 +7257,8 @@ function applyBattleScoreDelta(playerId, changes = {}){
         if(!row) continue;
         row.kills = nextKills;
         row.deaths = nextDeaths;
+    }
+}
 
 function awardBattleKillRewards(victimName = ''){
     const now = Date.now();
@@ -6602,7 +7266,7 @@ function awardBattleKillRewards(victimName = ''){
         battleKillCombo = Math.min(10, Math.max(1, Number(battleKillCombo || 0) + 1));
     }else{
         battleKillCombo = 1;
-
+    }
     battleLastKillAt = now;
 
     const rewardValue = Math.max(1, Math.min(10, Number(battleKillCombo || 1) || 1));
@@ -6611,20 +7275,24 @@ function awardBattleKillRewards(victimName = ''){
     player.credits = Math.max(0, Number(player.credits || 0) + rewardValue);
     if(typeof playerResources === 'object' && playerResources){
         playerResources.coins = Math.max(0, Number(playerResources.coins || 0) + rewardValue);
+    }
 
     if(rewardValue >= 2){
         pushKillFeed(`${killerName} уничтожил ${victimName || 'цель'} • комбо x${rewardValue}`, 'kill');
     }else{
         pushKillFeed(`${killerName} уничтожил ${victimName || 'противник'}`, 'kill');
+    }
 
     try{
         if(playerShip?.position){
             showBattleFloatingReward(rewardValue, rewardValue, playerShip.position);
-        }catch(_){}
+        }
+    }catch(_){}
     try{ updateHUD?.(); }catch(_){}
     try{ updateUI?.(); }catch(_){}
     try{ updateBattleScoreboard?.(); }catch(_){}
     try{ saveGame?.(); }catch(_){}
+}
 
 async function sendBattlePresenceEvent(eventName, payload = {}){
     if(!liveBattlePresenceChannel || !eventName) return false;
@@ -6634,14 +7302,17 @@ async function sendBattlePresenceEvent(eventName, payload = {}){
             await liveBattlePresenceChannel.httpSend(packet);
         }else{
             await liveBattlePresenceChannel.send(packet);
-
+        }
         return true;
     }catch(_){
         return false;
+    }
+}
 
 function getBattleHitsRoomId(){
     const rawRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
     return sanitizeOnlineRoomId(rawRoomId);
+}
 
 async function insertBattleHitRecord(targetPlayerId, damage, victimName = ''){
     if(!window.supabaseClient) return false;
@@ -6664,9 +7335,12 @@ async function insertBattleHitRecord(targetPlayerId, damage, victimName = ''){
         return true;
     }catch(_){
         return false;
+    }
+}
 
 async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
     return insertBattleHitRecord(targetPlayerId, damage, victimName);
+}
 
 async function insertBattleKillAckRecord(targetPlayerId, victimName = ''){
     if(!window.supabaseClient) return false;
@@ -6688,6 +7362,8 @@ async function insertBattleKillAckRecord(targetPlayerId, victimName = ''){
         return true;
     }catch(_){
         return false;
+    }
+}
 
 async function broadcastBattleKill(attackerId, attackerName, victimId, victimName){
     return sendBattlePresenceEvent('pilot-kill', {
@@ -6697,6 +7373,7 @@ async function broadcastBattleKill(attackerId, attackerName, victimId, victimNam
         victimName: String(victimName || '').trim() || 'Pilot',
         at: Date.now()
     });
+}
 
 async function initializeBattleHitCursor(){
     if(!window.supabaseClient) return;
@@ -6706,6 +7383,7 @@ async function initializeBattleHitCursor(){
     if(!self.playerId || !roomId){
         battleHitCursorId = 0;
         return;
+    }
 
     try{
         const { data, error } = await window.supabaseClient
@@ -6720,8 +7398,11 @@ async function initializeBattleHitCursor(){
             battleHitCursorId = Number(data[0]?.id || 0) || 0;
         }else{
             battleHitCursorId = 0;
-        }catch(_){
+        }
+    }catch(_){
         battleHitCursorId = 0;
+    }
+}
 
 async function pollIncomingBattleHits(){
     if(battleHitPollInFlight) return;
@@ -6742,6 +7423,7 @@ async function pollIncomingBattleHits(){
 
         if(Number.isFinite(battleHitCursorId) && battleHitCursorId > 0){
             query = query.gt('id', battleHitCursorId);
+        }
 
         const { data, error } = await query;
         if(error || !Array.isArray(data) || !data.length) return;
@@ -6754,6 +7436,8 @@ async function pollIncomingBattleHits(){
             if(Number.isFinite(battleHitSessionStartedAt) && battleHitSessionStartedAt > 0 && Number.isFinite(createdAtMs) && createdAtMs > 0){
                 if(createdAtMs < (battleHitSessionStartedAt - 150)){
                     continue;
+                }
+            }
 
             const attackerId = String(row?.attacker_id || '').trim();
             const targetPlayerId = String(row?.target_id || '').trim();
@@ -6770,6 +7454,7 @@ async function pollIncomingBattleHits(){
                     source: 'db-ack'
                 });
                 continue;
+            }
 
             applyIncomingBattleHit({
                 hitId: `db:${hitRowId}`,
@@ -6778,9 +7463,13 @@ async function pollIncomingBattleHits(){
                 targetPlayerId,
                 damage: damageValue
             });
-        }catch(_){
+        }
+    }catch(_){
     }finally{
         battleHitPollInFlight = false;
+    }
+}
+
 
 function applyIncomingBattleHit(payload = {}){
     if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || isBattleRespawning() || battleShipCrash) return;
@@ -6796,6 +7485,8 @@ function applyIncomingBattleHit(payload = {}){
         if(battleProcessedHitIds.size > 120){
             const firstKey = battleProcessedHitIds.values().next().value;
             if(firstKey) battleProcessedHitIds.delete(firstKey);
+        }
+    }
 
     const damageValue = Math.max(0, Number(payload?.damage || 0) || 0);
     if(!damageValue) return;
@@ -6815,16 +7506,19 @@ function applyIncomingBattleHit(payload = {}){
     applyBattleScoreDelta(self.playerId, { deathsDelta: 1 });
     if(attackerId){
         applyBattleScoreDelta(attackerId, { killsDelta: 1 });
+    }
 
     if(playerShip){
         spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
-
+    }
     pushKillFeed(`${attackerName} уничтожил ${player?.nickname || 'Commander'}`, 'kill');
     scheduleBattleRespawn(2000);
     updateBattleScoreboard?.();
 
     if(attackerId){
         insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander').catch(() => {});
+    }
+}
 
 function handleIncomingBattleKill(payload = {}){
     const killHitId = String(payload?.hitId || '').trim();
@@ -6834,6 +7528,8 @@ function handleIncomingBattleKill(payload = {}){
         if(battleProcessedHitIds.size > 120){
             const firstKey = battleProcessedHitIds.values().next().value;
             if(firstKey) battleProcessedHitIds.delete(firstKey);
+        }
+    }
 
     const attackerId = String(payload?.attackerId || '').trim();
     const victimId = String(payload?.victimId || '').trim();
@@ -6844,7 +7540,7 @@ function handleIncomingBattleKill(payload = {}){
     const isSelfAttacker = !!(attackerId && self.playerId && attackerId === self.playerId);
     if(attackerId){
         applyBattleScoreDelta(attackerId, { killsDelta: 1 });
-
+    }
     const remoteDeadUntil = Date.now() + 2000;
 
     if(victimId){
@@ -6853,6 +7549,7 @@ function handleIncomingBattleKill(payload = {}){
         const victimRemoteState = remoteBattleShips.get(victimId);
         if(victimRemoteState){
             victimRemoteState.deadUntil = remoteDeadUntil;
+        }
 
         const roomLists = [
             ...(Array.isArray(currentRoom?.currentPlayers) ? [currentRoom.currentPlayers] : []),
@@ -6863,20 +7560,25 @@ function handleIncomingBattleKill(payload = {}){
                 const rowId = String(row?.public_id || row?.player_public_id || row?.player_id || row?.id || '').trim();
                 if(rowId && rowId === victimId){
                     row.deadUntil = remoteDeadUntil;
-                });
+                }
+            });
         });
-
+    }
     if(isSelfAttacker){
         awardBattleKillRewards(victimName);
+    }
 
     const victimRemote = victimId ? remoteBattleShips.get(victimId) : null;
     if(victimRemote?.mesh){
         spawnShipDebris(victimRemote.mesh.position.clone(), 0xff7755);
         removeRemoteBattleShipById(victimId);
+    }
 
     updateBattleScoreboard?.();
     if(attackerName && victimName && !isSelfAttacker){
         pushKillFeed(`${attackerName} уничтожил ${victimName}`, 'kill');
+    }
+}
 
 function ensureLiveBattlePresenceChannel(){
     if(!window.supabaseClient) return;
@@ -6887,10 +7589,11 @@ function ensureLiveBattlePresenceChannel(){
     if(liveBattlePresenceChannel){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
         liveBattlePresenceChannel = null;
+    }
 
     liveBattlePresenceChannelName = channelName;
     liveBattlePresenceChannel = window.supabaseClient.channel(channelName, {
-        config: { broadcast: { self: false, ack: false }
+        config: { broadcast: { self: false, ack: false } }
     });
 
     liveBattlePresenceChannel
@@ -6904,6 +7607,7 @@ function ensureLiveBattlePresenceChannel(){
             handleIncomingBattleKill(payload || {});
         })
         .subscribe();
+}
 
 async function broadcastSelfBattleState(){
     if(gameState !== 'BATTLE' || !playerShip || !liveBattlePresenceChannel) return;
@@ -6931,6 +7635,7 @@ async function broadcastSelfBattleState(){
     let previousPayload = null;
     if(lastBattlePresencePayload){
         try{ previousPayload = JSON.parse(lastBattlePresencePayload); }catch(_){ previousPayload = null; }
+    }
 
     const needsForceSend = (now - lastBattlePresenceSentAt) >= BATTLE_PRESENCE_FORCE_INTERVAL_MS;
     const presencePingWindowPassed = (now - lastPresencePingAt) <= 60 || (now - lastPresencePingAt) >= BATTLE_PRESENCE_PING_UPDATE_MS;
@@ -6951,6 +7656,7 @@ async function broadcastSelfBattleState(){
 
     if(!needsForceSend && !changedMeta && !changedPosition && !changedRotation){
         return;
+    }
 
     try{
         const eventPayload = {
@@ -6962,10 +7668,11 @@ async function broadcastSelfBattleState(){
             await liveBattlePresenceChannel.httpSend(eventPayload);
         }else{
             await liveBattlePresenceChannel.send(eventPayload);
-
+        }
         lastBattlePresencePayload = JSON.stringify(payload);
         lastBattlePresenceSentAt = now;
     }catch(_){ }
+}
 
 function getObservedRoomId(targetMap = ''){
     const directRoomId = sanitizeOnlineRoomId(selectedLobbyMap?.id || selectedLobbyMap?.roomId || currentRoom?.id || currentRoom?.roomId || null);
@@ -6978,6 +7685,7 @@ function getObservedRoomId(targetMap = ''){
     });
 
     return sanitizeOnlineRoomId(publicRoom?.id || publicRoom?.roomId || null);
+}
 
 function buildObserveRoomState(targetMap = ''){
     const normalizedMap = normalizeBattleMapName(targetMap || selectedLobbyMap?.real || currentRoom?.map || 'earth');
@@ -6993,17 +7701,20 @@ function buildObserveRoomState(targetMap = ''){
         players: [],
         title: selectedLobbyMap?.title || currentRoom?.title || normalizedMap
     };
+}
 
 async function fetchCurrentRoomLivePlayers(){
     const now = Date.now();
     if((now - cachedRoomPlayersFetchedAt) < ROOM_PLAYER_FETCH_CACHE_MS && Array.isArray(cachedRoomPlayersRows)){
         return cachedRoomPlayersRows;
+    }
 
     if(roomPlayersFetchInFlight) return null;
 
     const roomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
     if(!window.supabaseClient || !roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')){
         return [];
+    }
 
     roomPlayersFetchInFlight = true;
 
@@ -7018,6 +7729,7 @@ async function fetchCurrentRoomLivePlayers(){
             if(error){
                 roomPlayersFetchInFlight = false;
                 return null;
+            }
 
             const mergedRows = new Map();
 
@@ -7058,6 +7770,7 @@ async function fetchCurrentRoomLivePlayers(){
                     },
                     updated_at: new Date(now).toISOString()
                 });
+            }
 
             if(remoteBattleShips instanceof Map){
                 let index = 0;
@@ -7089,6 +7802,7 @@ async function fetchCurrentRoomLivePlayers(){
                     });
                     index += 1;
                 });
+            }
 
             cachedRoomPlayersFetchedAt = now;
             cachedRoomPlayersRows = Array.from(mergedRows.values()).filter(item => isFreshRoomPlayerRow(item));
@@ -7097,13 +7811,16 @@ async function fetchCurrentRoomLivePlayers(){
         }catch(_){
             roomPlayersFetchInFlight = false;
             return null;
-        })();
+        }
+    })();
+}
 
 async function syncLiveBattlePlayers(){
     if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
     if(gameState === 'BATTLE' && playerShip){
         ensureSelfRoomPlayerState();
+    }
 
     const livePlayers = await fetchCurrentRoomLivePlayers();
     if(livePlayers === null) return;
@@ -7122,13 +7839,14 @@ async function syncLiveBattlePlayers(){
 
         if(isMe){
             return;
-
+        }
         if(!entryId) return;
 
         let remoteState = remoteBattleShips.get(entryId);
         if(!remoteState){
             remoteState = createRemoteBattleShipMesh(displayName, remoteBattleShips.size, team);
             remoteBattleShips.set(entryId, remoteState);
+        }
 
         const scoreSnapshot = getBattleScoreSnapshot(entryId);
         remoteState.nickname = displayName;
@@ -7142,7 +7860,7 @@ async function syncLiveBattlePlayers(){
         if(remoteState.mesh?.userData){
             remoteState.mesh.userData.team = team;
             remoteState.mesh.userData.pilotName = displayName;
-
+        }
         tryApplyRemoteShipTeamVisual(remoteState);
 
         const pos = entry?.position || {};
@@ -7154,6 +7872,8 @@ async function syncLiveBattlePlayers(){
             if(remoteState.mesh && !remoteState.mesh.userData.hasInitialSync){
                 remoteState.mesh.position.copy(remoteState.targetPosition);
                 remoteState.mesh.userData.hasInitialSync = true;
+            }
+        }
 
         const rot = entry?.rotation || {};
         const qx = Number(rot?.x);
@@ -7165,6 +7885,8 @@ async function syncLiveBattlePlayers(){
             if(remoteState.mesh && !remoteState.mesh.userData.hasInitialQuatSync){
                 remoteState.mesh.quaternion.copy(remoteState.targetQuaternion);
                 remoteState.mesh.userData.hasInitialQuatSync = true;
+            }
+        }
 
         visiblePlayers.push({
             nickname: displayName,
@@ -7184,7 +7906,8 @@ async function syncLiveBattlePlayers(){
         const stale = !!item && Number(item.lastSeenAt || 0) < expireBefore;
         if(!activeIds.has(String(entryId)) || stale){
             removeRemoteBattleShipById(entryId);
-        });
+        }
+    });
 
     const selfRow = gameState === 'OBSERVE'
         ? null
@@ -7205,8 +7928,11 @@ async function syncLiveBattlePlayers(){
         nextPlayers.push(...visiblePlayers);
         currentRoom.currentPlayers = nextPlayers;
         currentRoom.players = [...nextPlayers];
+    }
 
     updateBattleScoreboard();
+}
+
 
 function removeRemoteBattleShipById(entryId){
     const key = String(entryId || '').trim();
@@ -7219,9 +7945,11 @@ function removeRemoteBattleShipById(entryId){
             if(child?.material){
                 if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
                 else child.material.dispose?.();
-            });
-
+            }
+        });
+    }
     remoteBattleShips.delete(key);
+}
 
 async function startLiveBattleSync(){
     stopLiveBattleSync();
@@ -7237,6 +7965,7 @@ async function startLiveBattleSync(){
     battleHitPollTimer = setInterval(() => {
         pollIncomingBattleHits();
     }, LIVE_BATTLE_HIT_POLL_INTERVAL_MS);
+}
 
 function animateRemoteBattleShips(){
     if(!remoteBattleShips.size) return;
@@ -7246,21 +7975,25 @@ function animateRemoteBattleShips(){
 
         if(entry.targetPosition){
             mesh.position.lerp(entry.targetPosition, 0.16);
-
+        }
         if(entry.targetQuaternion){
             mesh.quaternion.slerp(entry.targetQuaternion, 0.18);
+        }
 
         if(entry.labelSprite){
             entry.labelSprite.position.set(0, 3.4, 0);
-        });
+        }
+    });
+}
 
 function createEnemyBot(){
     if(enemyBot){
         scene.remove(enemyBot);
         enemyBot = null;
-
+    }
     updateEnemyHud();
     updateBattleScoreboard();
+}
 
 function updateEnemyHud(){
     const hud = document.getElementById('enemy-hud');
@@ -7273,6 +8006,7 @@ function updateEnemyHud(){
     if(!enemyBot){
         hud.style.display = 'none';
         return;
+    }
 
     hud.style.display = 'block';
     const hp = Math.max(0, enemyBot.userData.hp);
@@ -7282,6 +8016,7 @@ function updateEnemyHud(){
     hpBar.style.width = percent + '%';
     hpText.textContent = hp + ' / ' + maxHp;
     if(hpInlineText) hpInlineText.textContent = hp + ' / ' + maxHp;
+}
 
 function fireBotLaser(){
     if(!enemyBot || !playerShip) return;
@@ -7308,6 +8043,7 @@ function fireBotLaser(){
             weaponType: 'pulse'
         });
     });
+}
 
 function updateBattleScoreboard(){
     const body = document.getElementById('battle-scoreboard-body');
@@ -7358,6 +8094,7 @@ function updateBattleScoreboard(){
     if(gameState === 'OBSERVE' && !rows.length){
       body.innerHTML = '<div class="battle-scoreboard-row enemy"><span></span><span>На карте нет активных игроков</span><span>0</span><span>0</span><span>—</span><span>—</span><span>—</span></div>';
       return;
+    }
 
     body.innerHTML = rows.map((entry) => {
       const safeName = String(entry?.nickname || 'Pilot');
@@ -7385,6 +8122,7 @@ function updateBattleScoreboard(){
         <span>${pingValue}</span>
       </div>`;
     }).join('');
+}
 
 // ================= SPAWN PLAYER =================
 
@@ -7393,6 +8131,7 @@ function spawnPlayer() {
     if (playerShip) {
         scene.remove(playerShip);
         playerShip = null;
+    }
 
     shipVelocity.set(0, 0, 0);
     activeLasers.forEach(laser => scene.remove(laser.mesh));
@@ -7441,6 +8180,7 @@ function spawnPlayer() {
     scene.add(playerShip);
     camera.lookAt(playerShip.position);
     updateBattlePlayerHud();
+}
 
 // ================= KEY SYSTEM =================
 
@@ -7485,6 +8225,10 @@ color:color
 const planet = new THREE.Mesh(geometry,material);
 
 scene.add(planet);
+
+}
+
+
 
 /* ===== SELECT MATCH ===== */
 
@@ -7555,6 +8299,8 @@ const preview = document.getElementById("planet-preview");
 
 if(preview){
 preview.style.backgroundImage = "url(maps/"+mapData.img+".jpg)";
+}
+
 };
 
 matchList.appendChild(map);
@@ -7610,8 +8356,13 @@ function updatePlayers(mapName){
 
         if(players[i]){
             slot.textContent = players[i];
+        }
 
         playersBox.appendChild(slot);
+
+    }
+
+}
 
 function updatePreview(mapName){
 
@@ -7621,7 +8372,13 @@ function updatePreview(mapName){
         preview.style.backgroundSize = "cover";
         preview.style.backgroundPosition = "center";
 
+       
+
+    }
+
     updatePlayers(mapName);
+
+}
 
 matchItems.forEach(item => {
 
@@ -7650,7 +8407,9 @@ setInterval(()=>{
 
         mapPlayers[randomPlanet].push("Player"+Math.floor(Math.random()*999));
 
-    },5000);
+    }
+
+},5000);
 
 
 updatePreview("Sun");
@@ -7667,7 +8426,7 @@ const profileWindow = document.getElementById("profile-window");
 if (hangarTab && hangarWindow) {
     hangarTab.addEventListener("click", () => {
         hangarWindow.classList.remove("hidden"); hangarWindow.style.display='flex';
-        requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){});
+        requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){} });
         profileWindow?.classList.add("hidden");
         bindHangarChatControls();
         try{ document.getElementById('chat-wrapper')?.classList.remove('hangar-chat-lowered'); }catch(_){}
@@ -7675,6 +8434,7 @@ if (hangarTab && hangarWindow) {
         setTimeout(__mountHangarChatPanel, 0);
         setTimeout(__mountHangarChatPanel, 120);
     });
+}
 
 if (profileTab && profileWindow) {
     profileTab.addEventListener("click", () => {
@@ -7682,6 +8442,8 @@ if (profileTab && profileWindow) {
         hangarWindow?.classList.add("hidden");
         __restoreHangarChatPanel();
     });
+}
+
 
 function addCreatedRoomToLobby(room){
     const matchListEl = document.getElementById('match-list');
@@ -7705,8 +8467,10 @@ function addCreatedRoomToLobby(room){
             preview.style.backgroundImage = `url(maps/${meta.img}.jpg)`;
             preview.style.backgroundSize = 'cover';
             preview.style.backgroundPosition = 'center';
-        });
+        }
+    });
     matchListEl.prepend(item);
+}
 
 const LOBBY_MAP_DATA = [
     { title:"Sun Arena", real:"sun", img:"sun", mode:"DM" },
@@ -7725,6 +8489,7 @@ function getSelectedLobbyMapFromUI(){
     if(!selectedEl) return selectedLobbyMap || LOBBY_MAP_DATA[3];
     const realText = selectedEl.querySelector('.map-real')?.textContent?.trim()?.toLowerCase();
     return LOBBY_MAP_DATA.find(m => m.real === realText) || selectedLobbyMap || LOBBY_MAP_DATA[3];
+}
 
 window.addEventListener('load', () => {
     initLobbyBackground();
@@ -7740,6 +8505,8 @@ window.addEventListener('load', () => {
             preview.style.backgroundImage = `url(maps/${selectedLobbyMap.img}.jpg)`;
             preview.style.backgroundSize = 'cover';
             preview.style.backgroundPosition = 'center';
+        }
+    }
 
     setTimeout(() => {
         const items = document.querySelectorAll('#match-list .match-item');
@@ -7759,12 +8526,14 @@ window.addEventListener('load', () => {
             window.currentRoomId = currentRoom.id || null;
             switchState('BATTLE');
         });
-    });
+    }
+});
 
 
 function closeBattlePauseMenu(){
     const menu = document.getElementById('battle-pause-menu');
     if(menu) menu.classList.add('hidden');
+}
 
 function toggleBattlePauseMenu(forceOpen=null){
     const menu = document.getElementById('battle-pause-menu');
@@ -7776,6 +8545,8 @@ function toggleBattlePauseMenu(forceOpen=null){
     }else{
         const canvas = document.querySelector('canvas');
         if(canvas && gameState === 'BATTLE') setTimeout(() => safeRequestPointerLock(canvas), 40);
+    }
+}
 
 function initBattleUI(){
     const battleExitBtn = document.getElementById('battle-exit-btn');
@@ -7790,17 +8561,20 @@ function initBattleUI(){
         switchState('LOBBY');
         if(typeof renderRoomsInLobby === 'function'){
             await renderRoomsInLobby(true);
-        };
+        }
+    };
 
     [battleExitBtn, battleLeaveBtn].forEach(btn => {
         if(btn && !btn.dataset.bound){
             btn.dataset.bound = '1';
             btn.addEventListener('click', leaveMap);
-        });
+        }
+    });
 
     if(battleSaveBtn && !battleSaveBtn.dataset.bound){
         battleSaveBtn.dataset.bound = '1';
         battleSaveBtn.addEventListener('click', () => closeBattlePauseMenu());
+    }
 
     if(battleOpenSettingsBtn && !battleOpenSettingsBtn.dataset.bound){
         battleOpenSettingsBtn.dataset.bound = '1';
@@ -7808,6 +8582,7 @@ function initBattleUI(){
             const settingsWindow = document.getElementById('settings-window');
             if(settingsWindow) settingsWindow.classList.remove('hidden');
         });
+    }
 
     if(!document.body.dataset.battleUiBound){
         document.body.dataset.battleUiBound = '1';
@@ -7815,7 +8590,7 @@ function initBattleUI(){
             if(e.code === 'Tab'){
                 e.preventDefault();
                 if(scoreboard && (gameState === 'BATTLE' || gameState === 'OBSERVE')) scoreboard.classList.remove('hidden');
-
+            }
             if(e.code === 'Escape' && (gameState === 'BATTLE' || gameState === 'OBSERVE') && !battleChatOpen){
                 e.preventDefault();
                 const settingsWindow = document.getElementById('settings-window');
@@ -7830,12 +8605,16 @@ function initBattleUI(){
                 }else if(!battleObserverMode){
                     const canvas = document.querySelector('canvas');
                     if(canvas) setTimeout(() => safeRequestPointerLock(canvas), 40);
-
+                }
+            }
         });
         document.addEventListener('keyup', (e) => {
             if(e.code === 'Tab'){
                 if(scoreboard) scoreboard.classList.add('hidden');
-            });
+            }
+        });
+    }
+}
 
 initBattleUI();
 initBattleChat();
@@ -7857,6 +8636,8 @@ function renderProfileStats(){
         <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${player.ships.length}</div></div>
       </div>`;
+}
+
 
 const hangarState = {
     shipIndex: 0,
@@ -7936,20 +8717,26 @@ function getHangarModuleTypeName(typeId){
     if(safe === 'shield') return 'Щиты';
     if(safe === 'booster') return 'Ускорители';
     return 'Модули';
+}
 
 function isStarterHullId(hullId){
     return STARTER_HULL_IDS.includes(String(hullId || '').trim());
+}
 
 function isStarterModuleId(moduleId){
     return STARTER_MODULE_IDS.includes(String(moduleId || '').trim());
+}
 
 function getHullSellPrice(hullId){
     const ship = getShopShipById(hullId);
     return Math.max(0, Math.floor((Number(ship?.price || 0) || 0) * 0.5));
+}
 
 function getModuleSellPrice(moduleId){
     const mod = getModuleById(moduleId);
     return Math.max(0, Math.floor((Number(mod?.price || 0) || 0) * 0.5));
+}
+
 
 function isOwnedShip(itemOrId){
     try{ ensureShopOwnershipDefaults?.(); }catch(_){ }
@@ -7957,14 +8744,17 @@ function isOwnedShip(itemOrId){
         ? String(itemOrId || '').trim()
         : String(itemOrId?.id || '').trim();
     return !!shipId && Array.isArray(player?.ownedShipIds) && player.ownedShipIds.includes(shipId);
+}
 
 function isHangarWindowOpen(){
     const win = document.getElementById('hangar-window');
     return !!(win && !win.classList.contains('hidden'));
+}
 
 function renderHangarIfOpen(forceSyncToSelected = true){
     if(!isHangarWindowOpen()) return;
     renderHangarCosmic?.(forceSyncToSelected);
+}
 
 function ensurePremiumCurrencyUi(){
     if(typeof document === 'undefined') return;
@@ -7977,19 +8767,20 @@ function ensurePremiumCurrencyUi(){
             margin-left:6px; width:18px; height:18px; border:none; border-radius:3px; cursor:pointer;
             display:inline-flex; align-items:center; justify-content:center; font-weight:900; font-size:16px; line-height:1;
             color:#fff; background:linear-gradient(180deg,#2d2d2d,#0d0d0d); box-shadow:0 0 8px rgba(0,0,0,0.35);
-
+          }
           .premium-plus-btn:hover{ transform:translateY(-1px); box-shadow:0 0 12px rgba(120,220,255,0.35); }
           .premium-currency-float{
             position:absolute; right:0; top:-18px; pointer-events:none; font-weight:800; font-size:14px; opacity:0;
             transform:translateY(0) scale(0.95); transition:opacity .18s ease, transform .9s ease;
             text-shadow:0 0 10px rgba(0,0,0,0.55);
-
+          }
           .premium-currency-float.show{ opacity:1; transform:translateY(-6px) scale(1); }
           .premium-currency-float.fade{ opacity:0; transform:translateY(-22px) scale(1.04); }
           .premium-currency-float.minus{ color:#ff4d4d; }
           .premium-currency-float.plus{ color:#6dff8e; }
         `;
         document.head.appendChild(style);
+    }
 
     const entries = [
         { id:'premium-coins', type:'coins', title:'Пополнить монеты' },
@@ -8012,7 +8803,9 @@ function ensurePremiumCurrencyUi(){
                 alert(type === 'crystals' ? 'Пополнение алмазов за деньги будет здесь.' : 'Пополнение монет за деньги будет здесь.');
             });
             host.appendChild(btn);
-        });
+        }
+    });
+}
 
 function showCurrencyDelta(kind, amount){
     const safeKind = String(kind || '').trim().toLowerCase();
@@ -8028,6 +8821,7 @@ function showCurrencyDelta(kind, amount){
     requestAnimationFrame(() => node.classList.add('show'));
     setTimeout(() => node.classList.add('fade'), 900);
     setTimeout(() => node.remove(), 1800);
+}
 
 function canSellHull(hullId){
     const safeId = String(hullId || '').trim();
@@ -8040,21 +8834,26 @@ function canSellHull(hullId){
     const equippedShipId = String(player?.selectedShipId || '').trim();
     if(equippedShipId && equippedShipId === safeId) return false;
     return true;
+}
 
 function canSellModule(moduleId){
     return !!String(moduleId || '').trim() && !isStarterModuleId(moduleId) && isOwnedModule(moduleId);
+}
 
 function getSellActionLabel(kind, itemId){
     const price = kind === 'ship' ? getHullSellPrice(itemId) : getModuleSellPrice(itemId);
     return `Продать за ${price} 🪙`;
+}
 
 function getCurrentHangarModuleType(){
     return String(hangarState?.moduleFilter || 'weapon').trim() || 'weapon';
+}
 
 function getEquippedModuleTypesForShip(shipId){
     const safeShipId = String(shipId || player?.selectedShipId || '').trim();
     const raw = player?.activeModulesByShip?.[safeShipId];
     return raw && typeof raw === 'object' ? raw : {};
+}
 
 function sellHullFromHangar(hullId){
     const safeId = String(hullId || '').trim();
@@ -8073,13 +8872,13 @@ function sellHullFromHangar(hullId){
     player.ownedShipIds = (player.ownedShipIds || []).filter(id => String(id || '').trim() !== safeId);
     if(player?.activeModulesByShip && player.activeModulesByShip[safeId]){
         delete player.activeModulesByShip[safeId];
-
+    }
     if(player?.hangarDockAssignments && player.hangarDockAssignments[safeId] != null){
         delete player.hangarDockAssignments[safeId];
-
+    }
     if(String(player?.selectedShipId || '').trim() === safeId){
         player.selectedShipId = String(player.ownedShipIds?.[0] || 'scout_1').trim() || 'scout_1';
-
+    }
     refreshOwnedShipsInventory?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     updatePremiumAccountInfo?.();
@@ -8094,7 +8893,7 @@ function sellHullFromHangar(hullId){
             if(savedAstronautPosition && hangarState?.astronautPivot){
                 hangarState.astronautPivot.position.copy(savedAstronautPosition);
                 hangarState.astronautPivot.rotation.y = savedAstronautYaw;
-
+            }
             hangarState.cameraYaw = savedCameraYaw;
             hangarState.cameraPitch = savedCameraPitch;
             hangarState.cameraYawTarget = savedCameraYaw;
@@ -8102,9 +8901,11 @@ function sellHullFromHangar(hullId){
             hangarState.selectedDockIndex = savedSelectedDockIndex;
             hangarState.hoverDockIndex = savedHoverDockIndex;
             updateHangarPlatformPrompt?.();
-        }catch(_){ });
+        }catch(_){ }
+    });
     window.renderShopScreen?.();
     return true;
+}
 
 function removeModuleFromAllShips(moduleId){
     const safeId = String(moduleId || '').trim();
@@ -8115,8 +8916,10 @@ function removeModuleFromAllShips(moduleId){
         Object.keys(slots).forEach(typeId => {
             if(String(slots[typeId] || '').trim() === safeId){
                 delete slots[typeId];
-            });
+            }
+        });
     });
+}
 
 function sellModuleFromHangar(moduleId){
     const safeId = String(moduleId || '').trim();
@@ -8134,6 +8937,7 @@ function sellModuleFromHangar(moduleId){
     renderHangarCosmic?.();
     window.renderShopScreen?.();
     return true;
+}
 
 function getAllHangarModules(){
     try{
@@ -8142,10 +8946,13 @@ function getAllHangarModules(){
         );
     }catch(_){
         return [];
+    }
+}
 
 function getModuleById(moduleId){
     const safeId = String(moduleId || '').trim();
     return getAllHangarModules().find(item => String(item?.id || '').trim() === safeId) || null;
+}
 
 function ensureModuleOwnershipDefaults(){
     try{
@@ -8154,7 +8961,7 @@ function ensureModuleOwnershipDefaults(){
         if(!Array.isArray(player.ownedModuleIds)) player.ownedModuleIds = [];
         if(!player.ownedModuleIds.length){
             player.ownedModuleIds = [...starterModuleIds];
-
+        }
         player.ownedModuleIds = Array.from(new Set(
             player.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean)
         ));
@@ -8163,19 +8970,21 @@ function ensureModuleOwnershipDefaults(){
         });
         if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object'){
             player.activeModulesByShip = {};
-
+        }
         if(!player.activeModulesByShip['scout_1'] || typeof player.activeModulesByShip['scout_1'] !== 'object'){
             player.activeModulesByShip['scout_1'] = {};
-
+        }
         if(!player.activeModulesByShip['scout_1'].weapon) player.activeModulesByShip['scout_1'].weapon = 'weapon_laser_s1';
         if(!player.activeModulesByShip['scout_1'].shield) player.activeModulesByShip['scout_1'].shield = 'shield_micro_s1';
         if(!player.activeModulesByShip['scout_1'].booster) player.activeModulesByShip['scout_1'].booster = 'booster_ion_s1';
     }catch(_){ }
+}
 
 function isOwnedModule(moduleId){
     ensureModuleOwnershipDefaults();
     const safeId = String(moduleId || '').trim();
     return !!safeId && Array.isArray(player?.ownedModuleIds) && player.ownedModuleIds.includes(safeId);
+}
 
 function getOwnedHangarModules(){
     ensureModuleOwnershipDefaults();
@@ -8188,6 +8997,7 @@ function getOwnedHangarModules(){
     });
     if(filteredOwned.length) return filteredOwned;
     return owned.length ? owned : modules.filter(item => String(item?.classId || item?.typeId || '').trim() === getCurrentHangarModuleType());
+}
 
 function getInstalledModulesForShip(shipId){
     ensureModuleOwnershipDefaults();
@@ -8195,12 +9005,14 @@ function getInstalledModulesForShip(shipId){
     const raw = safeShipId ? player?.activeModulesByShip?.[safeShipId] : null;
     if(!raw || typeof raw !== 'object') return [];
     return Object.values(raw).map(moduleId => getModuleById(moduleId)).filter(Boolean);
+}
 
 function getInstalledModuleForType(shipId, typeId){
     const safeShipId = String(shipId || player?.selectedShipId || '').trim();
     const safeTypeId = String(typeId || '').trim();
     if(!safeShipId || !safeTypeId) return null;
     return getModuleById(player?.activeModulesByShip?.[safeShipId]?.[safeTypeId] || '');
+}
 
 function toggleShipModule(moduleId, shipId){
     ensureModuleOwnershipDefaults();
@@ -8211,15 +9023,16 @@ function toggleShipModule(moduleId, shipId){
     if(!typeId) return false;
     if(!player.activeModulesByShip[safeShipId] || typeof player.activeModulesByShip[safeShipId] !== 'object'){
         player.activeModulesByShip[safeShipId] = {};
-
+    }
     const current = String(player.activeModulesByShip[safeShipId][typeId] || '').trim();
     if(current === module.id){
         delete player.activeModulesByShip[safeShipId][typeId];
     }else{
         player.activeModulesByShip[safeShipId][typeId] = module.id;
-
+    }
     try{ saveGame?.(); }catch(_){ }
     return true;
+}
 
 function getShipStatNumber(ship, label, fallback){
     const stats = Array.isArray(ship?.stats) ? ship.stats : [];
@@ -8228,10 +9041,12 @@ function getShipStatNumber(ship, label, fallback){
     const raw = String(found[1] || '').replace(',', '.');
     const match = raw.match(/-?\d+(?:\.\d+)?/);
     return match ? Number(match[0]) : (Number(fallback || 0) || 0);
+}
 
 function getSelectedShipItem(){
     const ships = getOwnedHangarShips();
     return ships.find(item => String(item?.id || '') === String(player?.selectedShipId || '')) || ships[0] || null;
+}
 
 function computeShipBattleStats(shipId){
     const safeShipId = String(shipId || player?.selectedShipId || '').trim();
@@ -8331,6 +9146,7 @@ function computeShipBattleStats(shipId){
         stats.turnPitch = 0.00165;
         stats.rollLimit = 0.72;
         stats.handlingLabel = 'Универсал';
+    }
 
     switch(stats.weaponType){
         case 'pulse':
@@ -8415,6 +9231,7 @@ function computeShipBattleStats(shipId){
             stats.spread = 0.003;
             stats.fireCooldown = 95;
             break;
+    }
 
     installedModules.forEach(module => {
         const typeId = String(module?.typeId || module?.classId || '').trim();
@@ -8436,7 +9253,8 @@ function computeShipBattleStats(shipId){
             stats.fireCooldown *= Number(module?.cooldownMult || 0.92);
             stats.laserScale += Number(module?.projectileScaleBonus || 0.1);
             stats.moduleSummary.push(module?.name ? module.name : '+пушка');
-        });
+        }
+    });
 
     stats.maxSpeed *= 0.76;
     stats.forwardAcceleration *= 0.72;
@@ -8466,6 +9284,7 @@ function computeShipBattleStats(shipId){
     stats.spread = Number(stats.spread.toFixed(3));
 
     return stats;
+}
 
 let currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
 
@@ -8475,7 +9294,7 @@ function getAllOwnedHangarShips(){
             .map(id => getShopShipById(id))
             .filter(Boolean);
         if(owned.length) return owned;
-
+    }
     if(Array.isArray(player?.ships) && player.ships.length){
         return player.ships.map((ship, index) => ({
             id: String(ship.id || `legacy_${index}`),
@@ -8496,13 +9315,16 @@ function getAllOwnedHangarShips(){
             art: 'classic',
             weapon: 'laser'
         }));
-
+    }
     return [];
+}
+
 
 function findOwnedHangarShipById(shipId){
     const safeId = String(shipId || '').trim();
     if(!safeId) return null;
     return getAllOwnedHangarShips().find(item => String(item?.id || '').trim() === safeId) || null;
+}
 
 function syncHangarSelectionState(options = {}){
     const forceClass = options?.forceClass !== false;
@@ -8511,10 +9333,12 @@ function syncHangarSelectionState(options = {}){
         hangarState.shipFilter = 'all';
         hangarState.shipIndex = 0;
         return;
+    }
 
     const preferredClass = String(preferredShip?.classId || 'all').trim() || 'all';
     if(forceClass){
         hangarState.shipFilter = preferredClass;
+    }
 
     let ships = getOwnedHangarShips();
     let selectedIndex = ships.findIndex(item => String(item?.id || '').trim() === String(preferredShip.id || '').trim());
@@ -8523,22 +9347,28 @@ function syncHangarSelectionState(options = {}){
         hangarState.shipFilter = preferredClass || 'all';
         ships = getOwnedHangarShips();
         selectedIndex = ships.findIndex(item => String(item?.id || '').trim() === String(preferredShip.id || '').trim());
+    }
 
     if(selectedIndex < 0){
         hangarState.shipFilter = 'all';
         ships = getOwnedHangarShips();
         selectedIndex = ships.findIndex(item => String(item?.id || '').trim() === String(preferredShip.id || '').trim());
+    }
 
     hangarState.shipIndex = Math.max(0, selectedIndex);
+}
 
 function setHangarTransition(direction = 0){
     hangarState.transitionDirection = Number(direction || 0) || 0;
     hangarState.transitionStartedAt = performance.now();
+}
+
 
 function getSelectedHangarShipIndex(){
     const ships = getOwnedHangarShips();
     const safeId = String(player?.selectedShipId || '').trim();
     return ships.findIndex(item => String(item?.id || '').trim() === safeId);
+}
 
 function getHangarSupportShips(){
     const selectedId = String(player?.selectedShipId || '').trim();
@@ -8546,6 +9376,7 @@ function getHangarSupportShips(){
     return getOwnedHangarShips()
         .filter(item => String(item?.id || '').trim() !== selectedId)
         .sort((a, b) => getHangarDockAssignment(a?.id) - getHangarDockAssignment(b?.id));
+}
 
 function syncHangarDockSelection(){
     if(!Number.isFinite(hangarState.hoverDockIndex)) hangarState.hoverDockIndex = -1;
@@ -8553,26 +9384,32 @@ function syncHangarDockSelection(){
     const selectedDockIndex = Number(hangarState.selectedDockIndex);
     if(!Number.isFinite(selectedDockIndex) || selectedDockIndex < 0 || selectedDockIndex >= supportCount){
         hangarState.selectedDockIndex = -1;
+    }
+}
 
 function getHangarDockShipByIndex(dockIndex){
     const safeIndex = Number(dockIndex || 0);
     if(!Number.isFinite(safeIndex) || safeIndex < 0) return null;
     return getHangarSupportShips().find(item => getHangarDockAssignment(item?.id) === safeIndex) || null;
+}
+
 
 function getHangarDockPadByIndex(dockIndex){
     const pads = Array.isArray(hangarState?.supportPlatforms) ? hangarState.supportPlatforms : [];
     const safeIndex = Number(dockIndex || 0);
     return pads[safeIndex] || null;
+}
 
 function getHangarDockWorldPosition(dockIndex){
     const pad = getHangarDockPadByIndex(dockIndex);
     if(!pad){
         return new THREE.Vector3(0, 0.6, 0);
-
+    }
     const worldPos = new THREE.Vector3();
     try{ pad.getWorldPosition(worldPos); }catch(_){ worldPos.set(0, 0.6, 0); }
     worldPos.y += 0.78;
     return worldPos;
+}
 
 function getHangarCenterWorldPosition(){
     const showcaseGroup = hangarState?.envGroup?.userData?.shipShowcaseGroup || hangarState?.showcaseGroup || null;
@@ -8580,8 +9417,9 @@ function getHangarCenterWorldPosition(){
         const worldPos = new THREE.Vector3();
         try{ showcaseGroup.getWorldPosition(worldPos); }catch(_){ worldPos.set(0, 2.08, 40); }
         return worldPos;
-
+    }
     return new THREE.Vector3(0, 2.08, 40);
+}
 
 function createHangarTransferMesh(ship){
     if(!ship) return null;
@@ -8599,10 +9437,13 @@ function createHangarTransferMesh(ship){
                     if('transparent' in mat) mat.transparent = true;
                     if('opacity' in mat && typeof mat.opacity === 'number') mat.opacity = Math.min(1, Math.max(mat.opacity, 0.92));
                 });
-            });
+            }
+        });
         return mesh;
     }catch(_){
         return null;
+    }
+}
 
 function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = -1){
     const safePrev = String(previousShipId || '').trim();
@@ -8623,6 +9464,7 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
         rebuildHangarSceneObjects?.();
         fillHangarText?.();
         return;
+    }
 
     const cloneDisplayedMeshToScene = (sourceMesh) => {
         if(!sourceMesh || !hangarState?.scene) return null;
@@ -8711,6 +9553,7 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
     };
 
     hangarState.shipTransfer = transfer;
+}
 
 function selectCurrentHangarShip(){
     if(hangarState.shipTransfer) return false;
@@ -8725,19 +9568,22 @@ function selectCurrentHangarShip(){
         fillHangarText();
         rebuildHangarSceneObjects();
         return true;
-
+    }
     syncHangarDockSelection();
     setHangarTransition?.(hangarState.shipIndex >= previousIndex ? 1 : -1);
     hangarState.shipAppearStartedAt = performance.now();
     startHangarShipTransfer(previousShipId, nextShipId, hangarState.selectedDockIndex);
     fillHangarText();
     return true;
+}
 
 function getOwnedHangarShips(){
     const allShips = getAllOwnedHangarShips();
     const filterId = String(hangarState?.shipFilter || 'all').trim();
     if(!filterId || filterId === 'all') return allShips;
     return allShips.filter(item => String(item?.classId || '').trim() === filterId);
+}
+
 
 function updateHangarFilterButtons(){
     const buttons = document.querySelectorAll('.hangar-class-chip[data-hangar-class]');
@@ -8750,6 +9596,7 @@ function updateHangarFilterButtons(){
         const typeId = String(btn.dataset.hangarModuleType || 'weapon').trim();
         btn.classList.toggle('active', typeId === getCurrentHangarModuleType());
     });
+}
 
 function ensureHangarIndexes(){
     const ships = getOwnedHangarShips();
@@ -8759,6 +9606,7 @@ function ensureHangarIndexes(){
     if(hangarState.shipIndex < 0) hangarState.shipIndex = 0;
     if(hangarState.moduleIndex < 0) hangarState.moduleIndex = 0;
     updateHangarFilterButtons();
+}
 
 function createHangarBeamTexture(){
     const canvas = document.createElement('canvas');
@@ -8796,6 +9644,7 @@ function createHangarBeamTexture(){
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
     return texture;
+}
 
 function createHangarPlatform(){
     const group = new THREE.Group();
@@ -8868,6 +9717,7 @@ function createHangarPlatform(){
     group.userData.beams = beams;
     group.userData.baseHalo = baseHalo;
     return group;
+}
 
 function createHangarShipMesh(item){
     const art = String(item?.art || 'classic').toLowerCase();
@@ -8926,7 +9776,8 @@ function createHangarShipMesh(item){
             const noseFin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 1.1), glowMat);
             noseFin.position.set(0, 0.35, -2.1);
             group.add(noseFin);
-        }else if(art === 'stinger' || art === 'phantom' || art === 'razor'){
+        }
+    }else if(art === 'stinger' || art === 'phantom' || art === 'razor'){
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.38, art === 'razor' ? 1.05 : 0.9, 6.0, 6), metal);
         body.rotation.x = -Math.PI / 2;
         group.add(body);
@@ -8958,7 +9809,8 @@ function createHangarShipMesh(item){
             const wingGlowR = wingGlowL.clone();
             wingGlowR.position.x = 1.45;
             group.add(wingGlowL, wingGlowR);
-        }else if(art === 'bulwark' || art === 'fortress' || art === 'citadel'){
+        }
+    }else if(art === 'bulwark' || art === 'fortress' || art === 'citadel'){
         const width = art === 'citadel' ? 2.8 : (art === 'fortress' ? 2.45 : 2.2);
         const body = new THREE.Mesh(new THREE.BoxGeometry(width, 0.95, 4.8), metal);
         group.add(body);
@@ -8985,7 +9837,8 @@ function createHangarShipMesh(item){
         addEngine(0.8, -0.06, 3.0, 0.32, 0.24, 1.1);
         if(art === 'citadel'){
             addEngine(0, -0.08, 3.18, 0.35, 0.26, 1.22);
-        }else if(art === 'lancer' || art === 'destroyer'){
+        }
+    }else if(art === 'lancer' || art === 'destroyer'){
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55, art === 'destroyer' ? 1.2 : 0.95, 5.8, 7), metal);
         body.rotation.x = -Math.PI / 2;
         group.add(body);
@@ -9015,7 +9868,8 @@ function createHangarShipMesh(item){
         if(art === 'destroyer'){
             addEngine(-1.18, -0.02, 2.84, 0.18, 0.18, 0.82);
             addEngine(1.18, -0.02, 2.84, 0.18, 0.18, 0.82);
-        }else if(art === 'halo'){
+        }
+    }else if(art === 'halo'){
         const body = new THREE.Mesh(new THREE.OctahedronGeometry(1.55, 0), metal);
         body.scale.set(1.25, 0.7, 2.45);
         group.add(body);
@@ -9083,6 +9937,7 @@ function createHangarShipMesh(item){
         group.add(finL, finR);
         addEngine(-0.48, -0.02, 2.8, 0.24, 0.24, 0.9);
         addEngine(0.48, -0.02, 2.8, 0.24, 0.24, 0.9);
+    }
 
     const noseGlow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), glowMat);
     noseGlow.position.set(0, 0.12, -3.15);
@@ -9120,6 +9975,8 @@ function createHangarShipMesh(item){
                     pod.position.set(x, -0.15, -0.8);
                     group.add(pod);
                 });
+            }
+        }
 
         if(equippedShield){
             const shieldColor = new THREE.Color(equippedShield?.neon || '#66e8ff');
@@ -9131,6 +9988,7 @@ function createHangarShipMesh(item){
             shieldArc.scale.set(1.35, 0.62, 2.1);
             shieldArc.position.y = 0.1;
             group.add(shieldRing, shieldArc);
+        }
 
         if(equippedBooster){
             const boosterColor = new THREE.Color(equippedBooster?.neon || engine);
@@ -9144,10 +10002,13 @@ function createHangarShipMesh(item){
                 flame.position.set(x, -0.08, 3.25);
                 group.add(boosterPod, flame);
             });
-        }catch(_){}
+        }
+    }catch(_){}
 
     group.scale.setScalar(1.28);
     return group;
+}
+
 
 function createHangarAstronautFallback(){
     const group = new THREE.Group();
@@ -9207,6 +10068,7 @@ function createHangarAstronautFallback(){
         legR: group.children[7]
     };
     return group;
+}
 
 function createHangarAstronaut(){
     const root = new THREE.Group();
@@ -9217,6 +10079,8 @@ function createHangarAstronaut(){
     root.rotation.y = Math.PI;
     root.userData.externalModel = null;
     return root;
+}
+
 
 function createHangarPlaqueBoard(width = 3.2, height = 1.36){
     const root = new THREE.Group();
@@ -9289,6 +10153,7 @@ function createHangarPlaqueBoard(width = 3.2, height = 1.36){
     root.userData.sellTexture = sellTexture;
     root.userData.sellButton = sellButton;
     return root;
+}
 
 function updateHangarPlaqueSellButton(plaque, sellable, shipId, dockIndex){
     const button = plaque?.userData?.sellButton || null;
@@ -9309,6 +10174,7 @@ function updateHangarPlaqueSellButton(plaque, sellable, shipId, dockIndex){
     if(!canShow){
         texture.needsUpdate = true;
         return;
+    }
 
     const label = getSellActionLabel('ship', safeShipId);
     const w = canvas.width;
@@ -9336,6 +10202,7 @@ function updateHangarPlaqueSellButton(plaque, sellable, shipId, dockIndex){
     ctx.textBaseline = 'middle';
     ctx.fillText(label, w/2, h/2 + 2);
     texture.needsUpdate = true;
+}
 
 function drawHangarPlaque(plaque, options = {}){
     if(!plaque?.userData?.canvas || !plaque?.userData?.texture) return;
@@ -9367,6 +10234,7 @@ function drawHangarPlaque(plaque, options = {}){
             ctx.font = '700 60px Arial';
             ctx.fillText(title, 42, y);
             y += 76;
+        }
 
         ctx.fillStyle = '#f3fdff';
         ctx.font = '700 42px Arial';
@@ -9374,17 +10242,20 @@ function drawHangarPlaque(plaque, options = {}){
             ctx.fillText(line, 42, y);
             y += 62;
         });
+    }
 
     plaque.userData.texture.needsUpdate = true;
     if(plaque.userData.textPlane?.material){
         plaque.userData.textPlane.material.opacity = hasContent ? 1 : 0;
         plaque.userData.textPlane.visible = hasContent;
-
+    }
     if(plaque.userData.board?.material){
         plaque.userData.board.material.opacity = hasContent ? 0.96 : 0.78;
-
+    }
     if(plaque.userData.frame?.material){
         plaque.userData.frame.material.opacity = hasContent ? 0.16 : 0.10;
+    }
+}
 
 function getHangarDisplayShipStats(ship){
     const battleStatsView = computeShipBattleStats(ship?.id || player?.selectedShipId || '');
@@ -9393,6 +10264,7 @@ function getHangarDisplayShipStats(ship){
         `Урон: ${Math.round(Number(battleStatsView?.weaponDamage || 0) || 0)}`,
         `Скорость: ${Number(battleStatsView?.maxSpeed || 0).toFixed(2)}`
     ];
+}
 
 function getForcedHangarDisplayShip(){
     return findOwnedHangarShipById(player?.selectedShipId || '') || getSelectedShipItem?.() || getOwnedHangarShips?.()[hangarState?.shipIndex || 0] || player?.ships?.[0] || {
@@ -9407,6 +10279,7 @@ function getForcedHangarDisplayShip(){
         accent: '#7a8cff',
         modelPath: 'ships/Spaceship.glb'
     };
+}
 
 function refreshHangarInfoBoards(){
     const boards = Array.isArray(hangarState?.infoBoards) ? hangarState.infoBoards : [];
@@ -9433,7 +10306,9 @@ function refreshHangarInfoBoards(){
         }else{
             drawHangarPlaque(plaque, {});
             updateHangarPlaqueSellButton(plaque, false, '', -1);
-        });
+        }
+    });
+}
 
 function createHangarExteriorPlanets(){
     const items = [];
@@ -9453,14 +10328,14 @@ function createHangarExteriorPlanets(){
             ringMesh.rotation.x = Math.PI / 2.35;
             ringMesh.rotation.y = 0.4;
             pivot.add(ringMesh);
-
+        }
         if(glow){
             const halo = new THREE.Mesh(
                 new THREE.SphereGeometry(radius * 1.22, 24, 24),
                 new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color, transparent:true, opacity:0.10 })
             );
             pivot.add(halo);
-
+        }
         pivot.position.set(x,y,z);
         return pivot;
     };
@@ -9484,6 +10359,7 @@ function createHangarExteriorPlanets(){
     items.push(makePlanet(3.8, 0xf2b16d, 0xb85c1b, 142, 17.5, 194));
     items.push(makePlanet(6.6, 0x89a2c7, 0x223355, 182, 26.0, 166, 1.18, true, false));
     return items;
+}
 
 function createHangarSidePlatform(labelText = ''){
     const group = new THREE.Group();
@@ -9509,6 +10385,7 @@ function createHangarSidePlatform(labelText = ''){
     group.userData.glow = glow;
     group.userData.label = labelText;
     return group;
+}
 
 function isHangarDockWithinUseDistance(dockIndex){
     const safeIndex = Number(dockIndex);
@@ -9519,6 +10396,7 @@ function isHangarDockWithinUseDistance(dockIndex){
     const padWorld = new THREE.Vector3();
     try{ pad.getWorldPosition(padWorld); }catch(_){ return false; }
     return astronautPos.distanceTo(padWorld) <= 9.75;
+}
 
 function bindHangarMovementControls(){
     if(hangarState.moveBound) return;
@@ -9536,7 +10414,7 @@ function bindHangarMovementControls(){
         if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(e.code)){
             if(e.code === 'Space') e.preventDefault();
             setKey(e.code, true);
-
+        }
         if(e.code === 'KeyE' && !e.repeat){
             const astronautPos = hangarState?.astronautPivot?.position || null;
             const candidates = [];
@@ -9549,18 +10427,18 @@ function bindHangarMovementControls(){
                 try{ pad.getWorldPosition(padWorld); }catch(_){ continue; }
                 const dist = astronautPos ? astronautPos.distanceTo(padWorld) : Infinity;
                 candidates.push({ ship, idx, dist, near: dist <= 9.75 });
-
+            }
             if(!candidates.length) return;
 
             let target = null;
             const hoverIndex = Number(hangarState.hoverDockIndex);
             if(Number.isFinite(hoverIndex) && hoverIndex >= 0){
                 target = candidates.find(item => item.idx === hoverIndex && item.near) || null;
-
+            }
             if(!target){
                 candidates.sort((a,b) => a.dist - b.dist);
                 target = candidates.find(item => item.near) || null;
-
+            }
             if(!target?.ship) return;
 
             e.preventDefault();
@@ -9571,18 +10449,21 @@ function bindHangarMovementControls(){
             const nextIndex = allShips.findIndex(item => String(item?.id || '').trim() === String(target.ship?.id || '').trim());
             if(nextIndex >= 0){
                 hangarState.shipIndex = nextIndex;
-
+            }
             const currentId = String(player?.selectedShipId || '').trim();
             const nextId = String(target.ship?.id || '').trim();
             fillHangarText();
             if(nextId && currentId !== nextId){
                 startHangarShipTransfer(currentId, nextId, target.idx);
-
+            }
+        }
     });
     document.addEventListener('keyup', (e) => {
         if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight','Space'].includes(e.code)){
             setKey(e.code, false);
-        });
+        }
+    });
+}
 
 function resetHangarAstronautState(){
     hangarState.astronautKeys = { w:false, a:false, s:false, d:false, shift:false, space:false };
@@ -9591,7 +10472,7 @@ function resetHangarAstronautState(){
     if(hangarState.astronautPivot){
         hangarState.astronautPivot.position.set(0, hangarState.astronautGroundY, 26.0);
         hangarState.astronautPivot.rotation.y = 0;
-
+    }
     hangarState.cameraYaw = 0;
     hangarState.cameraPitch = -0.08;
     hangarState.cameraYawTarget = 0;
@@ -9603,6 +10484,7 @@ function resetHangarAstronautState(){
     try{ document.querySelector('#hangar-window .hangar-room-shell')?.classList.remove('dragging'); }catch(_){ }
     try{ const c = document.querySelector('#hangar-window canvas'); if(c) c.style.cursor='auto'; }catch(_){}
     try{ document.body.style.cursor='auto'; }catch(_){}
+}
 
 
 function createHangarModuleMesh(item){
@@ -9655,9 +10537,12 @@ function createHangarModuleMesh(item){
         const brace = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.08, 16, 28), darkShell);
         brace.rotation.y = Math.PI / 2;
         group.add(pod, glowStrip, brace);
+    }
 
     group.scale.setScalar(1.28);
     return group;
+}
+
 
 function createHangarRoomEnvironment(){
     const group = new THREE.Group();
@@ -9713,6 +10598,7 @@ function createHangarRoomEnvironment(){
         animatedMaterials.push(lightBar.material);
         lightBars.push(lightBar);
         group.add(lightBar);
+    }
 
     const frontTop = new THREE.Mesh(new THREE.BoxGeometry(52, 0.75, 1.1), frameMat.clone());
     frontTop.position.set(0, 28.5, 58.5);
@@ -9763,6 +10649,7 @@ function createHangarRoomEnvironment(){
         sideGlow.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         glowPanels.push(sideGlow);
         group.add(sideGlow);
+    }
 
     const createDockTable = (x, z, accentMat, label) => {
         const dockGroup = new THREE.Group();
@@ -9875,18 +10762,20 @@ function createHangarRoomEnvironment(){
     group.userData.shipShowcaseGroup = centerShowcaseGroup;
     group.userData.shipDockWorld = new THREE.Vector3(0, centerDockGroup.position.y + centerPad.position.y, centerDockGroup.position.z);
     return group;
+}
 
 function disposeHangarRenderer(){
     if(hangarState.frameId){
         cancelAnimationFrame(hangarState.frameId);
         hangarState.frameId = 0;
-
+    }
     const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage');
     if(hangarState.renderer){
         try{ hangarState.renderer.dispose(); }catch(_){}
         if(stage && hangarState.renderer.domElement.parentNode === stage){
             stage.removeChild(hangarState.renderer.domElement);
-
+        }
+    }
     hangarState.renderer = null;
     hangarState.scene = null;
     hangarState.camera = null;
@@ -9906,6 +10795,7 @@ function disposeHangarRenderer(){
     if(hangarState.shipTransfer){
         try{ hangarState.shipTransfer.incoming?.mesh?.parent?.remove?.(hangarState.shipTransfer.incoming?.mesh); }catch(_){ }
         try{ hangarState.shipTransfer.outgoing?.mesh?.parent?.remove?.(hangarState.shipTransfer.outgoing?.mesh); }catch(_){ }
+    }
     hangarState.shipTransfer = null;
     hangarState.astronaut = null;
     hangarState.astronautPivot = null;
@@ -9918,12 +10808,15 @@ function disposeHangarRenderer(){
     hangarState.mouseLookActive = false;
     hangarState.lastMouseX = 0;
     hangarState.lastMouseY = 0;
+}
+
 
 function updateHangarHeaderNumbers(){
     const coinsEl = document.getElementById('hangar-coins');
     const diamondsEl = document.getElementById('hangar-diamonds');
     if(coinsEl) coinsEl.textContent = String(Number(playerResources?.coins || player?.credits || 0) || 0);
     if(diamondsEl) diamondsEl.textContent = String(Number(playerResources?.crystals || 0) || 0);
+}
 
 function updateHangarButtons(){
     const ships = getOwnedHangarShips();
@@ -9945,14 +10838,19 @@ function updateHangarButtons(){
     if(posLabel){
         const currentShip = ships[hangarState.shipIndex] || null;
         posLabel.textContent = currentShip ? `В ангаре: ${ships.length} • Активный: ${currentShip.name || currentShip.id || 'Корпус'}` : 'Нет корпусов';
+    }
 
     if(actionBtn){
         actionBtn.style.display = 'none';
         actionBtn.disabled = true;
+    }
+}
+
 
 function hideHangarShipPriceRow(){
     const row = document.getElementById('hangar-ship-price-row');
     if(row) row.style.display = 'none';
+}
 
 function disposeHangarSellTerminal(){
     const group = hangarState?.sellTerminalGroup || null;
@@ -9965,10 +10863,13 @@ function disposeHangarSellTerminal(){
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.filter(Boolean).forEach((mat) => {
                     try{ mat.map?.dispose?.(); }catch(_){ }
-                    try{ mat.dispose?.(); }catch(_){ });
-            }catch(_){ });
+                    try{ mat.dispose?.(); }catch(_){ }
+                });
+            }catch(_){ }
+        });
     }catch(_){ }
     hangarState.sellTerminalGroup = null;
+}
 
 function buildHangarSellTerminalLabel(textLabel){
     const canvas = document.createElement('canvas');
@@ -9990,14 +10891,17 @@ function buildHangarSellTerminalLabel(textLabel){
         ctx.fillStyle = '#e9ffff';
         ctx.font = 'bold 24px Arial';
         ctx.fillText('TERMINAL', canvas.width/2, 86);
-
+    }
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     return texture;
+}
 
 function ensureHangarSellTerminal(candidate){
     disposeHangarSellTerminal();
     return;
+}
+
 
 function updateHangarPlatformPrompt(){
     const hint = document.getElementById('hangar-platform-hint');
@@ -10011,30 +10915,37 @@ function updateHangarPlatformPrompt(){
         const hovered = candidates.find(item => item.idx === hoverIndex) || null;
         if(hovered && canSellHull(hovered.ship?.id)){
             activeCandidate = hovered;
-
+        }
+    }
     if(!activeCandidate){
         const selectedDockIndex = Number(hangarState?.selectedDockIndex);
         if(Number.isFinite(selectedDockIndex) && selectedDockIndex >= 0){
             const selectedCandidate = candidates.find(item => item.idx === selectedDockIndex) || null;
             if(selectedCandidate && canSellHull(selectedCandidate.ship?.id)){
                 activeCandidate = selectedCandidate;
-
-
+            }
+        }
+    }
     if(!activeCandidate){
         activeCandidate = candidates.find(item => canSellHull(item.ship?.id)) || null;
+    }
 
     if(hint){ hint.style.display = 'none'; hint.textContent = ''; }
     if(!activeCandidate){
         disposeHangarSellTerminal();
         return;
+    }
 
     const targetShip = activeCandidate.ship || null;
     const safeShipId = String(targetShip?.id || '').trim();
     if(!safeShipId || !canSellHull(safeShipId)){
         disposeHangarSellTerminal();
         return;
+    }
 
     ensureHangarSellTerminal(activeCandidate);
+}
+
 
 function renderHangarModuleList(ship){
     const wrap = document.getElementById('hangar-module-list');
@@ -10045,7 +10956,7 @@ function renderHangarModuleList(ship){
     if(!modules.length){
         wrap.innerHTML = `<div class="hangar-module-list-item empty"><div class="hangar-module-list-name">Нет модулей</div><div class="hangar-module-list-sub">Купи ${getHangarModuleTypeName(activeType).toLowerCase()} в магазине.</div></div>`;
         return;
-
+    }
     wrap.innerHTML = modules.map((item, index) => {
         const typeId = String(item?.typeId || item?.classId || '').trim();
         const equipped = String(equippedByType[typeId] || '').trim() === String(item?.id || '').trim();
@@ -10068,6 +10979,8 @@ function renderHangarModuleList(ship){
             rebuildHangarSceneObjects();
         });
     });
+}
+
 
 function fillHangarText(){
     hideHangarShipPriceRow();
@@ -10084,6 +10997,7 @@ function fillHangarText(){
     if(stageWrap){
         stageWrap.classList.toggle('empty-class', !ship);
         stageWrap.classList.toggle('ship-loading', !!ship && !!hangarState.isShipLoading);
+    }
 
     const setText = (id, value) => {
         const el = document.getElementById(id);
@@ -10119,17 +11033,19 @@ function fillHangarText(){
         moduleBtn.textContent = !module ? 'Нет модулей' : (moduleInstalled ? 'Снять' : 'Установить');
         moduleBtn.classList.toggle('equipped', moduleInstalled);
         moduleBtn.classList.toggle('locked', !ship || !module);
-
+    }
     if(moduleSellBtn){
         const sellable = !!module && canSellModule(module.id);
         moduleSellBtn.disabled = !sellable;
         moduleSellBtn.textContent = !module ? 'Нет модуля' : (sellable ? getSellActionLabel('module', module.id) : 'Стартовый модуль');
         moduleSellBtn.classList.toggle('locked', !sellable);
+    }
 
     const shipSellBtn = document.getElementById('hangar-ship-sell');
     if(shipSellBtn){
         shipSellBtn.style.display = 'none';
         shipSellBtn.disabled = true;
+    }
 
     const shipSlotMap = getEquippedModuleTypesForShip(ship?.id || '');
     const weaponInstalled = getModuleById(shipSlotMap.weapon || '');
@@ -10140,7 +11056,7 @@ function fillHangarText(){
     if(statsWrap){
         statsWrap.innerHTML = '';
         statsWrap.style.display = 'none';
-
+    }
     const weaponLabel = weaponInstalled?.name || 'Нет';
     const shieldLabel = shieldInstalled?.name || 'Нет';
     const boosterLabel = boosterInstalled?.name || 'Нет';
@@ -10162,10 +11078,14 @@ function fillHangarText(){
               <div class="hangar-stat-value">${value}</div>
             </div>
         `).join('');
+    }
 
     updateHangarHeaderNumbers();
     updateHangarButtons();
     updateHangarPlatformPrompt();
+}
+
+
 
 const hangarShipMeshCache = new Map();
 const hangarShipMeshPromiseCache = new Map();
@@ -10184,9 +11104,10 @@ function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
 
     if(hangarShipModelSourceCache.has(requestedPath)){
         return Promise.resolve(cloneObject3DDeepSafe(hangarShipModelSourceCache.get(requestedPath)));
-
+    }
     if(hangarShipMeshPromiseCache.has(`src:${requestedPath}`)){
         return hangarShipMeshPromiseCache.get(`src:${requestedPath}`).then(model => cloneObject3DDeepSafe(model));
+    }
 
     const loader = new GLTFLoader();
 
@@ -10195,7 +11116,7 @@ function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
         if(!activePath){
             reject(new Error('Failed to load GLB from all candidate paths'));
             return;
-
+        }
         loader.load(
             activePath,
             (gltf) => {
@@ -10214,23 +11135,26 @@ function loadExternalHangarShipModel(modelPath = 'ships/Spaceship.glb'){
                                     if(mat && 'metalness' in mat && mat.metalness < 0.45) mat.metalness = 0.45;
                                     if(mat && 'roughness' in mat && mat.roughness > 0.62) mat.roughness = 0.62;
                                 });
-
+                            }
+                        }
                     });
                     hangarShipModelSourceCache.set(requestedPath, cloneObject3DDeepSafe(model));
                     resolve(cloneObject3DDeepSafe(model));
                 }catch(err){
                     reject(err);
-                },
+                }
+            },
             undefined,
             () => {
                 tryLoadAt(i + 1).then(resolve).catch(reject);
-
+            }
         );
     });
 
     const promise = tryLoadAt(0);
     hangarShipMeshPromiseCache.set(`src:${requestedPath}`, promise);
     return promise.then(model => cloneObject3DDeepSafe(model));
+}
 
 function buildHangarShipMeshAsync(item){
     const externalPath = String(item?.modelPath || '').trim();
@@ -10244,8 +11168,10 @@ function buildHangarShipMeshAsync(item){
                 engine: String(item?.engine || '#63d1ff').trim() || '#63d1ff',
                 accent: String(item?.accent || '#7a8cff').trim() || '#7a8cff'
             })));
-
+    }
     return Promise.resolve(normalizeHangarShipMesh(createHangarShipMesh(item)));
+}
+
 
 function getBattleShipVisualConfig(shipId){
     const safeShipId = String(shipId || '').trim();
@@ -10257,7 +11183,7 @@ function getBattleShipVisualConfig(shipId){
             cameraDistance: 20.5,
             cameraHeight: 6.2
         };
-
+    }
     if(safeShipId === 'xwing_1'){
         return {
             scale: 2.05,
@@ -10266,7 +11192,7 @@ function getBattleShipVisualConfig(shipId){
             cameraDistance: 16.5,
             cameraHeight: 5.5
         };
-
+    }
     return {
         scale: 2.2,
         fallbackScale: 0.52,
@@ -10274,6 +11200,7 @@ function getBattleShipVisualConfig(shipId){
         cameraDistance: 16,
         cameraHeight: 5.5
     };
+}
 
 function buildBattleShipVisualAsync(item, team = 'blue'){
     const safeShipId = String(item?.id || '').trim();
@@ -10294,12 +11221,15 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
                     if(!mat) return;
                     if(mat.color?.isColor){
                         try{ mat.color.lerp(tint, 0.22); }catch(_){ }
+                    }
                     if(mat.emissive?.isColor){
                         try{ mat.emissive.copy(tint).multiplyScalar(0.06); }catch(_){ }
+                    }
                     if('metalness' in mat && Number(mat.metalness || 0) < 0.42) mat.metalness = 0.42;
                     if('roughness' in mat && Number(mat.roughness || 0) > 0.7) mat.roughness = 0.7;
                 });
-            });
+            }
+        });
         return root;
     };
 
@@ -10309,7 +11239,7 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
                 const normalized = normalizeHangarShipMesh(raw);
                 if(normalized?.scale?.multiplyScalar){
                     normalized.scale.multiplyScalar(Number(visualConfig?.scale || 2.2) || 2.2);
-
+                }
                 return applyBattleVisualTweaks(normalized);
             })
             .catch(() => {
@@ -10317,10 +11247,12 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
                 fallback.scale.multiplyScalar(Number(visualConfig?.fallbackScale || 0.52) || 0.52);
                 return applyBattleVisualTweaks(fallback);
             });
+    }
 
     const procedural = createHangarShipMesh(item);
     procedural.scale.multiplyScalar(Number(visualConfig?.fallbackScale || 0.52) || 0.52);
     return Promise.resolve(applyBattleVisualTweaks(procedural));
+}
 
 function mountBattleShipVisual(targetGroup, item, team = 'blue'){
     if(!targetGroup) return Promise.resolve(null);
@@ -10344,6 +11276,8 @@ function mountBattleShipVisual(targetGroup, item, team = 'blue'){
             return visual;
         })
         .catch(() => immediateFallback);
+}
+
 
 function createHangarNoShipPlaceholder(){
     const group = new THREE.Group();
@@ -10369,6 +11303,8 @@ function createHangarNoShipPlaceholder(){
 
     group.position.set(0, 0.42, 0.08);
     return group;
+}
+
 
 function createGuaranteedCentralShowcaseShip(){
     const ship = new THREE.Group();
@@ -10437,6 +11373,7 @@ function createGuaranteedCentralShowcaseShip(){
     ship.rotation.y = Math.PI;
     ship.userData.isGuaranteedCentralShip = true;
     return ship;
+}
 
 function createHangarLoadingPlaceholder(){
     const group = new THREE.Group();
@@ -10471,6 +11408,7 @@ function createHangarLoadingPlaceholder(){
 
     group.userData.isHangarPlaceholder = true
     return group;
+}
 
 function cloneObject3DDeepSafe(object3d){
     try{
@@ -10482,11 +11420,14 @@ function cloneObject3DDeepSafe(object3d){
                     node.material = node.material.map(mat => mat?.clone ? mat.clone() : mat);
                 }else if(node.material?.clone){
                     node.material = node.material.clone();
-
+                }
+            }
         });
         return cloned;
     }catch(_){
         return object3d?.clone ? object3d.clone(true) : object3d;
+    }
+}
 
 function queueHangarShipBuild(currentShip){
     if(!currentShip || !hangarState.shipPivot) return;
@@ -10505,6 +11446,7 @@ function queueHangarShipBuild(currentShip){
         hangarState.isShipLoading = false;
         fillHangarText();
         return;
+    }
 
     buildHangarShipMeshAsync(currentShip)
         .then((shipMesh) => {
@@ -10528,6 +11470,7 @@ function queueHangarShipBuild(currentShip){
             hangarState.isShipLoading = false;
             fillHangarText();
         });
+}
 
 function normalizeHangarShipMesh(shipMesh){
     try{
@@ -10571,6 +11514,8 @@ function normalizeHangarShipMesh(shipMesh){
         return wrap;
     }catch(_){
         return shipMesh;
+    }
+}
 
 function rebuildHangarSceneObjects(){
     if(!hangarState.scene || !hangarState.modulePivot) return;
@@ -10581,7 +11526,7 @@ function rebuildHangarSceneObjects(){
 
     if(hangarState.shipPivot){
         while(hangarState.shipPivot.children.length) hangarState.shipPivot.remove(hangarState.shipPivot.children[0]);
-
+    }
     while(hangarState.modulePivot.children.length) hangarState.modulePivot.remove(hangarState.modulePivot.children[0]);
 
     const modules = getOwnedHangarModules();
@@ -10595,9 +11540,10 @@ function rebuildHangarSceneObjects(){
         while(showcaseGroup.children.length) showcaseGroup.remove(showcaseGroup.children[0]);
         showcaseGroup.rotation.set(0, 0, 0);
         showcaseGroup.position.set(0, 2.08, 0);
-
+    }
     (hangarState.supportShipMeshes || []).forEach(mesh => {
-        try{ mesh?.parent?.remove?.(mesh); }catch(_){ });
+        try{ mesh?.parent?.remove?.(mesh); }catch(_){ }
+    });
     hangarState.supportShipMeshes = [];
     if(emergencyHull) emergencyHull.visible = false;
 
@@ -10632,6 +11578,8 @@ function rebuildHangarSceneObjects(){
             if(centerPlaque.userData?.textPlane?.material){
                 centerPlaque.userData.textPlane.material.opacity = 1;
                 centerPlaque.userData.textPlane.visible = true;
+            }
+        }
 
         const cachedCenterMesh = liveItem ? hangarShipMeshCache.get(String(liveItem.id || '').trim()) : null;
         if(cachedCenterMesh){
@@ -10647,6 +11595,7 @@ function rebuildHangarSceneObjects(){
             hangarState.isShipLoading = false;
         }else{
             hangarState.isShipLoading = true;
+        }
 
         buildHangarShipMeshAsync(liveItem || currentShip)
             .then((shipMesh) => {
@@ -10662,7 +11611,8 @@ function rebuildHangarSceneObjects(){
                 showcaseGroup.add(shipMesh);
                 if(liveItem){
                     hangarShipMeshCache.set(String(liveItem.id || '').trim(), cloneObject3DDeepSafe(shipMesh));
-                })
+                }
+            })
             .catch(() => {
                 if(buildToken !== hangarBuildToken || !showcaseGroup) return;
             })
@@ -10672,6 +11622,7 @@ function rebuildHangarSceneObjects(){
                 refreshHangarInfoBoards();
                 fillHangarText();
             });
+    }
 
     (hangarState.supportPlatforms || []).forEach((pad, dockIndex) => {
         if(!pad) return;
@@ -10709,11 +11660,13 @@ function rebuildHangarSceneObjects(){
             moduleMesh.position.set(worldPos.x, worldPos.y + 1.05, worldPos.z);
         }else{
             moduleMesh.position.set(-18, 0.8, -8);
-
+        }
         hangarState.modulePivot.add(moduleMesh);
+    }
 
     refreshHangarInfoBoards();
     fillHangarText();
+}
 
 function ensureHangarRenderer(){
     const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage');
@@ -10800,7 +11753,8 @@ function ensureHangarRenderer(){
             if(pad){
                 pad.userData = pad.userData || {};
                 pad.userData.hangarDockIndex = idx;
-            });
+            }
+        });
         syncHangarDockSelection();
         hangarState.infoBoards = [
             { kind:'center_ship', plaque: hangarState?.envGroup?.userData?.shipDockPlaque || null },
@@ -10825,6 +11779,7 @@ function ensureHangarRenderer(){
         hangarState.cameraPitchTarget = -0.08;
         hangarState.lastMouseX = window.innerWidth * 0.5;
         hangarState.lastMouseY = window.innerHeight * 0.5;
+    }
 
     bindHangarStageInteraction();
 
@@ -10834,7 +11789,8 @@ function ensureHangarRenderer(){
             hangarState.lastMouseX = window.innerWidth * 0.5;
             hangarState.lastMouseY = window.innerHeight * 0.5;
             safeRequestPointerLock(canvas);
-        }catch(_){}
+        }
+    }catch(_){}
 
     const width = window.innerWidth || stage.clientWidth || 1000;
     const height = window.innerHeight || stage.clientHeight || 700;
@@ -10848,11 +11804,13 @@ function ensureHangarRenderer(){
             if(document.getElementById('hangar-window')?.classList.contains('hidden')) return;
             ensureHangarRenderer();
         });
+    }
 
     const animate = () => {
         if(document.getElementById('hangar-window')?.classList.contains('hidden')){
             hangarState.frameId = 0;
             return;
+        }
 
         const now = performance.now();
         const time = now * 0.001;
@@ -10866,14 +11824,16 @@ function ensureHangarRenderer(){
         if(hangarState.platformRing?.material){
             hangarState.platformRing.material.opacity = isViewedShipSelected ? 1 : 0.82;
             hangarState.platformRing.material.color.copy(ringColor);
-
+        }
         if(hangarState.platformGlowDisc?.material){
             hangarState.platformGlowDisc.material.opacity = isViewedShipSelected ? 0.30 : 0.2;
             hangarState.platformGlowDisc.material.color.copy(glowColor);
+        }
 
         if(hangarState.showcaseGroup){
             hangarState.shipYaw += 0.0045;
             hangarState.showcaseGroup.rotation.y = hangarState.shipYaw;
+        }
 
         const ownedShips = getOwnedHangarShips();
         (hangarState.supportPlatforms || []).forEach((pad, idx) => {
@@ -10890,10 +11850,10 @@ function ensureHangarRenderer(){
             if(ring?.material){
                 ring.material.color.setHSL(baseHue, isOccupiedDock ? 0.96 : 0.35, lightness);
                 ring.material.opacity = (isOccupiedDock ? 0.76 : 0.32) + Math.sin(time * 1.8 + idx) * 0.05 + opacityBoost;
-
+            }
             if(glow?.material){
                 glow.material.opacity = (isOccupiedDock ? 0.16 : 0.05) + Math.sin(time * 1.35 + idx * 0.7) * 0.03 + opacityBoost * 0.7;
-
+            }
             const baseY = pad.userData?.baseY ?? pad.position.y;
             const lift = isSelectedDock ? 0.08 : (isHoveredDock ? 0.04 : 0.0);
             pad.position.y = baseY + Math.sin(time * 1.1 + idx * 0.5) * 0.01 + lift;
@@ -10924,7 +11884,10 @@ function ensureHangarRenderer(){
                     const nextScale = startScale + (targetScale - startScale) * eased;
                     child.scale.setScalar(nextScale);
                     child.position.y = 0.08 + 0.10 * eased;
-                });
+                }
+            });
+        }
+
 
         if(hangarState.shipTransfer){
             const transfer = hangarState.shipTransfer;
@@ -10947,7 +11910,7 @@ function ensureHangarRenderer(){
                 }else{
                     t = 1;
                     y = THREE.MathUtils.lerp(from.y + lift, to.y, smooth((progress - 0.78) / 0.22));
-
+                }
                 const pos = from.clone().lerp(to, t);
                 const arc = Math.sin(Math.PI * THREE.MathUtils.clamp((progress - 0.26) / 0.52, 0, 1)) * Number(entry.arcOffset || 0);
                 pos.z += arc;
@@ -10963,7 +11926,8 @@ function ensureHangarRenderer(){
                             : new THREE.Vector3(1, 0, 0);
                         const targetQuat = new THREE.Quaternion().setFromUnitVectors(forwardAxis, direction);
                         entry.mesh.quaternion.slerp(targetQuat, 0.22);
-
+                    }
+                }
                 const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
                 entry.mesh.scale.setScalar(scaleValue);
             });
@@ -10976,9 +11940,9 @@ function ensureHangarRenderer(){
                     updateHUD?.();
                     updateUI?.();
                     saveGame?.();
-
-                try{ if(transfer.hiddenOriginalIncoming){ transfer.hiddenOriginalIncoming.visible = true; transfer.hiddenOriginalIncoming.userData.hiddenForTransfer = false; }catch(_){ }
-                try{ if(transfer.hiddenOriginalOutgoing){ transfer.hiddenOriginalOutgoing.visible = true; transfer.hiddenOriginalOutgoing.userData.hiddenForTransfer = false; }catch(_){ }
+                }
+                try{ if(transfer.hiddenOriginalIncoming){ transfer.hiddenOriginalIncoming.visible = true; transfer.hiddenOriginalIncoming.userData.hiddenForTransfer = false; } }catch(_){ }
+                try{ if(transfer.hiddenOriginalOutgoing){ transfer.hiddenOriginalOutgoing.visible = true; transfer.hiddenOriginalOutgoing.userData.hiddenForTransfer = false; } }catch(_){ }
                 try{ transfer.incoming?.mesh && (transfer.incoming.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
                 try{ transfer.outgoing?.mesh && (transfer.outgoing.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
                 try{ transfer.incoming?.mesh?.parent?.remove?.(transfer.incoming?.mesh); }catch(_){ }
@@ -10988,6 +11952,8 @@ function ensureHangarRenderer(){
                 hangarState.selectedDockIndex = -1;
                 rebuildHangarSceneObjects();
                 fillHangarText();
+            }
+        }
 
         if(Array.isArray(hangarState.envAnimatedMaterials)){
             hangarState.envAnimatedMaterials.forEach((mat, idx) => {
@@ -10995,18 +11961,19 @@ function ensureHangarRenderer(){
                 const pulse = 0.88 + Math.sin(time * 1.25 + idx * 0.7) * 0.22;
                 if('emissiveIntensity' in mat) mat.emissiveIntensity = pulse * (idx % 3 === 0 ? 1.6 : 1.1);
             });
-
+        }
         if(Array.isArray(hangarState.envLightBars)){
             hangarState.envLightBars.forEach((mesh, idx) => {
                 if(!mesh) return;
                 mesh.scale.y = 1 + Math.sin(time * 1.05 + idx * 0.45) * 0.035;
             });
-
+        }
         if(Array.isArray(hangarState.envGlowPanels)){
             hangarState.envGlowPanels.forEach((mesh, idx) => {
                 if(!mesh?.material) return;
                 mesh.material.opacity = 0.07 + (idx % 2 ? 0.05 : 0.09) + Math.sin(time * 0.85 + idx) * 0.02;
             });
+        }
 
         if(hangarState.astronautPivot){
             const moveX = (hangarState.astronautKeys.d ? 1 : 0) - (hangarState.astronautKeys.a ? 1 : 0);
@@ -11028,10 +11995,10 @@ function ensureHangarRenderer(){
             }else{
                 hangarState.astronautVelocity.x *= 0.78;
                 hangarState.astronautVelocity.z *= 0.78;
-
+            }
             if(hangarState.astronautKeys.space && Math.abs(hangarState.astronautPivot.position.y - hangarState.astronautGroundY) < 0.04){
                 hangarState.astronautVelocity.y = 0.18;
-
+            }
             hangarState.astronautVelocity.y -= 0.0095;
             hangarState.astronautPivot.position.x = THREE.MathUtils.clamp(hangarState.astronautPivot.position.x + hangarState.astronautVelocity.x, -30.0, 30.0);
             hangarState.astronautPivot.position.z = THREE.MathUtils.clamp(hangarState.astronautPivot.position.z + hangarState.astronautVelocity.z, -52.0, 52.0);
@@ -11039,7 +12006,7 @@ function ensureHangarRenderer(){
             if(hangarState.astronautPivot.position.y <= hangarState.astronautGroundY){
                 hangarState.astronautPivot.position.y = hangarState.astronautGroundY;
                 hangarState.astronautVelocity.y = 0;
-
+            }
             hangarState.astronautPivot.rotation.y += (hangarState.astronautTargetYaw - hangarState.astronautPivot.rotation.y) * 0.18;
             hangarState.astronautBob += isMoving ? 0.22 * runMul : 0.05;
             const walkSwing = isMoving ? Math.sin(hangarState.astronautBob) * 0.55 : 0;
@@ -11048,6 +12015,7 @@ function ensureHangarRenderer(){
             if(parts.armR) parts.armR.rotation.x = -walkSwing;
             if(parts.legL) parts.legL.rotation.x = -walkSwing;
             if(parts.legR) parts.legR.rotation.x = walkSwing;
+        }
 
         (hangarState.planets || []).forEach((planet, idx) => {
             if(!planet) return;
@@ -11070,20 +12038,23 @@ function ensureHangarRenderer(){
             desiredPos.y += 5.4;
             hangarState.camera.position.lerp(desiredPos, 0.28);
             hangarState.camera.lookAt(focus);
-
+        }
         const floatingSellBtn = document.getElementById('hangar-platform-sell');
         if(floatingSellBtn){
             floatingSellBtn.style.display = 'none';
             floatingSellBtn.disabled = true;
             floatingSellBtn.dataset.shipId = '';
             floatingSellBtn.dataset.dockIndex = '';
-
+        }
         hangarState.renderer.render(hangarState.scene, hangarState.camera);
         hangarState.frameId = requestAnimationFrame(animate);
     };
 
     if(!hangarState.frameId){
         hangarState.frameId = requestAnimationFrame(animate);
+    }
+}
+
 
 function bindHangarStageInteraction(){
     const stage = document.getElementById('hangar-runtime-stage') || document.getElementById('hangar-3d-stage') || document.querySelector('#hangar-window .hangar-room-shell');
@@ -11097,7 +12068,7 @@ function bindHangarStageInteraction(){
             hangarState.hoverDockIndex = -1;
             updateHangarPlatformPrompt();
             return;
-
+        }
         mouse.x = ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
         mouse.y = -(((clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1);
         raycaster.setFromCamera(mouse, hangarState.camera);
@@ -11110,7 +12081,7 @@ function bindHangarStageInteraction(){
             try{ pad?.traverse?.(child => { if(child?.isMesh) nodes.push(child); }); }catch(_){}
             return nodes;
         });
-        plaques.forEach(plaque => { try{ plaque?.traverse?.(child => { if(child?.isMesh) targets.push(child); }); }catch(_){});
+        plaques.forEach(plaque => { try{ plaque?.traverse?.(child => { if(child?.isMesh) targets.push(child); }); }catch(_){} });
         const hits = raycaster.intersectObjects(targets, false);
         let hoverIndex = -1;
         let terminalShipId = '';
@@ -11121,7 +12092,8 @@ function bindHangarStageInteraction(){
                 if(obj?.userData?.hangarSellPlaqueButton && Number.isFinite(obj?.userData?.hangarDockIndex)) hoverIndex = Number(obj.userData.hangarDockIndex);
                 if(Number.isFinite(obj?.userData?.hangarDockIndex)) hoverIndex = Number(obj.userData.hangarDockIndex);
                 obj = obj.parent;
-
+            }
+        }
         hangarState.hoverDockIndex = hoverIndex;
         updateHangarPlatformPrompt();
         if(activateClick && terminalShipId && !hangarState.shipTransfer && canSellHull(terminalShipId) && isHangarDockWithinUseDistance(hoverIndex)){
@@ -11132,7 +12104,7 @@ function bindHangarStageInteraction(){
             fillHangarText();
             rebuildHangarSceneObjects();
             return;
-
+        }
         if(activateClick && hoverIndex >= 0 && !hangarState.shipTransfer && isHangarDockWithinUseDistance(hoverIndex)){
             hangarState.selectedDockIndex = hoverIndex;
             updateHangarPlatformPrompt();
@@ -11146,8 +12118,10 @@ function bindHangarStageInteraction(){
                 if(nextId && currentId !== nextId){
                     fillHangarText();
                     startHangarShipTransfer(currentId, nextId, hoverIndex);
-
-        };
+                }
+            }
+        }
+    };
 
     const applyDelta = (dx, dy) => {
         const safeDx = THREE.MathUtils.clamp(Number(dx || 0) || 0, -22, 22);
@@ -11176,6 +12150,8 @@ function bindHangarStageInteraction(){
         stage.addEventListener('click', (event) => {
             updateDockHover(event.clientX, event.clientY, true);
         });
+    }
+
 
     if(!hangarState.stageDocBound){
         hangarState.stageDocBound = true;
@@ -11206,9 +12182,11 @@ function bindHangarStageInteraction(){
                         return nextX >= rect.left && nextX <= rect.right && nextY >= rect.top && nextY <= rect.bottom;
                     }catch(_){
                         return true;
-                    })();
+                    }
+                })();
 
                 if(!insideStage) return;
+            }
 
             applyDelta(dx, dy);
         }, { passive:true });
@@ -11222,6 +12200,7 @@ function bindHangarStageInteraction(){
             hangarState.lastMouseX = 0;
             hangarState.lastMouseY = 0;
         }, { passive:true });
+    }
 
     const canvas = hangarState?.renderer?.domElement || null;
     if(canvas && !canvas.dataset.hangarLookBound){
@@ -11231,6 +12210,9 @@ function bindHangarStageInteraction(){
             if(document.pointerLockElement !== canvas) return;
             applyDelta(event.movementX || 0, event.movementY || 0);
         }, { passive:true });
+    }
+}
+
 
 function bindHangarRuntimeUI(){
     const leftBtn = document.getElementById('hangar-ship-left');
@@ -11255,7 +12237,7 @@ function bindHangarRuntimeUI(){
             fillHangarText();
             rebuildHangarSceneObjects();
         });
-
+    }
     if(rightBtn && !rightBtn.dataset.boundHangarRuntime){
         rightBtn.dataset.boundHangarRuntime = '1';
         rightBtn.addEventListener('click', () => {
@@ -11266,7 +12248,7 @@ function bindHangarRuntimeUI(){
             fillHangarText();
             rebuildHangarSceneObjects();
         });
-
+    }
     if(upBtn && !upBtn.dataset.boundHangarRuntime){
         upBtn.dataset.boundHangarRuntime = '1';
         upBtn.addEventListener('click', () => {
@@ -11276,7 +12258,7 @@ function bindHangarRuntimeUI(){
             fillHangarText();
             rebuildHangarSceneObjects();
         });
-
+    }
     if(downBtn && !downBtn.dataset.boundHangarRuntime){
         downBtn.dataset.boundHangarRuntime = '1';
         downBtn.addEventListener('click', () => {
@@ -11286,7 +12268,7 @@ function bindHangarRuntimeUI(){
             fillHangarText();
             rebuildHangarSceneObjects();
         });
-
+    }
     if(moduleBtn && !moduleBtn.dataset.boundHangarRuntime){
         moduleBtn.dataset.boundHangarRuntime = '1';
         moduleBtn.addEventListener('click', () => {
@@ -11300,11 +12282,11 @@ function bindHangarRuntimeUI(){
                 unequipModuleFromShip?.(ship.id, moduleType);
             }else{
                 equipModuleToShip?.(ship.id, module.id);
-
+            }
             fillHangarText();
             rebuildHangarSceneObjects();
         });
-
+    }
     if(moduleSellBtn && !moduleSellBtn.dataset.boundHangarRuntime){
         moduleSellBtn.dataset.boundHangarRuntime = '1';
         moduleSellBtn.addEventListener('click', () => {
@@ -11315,13 +12297,13 @@ function bindHangarRuntimeUI(){
             fillHangarText();
             rebuildHangarSceneObjects();
         });
-
+    }
     if(shipActionBtn && !shipActionBtn.dataset.boundHangarRuntime){
         shipActionBtn.dataset.boundHangarRuntime = '1';
         shipActionBtn.addEventListener('click', () => {
             selectCurrentHangarShip?.();
         });
-
+    }
     if(shipSellBtn && !shipSellBtn.dataset.boundHangarRuntime){
         shipSellBtn.dataset.boundHangarRuntime = '1';
         shipSellBtn.addEventListener('click', () => {
@@ -11331,7 +12313,7 @@ function bindHangarRuntimeUI(){
             fillHangarText();
             rebuildHangarSceneObjects();
         });
-
+    }
     if(floatingShipSellBtn && !floatingShipSellBtn.dataset.boundHangarRuntime){
         floatingShipSellBtn.dataset.boundHangarRuntime = '1';
         floatingShipSellBtn.addEventListener('click', () => {
@@ -11343,6 +12325,7 @@ function bindHangarRuntimeUI(){
             fillHangarText();
             rebuildHangarSceneObjects();
         });
+    }
 
     classButtons.forEach((btn) => {
         if(btn.dataset.boundHangarRuntime) return;
@@ -11367,6 +12350,7 @@ function bindHangarRuntimeUI(){
             rebuildHangarSceneObjects();
         });
     });
+}
 
 function bindHangarControls(){
     const closeBtn = document.getElementById('close-hangar');
@@ -11378,7 +12362,11 @@ function bindHangarControls(){
             try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
             try{ document.body.style.cursor='auto'; }catch(_){ }
             try{ const c = document.querySelector('#hangar-window canvas'); if(c) c.style.cursor='auto'; }catch(_){ }
-            try{ disposeHangarRenderer?.(); }catch(_){ });
+            try{ disposeHangarRenderer?.(); }catch(_){ }
+        });
+    }
+}
+
 
 function renderHangarCosmic(forceSyncToSelected = true){
     try{ disposeHangarRenderer?.(); }catch(_){ }
@@ -11389,6 +12377,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
 
     if(forceSyncToSelected !== false){
         try{ syncHangarSelectionState?.({ forceClass:true }); }catch(_){ }
+    }
     try{ ensureHangarIndexes?.(); }catch(_){ }
 
     const shell = win.querySelector('.hangar-empty-shell');
@@ -11447,6 +12436,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
             </section>
           </div>
         `;
+    }
 
     bindHangarControls();
     bindHangarRuntimeUI();
@@ -11454,6 +12444,8 @@ function renderHangarCosmic(forceSyncToSelected = true){
     fillHangarText();
     ensureHangarRenderer();
     rebuildHangarSceneObjects();
+}
+
 
 function renderClansWindow(){
     const clansInfo = document.getElementById('clans-info');
@@ -11462,6 +12454,7 @@ function renderClansWindow(){
       <div class="clan-card"><div class="cosmic-badge">Ваш клан</div><div>Пока не выбран</div></div>
       <div class="clan-card"><div class="cosmic-badge">Возможности</div><div>Создать клан, подать заявку, список участников и клановый чат. Вкладка Clan уже добавлена в общий чат; для полной работы нужен clan_id игрока в базе.</div></div>
       <div class="clan-card"><div class="cosmic-badge">Топ кланы</div><div>1. Nova Wolves<br>2. Orbit Guard<br>3. Red Comets</div></div>`;
+}
 
 function renderLeadersWindow(){
     const leadersInfo = document.getElementById('leaders-info');
@@ -11476,6 +12469,7 @@ function renderLeadersWindow(){
       <div class="leader-row header"><div>#</div><div>Пилот</div><div>Рейтинг</div><div>Победы</div><div>Уровень</div></div>
       ${rows.map(r => `<div class="leader-row"><div>${r.place}</div><div>${r.name}</div><div>${r.rating}</div><div>${r.wins}</div><div>${r.level}</div></div>`).join('')}
     </div>`;
+}
 
 function initExtraLobbyWindows(){
     const openers = [
@@ -11498,13 +12492,15 @@ function initExtraLobbyWindows(){
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
                 try{ renderHangarCosmic?.(true); }catch(_){}
-                setTimeout(() => { try{ renderHangarCosmic?.(false); }catch(_){}, 40);
+                setTimeout(() => { try{ renderHangarCosmic?.(false); }catch(_){} }, 40);
               });
             });
           } else {
             renderer();
-          });
-      });
+          }
+        });
+      }
+    });
     [['close-profile','profile-window'],['close-hangar','hangar-window'],['close-clans','clans-window'],['close-leaders','leaders-window']].forEach(([btnId,winId]) => {
       const btn = document.getElementById(btnId);
       const win = document.getElementById(winId);
@@ -11515,8 +12511,11 @@ function initExtraLobbyWindows(){
           if(winId === 'hangar-window'){
             try{ disposeHangarRenderer?.(); }catch(_){}
             __restoreHangarChatPanel();
-          });
-      });
+          }
+        });
+      }
+    });
+}
 
 window.addEventListener('load', () => {
     initExtraLobbyWindows();
@@ -11532,7 +12531,9 @@ window.addEventListener('load', () => {
         if(chatWrapper && !__hangarChatHomeParent){
             __hangarChatHomeParent = chatWrapper.parentNode;
             __hangarChatHomeNextSibling = chatWrapper.nextSibling;
-        }catch(_){});
+        }
+    }catch(_){}
+});
 
 
 // ===== V6 BATTLE + OBSERVE EXTENSIONS =====
@@ -11546,6 +12547,7 @@ function initCreateMatchLevels(){
     maxLevel.innerHTML = values.map(v => `<option value="${v}">${v}</option>`).join('');
     minLevel.value = '1';
     maxLevel.value = '120';
+}
 
 function createRockMesh(scale=1, color=0x5f6778){
     const geo = new THREE.IcosahedronGeometry(1.1 * scale, 0);
@@ -11554,10 +12556,11 @@ function createRockMesh(scale=1, color=0x5f6778){
         const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
         const factor = 0.82 + Math.random() * 0.45;
         pos.setXYZ(i, x * factor, y * (0.75 + Math.random()*0.55), z * factor);
-
+    }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
     return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness:0.95, metalness:0.05 }));
+}
 
 function clearBattleObstacles(){
     battleObstacles.forEach(obj => obj && scene.remove(obj));
@@ -11566,6 +12569,7 @@ function clearBattleObstacles(){
     setBattleChatOpen(false);
     const feed = document.getElementById('kill-feed'); if(feed) feed.innerHTML = "";
     const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = "";
+}
 
 function createBattleObstacles(mapKey){
     clearBattleObstacles();
@@ -11583,7 +12587,7 @@ function createBattleObstacles(mapKey){
         rock.userData.radius = 1.8 + Math.random()*1.8;
         battleObstacles.push(rock);
         scene.add(rock);
-
+    }
     for(let i=0;i<6;i++){
         const wreck = new THREE.Group();
         const beamMat = new THREE.MeshStandardMaterial({ color:0x46566d, roughness:0.82, metalness:0.28 });
@@ -11599,6 +12603,8 @@ function createBattleObstacles(mapKey){
         wreck.userData.radius = 2.8 + Math.random()*2.5;
         battleObstacles.push(wreck);
         scene.add(wreck);
+    }
+}
 
 function handleBattleCollisions(object, velocityRef=null){
     if(!object) return;
@@ -11611,7 +12617,9 @@ function handleBattleCollisions(object, velocityRef=null){
             if(!Number.isFinite(push.x)) push.set(1,0,0);
             object.position.copy(obstacle.position.clone().add(push.multiplyScalar(radius + 2.6)));
             if(velocityRef) velocityRef.multiplyScalar(0.55);
-
+        }
+    }
+}
 
 function spawnShipDebris(position, color=0xffffff){
     for(let i=0;i<14;i++){
@@ -11625,6 +12633,8 @@ function spawnShipDebris(position, color=0xffffff){
             spin: new THREE.Vector3((Math.random()-0.5)*0.12,(Math.random()-0.5)*0.12,(Math.random()-0.5)*0.12),
             ttl: 180
         });
+    }
+}
 
 function updateDebrisPieces(){
     for(let i=debrisPieces.length-1;i>=0;i--){
@@ -11638,7 +12648,9 @@ function updateDebrisPieces(){
         if(d.ttl <= 0){
             scene.remove(d.mesh);
             debrisPieces.splice(i,1);
-
+        }
+    }
+}
 
 function createObserverBot(index=0){
     const botGroup = new THREE.Group();
@@ -11665,6 +12677,7 @@ function createObserverBot(index=0){
     };
     scene.add(botGroup);
     return botGroup;
+}
 
 function setupObserverBattle(mapName){
     clearBattleScene();
@@ -11678,6 +12691,7 @@ function setupObserverBattle(mapName){
     camera.position.copy(observerFreeCameraPosition);
     const hud = document.getElementById('enemy-hud');
     if(hud) hud.style.display = 'none';
+}
 
 function updateObserverBattle(){
     const lookEuler = new THREE.Euler(observerCameraPitch, observerCameraYaw, 0, 'YXZ');
@@ -11698,9 +12712,11 @@ function updateObserverBattle(){
     if(move.lengthSq() > 0){
         move.normalize().multiplyScalar(flySpeed);
         observerFreeCameraPosition.add(move);
+    }
 
     camera.position.copy(observerFreeCameraPosition);
     camera.lookAt(observerFreeCameraPosition.clone().add(forward.multiplyScalar(80)));
+}
 
 function fireObserverLaser(shooter, target){
     const dir = target.position.clone().sub(shooter.position).normalize();
@@ -11712,6 +12728,7 @@ function fireObserverLaser(shooter, target){
         scene.add(mesh);
         enemyLasers.push({ mesh, velocity: dir.clone().multiplyScalar(2.5), life: 90, damage: 10, shooter });
     });
+}
 
 (function bindObserverButton(){
     const btn = document.getElementById('observe-match-btn');
@@ -11723,7 +12740,8 @@ function fireObserverLaser(shooter, target){
             currentRoom = buildObserveRoomState(targetMap);
             switchState('OBSERVE');
         });
-    })();
+    }
+})();
 
 (function patchCreateMatchPreview(){
     const mapPreview = document.getElementById('map-preview');
@@ -11734,11 +12752,12 @@ function fireObserverLaser(shooter, target){
 
 function getStoredAccounts(){
     try{ return JSON.parse(localStorage.getItem('cosmicAccounts') || '[]'); }catch(_){ return []; }
+}
 function saveStoredAccounts(accounts){ localStorage.setItem('cosmicAccounts', JSON.stringify(accounts)); }
 function getNextAccountId(accounts){
     const maxId = accounts.reduce((max, acc) => Math.max(max, Number(acc.id) || 0), 0);
     return maxId + 1;
-
+}
 function ensureDeveloperAccount(){
     const devEmail = 'calean3@gmail.com';
     const devPassword = '123';
@@ -11760,12 +12779,12 @@ function ensureDeveloperAccount(){
             developer: true,
             verificationCode: ''
         });
-
+    }
     saveStoredAccounts(accounts);
-
+}
 function findStoredAccountByEmail(email){
     return getStoredAccounts().find(acc => acc.email.toLowerCase() === String(email || '').trim().toLowerCase());
-
+}
 function updatePremiumAccountInfo(){
     const nameEl = document.getElementById('premium-player-name');
     const idEl = document.getElementById('premium-player-id');
@@ -11789,7 +12808,7 @@ function updatePremiumAccountInfo(){
         textNode.className = 'premium-currency-text';
         textNode.textContent = `💎 ${playerResources?.crystals || 0}`;
         crystalEl.prepend(textNode);
-
+    }
     if(coinsEl){
         coinsEl.classList.add('premium-item','currency-item');
         coinsEl.childNodes.forEach(node => {
@@ -11800,9 +12819,9 @@ function updatePremiumAccountInfo(){
         textNode.className = 'premium-currency-text';
         textNode.textContent = `🪙 ${playerResources?.coins || 0}`;
         coinsEl.prepend(textNode);
-
+    }
     ensurePremiumCurrencyUi?.();
-
+}
 function updateNicknameSettingsState(message=''){
     const nicknameInput = document.getElementById('nickname-input');
     const nicknameStatus = document.getElementById('nickname-status');
@@ -11817,7 +12836,7 @@ function updateNicknameSettingsState(message=''){
     if(battleSaveBtn) battleSaveBtn.style.display = inBattleMenu ? 'inline-flex' : 'none';
     if(closeSettings) closeSettings.textContent = inBattleMenu ? 'Выйти с карты' : 'Закрыть';
     updatePremiumAccountInfo();
-
+}
 function logoutToAuth(message='Возврат в меню входа.'){
     try{ resetPrivateChatState?.(); }catch(_e){}
     stopRemotePlayerSync?.();
@@ -11836,7 +12855,7 @@ function logoutToAuth(message='Возврат в меню входа.'){
     resetBattleInputState();
     applyAuthUIState(message);
     switchState('AUTH');
-
+}
 function saveNicknameFromSettings(){
     const nicknameInput = document.getElementById('nickname-input');
     const nextNickname = nicknameInput?.value?.trim() || '';
@@ -11850,7 +12869,8 @@ function saveNicknameFromSettings(){
             .then(({error}) => { if(error) console.warn('Не удалось сохранить ник:', error.message); else saveGame(); });
     } else {
         saveGame();
-
+    }
+}
 function applyAuthUIState(message=''){
     const loginEmail = document.getElementById('login-email');
     const loginPassword = document.getElementById('login-password');
@@ -11868,7 +12888,7 @@ function applyAuthUIState(message=''){
     if(verifyCode) verifyCode.value = '';
     if(remember) remember.checked = !!rememberedEmail;
     if(authMessage) authMessage.textContent = message;
-
+}
 function openGameAsGuest(){
     stopRemotePlayerSync?.();
     window.playerMuted = false;
@@ -11884,13 +12904,14 @@ function openGameAsGuest(){
     resetPlayerProgress();
     updatePremiumAccountInfo();
     switchState('LOBBY');
-
+}
 function registerLocalAccount(){
     const email = document.getElementById('register-email')?.value?.trim() || '';
     const password = document.getElementById('register-password')?.value || '';
     if(!email || !password){
         showAuthMessage('Введите email и пароль для регистрации.');
         return;
+    }
 
     (async () => {
         try{
@@ -11898,7 +12919,7 @@ function registerLocalAccount(){
             if(error){
                 showAuthMessage('Ошибка: ' + error.message);
                 return;
-
+            }
             const loginEmail = document.getElementById('login-email');
             const loginPassword = document.getElementById('login-password');
             if(loginEmail) loginEmail.value = email;
@@ -11906,11 +12927,12 @@ function registerLocalAccount(){
             showAuthMessage('Регистрация успешна. Теперь войди в аккаунт.');
         }catch(err){
             showAuthMessage('Ошибка: ' + (err?.message || err));
-        })();
-
+        }
+    })();
+}
 function confirmEmailCode(){
     showAuthMessage('Код подтверждения больше не используется. Просто войди в аккаунт.');
-
+}
 function loginLocalAccount(){
     const email = document.getElementById('login-email')?.value?.trim() || '';
     const password = document.getElementById('login-password')?.value || '';
@@ -11919,6 +12941,7 @@ function loginLocalAccount(){
     if(!email || !password){
         showAuthMessage('Введите email и пароль.');
         return;
+    }
 
     (async () => {
         try{
@@ -11926,6 +12949,7 @@ function loginLocalAccount(){
             if(error){
                 showAuthMessage('Ошибка входа: ' + error.message);
                 return;
+            }
 
             const user = data?.user;
             authState.mode = 'account';
@@ -11947,7 +12971,7 @@ function loginLocalAccount(){
 
             if(existingRes.error){
                 console.warn('Ошибка чтения players:', existingRes.error.message);
-
+            }
             playerRow = existingRes.data || null;
 
             if(!playerRow){
@@ -11979,6 +13003,8 @@ function loginLocalAccount(){
                     console.warn('Ошибка создания players при входе:', insertRes.error.message);
                 }else{
                     playerRow = insertRes.data;
+                }
+            }
 
             authState.playerId = Number(playerRow?.public_id) || 0;
             player.id = authState.playerId || user?.id || 'local_player';
@@ -11994,6 +13020,7 @@ function loginLocalAccount(){
             }else{
                 localStorage.removeItem('cosmicRememberedEmail');
                 localStorage.removeItem('cosmicRememberedPassword');
+            }
 
             resetPlayerProgress();
             await loadGame();
@@ -12007,13 +13034,14 @@ function loginLocalAccount(){
             saveGame();
         }catch(err){
             showAuthMessage('Ошибка входа: ' + (err?.message || err));
-        })();
-
+        }
+    })();
+}
 function showForgotPassword(){
     const email = document.getElementById('login-email')?.value?.trim() || '';
     if(!email){ showAuthMessage('Сначала введи email, затем нажми «Забыли пароль?»'); return; }
     showAuthMessage(`Для ${email} используй восстановление пароля через Supabase Dashboard или настрой SMTP позже.`);
-
+}
 function initAuthScreen(){
     ensureDeveloperAccount();
     applyAuthUIState('Вход и регистрация работают через Supabase.');
@@ -12036,17 +13064,20 @@ function initAuthScreen(){
         if(el && !el.dataset.enterBound){
             el.dataset.enterBound='1';
             el.addEventListener('keydown', (e) => { if(e.key === 'Enter') loginLocalAccount(); });
-        });
+        }
+    });
     [registerEmail, registerPassword].forEach((el) => {
         if(el && !el.dataset.enterBound){
             el.dataset.enterBound='1';
             el.addEventListener('keydown', (e) => { if(e.key === 'Enter') registerLocalAccount(); });
-        });
+        }
+    });
     if(verifyCode && !verifyCode.dataset.enterBound){
         verifyCode.dataset.enterBound='1';
         verifyCode.addEventListener('keydown', (e) => { if(e.key === 'Enter') confirmEmailCode(); });
-
+    }
     switchState('AUTH');
+}
 
 // ===== BATTLE MAP LIMIT =====
 function limitBattleArea(){
@@ -12063,8 +13094,10 @@ function limitBattleArea(){
     const outwardSpeed = shipVelocity.dot(normal);
     if(outwardSpeed > 0){
         shipVelocity.addScaledVector(normal, -outwardSpeed * (0.35 + soft * 0.35));
-
+    }
     shipVelocity.multiplyScalar(0.96);
+}
+
 
 /* ================= V16 STABILITY PATCH ================= */
 (function(){
@@ -12073,6 +13106,7 @@ function limitBattleArea(){
         document.body.classList.remove('state-auth','state-lobby','state-orbit','state-battle','state-observe');
         const key = String(gameState || 'auth').toLowerCase();
         document.body.classList.add('state-' + key);
+    }
 
     const baseSwitchState = switchState;
     switchState = function(newState){
@@ -12101,11 +13135,11 @@ function limitBattleArea(){
                     const info = resourceInfo[resId];
                     if(!info) continue;
                     html += `<div class="resource-item"><span class="icon">${info.icon}</span><span class="amount">${playerResources[resId]}</span><span class="tooltip">${info.name}</span></div>`;
-
+                }
                 html += `</div>`;
-
+            }
             bar.innerHTML = html;
-
+        }
         playerResources.coins = playerResources.coins || 0;
         playerResources.crystals = playerResources.crystals || 0;
         const premiumBar = document.getElementById('premium-bar');
@@ -12114,10 +13148,10 @@ function limitBattleArea(){
         if(premiumCrystals || premiumCoins){
             updatePremiumAccountInfo();
             ensurePremiumCurrencyUi?.();
-
+        }
         if(premiumBar){
             premiumBar.style.display = gameState === 'LOBBY' ? 'flex' : 'none';
-
+        }
         setBodyStateClass();
     };
 
@@ -12183,14 +13217,16 @@ function limitBattleArea(){
         group.userData.damageRadius = Math.max(3.8, radius * 0.028);
         group.userData.samplePoints = samplePoints.map(point => point.clone());
         return group;
+    }
 
     function createSunProminenceGroup(radius){
         const group = new THREE.Group();
         group.name = 'sunProminenceGroup';
         for(let i = 0; i < 3; i++){
             group.add(createSunProminenceArc(radius, i));
-
+        }
         return group;
+    }
 
     getBattlePlanetConfig = function(mapKey){
         const configs = {
@@ -12202,7 +13238,8 @@ function limitBattleArea(){
             jupiter:{ color:0xcda27f, size:152, light:0xfff0db },
             saturn:{ color:0xd9c08a, size:142, light:0xffefcc },
             uranus:{ color:0x86d8dd, size:126, light:0xe1ffff },
-            neptune:{ color:0x4469ff, size:126, light:0xdce6ff };
+            neptune:{ color:0x4469ff, size:126, light:0xdce6ff }
+        };
         return configs[mapKey] || configs.earth;
     };
 
@@ -12279,6 +13316,8 @@ function limitBattleArea(){
 
             if(typeof createSunProminenceGroup === 'function'){
                 battleMapPlanet.add(createSunProminenceGroup(config.size));
+            }
+        }
 
         if(mapKey === 'saturn'){
             const ringGeo = new THREE.RingGeometry(config.size * 1.42, config.size * 2.2, 128);
@@ -12286,6 +13325,7 @@ function limitBattleArea(){
             const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.rotation.x = Math.PI / 2.38;
             battleMapPlanet.add(ring);
+        }
 
         spawnPointA = new THREE.Vector3(-320, 12, 260);
         spawnPointB = new THREE.Vector3(320, -16, -260);
@@ -12311,12 +13351,12 @@ function limitBattleArea(){
             if(rock.position.distanceTo(center) < 220 || rock.position.distanceTo(spawnPointA) < 120 || rock.position.distanceTo(spawnPointB) < 120){
                 rock.position.x += (rock.position.x < 0 ? -1 : 1) * 140;
                 rock.position.z += (rock.position.z < 0 ? -1 : 1) * 140;
-
+            }
             rock.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
             rock.userData.radius = 4.5 + Math.random()*7.5;
             battleObstacles.push(rock);
             scene.add(rock);
-
+        }
         for(let i=0;i<10;i++){
             const wreck = new THREE.Group();
             const beamMat = new THREE.MeshStandardMaterial({ color:0x46566d, roughness:0.82, metalness:0.28 });
@@ -12330,12 +13370,13 @@ function limitBattleArea(){
             if(wreck.position.distanceTo(center) < 260 || wreck.position.distanceTo(spawnPointA) < 130 || wreck.position.distanceTo(spawnPointB) < 130){
                 wreck.position.x += (wreck.position.x < 0 ? -1 : 1) * 180;
                 wreck.position.z += (wreck.position.z < 0 ? -1 : 1) * 180;
-
+            }
             wreck.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
             wreck.userData.radius = 8 + Math.random()*8;
             battleObstacles.push(wreck);
             scene.add(wreck);
-        };
+        }
+    };
 
     handleBattleCollisions = function(object, velocityRef=null){
         if(!object) return;
@@ -12350,7 +13391,8 @@ function limitBattleArea(){
                 if(!Number.isFinite(push.x)) push.set(1,0,0);
                 object.position.copy(obstacle.position.clone().add(push.multiplyScalar(minDist + 0.2)));
                 if(velocityRef) velocityRef.multiplyScalar(0.42);
-
+            }
+        }
         if(!battleMapPlanet || object === playerShip) return;
         const delta = object.position.clone().sub(battleMapPlanet.position);
         const dist = delta.length();
@@ -12361,7 +13403,8 @@ function limitBattleArea(){
             if(!Number.isFinite(push.x)) push.set(0,1,0);
             object.position.copy(battleMapPlanet.position.clone().add(push.multiplyScalar(minDist)));
             if(velocityRef) velocityRef.multiplyScalar(0.18);
-        };
+        }
+    };
 
     updateBattlePlanetEffects = function(){
         if(!battleMapPlanet || !playerShip || battleObserverMode) return;
@@ -12379,17 +13422,20 @@ function limitBattleArea(){
 
         if(isBattlePlanetCaptureActive()){
             return;
+        }
 
         if(distance <= captureRadius){
             startBattlePlanetCapture();
             return;
+        }
 
         if(distance < dangerRadius){
             const towardPlanet = toPlanet.clone().normalize();
             shipVelocity.add(towardPlanet.multiplyScalar(0.065 * Math.max(0.16, closeness)));
             if(distance < nearSurfaceRadius){
                 shipVelocity.multiplyScalar(0.92);
-
+            }
+        }
     };
 
     limitBattleArea = function(){
@@ -12469,11 +13515,14 @@ function limitBattleArea(){
                 sunOrbitData.originalLocalPosition = new THREE.Vector3(0,0,0);
                 if(sunOrbitData.resourceLabel && !sun.children.includes(sunOrbitData.resourceLabel)){
                     sun.add(sunOrbitData.resourceLabel);
-
+                }
                 sunOrbitData.updateResourceLabelPosition?.(false);
                 sunOrbitData.updateResourceLabel?.();
-            }catch(error){
+            }
+        }catch(error){
             console.warn('Sun restore warning:', error);
+        }
+    }
 
     function getBattleDataset(){
         return (typeof LOBBY_MAP_DATA !== 'undefined' && Array.isArray(LOBBY_MAP_DATA) && LOBBY_MAP_DATA.length)
@@ -12482,9 +13531,11 @@ function limitBattleArea(){
                 { title:'Earth Core', real:'earth', img:'earth', mode:'DM' },
                 { title:'Mars Colony', real:'mars', img:'mars', mode:'Survival' }
             ];
+    }
 
     function getCurrentLobbyDataset(){
         return lobbyMode === 'solo' ? SOLO_MISSION_DATA : getBattleDataset();
+    }
 
     function updateLobbyTabStyles(){
         const battleTab = document.getElementById('battle-zone-tab');
@@ -12498,14 +13549,16 @@ function limitBattleArea(){
         if(battleTab && lobbyMode === 'battle' && !shopState?.open){
             battleTab.style.color = '#00ffff';
             battleTab.style.textShadow = '0 0 10px rgba(0,255,255,0.4)';
-
+        }
         if(soloTab && lobbyMode === 'solo' && !shopState?.open){
             soloTab.style.color = '#00ffff';
             soloTab.style.textShadow = '0 0 10px rgba(0,255,255,0.4)';
-
+        }
         if(shopTab && shopState?.open){
             shopTab.style.color = '#00ffff';
             shopTab.style.textShadow = '0 0 10px rgba(0,255,255,0.4)';
+        }
+    }
 
     function renderLobbyList(mode = 'battle'){
         lobbyMode = mode;
@@ -12533,22 +13586,24 @@ function limitBattleArea(){
                     preview.style.backgroundImage = `url(maps/${entry.img}.jpg)`;
                     preview.style.backgroundSize = 'cover';
                     preview.style.backgroundPosition = 'center';
-
+                }
                 if(playersBox){
                     playersBox.innerHTML = '';
-
+                }
                 if(mode === 'solo'){
                     window.renderPlayersOnPlanet({ players: [] });
                 }else{
                     const players = Array.isArray(entry.currentPlayers) ? entry.currentPlayers : (Array.isArray(entry.players) ? entry.players : []);
                     window.renderPlayersOnPlanet({ ...entry, currentPlayers: players, players: players });
-                });
+                }
+            });
             matchListEl.appendChild(item);
             if(index === 0) item.click();
         });
         const observeBtn = document.getElementById('observe-match-btn');
         if(observeBtn) observeBtn.style.display = mode === 'solo' ? 'none' : 'inline-flex';
         updateLobbyTabStyles();
+    }
 
     function rebindLobbyButtons(){
         const joinBtnOld = document.getElementById('join-match-btn');
@@ -12568,6 +13623,7 @@ function limitBattleArea(){
                 };
                 switchState('BATTLE');
             });
+        }
 
         const observeBtnOld = document.getElementById('observe-match-btn');
         if(observeBtnOld && !observeBtnOld.dataset.v26Bound){
@@ -12583,7 +13639,13 @@ function limitBattleArea(){
                 const canvas = document.querySelector('canvas');
                 if(canvas){
                     try{ safeRequestPointerLock(canvas); }catch(_){ }
+                }
             });
+        }
+    }
+
+
+
 
 /* ===== V82 SHOP CLASSES ===== */
 const SHOP_DATA = {
@@ -12624,7 +13686,8 @@ const SHOP_DATA = {
             { id:'booster_afterburn_x', type:'module', classId:'booster', tier:'Эпический', name:'Afterburn-X', subtitle:'Форсажная катушка', badge:'Ускорители', price:640, description:'Мощный ускоритель для скоростных и маневренных корпусов. Даёт очень бодрый разгон и хороший крен.', stats:[['Скорость','+18%'],['Разгон','+16%'],['Тип','Ускоритель'],['Слот','Двигатель']], art:'plasma', speedMult:1.18, accelMult:1.16, turnMult:1.07 },
             { id:'booster_void_rush', type:'module', classId:'booster', tier:'Легендарный', name:'Void Rush', subtitle:'Пиковый форсаж', badge:'Ускорители', price:920, description:'Максимальный ускоритель для топовых сборок. Очень сильно поднимает темп движения и живость корпуса.', stats:[['Скорость','+22%'],['Разгон','+20%'],['Тип','Ускоритель'],['Слот','Двигатель']], art:'phase', speedMult:1.22, accelMult:1.2, turnMult:1.08 }
         ]
-    };
+    }
+};
 try{ window.__cosmicShopData = SHOP_DATA; }catch(_){}
 
 
@@ -12633,19 +13696,24 @@ function getAllShopShipsLegacy(){
         return Object.values(SHOP_DATA?.shipsByType || {}).flat();
     }catch(_){
         return [];
+    }
+}
 
 function getShopShipByIdLegacy(shipId){
     const safeId = String(shipId || '').trim();
     return getAllShopShips().find(item => String(item?.id || '').trim() === safeId) || null;
+}
 
 function getShipCoinPriceLegacy(item){
     return Math.max(0, Number(item?.price || 0) || 0);
+}
 
 function getShipDiamondPriceLegacy(item){
     const coins = getShipCoinPrice(item);
     const tier = String(item?.tier || '').toLowerCase();
     const extra = tier.includes('топ') ? 12 : (tier.includes('соврем') ? 7 : 3);
     return Math.max(0, Math.round(coins / 220 + extra));
+}
 
 function buyModuleFromShop(moduleId){
     ensureModuleOwnershipDefaults();
@@ -12658,12 +13726,13 @@ function buyModuleFromShop(moduleId){
         if(coins < modulePrice){
             alert(`Недостаточно монет для покупки модуля: нужно ${modulePrice}.`);
             return false;
-
+        }
         playerResources.coins = coins - modulePrice;
         player.credits = playerResources.coins;
         showCurrencyDelta?.('coins', -modulePrice);
         player.ownedModuleIds.push(module.id);
         player.ownedModuleIds = Array.from(new Set(player.ownedModuleIds));
+    }
 
     toggleShipModule(module.id, player.selectedShipId || 'scout_1');
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
@@ -12674,6 +13743,7 @@ function buyModuleFromShop(moduleId){
     window.renderShopScreen?.();
     renderHangarIfOpen?.();
     return true;
+}
 
 function refreshOwnedShipsInventoryFull(){
     ensureShopOwnershipDefaults();
@@ -12691,7 +13761,7 @@ function refreshOwnedShipsInventoryFull(){
             speed: stats.maxSpeed
         };
     });
-
+}
 refreshOwnedShipsInventory = refreshOwnedShipsInventoryFull;
 
 function equipOwnedShip(shipId){
@@ -12706,6 +13776,7 @@ function equipOwnedShip(shipId){
     window.renderShopScreen?.();
     renderHangarIfOpen?.();
     return true;
+}
 
 function buyShipFromShop(shipId){
     ensureShopOwnershipDefaults();
@@ -12726,6 +13797,7 @@ function buyShipFromShop(shipId){
         if(missingDiamonds > 0) parts.push(`${missingDiamonds} алмазов`);
         alert(`Недостаточно ресурсов: не хватает ${parts.join(' и ')}.`);
         return false;
+    }
 
     playerResources.coins = coins - coinPrice;
     player.credits = playerResources.coins;
@@ -12756,6 +13828,7 @@ function buyShipFromShop(shipId){
     window.renderShopScreen?.();
     renderHangarIfOpen?.();
     return true;
+}
 
 const shopState = {
     open:false,
@@ -12770,13 +13843,16 @@ refreshOwnedShipsInventory();
 function getCurrentShopShips(){
     const list = SHOP_DATA.shipsByType[shopState.shipType] || [];
     return list.filter(item => !isOwnedShip(item.id));
+}
 
 function getCurrentShopModules(){
     return SHOP_DATA.modulesByType?.[shopState.moduleType] || [];
+}
 
 function getShopSelectedItem(){
     const list = shopState.view === 'modules' ? getCurrentShopModules() : getCurrentShopShips();
     return list.find(item => item.id === shopState.selectedId) || list[0] || null;
+}
 
 function buildShopModelSvg(item){
     const common = 'viewBox="0 0 280 280" class="shop-model-svg" xmlns="http://www.w3.org/2000/svg"';
@@ -12845,6 +13921,7 @@ function buildShopModelSvg(item){
 
     if(item?.type === 'module'){
         return `<svg ${common}>${defs}${(moduleMap[art] || moduleMap.speed).replaceAll('${accent}', accent).replaceAll('${neon}', neon)}</svg>`;
+    }
 
     const frame = (shipMap[art] || shipMap.classic)
         .replaceAll('${accent}', accent)
@@ -12861,6 +13938,7 @@ function buildShopModelSvg(item){
       <circle cx="160" cy="206" r="8" fill="${engine}" class="shop-neon-dot"/>`;
 
     return `<svg ${common}>${defs}${frame}${weapons}${engineSvg}</svg>`;
+}
 
 function renderShopMainSwitch(){
     const wrap = document.getElementById('shop-main-switch');
@@ -12885,7 +13963,7 @@ function renderShopMainSwitch(){
             }else{
                 shopState.view = 'modules';
                 if(shopState.moduleType === 'weapon') shopState.moduleType = 'shield';
-
+            }
             const nextList = shopState.view === 'ships' ? getCurrentShopShips() : getCurrentShopModules();
             shopState.selectedId = nextList[0]?.id || '';
             renderShopScreen();
@@ -12894,6 +13972,9 @@ function renderShopMainSwitch(){
     if(shop){
         shop.classList.toggle('shop-ships-only', shopState.view === 'ships');
         shop.classList.toggle('shop-modules-only', shopState.view !== 'ships');
+    }
+}
+
 
 function renderShopTypeTabs(){
     const wrap = document.getElementById('shop-type-tabs');
@@ -12918,6 +13999,7 @@ function renderShopTypeTabs(){
                 <span class="shop-type-sub">${type.subtitle}</span>
             </button>
         `).join('');
+    }
 
     wrap.querySelectorAll('.shop-type-tab').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -12938,6 +14020,8 @@ function renderShopTypeTabs(){
             renderShopScreen();
         });
     });
+}
+
 
 function renderShopLists(){
     const shipsList = document.getElementById('shop-ships-list');
@@ -12948,6 +14032,8 @@ function renderShopLists(){
     if(shipsList) shipsList.style.display = 'none';
     if(modulesLabel) modulesLabel.style.display = 'none';
     if(modulesList) modulesList.style.display = 'none';
+}
+
 
 function splitItemStats(item){
     const stats = Array.isArray(item?.stats) ? item.stats : [];
@@ -12956,11 +14042,12 @@ function splitItemStats(item){
             left: stats.slice(0, 2),
             right: stats.slice(2)
         };
-
+    }
     return {
         left: stats.slice(0, 4),
         right: stats.slice(4)
     };
+}
 
 function getShopCurrentTitle(){
     if(shopState.view === 'modules'){
@@ -12969,12 +14056,13 @@ function getShopCurrentTitle(){
             title:(activeModuleType?.name || 'ОБОРУДОВАНИЕ').toUpperCase(),
             subtitle:'Покупай детали отдельно и ставь их на активный корпус'
         };
-
+    }
     const activeType = SHOP_DATA.types.find(type => type.id === shopState.shipType) || SHOP_DATA.types[0];
     return {
         title:(activeType?.name || 'КОРПУСА').toUpperCase(),
         subtitle:'Собери машину из корпуса, пушки, щита и ускорителя'
     };
+}
 
 function renderShopCatalog(){
     const wrap = document.getElementById('shop-catalog-list');
@@ -12993,6 +14081,7 @@ function renderShopCatalog(){
     if(!list.length){
         wrap.innerHTML = shopState.view === 'ships' ? '<div class="shop-empty">Все корпуса этого типа уже куплены.</div>' : '<div class="shop-empty">Тут пока пусто.</div>';
         return;
+    }
 
     wrap.innerHTML = list.map((item, index) => {
         const selected = shopState.selectedId === item.id;
@@ -13058,12 +14147,15 @@ function renderShopCatalog(){
             else buyShipFromShop(itemId);
         });
     });
+}
 
 function renderShopScreen(){
     renderShopMainSwitch();
     renderShopTypeTabs();
     renderShopLists();
     renderShopCatalog();
+}
+
 
 function setShopMode(open){
     const shop = document.getElementById('shop-screen');
@@ -13081,6 +14173,7 @@ function setShopMode(open){
     if(!open){ shopState.view = 'ships'; shopState.moduleType = 'weapon'; }
     try{ updateLobbyTabStyles?.(); }catch(_){ }
     if(open) renderShopScreen();
+}
 
 function openShopView(){
     if(gameState !== 'LOBBY') switchState('LOBBY');
@@ -13088,11 +14181,14 @@ function openShopView(){
     shopState.selectedId = getCurrentShopShips()[0]?.id || '';
     setTimeout(() => {
         setShopMode(true);
-        try{ updateLobbyTabStyles?.(); }catch(_){}, gameState === 'LOBBY' ? 0 : 80);
+        try{ updateLobbyTabStyles?.(); }catch(_){}
+    }, gameState === 'LOBBY' ? 0 : 80);
+}
 
 function closeShopView(){
     if(!shopState.open) return;
     setShopMode(false);
+}
 
     function bindTopNavModes(){
         const battleTab = document.getElementById('battle-zone-tab');
@@ -13106,51 +14202,56 @@ function closeShopView(){
                 if(gameState !== 'LOBBY') switchState('LOBBY');
                 renderLobbyList('battle');
             };
-
+        }
         if(soloTab && !soloTab.dataset.v26Bound){
             soloTab.dataset.v26Bound = '1';
             soloTab.onclick = () => {
                 if(isGuestAccount()){
                     showGuestOnlyPvpMessage();
                     return;
-
+                }
                 closeShopView();
                 if(gameState !== 'LOBBY') switchState('LOBBY');
                 renderLobbyList('solo');
             };
-
+        }
         if(shopTab && !shopTab.dataset.v26Bound){
             shopTab.dataset.v26Bound = '1';
             shopTab.onclick = () => {
                 openShopView();
             };
+        }
+    }
 
     const prevSwitchState = switchState;
     switchState = function(newState){
         prevSwitchState(newState);
         if(newState === 'LOBBY'){
             closeShopView();
-
+        }
         if(newState === 'ORBIT'){
             ensureSunBackToOrbit();
             if(typeof orbitNebulaGroup !== 'undefined' && orbitNebulaGroup) orbitNebulaGroup.visible = true;
             updateHUD?.();
-
+        }
         if(newState === 'OBSERVE'){
             const canvas = document.querySelector('canvas');
             if(canvas){
                 setTimeout(() => {
-                    try{ safeRequestPointerLock(canvas); }catch(_){ }, 10);
-
+                    try{ safeRequestPointerLock(canvas); }catch(_){ }
+                }, 10);
+            }
             setTimeout(() => {
                 try{ loadChatHistory?.('battle'); }catch(_){ }
-                try{ renderBattleMessages?.(); }catch(_){ }, 60);
-
+                try{ renderBattleMessages?.(); }catch(_){ }
+            }, 60);
+        }
         if(newState === 'LOBBY'){
             bindTopNavModes();
             rebindLobbyButtons();
             renderLobbyList(lobbyMode || 'battle');
-        };
+        }
+    };
     window.switchState = switchState;
 
     document.addEventListener('click', (event) => {
@@ -13158,6 +14259,7 @@ function closeShopView(){
         const canvas = document.querySelector('canvas');
         if(canvas && document.pointerLockElement !== canvas){
             try{ safeRequestPointerLock(canvas); }catch(_){ }
+        }
     }, true);
 
     window.addEventListener('load', () => {
@@ -13206,11 +14308,14 @@ function closeShopView(){
                 sunOrbitData.originalLocalPosition = new THREE.Vector3(0,0,0);
                 if(sunOrbitData.resourceLabel && !sun.children.includes(sunOrbitData.resourceLabel)){
                     sun.add(sunOrbitData.resourceLabel);
-
+                }
                 sunOrbitData.updateResourceLabelPosition?.(selectedPlanet === sunOrbitData);
                 sunOrbitData.updateResourceLabel?.();
-            }catch(error){
+            }
+        }catch(error){
             console.warn('Sun stabilize warning:', error);
+        }
+    }
 
     const mapNebulaGroup = new THREE.Group();
     mapNebulaGroup.visible = false;
@@ -13244,7 +14349,7 @@ function closeShopView(){
             spr.scale.set(s, s * (0.55 + Math.random()*0.35), 1);
             spr.material.rotation = Math.random()*Math.PI*2;
             targetGroup.add(spr);
-
+        }
         const gasGeom = new THREE.BufferGeometry();
         const gasCount = 4200;
         const arr = [];
@@ -13254,7 +14359,7 @@ function closeShopView(){
                 (Math.random()-0.5)*1200,
                 depthStart - Math.random()*(depthSpread+500)
             );
-
+        }
         gasGeom.setAttribute('position', new THREE.Float32BufferAttribute(arr,3));
         const gasMat = new THREE.PointsMaterial({
             size: 3.5,
@@ -13265,14 +14370,15 @@ function closeShopView(){
             blending: THREE.AdditiveBlending
         });
         targetGroup.add(new THREE.Points(gasGeom, gasMat));
-
+    }
     createNebulaLayer(mapNebulaGroup, 28, 320, 720, -700, 1600, 0.23);
 
     function updateNebulaVisibility(){
         if(typeof orbitNebulaGroup !== 'undefined' && orbitNebulaGroup){
             orbitNebulaGroup.visible = gameState === 'ORBIT';
-
+        }
         mapNebulaGroup.visible = ['ORBIT','BATTLE','OBSERVE'].includes(gameState);
+    }
 
     const prevResetOrbitView = resetOrbitView;
     resetOrbitView = function(forcePlanetReset=false){
@@ -13301,8 +14407,10 @@ function closeShopView(){
         const canvas = document.querySelector('canvas');
         if(canvas){
             setTimeout(() => {
-                try{ safeRequestPointerLock(canvas); }catch(_){ }, 40);
-        };
+                try{ safeRequestPointerLock(canvas); }catch(_){ }
+            }, 40);
+        }
+    };
 
     const prevUpdateObserverBattle = updateObserverBattle;
     updateObserverBattle = function(){
@@ -13320,7 +14428,7 @@ function closeShopView(){
             observerFreeCameraPosition.add(lookDirection.clone().multiplyScalar(moveForward * observerSpeed));
             observerFreeCameraPosition.add(rightDirection.clone().multiplyScalar(moveRight * observerSpeed));
             observerFreeCameraPosition.y += moveUp * observerSpeed;
-
+        }
         prevUpdateObserverBattle();
         camera.position.lerp(observerFreeCameraPosition, 0.35);
         camera.lookAt(camera.position.clone().add(lookDirection));
@@ -13331,6 +14439,7 @@ function closeShopView(){
         const canvas = document.querySelector('canvas');
         if(canvas && document.pointerLockElement !== canvas){
             try{ safeRequestPointerLock(canvas); }catch(_){ }
+        }
     }, true);
 
     document.addEventListener('wheel', (event) => {
@@ -13368,14 +14477,17 @@ function closeShopView(){
             : [];
 
         return [...sortedLiveRooms, ...baseMaps];
+    }
 
     function getTournamentMaps(){
         return tournamentRooms;
+    }
 
     function getCurrentDataset(){
         if(lobbyModeV27 === 'solo') return SOLO_DATA;
         if(lobbyModeV27 === 'tournament') return getTournamentMaps();
         return getBattleMaps();
+    }
 
     function setModeTabUI(){
         ['lobby-battle-tab','lobby-solo-tab','lobby-tournament-tab'].forEach((id) => {
@@ -13390,6 +14502,8 @@ function closeShopView(){
         };
         const active = document.getElementById(map[lobbyModeV27]);
         if(active) active.classList.add('active');
+    }
+
 
 function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
     const ownerId = String(entry?.owner_id || entry?.host_id || entry?.creator_id || entry?.player_id || '').trim();
@@ -13402,9 +14516,11 @@ function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
     }else if(rawPlayer && typeof rawPlayer === 'object'){
         id = String(rawPlayer.public_id || rawPlayer.player_id || rawPlayer.id || rawPlayer.user_id || '').trim();
         nickname = String(rawPlayer.nickname || rawPlayer.name || rawPlayer.player_nickname || rawPlayer.display_name || '').trim();
+    }
 
     if(!nickname){
         nickname = `Игрок ${index + 1}`;
+    }
 
     const isOwner = !!(
         (ownerId && id && ownerId === id) ||
@@ -13413,6 +14529,7 @@ function normalizePreviewPlayerEntry(rawPlayer, entry = {}, index = 0){
     );
 
     return { id, nickname, isOwner };
+}
 
 window.renderPlayersOnPlanet = function(entry = {}){
     const overlay = document.getElementById('map-player-overlay');
@@ -13438,6 +14555,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
             crown.className = 'map-player-owner';
             crown.textContent = '👑';
             chip.appendChild(crown);
+        }
 
         const name = document.createElement('span');
         name.className = 'map-player-name';
@@ -13448,9 +14566,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
             event.stopPropagation();
             if(typeof openPlayerProfile === 'function'){
                 await openPlayerProfile(playerMeta.id || '', playerMeta.nickname);
-            });
+            }
+        });
 
         overlay.appendChild(chip);
+    }
+}
 
     function syncPreview(entry){
         const preview = document.getElementById('planet-preview');
@@ -13463,14 +14584,14 @@ window.renderPlayersOnPlanet = function(entry = {}){
             preview.style.backgroundImage = `url(maps/${entry.img}.jpg)`;
             preview.style.backgroundSize = 'cover';
             preview.style.backgroundPosition = 'center';
-
+        }
         if(lobbyModeV27 === 'solo'){
             if(waitNote) waitNote.textContent = '';
             if(statusNote) statusNote.textContent = '';
-
+        }
         if(playersBox){
             playersBox.innerHTML = '';
-
+        }
         if(lobbyModeV27 === 'solo'){
             window.renderPlayersOnPlanet({ players: [] });
         } else if(lobbyModeV27 === 'tournament'){
@@ -13489,14 +14610,16 @@ window.renderPlayersOnPlanet = function(entry = {}){
                 ? getBattleMapOccupants(entry.real || entry.map || entry.name)
                 : (entry.currentPlayers || entry.players || []);
             window.renderPlayersOnPlanet({ ...entry, currentPlayers: players, players: players });
-
+        }
         if(waitNote) waitNote.textContent = '';
         if(statusNote){
             if(lobbyModeV27 === 'solo'){
                 statusNote.textContent = entry.mission || 'Миссия против ботов';
             } else {
                 statusNote.textContent = entry.title || '';
-
+            }
+        }
+    }
 
     function renderLobbyListV27(mode = getLobbyModeSafe()){
         lobbyModeV27 = mode;
@@ -13531,7 +14654,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     extra = `<span class="map-extra">${entry.mission || ''}</span>`;
                 } else {
                     extra = '';
-
+                }
                 if(entry.id) item.dataset.roomId = entry.id;
                 item.innerHTML =
                     `<span class="map-title">${entry.title}</span>`+
@@ -13553,10 +14676,11 @@ window.renderPlayersOnPlanet = function(entry = {}){
                 list.appendChild(item);
                 if(index === 0) item.click();
             });
-
+        }
         if(joinBtn) joinBtn.textContent = mode === 'tournament' ? 'Участвовать' : 'Войти';
         if(createBtn) createBtn.textContent = mode === 'tournament' ? 'Создать турнир' : 'Создать';
         if(observeBtn) observeBtn.style.display = mode === 'battle' ? 'inline-flex' : 'none';
+    }
 
     function openTournamentWindow(){
         const win = document.getElementById('tournament-window');
@@ -13574,7 +14698,8 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     op.value = String(i);
                     op.textContent = String(i);
                     el.appendChild(op);
-
+                }
+            }
             if(el) el.value = idx === 0 ? '1' : '120';
         });
         const stakeCoins = document.getElementById('tournament-stake-coins');
@@ -13582,12 +14707,13 @@ window.renderPlayersOnPlanet = function(entry = {}){
         if(stakeCoins && !stakeCoins.dataset.boundV28){
             stakeCoins.dataset.boundV28 = '1';
             stakeCoins.innerHTML = ['0','50','100','250','500'].map(v => `<option value="${v}">${v === '0' ? 'Без ставки монетами' : `${v} монет`}</option>`).join('');
-
+        }
         if(stakeCrystals && !stakeCrystals.dataset.boundV28){
             stakeCrystals.dataset.boundV28 = '1';
             stakeCrystals.innerHTML = ['0','1','2','5','10'].map(v => `<option value="${v}">${v === '0' ? 'Без ставки кристаллами' : `${v} кристаллов`}</option>`).join('');
-
+        }
         win.classList.remove('hidden');
+    }
 
     function bindLobbyModeButtons(){
         window.renderLobbyListV27 = renderLobbyListV27;
@@ -13602,27 +14728,30 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     await renderRoomsInLobby(true);
                 }else{
                     renderLobbyListV27('battle');
-                };
-
+                }
+            };
+        }
         if(soloTab && !soloTab.dataset.v27Bound){
             soloTab.dataset.v27Bound = '1';
             soloTab.onclick = () => {
                 if(isGuestAccount()){
                     showGuestOnlyPvpMessage();
                     return;
-
+                }
                 renderLobbyListV27('solo');
             };
-
+        }
         if(tournamentTab && !tournamentTab.dataset.v27Bound){
             tournamentTab.dataset.v27Bound = '1';
             tournamentTab.onclick = () => {
                 if(isGuestAccount()){
                     showGuestOnlyPvpMessage();
                     return;
-
+                }
                 renderLobbyListV27('tournament');
             };
+        }
+    }
 
     function bindActionButtons(){
         const createBtnOld = document.getElementById('create-match-btn');
@@ -13635,12 +14764,13 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     if(isGuestAccount()){
                         showGuestOnlyPvpMessage();
                         return;
-
+                    }
                     openTournamentWindow();
                 }else if(lobbyModeV27 === 'battle'){
                     document.getElementById('create-match-window')?.classList.remove('hidden');
-                });
-
+                }
+            });
+        }
         const joinBtnOld = document.getElementById('join-match-btn');
         if(joinBtnOld && !joinBtnOld.dataset.v27Bound){
             const joinBtn = joinBtnOld.cloneNode(true);
@@ -13652,20 +14782,20 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     if(isGuestAccount()){
                         showGuestOnlyPvpMessage();
                         return;
-
+                    }
                     currentRoom = { ...selectedLobbyMap, solo:true, state:'solo', players:[getDisplayPlayerTag()] };
                     switchState('BATTLE');
                     return;
-
+                }
                 if(lobbyModeV27 === 'tournament'){
                     if(isGuestAccount()){
                         showGuestOnlyPvpMessage();
                         return;
-
+                    }
                     const room = tournamentRooms.find(r => r.id === selectedLobbyMap.id) || selectedLobbyMap;
                     if(!room.currentPlayers.includes(getDisplayPlayerTag())){
                         room.currentPlayers.push(getDisplayPlayerTag());
-
+                    }
                     const need = Math.max(0, Number(room.maxPlayers) - room.currentPlayers.length);
                     currentRoom = room;
                     if(need <= 0){
@@ -13674,9 +14804,9 @@ window.renderPlayersOnPlanet = function(entry = {}){
                         switchState('BATTLE');
                     }else{
                         renderLobbyListV27('tournament');
-
+                    }
                     return;
-
+                }
                 (async () => {
                     const room = {
                         ...selectedLobbyMap,
@@ -13700,7 +14830,8 @@ window.renderPlayersOnPlanet = function(entry = {}){
                             room.maxPlayers = freshRoom.maxPlayers || room.maxPlayers;
                             room.host = freshRoom.host || room.host;
                             room.rawRoom = freshRoom.rawRoom || room.rawRoom;
-                        } else if(selectedLobbyMap.real){
+                        }
+                    } else if(selectedLobbyMap.real){
                         const publicRoomName = `Public ${String(selectedLobbyMap.real || 'earth').toUpperCase()}`;
                         const createdOrExisting = await createGameRoom(publicRoomName, selectedLobbyMap.real, Number(selectedLobbyMap.maxPlayers || selectedLobbyMap.playerCount || 8), getDisplayPlayerTag());
                         if(!createdOrExisting?.id) return;
@@ -13715,13 +14846,15 @@ window.renderPlayersOnPlanet = function(entry = {}){
                             room.maxPlayers = freshRoom.maxPlayers || room.maxPlayers;
                             room.host = freshRoom.host || room.host;
                             room.rawRoom = freshRoom.rawRoom || room.rawRoom;
+                        }
+                    }
 
                     currentRoom = room;
                     window.currentRoomId = room.id || room.roomId || null;
                     switchState('BATTLE');
                 })();
             });
-
+        }
         const observeBtnOld = document.getElementById('observe-match-btn');
         if(observeBtnOld && !observeBtnOld.dataset.v27Bound){
             const observeBtn = observeBtnOld.cloneNode(true);
@@ -13734,7 +14867,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
                 window.currentRoomId = currentRoom.id || null;
                 switchState('OBSERVE');
             });
-
+        }
         const refreshBtn = document.getElementById('refresh-matches-btn');
         if(refreshBtn && !refreshBtn.dataset.v27Bound){
             refreshBtn.dataset.v27Bound = '1';
@@ -13743,7 +14876,10 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     await renderRoomsInLobby();
                 }else{
                     renderLobbyListV27(getLobbyModeSafe());
-                });
+                }
+            });
+        }
+    }
 
     function bindCreateWindows(){
         const confirmOld = document.getElementById('confirm-create');
@@ -13794,12 +14930,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
 
                 switchState('BATTLE');
             });
-
+        }
         const cancelTournament = document.getElementById('cancel-tournament-create');
         if(cancelTournament && !cancelTournament.dataset.v27Bound){
             cancelTournament.dataset.v27Bound = '1';
             cancelTournament.onclick = () => document.getElementById('tournament-window')?.classList.add('hidden');
-
+        }
         const confirmTournament = document.getElementById('confirm-tournament-create');
         if(confirmTournament && !confirmTournament.dataset.v27Bound){
             confirmTournament.dataset.v27Bound = '1';
@@ -13837,6 +14973,8 @@ window.renderPlayersOnPlanet = function(entry = {}){
                 renderLobbyListV27('tournament');
                 switchState('BATTLE');
             };
+        }
+    }
 
     const prevSwitchState = switchState;
     switchState = function(newState){
@@ -13848,19 +14986,22 @@ window.renderPlayersOnPlanet = function(entry = {}){
             bindActionButtons();
             bindCreateWindows();
             renderLobbyListV27(getLobbyModeSafe());
-
+        }
         if(newState === 'OBSERVE'){
             const canvas = document.querySelector('canvas');
             if(canvas){
                 setTimeout(() => {
-                    try{ safeRequestPointerLock(canvas); }catch(_){ }, 30);
-
+                    try{ safeRequestPointerLock(canvas); }catch(_){ }
+                }, 30);
+            }
+        }
         if(newState === 'LOBBY'){
             closeShopView();
-
+        }
         if(newState === 'ORBIT'){
             if (window.gameState !== 'BATTLE') ensureSunStable();
-        };
+        }
+    };
     window.switchState = switchState;
 
     window.addEventListener('load', () => {
@@ -13891,10 +15032,12 @@ function getRoomMetaFromMapName(mapName){
   return (typeof LOBBY_MAP_DATA !== 'undefined' && Array.isArray(LOBBY_MAP_DATA)
     ? LOBBY_MAP_DATA.find(item => item.real === realKey)
     : null) || { title: String(mapName || 'Earth'), real: realKey, img: realKey, mode: 'DM' };
+}
 
 function isPublicBattleRoom(room){
   const roomName = String(room?.room_name || room?.title || '').trim().toLowerCase();
   return roomName.startsWith('public ');
+}
 
 function getCurrentPlayerIdentity(){
   const fallbackNickname = (typeof player !== 'undefined' && player?.nickname) ? player.nickname : 'Commander';
@@ -13911,6 +15054,7 @@ function getCurrentPlayerIdentity(){
     nickname: fallbackNickname,
     displayName: (typeof getDisplayPlayerTag === 'function') ? getDisplayPlayerTag() : fallbackNickname
   };
+}
 
 function getRoomOccupantsFromPresence(roomId, presenceRows = []){
   if(!roomId) return [];
@@ -13919,6 +15063,7 @@ function getRoomOccupantsFromPresence(roomId, presenceRows = []){
     .sort((a, b) => new Date(a.updated_at || 0) - new Date(b.updated_at || 0))
     .map(row => row.nickname || row.player_id)
     .filter(Boolean);
+}
 
 function getRoomOccupantsFromRoomPlayers(room = null){
   return Array.isArray(room?.room_players)
@@ -13928,6 +15073,7 @@ function getRoomOccupantsFromRoomPlayers(room = null){
         .map(item => item?.nickname || item?.player_id)
         .filter(Boolean)
     : [];
+}
 
 function mergeUniquePlayers(primary = [], secondary = []){
   const seen = new Set();
@@ -13941,6 +15087,7 @@ function mergeUniquePlayers(primary = [], secondary = []){
     result.push(value);
   });
   return result;
+}
 
 function rebuildBattleMapOccupants(rooms = [], presenceRows = []){
   const next = new Map();
@@ -13953,12 +15100,14 @@ function rebuildBattleMapOccupants(rooms = [], presenceRows = []){
   });
   supabaseBattleMapOccupants = next;
   return next;
+}
 
 function getBattleMapOccupants(mapName){
   const mapKey = normalizeBattleMapName(mapName);
   return Array.isArray(supabaseBattleMapOccupants.get(mapKey))
     ? [...supabaseBattleMapOccupants.get(mapKey)]
     : [];
+}
 
 function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
   const meta = getRoomMetaFromMapName(room.map_name);
@@ -13982,13 +15131,15 @@ function mapSupabaseRoomToLobbyEntry(room, presenceRows = []){
     map: meta.real,
     rawRoom: room
   };
+}
 
 async function savePlayerToSupabase(playerData) {
   if (!window.supabaseReady || !window.supabaseClient) {
         return null;
-
+  }
   if (authState?.mode !== 'account' || !authState?.isAuthenticated) {
     return null;
+  }
 
   const payload = {
     auth_id: typeof playerData.auth_id !== 'undefined' ? playerData.auth_id : null,
@@ -14018,11 +15169,12 @@ async function savePlayerToSupabase(playerData) {
   if (error) {
     console.error('Ошибка сохранения игрока:', error);
     return null;
+  }
 
   if(data?.public_id){
     authState.playerId = Number(data.public_id) || 0;
     player.id = authState.playerId;
-
+  }
   if(data?.nickname) player.nickname = data.nickname;
   if(typeof data?.level !== 'undefined') player.level = Number(data.level) || 1;
   if(typeof data?.experience !== 'undefined') player.experience = Number(data.experience) || 0;
@@ -14032,9 +15184,11 @@ async function savePlayerToSupabase(playerData) {
   updatePremiumAccountInfo?.();
   data.map_name = normalizeBattleMapName(data.map_name || data.room_name || 'earth');
   return data;
+}
 
 async function ensureDefaultBattleRoomsInSupabase() {
   return [];
+}
 
 async function joinRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return false;
@@ -14046,6 +15200,7 @@ async function joinRoomPlayers(roomId) {
   if (!identity.playerId) {
     console.error('Ошибка входа в room_players: пустой playerId', identity);
     return false;
+  }
 
   const { data: existingRows, error: existingError } = await window.supabaseClient
     .from('room_players')
@@ -14057,6 +15212,7 @@ async function joinRoomPlayers(roomId) {
   if (existingError) {
     console.error('Ошибка проверки room_players:', existingError);
     return false;
+  }
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
     
@@ -14067,6 +15223,7 @@ try {
 } catch(e){}
 
 return true;
+  }
 
   let roomExists = false;
   for(const waitMs of [0, 120, 260, 420]){
@@ -14080,11 +15237,14 @@ return true;
       if(Array.isArray(roomProbe) && roomProbe.length > 0){
         roomExists = true;
         break;
-      }catch(_){}
+      }
+    }catch(_){}
+  }
 
   if(!roomExists){
     console.error('Ошибка входа в room_players: комната ещё не подтверждена в rooms', normalizedRoomId);
     return false;
+  }
 
   const insertPayload = {
     id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
@@ -14108,11 +15268,14 @@ return true;
   if (error) {
     console.error('Ошибка входа в room_players:', error, insertPayload);
     return false;
+  }
+
 
   await loadRoomsFromSupabase();
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
-
+  }
+  
 try {
     renderBattleMessages && renderBattleMessages();
     renderLobbyMessages && renderLobbyMessages();
@@ -14120,6 +15283,7 @@ try {
 } catch(e){}
 
 return true;
+}
 
 async function leaveRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return 0;
@@ -14135,6 +15299,7 @@ async function leaveRoomPlayers(roomId) {
   if (deletePlayerError) {
     console.error('Ошибка выхода из room_players:', deletePlayerError);
     return -1;
+  }
 
   try {
     removeRemoteBattleShipById(identity.playerId);
@@ -14159,6 +15324,7 @@ async function leaveRoomPlayers(roomId) {
   if (countError) {
     console.error('Ошибка подсчёта игроков в комнате:', countError);
     return -1;
+  }
 
   if ((count || 0) <= 0) {
     const { error: roomDeleteError } = await window.supabaseClient
@@ -14168,16 +15334,20 @@ async function leaveRoomPlayers(roomId) {
 
     if (roomDeleteError) {
       console.error('Ошибка удаления пустой комнаты:', roomDeleteError);
+    }
+  }
 
   await loadRoomsFromSupabase();
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
-
+  }
   return count || 0;
+}
 
 async function cleanupCurrentBattleRoom() {
   if (currentRoom?.id && currentRoom?.state !== 'solo' && currentRoom?.observer !== true) {
     await leaveRoomPlayers(currentRoom.id);
+  }
 
   currentRoom = null;
   window.currentRoomId = null;
@@ -14186,6 +15356,8 @@ async function cleanupCurrentBattleRoom() {
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function'){
     await loadRoomsFromSupabase();
     renderLobbyListV27(getLobbyModeSafe());
+  }
+}
 
 function cleanupBattleRoomSilently(){
   const roomSnapshot = currentRoom ? { ...currentRoom } : null;
@@ -14201,11 +15373,12 @@ function cleanupBattleRoomSilently(){
       .then(async (leftCount) => {
         if((leftCount || 0) <= 0 && window.supabaseReady && window.supabaseClient){
           await window.supabaseClient.from('rooms').delete().eq('id', roomId);
-
+        }
         await loadRoomsFromSupabase();
         if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
           renderLobbyListV27('battle');
-        })
+        }
+      })
       .catch(async (error) => {
         console.warn('cleanupBattleRoomSilently error:', error);
         try{
@@ -14214,13 +15387,20 @@ function cleanupBattleRoomSilently(){
             await loadRoomsFromSupabase();
             if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
               renderLobbyListV27('battle');
+            }
+          }
+        }catch(_){}
+      });
+  }
+}
 
-        }catch(_){});
 
 function stopLiveRoomsRefresh(){
   if(liveRoomsRefreshTimer){
     clearInterval(liveRoomsRefreshTimer);
     liveRoomsRefreshTimer = null;
+  }
+}
 
 function startLiveRoomsRefresh(){
   stopLiveRoomsRefresh();
@@ -14243,14 +15423,19 @@ function startLiveRoomsRefresh(){
             if(selectedEl){
               list?.querySelectorAll('.match-item').forEach(el => el.classList.remove('selected'));
               selectedEl.classList.add('selected');
-
-
+            }
+          }
+        }
+      }
     }catch(error){
-          }, LIVE_ROOMS_REFRESH_MS);
+          }
+  }, LIVE_ROOMS_REFRESH_MS);
+}
 
 async function loadRoomsFromSupabase() {
   if (!window.supabaseReady || !window.supabaseClient) {
         return [];
+  }
 
   const cutoffIso = getOnlineFreshCutoffIso();
   const [roomsResponse, onlineResponse] = await Promise.all([
@@ -14271,9 +15456,10 @@ async function loadRoomsFromSupabase() {
   if (error) {
     console.error('Ошибка загрузки комнат:', error);
     return [];
-
+  }
   if (onlineError) {
     console.warn('Не удалось загрузить active presence для комнат:', onlineError);
+  }
 
   const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
   let allRooms = Array.isArray(data) ? data : [];
@@ -14284,7 +15470,8 @@ async function loadRoomsFromSupabase() {
     rows.forEach(row => {
       if(row?.room_id && !isFreshRoomPlayerRow(row)){
         staleRoomPlayers.push(row.player_id);
-      });
+      }
+    });
     room.room_players = rows.filter(row => isFreshRoomPlayerRow(row));
   });
 
@@ -14295,6 +15482,7 @@ async function loadRoomsFromSupabase() {
         .delete()
         .in('player_id', staleRoomPlayers);
     }catch(_){}
+  }
 
   const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
   if (emptyRooms.length) {
@@ -14305,8 +15493,9 @@ async function loadRoomsFromSupabase() {
       .in('id', emptyRoomIds);
     if (emptyDeleteError) {
       console.warn('Не удалось удалить пустые комнаты:', emptyDeleteError);
-
+    }
     allRooms = allRooms.filter(room => !emptyRoomIds.includes(room.id));
+  }
 
   rebuildBattleMapOccupants(allRooms, presenceRows);
 
@@ -14317,7 +15506,7 @@ async function loadRoomsFromSupabase() {
     const players = Array.isArray(mapped.currentPlayers) ? mapped.currentPlayers : [];
     if(players.includes(myName)){
       mapped.ping = getBattlePingValue();
-
+    }
     return mapped;
   });
 
@@ -14327,12 +15516,15 @@ async function loadRoomsFromSupabase() {
     if(freshSelected){
       if(selectedLobbyMap?.id) selectedLobbyMap = { ...freshSelected, name: freshSelected.real };
       if(currentRoom?.id) currentRoom = { ...currentRoom, ...freshSelected, currentPlayers:[...(freshSelected.currentPlayers||[])], players:[...(freshSelected.players||[])] };
-    } else if(selectedLobbyMap?.isBaseMap || (!selectedLobbyMap?.id && selectedLobbyMap?.real)) {
+    }
+  } else if(selectedLobbyMap?.isBaseMap || (!selectedLobbyMap?.id && selectedLobbyMap?.real)) {
     const occupants = getBattleMapOccupants(selectedLobbyMap.real || selectedLobbyMap.map || selectedLobbyMap.name);
     selectedLobbyMap.currentPlayers = occupants;
     selectedLobbyMap.players = [...occupants];
+  }
 
   return supabaseBattleRoomsCache;
+}
 
 async function renderRoomsInLobby(forceBattleMode = false) {
   await loadRoomsFromSupabase();
@@ -14340,10 +15532,12 @@ async function renderRoomsInLobby(forceBattleMode = false) {
   if (typeof renderLobbyListV27 === 'function') {
     renderLobbyListV27(forceBattleMode ? 'battle' : getLobbyModeSafe());
     return;
+  }
 
   const matchList = document.getElementById('match-list');
   if (!matchList) {
         return;
+  }
 
   const baseMaps = (typeof LOBBY_MAP_DATA !== 'undefined' && Array.isArray(LOBBY_MAP_DATA))
     ? LOBBY_MAP_DATA
@@ -14370,7 +15564,7 @@ async function renderRoomsInLobby(forceBattleMode = false) {
         preview.style.backgroundImage = `url(maps/${entry.img}.jpg)`;
         preview.style.backgroundSize = 'cover';
         preview.style.backgroundPosition = 'center';
-
+      }
       const playersBox = document.getElementById('map-players');
       if (playersBox) playersBox.innerHTML = '';
       window.renderPlayersOnPlanet({ ...selectedLobbyMap, currentPlayers: occupants, players: occupants });
@@ -14384,10 +15578,12 @@ async function renderRoomsInLobby(forceBattleMode = false) {
 
   const first = matchList.querySelector('.match-item');
   if (first) first.click();
+}
 
 async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   if (!window.supabaseReady || !window.supabaseClient) {
         return null;
+  }
 
   const normalizedMap = normalizeBattleMapName(mapName);
   const safeRoomName = String(roomName || '').trim() || `Public ${String(normalizedMap || 'earth').toUpperCase()}`;
@@ -14403,11 +15599,13 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
     existingQuery = existingQuery.eq('room_name', safeRoomName);
   } else {
     existingQuery = existingQuery.eq('room_name', safeRoomName).eq('host_name', hostName);
+  }
 
   const { data: existingRows, error: existingError } = await existingQuery;
   if (existingError) {
     console.error('Ошибка проверки существующей комнаты:', existingError);
     return null;
+  }
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
     const existingRoom = existingRows[0];
@@ -14416,9 +15614,10 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
     await loadRoomsFromSupabase();
     if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
       renderLobbyListV27('battle');
-
+    }
     existingRoom.map_name = normalizeBattleMapName(existingRoom.map_name || existingRoom.room_name || 'earth');
     return existingRoom;
+  }
 
   const { data, error } = await window.supabaseClient
     .from('rooms')
@@ -14428,7 +15627,7 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
         map_name: normalizedMap,
         max_players: maxPlayers,
         host_name: isPublicRoom ? 'SYSTEM' : hostName
-
+      }
     ])
     .select()
     .single();
@@ -14436,31 +15635,35 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   if (error) {
     console.error('Ошибка создания комнаты:', error);
     return null;
+  }
 
   const joined = await joinRoomPlayers(data.id);
   if (!joined) {
     console.error('Не удалось добавить создателя в room_players, комната будет удалена:', data);
     await window.supabaseClient.from('rooms').delete().eq('id', data.id);
     return null;
+  }
 
   await loadRoomsFromSupabase();
   if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
-
+  }
   return data;
-
+}
 /* ================= AUTO LOAD ================= */
 
 window.addEventListener('load', async () => {
   if (typeof player === 'undefined') {
     console.warn('player не найден — проверь код');
     return;
+  }
 
   await loadRoomsFromSupabase();
 
   if (typeof gameState !== 'undefined' && gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function') {
     renderLobbyListV27('battle');
-  });
+  }
+});
 
 
 
@@ -14468,9 +15671,11 @@ window.addEventListener('load', async () => {
 
 function isGuestAccount(){
     return authState?.mode === 'guest';
+}
 
 function showGuestOnlyPvpMessage(){
     alert('Гостям доступен только PvP режим.');
+}
 
 // ================= ONLINE PLAYERS (SUPABASE) =================
 
@@ -14484,9 +15689,11 @@ const LIVE_ROOMS_REFRESH_MS = 2500;
 
 function isAccountPublicId(value){
     return !!(value && /^\d+$/.test(String(value)));
+}
 
 function getOnlineFreshCutoffIso(){
     return new Date(Date.now() - ONLINE_TTL_MS).toISOString();
+}
 
 function ensurePlayerActionMenu(){
     if (playerActionMenuEl && document.body.contains(playerActionMenuEl)) return playerActionMenuEl;
@@ -14509,11 +15716,13 @@ function ensurePlayerActionMenu(){
     window.addEventListener('resize', () => hidePlayerActionMenu());
     window.addEventListener('scroll', () => hidePlayerActionMenu(), true);
     return playerActionMenuEl;
+}
 
 function hidePlayerActionMenu(){
     const menu = ensurePlayerActionMenu();
     menu.classList.add('hidden');
     menu.innerHTML = '';
+}
 
 function showPlayerActionMenu(anchorEl, targetId, nickname){
     const menu = ensurePlayerActionMenu();
@@ -14541,6 +15750,7 @@ function showPlayerActionMenu(anchorEl, targetId, nickname){
         hidePlayerActionMenu();
         openPrivateChat(String(targetId), nickname || `ID ${targetId}`);
     });
+}
 
 async function fetchPlayerProfileData(targetId){
     if(!window.supabaseClient || !targetId) return null;
@@ -14554,8 +15764,10 @@ async function fetchPlayerProfileData(targetId){
     if(error){
         console.error('Ошибка загрузки профиля игрока:', error);
         return null;
+    }
 
     return data || null;
+}
 
 async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
     const profileWindowEl = document.getElementById('profile-window');
@@ -14569,6 +15781,7 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
         if (typeof renderProfileStats === 'function') renderProfileStats();
         profileWindowEl.classList.remove('hidden');
         return;
+    }
 
     profileInfoEl.innerHTML = '<div class="auth-note">Загрузка профиля игрока...</div>';
     profileWindowEl.classList.remove('hidden');
@@ -14576,7 +15789,7 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
     const data = normalizedId ? await fetchPlayerProfileData(normalizedId) : null;
     if (data?.public_id) {
         setCachedStaffRole(String(data.public_id), data.staff_role || 'player');
-
+    }
     const displayName = data?.nickname || fallbackNickname || 'Player';
     const profileRole = normalizeStaffRole(data?.staff_role || (normalizedId && normalizedId === myId ? player?.staff_role : 'player'));
     const roleMeta = getStaffRoleMeta(profileRole);
@@ -14613,6 +15826,7 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
     document.getElementById('profile-pm-btn')?.addEventListener('click', () => {
         openPrivateChat(String(normalizedId), displayName);
     });
+}
 
 async function setPlayerOnlineStatus(status = 'lobby', roomId = null){
     if(!window.supabaseClient) return;
@@ -14643,6 +15857,8 @@ async function setPlayerOnlineStatus(status = 'lobby', roomId = null){
 
     if(error){
         console.error('Ошибка записи online_players:', error);
+    }
+}
 
 async function removePlayerFromOnline(){
     if(!window.supabaseClient) return;
@@ -14661,6 +15877,8 @@ async function removePlayerFromOnline(){
 
     if(error){
         console.error('Ошибка удаления online_players:', error);
+    }
+}
 
 async function cleanupStaleOnlinePlayers(){
     if(!window.supabaseClient) return;
@@ -14671,6 +15889,8 @@ async function cleanupStaleOnlinePlayers(){
         .lt('updated_at', cutoffIso);
     if(error){
         console.warn('Не удалось очистить старый online:', error);
+    }
+}
 
 async function loadOnlinePlayersFromSupabase(){
     if(!window.supabaseClient) return [];
@@ -14685,8 +15905,10 @@ async function loadOnlinePlayersFromSupabase(){
     if(error){
         console.error('Ошибка загрузки online_players:', error);
         return [];
+    }
 
     return data || [];
+}
 
 function refreshPmOnlineState(players = []){
     onlinePmPeers.clear();
@@ -14705,8 +15927,10 @@ function refreshPmOnlineState(players = []){
         } else {
             inGamePmPeers.add(targetId);
             if(roomId) pmPeerRoomIds.set(targetId, roomId);
-
+        }
+    }
     renderChatTabs();
+}
 
 async function renderOnlinePlayers(){
     const list = document.getElementById('online-list');
@@ -14743,7 +15967,8 @@ async function renderOnlinePlayers(){
             row.addEventListener('click', async () => {
                 await openPlayerProfile(targetId, p.nickname || `ID ${targetId}`);
             });
-        };
+        }
+    };
 
     if(lobbyPlayers.length){
         lobbyPlayers.forEach(p => appendPlayerRow(p));
@@ -14753,46 +15978,55 @@ async function renderOnlinePlayers(){
         empty.style.opacity = '0.7';
         empty.textContent = 'Игроков онлайн пока нет';
         list.appendChild(empty);
+    }
+}
 
 function getOnlinePresenceStateForGameState(state = gameState){
     const value = String(state || '').toUpperCase();
     if(value === 'LOBBY') return 'lobby';
     if(value === 'BATTLE' || value === 'OBSERVE' || value === 'ORBIT' || value === 'COMBAT') return 'in-game';
     return 'offline';
+}
 
 function syncCurrentOnlinePresence(){
     const status = getOnlinePresenceStateForGameState(gameState);
     if(status === 'offline'){
         removePlayerFromOnline();
         return;
+    }
 
     const roomId = status === 'in-game'
         ? sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null)
         : null;
 
     setPlayerOnlineStatus(status, roomId);
+}
 
 function startOnlinePresenceHeartbeat(){
     if(onlineHeartbeatTimer) clearInterval(onlineHeartbeatTimer);
     onlineHeartbeatTimer = setInterval(() => {
         syncCurrentOnlinePresence();
     }, ONLINE_HEARTBEAT_MS);
+}
 
 function startOnlineRenderLoop(){
     if(onlineRenderTimer) clearInterval(onlineRenderTimer);
     onlineRenderTimer = setInterval(() => {
         renderOnlinePlayers();
     }, 5000);
+}
 
 function startBattleRoomsRenderLoop(){
     if(battleRoomsRenderTimer) clearInterval(battleRoomsRenderTimer);
     battleRoomsRenderTimer = null;
+}
 
 const previousSwitchStateOnline = window.switchState || switchState;
 switchState = function(newState){
     if(newState === 'AUTH'){
         deleteAllOwnPmHistory();
         resetPrivateChatState();
+    }
 
     if(isGuestAccount() && (newState === 'ORBIT' || newState === 'INVENTORY' || newState === 'COMBAT')){
         showGuestOnlyPvpMessage();
@@ -14800,13 +16034,15 @@ switchState = function(newState){
         syncCurrentOnlinePresence();
         setTimeout(renderOnlinePlayers, 300);
         return;
+    }
 
     previousSwitchStateOnline(newState);
     syncCurrentOnlinePresence();
     setTimeout(renderOnlinePlayers, 300);
     if(newState === 'LOBBY' && typeof renderRoomsInLobby === 'function'){
         setTimeout(() => { renderRoomsInLobby(true); }, 180);
-    };
+    }
+};
 
 window.switchState = switchState;
 window.openPlayerProfile = openPlayerProfile;
@@ -14825,7 +16061,8 @@ document.addEventListener('visibilitychange', () => {
     if(document.visibilityState === 'visible'){
         syncCurrentOnlinePresence();
         setTimeout(renderOnlinePlayers, 250);
-    });
+    }
+});
 
 window.addEventListener('focus', () => {
     syncCurrentOnlinePresence();
@@ -14867,6 +16104,7 @@ function cleanupHangarOverlayUi(){
     selectors.forEach((selector) => {
         document.querySelectorAll(selector).forEach((node) => node.remove());
     });
+}
 
 const previousOpenHangarWindowV188 = typeof openHangarWindow === 'function' ? openHangarWindow : null;
 if(previousOpenHangarWindowV188){
@@ -14879,5 +16117,7 @@ if(previousOpenHangarWindowV188){
         return result;
     };
     window.openHangarWindow = openHangarWindow;
+}
+
 
 try{ ensurePremiumCurrencyUi?.(); }catch(_){ }
