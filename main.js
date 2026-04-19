@@ -10226,7 +10226,7 @@ function createHangarRoomEnvironment(){
 
     const centerPlaque = createHangarPlaqueBoard(5.9, 2.3);
     centerPlaque.position.set(0, 1.58, -5.34);
-    centerPlaque.rotation.x = -0.24;
+    centerPlaque.rotation.x = 0.24;
     centerPlaque.rotation.y = Math.PI;
     centerPlaque.rotation.z = 0;
     centerDockGroup.add(centerPlaque);
