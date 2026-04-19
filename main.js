@@ -4400,6 +4400,7 @@ let __hangarChatHomeParent = null;
 let __hangarChatHomeNextSibling = null;
 let __hangarEmojiHomeParent = null;
 let __hangarEmojiHomeNextSibling = null;
+let __hangarPmPulseUntil = 0;
 
 function __mountHangarChatPanel(){
     try{
@@ -4475,6 +4476,7 @@ function setHangarChatMode(active, lowered = false){
         if(chatWrapper) chatWrapper.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         if(emojiPanel) emojiPanel.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         __updateHangarPmNeon?.();
+    setInterval(() => { __updateHangarPmNeon?.(); }, 400);
         
     }catch(_){}
 }
@@ -4528,9 +4530,10 @@ function __updateHangarPmNeon(){
 
         const isLowered = chatWrapper.classList.contains('hangar-chat-lowered') || document.body.classList.contains('hangar-chat-lowered');
         const activeScope = parseChatScope(currentChat);
-        const activePmUnread = activeScope.channel === 'pm' ? getUnreadCount(currentChat) : 0;
-        const shouldGlow = !!(isLowered && activeScope.channel === 'pm' && activePmUnread > 0);
+        const hasAnyUnreadPm = __getTotalPmUnreadCount() > 0;
+        const hasRecentActivePmPulse = Date.now() < Number(__hangarPmPulseUntil || 0);
 
+        const shouldGlow = !!(isLowered && (hasAnyUnreadPm || (activeScope.channel === 'pm' && hasRecentActivePmPulse)));
         chatWrapper.classList.toggle('hangar-pm-neon', shouldGlow);
     }catch(_){}
 }
@@ -6184,7 +6187,7 @@ async function handleIncomingRealtimeMessage(msg) {
         if (currentChat !== scope.key) {
             incrementUnread(scope.key);
         } else if (isHangarLowered) {
-            incrementUnread(scope.key);
+            __hangarPmPulseUntil = Date.now() + 5000;
         }
 
         if (currentChat === scope.key) renderLobbyMessages();
