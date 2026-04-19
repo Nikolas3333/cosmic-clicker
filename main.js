@@ -9780,12 +9780,14 @@ function refreshHangarInfoBoards(){
                 lines: getHangarDisplayShipStats(currentShip || { id:'scout_1', name:'Cargo Drone', hp:100, attack:10, speed:5 })
             });
         }else if(entry.kind === 'dock_ship'){
-            const dockShip = entry.ship || null;
+            const dockIndex = Number(entry?.dockIndex ?? -1);
+            const dockShip = getHangarDockShipByIndex(dockIndex) || null;
+            entry.ship = dockShip;
             drawHangarPlaque(plaque, {
                 title: String(dockShip?.name || 'Свободный док').trim() || 'Свободный док',
                 lines: dockShip ? getHangarDisplayShipStats(dockShip) : ['Пустая платформа']
             });
-            updateHangarPlaqueSellButton(plaque, !!dockShip && canSellHull(dockShip.id), dockShip?.id || '', Number(entry?.dockIndex ?? -1));
+            updateHangarPlaqueSellButton(plaque, !!dockShip && canSellHull(dockShip.id), dockShip?.id || '', dockIndex);
         }else{
             drawHangarPlaque(plaque, {});
             updateHangarPlaqueSellButton(plaque, false, '', -1);
@@ -11372,7 +11374,7 @@ function ensureHangarRenderer(){
                     const flatDir = moveDir.clone().setY(0);
                     if(flatDir.lengthSq() > 0.0001){
                         const yaw = Math.atan2(flatDir.z, flatDir.x);
-                        entry.mesh.rotation.set(0, -yaw + Math.PI * 0.5, 0);
+                        entry.mesh.rotation.set(0, -yaw, 0);
                     }
                 }
                 const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
