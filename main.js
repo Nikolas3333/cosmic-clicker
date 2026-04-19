@@ -4528,14 +4528,17 @@ function __updateHangarPmNeon(){
         const chatWrapper = document.getElementById('chat-wrapper');
         if(!chatWrapper) return;
 
-        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered') || document.body.classList.contains('hangar-chat-lowered');
-        const activeScope = parseChatScope(currentChat);
-        const hasAnyUnreadPm = __getTotalPmUnreadCount() > 0;
-        const hasRecentActivePmPulse = Date.now() < Number(__hangarPmPulseUntil || 0);
+        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered');
+        const hasUnread = __getTotalPmUnreadCount() > 0;
 
-        const shouldGlow = !!(isLowered && (hasAnyUnreadPm || (activeScope.channel === 'pm' && hasRecentActivePmPulse)));
-        chatWrapper.classList.toggle('hangar-pm-neon', shouldGlow);
+        if(isLowered && hasUnread){
+            chatWrapper.classList.add('hangar-pm-neon');
+        }else{
+            chatWrapper.classList.remove('hangar-pm-neon');
+        }
+
     }catch(_){}
+}catch(_){}
 }
 
 function bindHangarChatControls(){
