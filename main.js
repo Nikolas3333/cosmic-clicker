@@ -4439,7 +4439,7 @@ function __restoreHangarChatPanel(){
         if(chatWrapper){
             chatWrapper.classList.remove('hangar-inline-mode');
             chatWrapper.classList.remove('hangar-chat-lowered');
-            chatWrapper.classList.remove('has-hangar-pm-alert');
+            
 
             if(__hangarChatHomeParent && chatWrapper.parentNode !== __hangarChatHomeParent){
                 if(__hangarChatHomeNextSibling && __hangarChatHomeNextSibling.parentNode === __hangarChatHomeParent){
@@ -4474,7 +4474,40 @@ function setHangarChatMode(active, lowered = false){
         document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         if(chatWrapper) chatWrapper.classList.toggle('hangar-chat-lowered', !!(active && lowered));
         if(emojiPanel) emojiPanel.classList.toggle('hangar-chat-lowered', !!(active && lowered));
-        __updateHangarPmAlert?.();
+        
+    }catch(_){}
+}
+
+
+function __appendEmojiToChatInput(symbol){
+    try{
+        const input = document.getElementById('chat-input');
+        if(!input) return;
+        const current = String(input.value || '');
+        input.value = `${current}${current ? ' ' : ''}${symbol}`.trimStart() + ' ';
+        input.focus();
+    }catch(_){}
+}
+
+function __initHangarEmojiPanel(){
+    try{
+        const panel = document.getElementById('hangar-emoji-panel');
+        if(!panel || panel.dataset.readyHangarEmoji === '1') return;
+        panel.dataset.readyHangarEmoji = '1';
+        const emojis = ['😀','🚀','🔥','😎','💀','🪐','✴️','⚔️'];
+        panel.innerHTML = '';
+        emojis.forEach(symbol => {
+            const btn = document.createElement('div');
+            btn.className = 'hangar-emoji-btn';
+            btn.textContent = symbol;
+            btn.title = symbol;
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                __appendEmojiToChatInput(symbol);
+            });
+            panel.appendChild(btn);
+        });
     }catch(_){}
 }
 
@@ -4512,6 +4545,7 @@ function __syncHangarChatVisibility(){
         const isVisible = !hangarWindow.classList.contains('hidden') && hangarWindow.style.display !== 'none';
         if(isVisible){
             bindHangarChatControls();
+            __initHangarEmojiPanel();
             __mountHangarChatPanel();
             const lowered = document.body.classList.contains('hangar-chat-lowered');
             setHangarChatMode(true, lowered);
@@ -5069,35 +5103,14 @@ function setUnreadCount(scopeName, count = 0) {
     } else {
         chatUnread.global = safeCount;
     }
-    __updateHangarPmAlert?.();
+    
 }
 
 function incrementUnread(scopeName, amount = 1) {
     setUnreadCount(scopeName, getUnreadCount(scopeName) + Math.max(1, Number(amount) || 1));
-    __updateHangarPmAlert?.();
+    
 }
 
-function __getTotalPmUnread(){
-    try{
-        return Object.values(chatUnread?.pm || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
-    }catch(_){
-        return 0;
-    }
-}
-
-function __updateHangarPmAlert(){
-    try{
-        const chatWrapper = document.getElementById('chat-wrapper');
-        const badge = document.getElementById('hangar-chat-alert');
-        if(!chatWrapper || !badge){
-            return;
-        }
-        const isLowered = chatWrapper.classList.contains('hangar-chat-lowered');
-        const totalPmUnread = __getTotalPmUnread();
-        badge.textContent = String(totalPmUnread > 99 ? '99+' : totalPmUnread);
-        chatWrapper.classList.toggle('has-hangar-pm-alert', !!(isLowered && totalPmUnread > 0));
-    }catch(_){}
-}
 
 function getLastMessagePreview(scopeName) {
     const scope = parseChatScope(scopeName);
@@ -12493,7 +12506,7 @@ window.addEventListener('load', () => {
     bindHangarChatControls();
     __installHangarChatWatcher();
     __syncHangarChatVisibility();
-    __updateHangarPmAlert?.();
+    
     try{
         const chatWrapper = document.getElementById('chat-wrapper');
         if(chatWrapper && !__hangarChatHomeParent){
