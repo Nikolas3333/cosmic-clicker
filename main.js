@@ -8842,41 +8842,78 @@ function createHangarTransferMesh(ship){
     }
 }
 
-function startHangarShipTransfer(previousShipId, nextShipId){
+function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = -1){
     const safePrev = String(previousShipId || '').trim();
     const safeNext = String(nextShipId || '').trim();
     if(!hangarState?.scene) return;
     if(!safeNext || safePrev === safeNext) return;
 
-    const nextIndex = getAllOwnedHangarShips().findIndex(item => String(item?.id || '').trim() === safeNext);
-    const prevIndex = getAllOwnedHangarShips().findIndex(item => String(item?.id || '').trim() === safePrev);
-    const nextShip = findOwnedHangarShipById(safeNext);
-    const prevShip = findOwnedHangarShipById(safePrev);
-    const incomingMesh = createHangarTransferMesh(nextShip);
-    const outgoingMesh = createHangarTransferMesh(prevShip);
+    const showcaseGroup = hangarState?.envGroup?.userData?.shipShowcaseGroup || hangarState?.showcaseGroup || null;
+    const centerMesh = showcaseGroup?.children?.[0] || null;
+    const supportMesh = (hangarState.supportShipMeshes || []).find(mesh => String(mesh?.userData?.shipId || '').trim() === safeNext) || null;
+    if(!centerMesh && !supportMesh) return;
+
+    const detachMeshToScene = (mesh) => {
+        if(!mesh || !hangarState?.scene) return null;
+        const worldPos = new THREE.Vector3();
+        const worldQuat = new THREE.Quaternion();
+        const worldScale = new THREE.Vector3(1, 1, 1);
+        try{
+            mesh.updateMatrixWorld(true);
+            mesh.getWorldPosition(worldPos);
+            mesh.getWorldQuaternion(worldQuat);
+            mesh.getWorldScale(worldScale);
+        }catch(_){ }
+        try{ mesh.parent?.remove?.(mesh); }catch(_){ }
+        hangarState.scene.add(mesh);
+        mesh.position.copy(worldPos);
+        mesh.quaternion.copy(worldQuat);
+        mesh.scale.copy(worldScale);
+        mesh.userData = mesh.userData || {};
+        mesh.userData.isActiveHangarTransferMesh = true;
+        return mesh;
+    };
+
+    const incomingMesh = detachMeshToScene(supportMesh);
+    const outgoingMesh = detachMeshToScene(centerMesh);
     if(!incomingMesh && !outgoingMesh) return;
 
     const transfer = {
         startedAt: performance.now(),
-        duration: 560,
+        duration: 1550,
         incoming: null,
-        outgoing: null
+        outgoing: null,
+        clickedDockIndex: Number(clickedDockIndex || -1)
     };
 
     const centerPos = getHangarCenterWorldPosition();
+    const dockPos = Number.isFinite(Number(clickedDockIndex)) && Number(clickedDockIndex) >= 0
+        ? getHangarDockWorldPosition(Number(clickedDockIndex))
+        : centerPos.clone().add(new THREE.Vector3(0, 0, -4.2));
+
     if(incomingMesh){
-        const fromPos = nextIndex >= 0 ? getHangarDockWorldPosition(nextIndex) : centerPos.clone().add(new THREE.Vector3(0, 0, -3.5));
-        incomingMesh.position.copy(fromPos);
-        incomingMesh.scale.setScalar(0.86);
-        hangarState.scene.add(incomingMesh);
-        transfer.incoming = { mesh: incomingMesh, from: fromPos.clone(), to: centerPos.clone(), fromScale: 0.86, toScale: 1.18 };
+        const fromPos = new THREE.Vector3();
+        try{ incomingMesh.getWorldPosition(fromPos); }catch(_){ fromPos.copy(dockPos); }
+        transfer.incoming = {
+            mesh: incomingMesh,
+            from: fromPos.clone(),
+            to: centerPos.clone(),
+            fromScale: Number(incomingMesh.scale.x || 1),
+            toScale: 1.22,
+            lift: 2.2
+        };
     }
     if(outgoingMesh){
-        const toPos = prevIndex >= 0 ? getHangarDockWorldPosition(prevIndex) : centerPos.clone().add(new THREE.Vector3(0, 0, -4.2));
-        outgoingMesh.position.copy(centerPos);
-        outgoingMesh.scale.setScalar(1.18);
-        hangarState.scene.add(outgoingMesh);
-        transfer.outgoing = { mesh: outgoingMesh, from: centerPos.clone(), to: toPos.clone(), fromScale: 1.18, toScale: 0.84 };
+        const fromPos = new THREE.Vector3();
+        try{ outgoingMesh.getWorldPosition(fromPos); }catch(_){ fromPos.copy(centerPos); }
+        transfer.outgoing = {
+            mesh: outgoingMesh,
+            from: fromPos.clone(),
+            to: dockPos.clone(),
+            fromScale: Number(outgoingMesh.scale.x || 1),
+            toScale: 0.84,
+            lift: 1.65
+        };
     }
 
     hangarState.shipTransfer = transfer;
@@ -8901,7 +8938,7 @@ function selectCurrentHangarShip(){
     syncHangarDockSelection();
     setHangarTransition?.(hangarState.shipIndex >= previousIndex ? 1 : -1);
     hangarState.shipAppearStartedAt = performance.now();
-    startHangarShipTransfer(previousShipId, nextShipId);
+    startHangarShipTransfer(previousShipId, nextShipId, hangarState.shipIndex);
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
@@ -11071,29 +11108,34 @@ function ensureHangarRenderer(){
 
         if(hangarState.shipTransfer){
             const transfer = hangarState.shipTransfer;
-            const progress = THREE.MathUtils.clamp((now - Number(transfer.startedAt || now)) / Math.max(1, Number(transfer.duration || 1120)), 0, 1);
-            const easeInOut = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+            const progress = THREE.MathUtils.clamp((now - Number(transfer.startedAt || now)) / Math.max(1, Number(transfer.duration || 1550)), 0, 1);
+            const smooth = (value) => value * value * (3 - 2 * value);
             ['incoming','outgoing'].forEach((key) => {
                 const entry = transfer[key];
                 if(!entry?.mesh) return;
-                entry.mesh.position.lerpVectors(entry.from, entry.to, easeInOut);
-                const liftStrength = key === 'incoming' ? 1.35 : 1.05;
-                const arc = Math.sin(progress * Math.PI) * liftStrength;
-                entry.mesh.position.y += arc;
-                const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * easeInOut;
+                const from = entry.from.clone();
+                const to = entry.to.clone();
+                let t = 0;
+                let y = from.y;
+                if(progress < 0.25){
+                    t = 0;
+                    y = THREE.MathUtils.lerp(from.y, from.y + Number(entry.lift || 1.8), smooth(progress / 0.25));
+                }else if(progress < 0.78){
+                    t = smooth((progress - 0.25) / 0.53);
+                    y = from.y + Number(entry.lift || 1.8);
+                }else{
+                    t = 1;
+                    y = THREE.MathUtils.lerp(from.y + Number(entry.lift || 1.8), to.y, smooth((progress - 0.78) / 0.22));
+                }
+                const pos = from.clone().lerp(to, t);
+                pos.y = y;
+                entry.mesh.position.copy(pos);
+                const scaleValue = Number(entry.fromScale || 1) + (Number(entry.toScale || 1) - Number(entry.fromScale || 1)) * smooth(progress);
                 entry.mesh.scale.setScalar(scaleValue);
-                entry.mesh.rotation.y += key === 'incoming' ? 0.012 : 0.008;
-                entry.mesh.traverse?.((child) => {
-                    if(!child?.material) return;
-                    const mats = Array.isArray(child.material) ? child.material : [child.material];
-                    mats.forEach((mat) => {
-                        if(mat && 'opacity' in mat){
-                            mat.opacity = key === 'outgoing' ? Math.max(0.12, 1 - easeInOut * 0.82) : Math.min(1, 0.35 + easeInOut * 0.65);
-                        }
-                    });
-                });
             });
             if(progress >= 1){
+                try{ transfer.incoming?.mesh && (transfer.incoming.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
+                try{ transfer.outgoing?.mesh && (transfer.outgoing.mesh.userData.isActiveHangarTransferMesh = false); }catch(_){ }
                 try{ transfer.incoming?.mesh?.parent?.remove?.(transfer.incoming?.mesh); }catch(_){ }
                 try{ transfer.outgoing?.mesh?.parent?.remove?.(transfer.outgoing?.mesh); }catch(_){ }
                 hangarState.shipTransfer = null;
@@ -11190,32 +11232,19 @@ function ensureHangarRenderer(){
         const floatingSellBtn = document.getElementById('hangar-platform-sell');
         const stageRect = stage.getBoundingClientRect();
         if(floatingSellBtn && hangarState.camera){
-            let dockIndex = Number(floatingSellBtn.dataset.dockIndex || NaN);
-            let hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
+            const dockIndex = Number(floatingSellBtn.dataset.dockIndex || NaN);
+            const hoverShip = Number.isFinite(dockIndex) && dockIndex >= 0 ? getHangarDockShipByIndex(dockIndex) : null;
             if(hoverShip && Number.isFinite(dockIndex) && dockIndex >= 0 && floatingSellBtn.style.display !== 'none'){
-                let worldPos = null;
-                const liveMesh = (hangarState.supportShipMeshes || []).find(mesh => String(mesh?.userData?.shipId || '').trim() === String(hoverShip?.id || '').trim());
-                if(liveMesh){
-                    const anchor = new THREE.Vector3();
-                    try{
-                        liveMesh.getWorldPosition(anchor);
-                        worldPos = anchor;
-                    }catch(_){
-                        worldPos = null;
-                    }
-                }
-                if(!worldPos){
-                    worldPos = getHangarDockWorldPosition(dockIndex).clone();
-                }
-                worldPos.y += 1.95;
+                const worldPos = getHangarDockWorldPosition(dockIndex).clone();
+                worldPos.y += 2.85;
                 const projected = worldPos.project(hangarState.camera);
                 if(projected.z > -1 && projected.z < 1){
                     const screenX = ((projected.x + 1) * 0.5) * stageRect.width;
                     const screenY = ((-projected.y + 1) * 0.5) * stageRect.height;
                     floatingSellBtn.style.left = `${screenX}px`;
                     floatingSellBtn.style.top = `${screenY}px`;
-                    floatingSellBtn.style.transform = 'translate(-50%, -115%)';
-                    floatingSellBtn.style.zIndex = '12';
+                    floatingSellBtn.style.transform = 'translate(-50%, -50%)';
+                    floatingSellBtn.style.zIndex = '20';
                 }else{
                     floatingSellBtn.style.display = 'none';
                     floatingSellBtn.dataset.shipId = '';
