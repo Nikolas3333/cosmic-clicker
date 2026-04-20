@@ -7807,37 +7807,10 @@ async function fetchCurrentRoomLivePlayers(){
                 });
             }
 
-            if(remoteBattleShips instanceof Map){
-                let index = 0;
-                remoteBattleShips.forEach((entry, entryId) => {
-                    if(!entryId) return;
-                    const safeId = String(entryId);
-                    if(mergedRows.has(safeId)) return;
-                    const pos = entry?.targetPosition || entry?.mesh?.position || {};
-                    const quat = entry?.targetQuaternion || entry?.mesh?.quaternion || {};
-                    mergedRows.set(safeId, {
-                        player_id: safeId,
-                        nickname: entry?.nickname || `Pilot ${index + 1}`,
-                        joined_at: new Date(Number(entry?.lastSeenAt || now)).toISOString(),
-                        team: entry?.team || getBattleRoomPlayerTeam(safeId),
-                        level: Number(entry?.level || 1) || 1,
-                        ping: Number(entry?.ping || 0) || 0,
-                        position: {
-                            x: Number(pos?.x || 0),
-                            y: Number(pos?.y || 0),
-                            z: Number(pos?.z || 0)
-                        },
-                        rotation: {
-                            x: Number(quat?.x || 0),
-                            y: Number(quat?.y || 0),
-                            z: Number(quat?.z || 0),
-                            w: Number(quat?.w || 1)
-                        },
-                        updated_at: new Date(Number(entry?.lastSeenAt || now)).toISOString()
-                    });
-                    index += 1;
-                });
-            }
+            // ghost-fix v303:
+            // Не подмешиваем remoteBattleShips в live roster.
+            // Источником истины остаётся только room_players (+ локальный self),
+            // иначе вышедший игрок может визуально зависать у другого клиента.
 
             cachedRoomPlayersFetchedAt = now;
             cachedRoomPlayersRows = Array.from(mergedRows.values()).filter(item => isFreshRoomPlayerRow(item));
