@@ -15155,11 +15155,11 @@ function getCurrentPlayerIdentity(){
   const authPublicId = (typeof authState !== 'undefined' && authState?.mode === 'account' && authState?.playerId)
     ? String(authState.playerId)
     : '';
-  const chatPlayerId = (typeof getValidChatPlayerId === 'function') ? String(getValidChatPlayerId() || '') : '';
   const playerPublicId = (typeof player !== 'undefined' && player?.id && String(player.id) !== 'local_player')
     ? String(player.id)
     : '';
-  const fallbackId = authPublicId || chatPlayerId || playerPublicId || '';
+  const chatPlayerId = (typeof getValidChatPlayerId === 'function') ? String(getValidChatPlayerId() || '') : '';
+  const fallbackId = authPublicId || playerPublicId || chatPlayerId || '';
   return {
     playerId: fallbackId,
     nickname: fallbackNickname,
@@ -15402,17 +15402,22 @@ async function leaveRoomPlayers(roomId) {
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
   if(!normalizedRoomId) return 0;
 
-  const identity = getCurrentPlayerIdentity();
-  if(identity?.playerId){
+  const selfPlayerId = String(getSelfBattlePlayerId() || '').trim()
+    || String(authState?.playerId || '').trim()
+    || String(player?.id || '').trim();
+
+  const selfNickname = String(player?.nickname || getDisplayPlayerTag?.() || 'Commander').trim() || 'Commander';
+
+  if(selfPlayerId){
     try{
       await sendBattlePresenceEvent('pilot-left', {
-        playerId: identity.playerId,
-        nickname: identity.displayName || identity.nickname || player?.nickname || 'Commander',
+        playerId: selfPlayerId,
+        nickname: selfNickname,
         roomId: normalizedRoomId
       });
     }catch(_){}
     try{
-      lastBattlePresenceSnapshot.delete(String(identity.playerId).trim());
+      lastBattlePresenceSnapshot.delete(selfPlayerId);
     }catch(_){}
   }
 
@@ -15420,7 +15425,7 @@ async function leaveRoomPlayers(roomId) {
     .from('room_players')
     .delete()
     .eq('room_id', normalizedRoomId)
-    .eq('player_id', identity.playerId);
+    .eq('player_id', selfPlayerId);
 
   if (deletePlayerError) {
     console.error('Ошибка выхода из room_players:', deletePlayerError);
@@ -15428,7 +15433,7 @@ async function leaveRoomPlayers(roomId) {
   }
 
   try {
-    removeRemoteBattleShipById(identity.playerId);
+    removeRemoteBattleShipById(selfPlayerId);
   } catch(_) {}
 
   const freshCutoff = getRoomPlayerFreshCutoffIso();
@@ -15491,8 +15496,8 @@ function cleanupBattleRoomSilently(){
   const shouldLeave = !!(roomId && roomSnapshot?.state !== 'solo' && roomSnapshot?.observer !== true);
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
   const identity = getCurrentPlayerIdentity?.() || {};
-  const selfId = String(identity?.playerId || '').trim();
-  const selfNickname = identity?.displayName || identity?.nickname || player?.nickname || 'Commander';
+  const selfId = String(getSelfBattlePlayerId() || authState?.playerId || player?.id || identity?.playerId || '').trim();
+  const selfNickname = player?.nickname || identity?.displayName || identity?.nickname || 'Commander';
 
   if(shouldLeave && selfId && roomSnapshot){
     const filterList = (list) => Array.isArray(list)
