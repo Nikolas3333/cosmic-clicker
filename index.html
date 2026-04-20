@@ -6738,3 +6738,57 @@ body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper.hangar-inline-mode.hanga
 
 </body>
 </html>
+
+<style id="hangar-chat-v295-fix">
+body.hangar-chat-mode #chat-wrapper,
+body.hangar-chat-mode #chat-wrapper.hangar-inline-mode{
+  position:fixed !important;
+  left:18px !important;
+  bottom:18px !important;
+  top:auto !important;
+  width:min(560px, calc(100vw - 36px)) !important;
+  height:264px !important;
+  z-index:22060 !important;
+}
+
+body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper,
+body.hangar-chat-mode #chat-wrapper.hangar-chat-lowered{
+  transform:translateY(calc(100% - 42px)) !important;
+}
+
+body.hangar-chat-mode #chat-wrapper.hangar-pm-neon,
+body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper.hangar-pm-neon,
+body.hangar-chat-mode #chat-wrapper.hangar-inline-mode.hangar-pm-neon,
+body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper.hangar-inline-mode.hangar-pm-neon{
+  border:2px solid rgba(255,58,104,1) !important;
+  box-shadow:
+    0 0 14px rgba(255,34,76,0.98),
+    0 0 34px rgba(255,34,76,0.96),
+    0 0 72px rgba(255,34,76,0.86),
+    0 0 110px rgba(255,34,76,0.52),
+    inset 0 0 24px rgba(255,42,92,0.24),
+    inset 0 0 0 1px rgba(255,214,226,0.16) !important;
+  animation:hangarPmBlinkV295 0.24s steps(2,end) infinite !important;
+}
+
+@keyframes hangarPmBlinkV295{
+  0%, 100%{
+    border-color:rgba(255,58,104,0.10);
+    box-shadow:
+      0 0 2px rgba(255,34,76,0.06),
+      0 0 8px rgba(255,34,76,0.05),
+      inset 0 0 2px rgba(255,42,92,0.03),
+      inset 0 0 0 1px rgba(255,214,226,0.02);
+  }
+  50%{
+    border-color:rgba(255,58,104,1);
+    box-shadow:
+      0 0 16px rgba(255,34,76,1),
+      0 0 42px rgba(255,34,76,0.98),
+      0 0 84px rgba(255,34,76,0.90),
+      0 0 118px rgba(255,34,76,0.58),
+      inset 0 0 28px rgba(255,42,92,0.28),
+      inset 0 0 0 1px rgba(255,214,226,0.18);
+  }
+}
+</style>
