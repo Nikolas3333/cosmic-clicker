@@ -16225,3 +16225,209 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   },500);
 });
+
+
+// ===== V294 HANGAR CHAT + PM PERSIST FIX =====
+const COSMIC_PM_CACHE_KEY_V294 = 'cosmicPmCache:v294';
+
+function __v294_collectPmCacheSnapshot(){
+  try{
+    const snapshot = { tabs:{}, messages:{}, savedAt: Date.now() };
+    Object.entries(privateChatTabs || {}).forEach(([peerId, meta]) => {
+      const safePeerId = String(peerId || '').trim();
+      if(!safePeerId) return;
+      snapshot.tabs[safePeerId] = {
+        label: String(meta?.label || `ID ${safePeerId}`),
+        updatedAt: Number(meta?.updatedAt) || Date.now(),
+        pinned: !!meta?.pinned,
+        preview: String(meta?.preview || '')
+      };
+      const list = Array.isArray(chatCache?.pm?.[safePeerId]) ? chatCache.pm[safePeerId] : [];
+      snapshot.messages[safePeerId] = list.slice(-20);
+    });
+    return snapshot;
+  }catch(_){
+    return { tabs:{}, messages:{}, savedAt: Date.now() };
+  }
+}
+
+function __v294_savePmCache(){
+  try{
+    localStorage.setItem(COSMIC_PM_CACHE_KEY_V294, JSON.stringify(__v294_collectPmCacheSnapshot()));
+  }catch(_){ }
+}
+
+function __v294_restorePmCache(){
+  try{
+    const raw = localStorage.getItem(COSMIC_PM_CACHE_KEY_V294);
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    const tabs = state?.tabs && typeof state.tabs === 'object' ? state.tabs : {};
+    const messages = state?.messages && typeof state.messages === 'object' ? state.messages : {};
+
+    Object.entries(tabs).forEach(([peerId, meta]) => {
+      const safePeerId = String(peerId || '').trim();
+      if(!safePeerId || !/^\d+$/.test(safePeerId)) return;
+      privateChatTabs[safePeerId] = {
+        label: String(meta?.label || `ID ${safePeerId}`),
+        updatedAt: Number(meta?.updatedAt) || Date.now(),
+        pinned: !!meta?.pinned,
+        preview: String(meta?.preview || '')
+      };
+      if(!Array.isArray(chatCache.pm[safePeerId])) chatCache.pm[safePeerId] = [];
+      const list = Array.isArray(messages?.[safePeerId]) ? messages[safePeerId] : [];
+      if(!chatCache.pm[safePeerId].length && list.length){
+        list.slice(-20).forEach(msg => chatCache.pm[safePeerId].push(msg));
+      }
+    });
+  }catch(_){ }
+}
+
+(function(){
+  const __origSaveChatUiStateV294 = typeof saveChatUiState === 'function' ? saveChatUiState : null;
+  if(__origSaveChatUiStateV294){
+    saveChatUiState = function(){
+      const result = __origSaveChatUiStateV294.apply(this, arguments);
+      try{ __v294_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+const __v294_originalDeletePmHistoryWithPeer = typeof deletePmHistoryWithPeer === 'function' ? deletePmHistoryWithPeer : null;
+if(__v294_originalDeletePmHistoryWithPeer){
+  deletePmHistoryWithPeer = async function(){ return true; };
+}
+
+const __v294_originalDeleteAllOwnPmHistory = typeof deleteAllOwnPmHistory === 'function' ? deleteAllOwnPmHistory : null;
+if(__v294_originalDeleteAllOwnPmHistory){
+  deleteAllOwnPmHistory = async function(){ return true; };
+}
+
+(function(){
+  const __origUpdateHangarPmNeonV294 = typeof __updateHangarPmNeon === 'function' ? __updateHangarPmNeon : null;
+  __updateHangarPmNeon = function(){
+    try{
+      const chatWrapper = document.getElementById('chat-wrapper');
+      if(!chatWrapper) return;
+      const lowered = document.body.classList.contains('hangar-chat-lowered') || chatWrapper.classList.contains('hangar-chat-lowered');
+      const hasUnreadPm = (function(){ try{ return Object.values(chatUnread?.pm || {}).reduce((sum, value) => sum + (Number(value) || 0), 0) > 0; }catch(_){ return false; } })();
+      const hasPulse = Date.now() < Number(__hangarPmPulseUntil || 0);
+      const inHangarMode = document.body.classList.contains('hangar-chat-mode');
+      const shouldNeon = !!(inHangarMode && lowered && (hasUnreadPm || hasPulse));
+      chatWrapper.classList.toggle('hangar-pm-neon', shouldNeon);
+    }catch(_){
+      try{ __origUpdateHangarPmNeonV294 && __origUpdateHangarPmNeonV294.apply(this, arguments); }catch(__){}
+    }
+  };
+})();
+
+(function(){
+  const __origSetHangarChatModeV294 = typeof setHangarChatMode === 'function' ? setHangarChatMode : null;
+  if(__origSetHangarChatModeV294){
+    setHangarChatMode = function(active, lowered = false){
+      const result = __origSetHangarChatModeV294.apply(this, arguments);
+      try{
+        const chatWrapper = document.getElementById('chat-wrapper');
+        const emojiPanel = document.getElementById('emoji-panel');
+        document.body.classList.toggle('hangar-chat-mode', !!active);
+        document.body.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+        if(chatWrapper){
+          chatWrapper.classList.toggle('hangar-inline-mode', !!active);
+          chatWrapper.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+        }
+        if(emojiPanel) emojiPanel.classList.toggle('hangar-chat-lowered', !!(active && lowered));
+        __updateHangarPmNeon?.();
+      }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origRestoreChatUiStateV294 = typeof restoreChatUiState === 'function' ? restoreChatUiState : null;
+  if(__origRestoreChatUiStateV294){
+    restoreChatUiState = function(){
+      const result = __origRestoreChatUiStateV294.apply(this, arguments);
+      try{ __v294_restorePmCache(); }catch(_){ }
+      return result;
+    };
+  }else{
+    try{ __v294_restorePmCache(); }catch(_){ }
+  }
+})();
+
+(function(){
+  const __origLoadChatHistoryV294 = typeof loadChatHistory === 'function' ? loadChatHistory : null;
+  if(__origLoadChatHistoryV294){
+    loadChatHistory = async function(scopeName = currentChat){
+      const result = await __origLoadChatHistoryV294.apply(this, arguments);
+      try{ __v294_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origPushChatToCacheV294 = typeof pushChatToCache === 'function' ? pushChatToCache : null;
+  if(__origPushChatToCacheV294){
+    pushChatToCache = function(scope, msg){
+      const result = __origPushChatToCacheV294.apply(this, arguments);
+      try{ if(scope?.channel === 'pm'){ __v294_savePmCache(); } }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origInitRealtimeChatV294 = typeof initRealtimeChat === 'function' ? initRealtimeChat : null;
+  if(__origInitRealtimeChatV294){
+    initRealtimeChat = async function(){
+      if (!canUsePrivateChat()) {
+        resetPrivateChatState();
+      }
+      restoreChatUiState();
+      try{ __v294_restorePmCache(); }catch(_){ }
+      chatUnread.global = 0;
+      chatUnread.clan = 0;
+      chatUnread.battle = 0;
+      startRealtimeChat();
+      renderChatTabs();
+      updateLobbyChatComposerVisibility();
+      await loadChatHistory("global");
+      if (canUseClanChat()) await loadChatHistory("clan");
+      const restoredPmIds = Object.keys(privateChatTabs || {});
+      for(const peerId of restoredPmIds){
+        try{ await loadChatHistory(`pm:${peerId}`); }catch(_){ }
+      }
+      if (currentChat !== 'battle') renderLobbyMessages();
+      saveChatUiState();
+    };
+  }
+})();
+
+setInterval(() => {
+  try{
+    if(gameState === 'HANGAR'){
+      const chatWrapper = document.getElementById('chat-wrapper');
+      if(chatWrapper){
+        document.body.classList.add('hangar-chat-mode');
+        document.body.classList.add('hangar-chat-lowered');
+        chatWrapper.classList.add('hangar-inline-mode');
+        chatWrapper.classList.add('hangar-chat-lowered');
+      }
+      __updateHangarPmNeon?.();
+    }
+  }catch(_){ }
+}, 350);
+
+document.addEventListener('DOMContentLoaded', () => {
+  try{ __v294_restorePmCache(); }catch(_){ }
+  setTimeout(() => {
+    try{
+      if(gameState === 'HANGAR') setHangarChatMode?.(true, true);
+      __updateHangarPmNeon?.();
+      renderChatTabs?.();
+    }catch(_){ }
+  }, 450);
+});
