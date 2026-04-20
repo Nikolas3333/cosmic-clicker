@@ -6935,3 +6935,106 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
 }
 
 </style>
+
+
+/* ===== FINAL HANGAR CHAT OVERRIDE V291 ===== */
+/* normal lobby/chat outside hangar must stay normal */
+#chat-wrapper:not(.hangar-inline-mode){
+  position:relative !important;
+  left:auto !important;
+  top:auto !important;
+  bottom:auto !important;
+  width:auto !important;
+  height:240px !important;
+  z-index:auto !important;
+  transform:none !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+#chat-wrapper:not(.hangar-inline-mode) #chat-panel{
+  width:100% !important;
+  height:100% !important;
+}
+#emoji-panel:not(.hangar-emoji-inline-mode){
+  position:static !important;
+  left:auto !important;
+  top:auto !important;
+  bottom:auto !important;
+  width:auto !important;
+  height:auto !important;
+  transform:none !important;
+  opacity:1 !important;
+  z-index:auto !important;
+}
+
+/* hangar mode */
+#chat-wrapper.hangar-inline-mode{
+  position:fixed !important;
+  left:22px !important;
+  top:auto !important;
+  bottom:26px !important;
+  width:600px !important;
+  height:270px !important;
+  z-index:999999 !important;
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  transform:none !important;
+}
+#chat-wrapper.hangar-inline-mode #chat-panel{
+  width:100% !important;
+  height:100% !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered{
+  transform:translateY(calc(100% - 38px)) !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-input-area,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-tabs,
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #chat-messages{
+  opacity:0.14 !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-pm-neon{
+  border:3px solid rgba(255,58,92,1) !important;
+  box-shadow:
+    0 0 12px rgba(255,25,70,0.95),
+    0 0 26px rgba(255,25,70,0.92),
+    0 0 52px rgba(255,25,70,0.70),
+    inset 0 0 14px rgba(255,25,70,0.26) !important;
+  animation:hangarPmBlinkV291 0.28s steps(2,end) infinite !important;
+}
+@keyframes hangarPmBlinkV291{
+  0%, 100%{
+    border-color:rgba(255,58,92,0.22);
+    box-shadow:
+      0 0 2px rgba(255,25,70,0.05),
+      0 0 7px rgba(255,25,70,0.03),
+      inset 0 0 2px rgba(255,25,70,0.02);
+  }
+  50%{
+    border-color:rgba(255,58,92,1);
+    box-shadow:
+      0 0 16px rgba(255,25,70,1),
+      0 0 34px rgba(255,25,70,0.96),
+      0 0 60px rgba(255,25,70,0.78),
+      inset 0 0 16px rgba(255,25,70,0.32);
+  }
+}
+#chat-wrapper.hangar-inline-mode #hangar-chat-controls{
+  display:flex !important;
+  position:absolute !important;
+  right:12px !important;
+  top:-44px !important;
+  z-index:6 !important;
+}
+#chat-wrapper.hangar-inline-mode #hangar-emoji-panel{
+  display:flex !important;
+  position:absolute !important;
+  left:12px !important;
+  top:-50px !important;
+  z-index:5 !important;
+}
+#chat-wrapper.hangar-inline-mode.hangar-chat-lowered #hangar-emoji-panel{
+  transform:translateY(calc(100% + 252px)) !important;
+  opacity:0.16 !important;
+}
