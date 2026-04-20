@@ -6975,7 +6975,7 @@ function enterBattleMap(mapName){
 }
 
 var remoteBattleShips = new Map();
-let lastBattlePresenceSnapshot = new Map();
+var lastBattlePresenceSnapshot = new Map();
 var liveBattleSyncTimer = null;
 var liveBattlePresencePushTimer = null;
 var liveBattlePresenceChannel = null;
