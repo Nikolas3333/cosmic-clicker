@@ -16431,3 +16431,285 @@ document.addEventListener('DOMContentLoaded', () => {
     }catch(_){ }
   }, 450);
 });
+
+
+// ===== V295 FINAL HANGAR CHAT FIX =====
+const COSMIC_PM_CACHE_KEY_V295 = 'cosmicPmCache:v295';
+let __hangarPmBlinkTimerV295 = null;
+
+function __v295_isHangarChatLowered(){
+  try{
+    const chatWrapper = document.getElementById('chat-wrapper');
+    return !!(
+      document.body.classList.contains('hangar-chat-mode') &&
+      (document.body.classList.contains('hangar-chat-lowered') || chatWrapper?.classList.contains('hangar-chat-lowered'))
+    );
+  }catch(_){ return false; }
+}
+
+function __v295_forceHangarChatLowered(){
+  try{
+    const chatWrapper = document.getElementById('chat-wrapper');
+    const emojiPanel = document.getElementById('emoji-panel');
+    if(!chatWrapper) return;
+    document.body.classList.add('hangar-chat-mode');
+    document.body.classList.add('hangar-chat-lowered');
+    chatWrapper.classList.add('hangar-inline-mode');
+    chatWrapper.classList.add('hangar-chat-lowered');
+    if(emojiPanel) emojiPanel.classList.add('hangar-chat-lowered');
+    __updateHangarPmNeon?.();
+  }catch(_){ }
+}
+
+function __v295_collectPmCacheSnapshot(){
+  try{
+    const snapshot = { tabs:{}, messages:{}, unread:{}, currentChat: currentChat || 'global', savedAt: Date.now() };
+    Object.entries(privateChatTabs || {}).forEach(([peerId, meta]) => {
+      const safePeerId = String(peerId || '').trim();
+      if(!safePeerId) return;
+      snapshot.tabs[safePeerId] = {
+        label: String(meta?.label || `ID ${safePeerId}`),
+        updatedAt: Number(meta?.updatedAt) || Date.now(),
+        pinned: !!meta?.pinned,
+        preview: String(meta?.preview || '')
+      };
+      snapshot.unread[safePeerId] = Number(chatUnread?.pm?.[safePeerId] || 0) || 0;
+      const list = Array.isArray(chatCache?.pm?.[safePeerId]) ? chatCache.pm[safePeerId] : [];
+      snapshot.messages[safePeerId] = list.slice(-40);
+    });
+    return snapshot;
+  }catch(_){
+    return { tabs:{}, messages:{}, unread:{}, currentChat:'global', savedAt: Date.now() };
+  }
+}
+
+function __v295_savePmCache(){
+  try{
+    localStorage.setItem(COSMIC_PM_CACHE_KEY_V295, JSON.stringify(__v295_collectPmCacheSnapshot()));
+  }catch(_){ }
+}
+
+function __v295_restorePmCache(){
+  try{
+    const raw = localStorage.getItem(COSMIC_PM_CACHE_KEY_V295) || localStorage.getItem(COSMIC_PM_CACHE_KEY_V294);
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    const tabs = state?.tabs && typeof state.tabs === 'object' ? state.tabs : {};
+    const messages = state?.messages && typeof state.messages === 'object' ? state.messages : {};
+    const unread = state?.unread && typeof state.unread === 'object' ? state.unread : {};
+
+    Object.entries(tabs).forEach(([peerId, meta]) => {
+      const safePeerId = String(peerId || '').trim();
+      if(!safePeerId) return;
+      privateChatTabs[safePeerId] = {
+        label: String(meta?.label || `ID ${safePeerId}`),
+        updatedAt: Number(meta?.updatedAt) || Date.now(),
+        pinned: !!meta?.pinned,
+        preview: String(meta?.preview || '')
+      };
+      if(!Array.isArray(chatCache.pm[safePeerId])) chatCache.pm[safePeerId] = [];
+      const list = Array.isArray(messages?.[safePeerId]) ? messages[safePeerId] : [];
+      if(list.length){
+        chatCache.pm[safePeerId] = list.slice(-40);
+      }
+      if(chatUnread?.pm){
+        chatUnread.pm[safePeerId] = Math.max(0, Number(unread?.[safePeerId] || chatUnread.pm[safePeerId] || 0) || 0);
+      }
+    });
+
+    const savedCurrent = String(state?.currentChat || currentChat || 'global');
+    if(savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')){
+      currentChat = savedCurrent;
+    }
+  }catch(_){ }
+}
+
+(function(){
+  const __origResetPrivateChatStateV295 = typeof resetPrivateChatState === 'function' ? resetPrivateChatState : null;
+  if(__origResetPrivateChatStateV295){
+    resetPrivateChatState = function(){
+      const shouldPreserve = !!(authState?.mode === 'account' && authState?.playerId);
+      if(shouldPreserve){
+        try{ __v295_savePmCache(); }catch(_){ }
+      }
+      const result = __origResetPrivateChatStateV295.apply(this, arguments);
+      if(shouldPreserve){
+        try{ __v295_restorePmCache(); }catch(_){ }
+        try{ renderChatTabs?.(); }catch(_){ }
+      }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  restoreChatUiState = function(){
+    try {
+      const raw = localStorage.getItem(CHAT_UI_STATE_KEY);
+      if (raw) {
+        const state = JSON.parse(raw);
+        const tabs = state?.privateTabs && typeof state.privateTabs === 'object' ? state.privateTabs : {};
+        Object.keys(privateChatTabs).forEach(key => delete privateChatTabs[key]);
+        Object.entries(tabs).forEach(([peerId, meta]) => {
+          const safePeerId = String(peerId || '').trim();
+          if (!safePeerId) return;
+          privateChatTabs[safePeerId] = {
+            label: String(meta?.label || `ID ${safePeerId}`),
+            updatedAt: Number(meta?.updatedAt) || Date.now(),
+            pinned: !!meta?.pinned,
+            preview: String(meta?.preview || '')
+          };
+        });
+        const savedCurrent = String(state?.currentChat || 'global');
+        if (savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')) {
+          currentChat = savedCurrent;
+        }
+      }
+    } catch (_) {}
+    try{ __v295_restorePmCache(); }catch(_){ }
+  };
+})();
+
+(function(){
+  const __origSaveChatUiStateV295 = typeof saveChatUiState === 'function' ? saveChatUiState : null;
+  if(__origSaveChatUiStateV295){
+    saveChatUiState = function(){
+      const result = __origSaveChatUiStateV295.apply(this, arguments);
+      try{ __v295_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origPushChatToCacheV295 = typeof pushChatToCache === 'function' ? pushChatToCache : null;
+  if(__origPushChatToCacheV295){
+    pushChatToCache = function(scope, msg){
+      const result = __origPushChatToCacheV295.apply(this, arguments);
+      try{ if(scope?.channel === 'pm'){ __v295_savePmCache(); } }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origEnsurePmTabV295 = typeof ensurePmTab === 'function' ? ensurePmTab : null;
+  if(__origEnsurePmTabV295){
+    ensurePmTab = function(peerId, label = null){
+      const result = __origEnsurePmTabV295.apply(this, arguments);
+      try{ __v295_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origSetUnreadCountV295 = typeof setUnreadCount === 'function' ? setUnreadCount : null;
+  if(__origSetUnreadCountV295){
+    setUnreadCount = function(scopeName, count = 0){
+      const result = __origSetUnreadCountV295.apply(this, arguments);
+      try{ if(String(scopeName || '').startsWith('pm:')) __v295_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origClearUnreadForCurrentScopeV295 = typeof clearUnreadForCurrentScope === 'function' ? clearUnreadForCurrentScope : null;
+  if(__origClearUnreadForCurrentScopeV295){
+    clearUnreadForCurrentScope = function(){
+      const result = __origClearUnreadForCurrentScopeV295.apply(this, arguments);
+      try{ __v295_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  __updateHangarPmNeon = function(){
+    try{
+      const chatWrapper = document.getElementById('chat-wrapper');
+      if(!chatWrapper) return;
+      const shouldBlink = !!(
+        document.body.classList.contains('hangar-chat-mode') &&
+        __v295_isHangarChatLowered() &&
+        Date.now() < Number(__hangarPmPulseUntil || 0)
+      );
+      chatWrapper.classList.toggle('hangar-pm-neon', shouldBlink);
+    }catch(_){ }
+  };
+})();
+
+(function(){
+  const __origSetHangarChatModeV295 = typeof setHangarChatMode === 'function' ? setHangarChatMode : null;
+  if(__origSetHangarChatModeV295){
+    setHangarChatMode = function(active, lowered = false){
+      const result = __origSetHangarChatModeV295.call(this, active, lowered);
+      if(active && lowered){
+        setTimeout(__v295_forceHangarChatLowered, 0);
+        setTimeout(__v295_forceHangarChatLowered, 60);
+        setTimeout(__v295_forceHangarChatLowered, 180);
+      }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origHandleIncomingChatMessageV295 = typeof handleIncomingChatMessage === 'function' ? handleIncomingChatMessage : null;
+  if(__origHandleIncomingChatMessageV295){
+    handleIncomingChatMessage = function(msg){
+      const beforePmKeys = new Set(Object.keys(chatCache?.pm || {}));
+      const result = __origHandleIncomingChatMessageV295.apply(this, arguments);
+      try{
+        if(msg?.channel === 'pm' && document.body.classList.contains('hangar-chat-mode') && __v295_isHangarChatLowered()){
+          __hangarPmPulseUntil = Date.now() + 12000;
+          if(__hangarPmBlinkTimerV295) clearTimeout(__hangarPmBlinkTimerV295);
+          __hangarPmBlinkTimerV295 = setTimeout(() => { try{ __updateHangarPmNeon?.(); }catch(_){} }, 12100);
+        }
+        if(msg?.channel === 'pm'){
+          __v295_savePmCache();
+          __updateHangarPmNeon?.();
+        }
+      }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const hangarTab = document.getElementById('hangar-tab');
+  if(hangarTab && !hangarTab.dataset.v295CollapseBound){
+    hangarTab.dataset.v295CollapseBound = '1';
+    hangarTab.addEventListener('click', () => {
+      setTimeout(() => { try{ setHangarChatMode?.(true, true); __v295_forceHangarChatLowered(); }catch(_){} }, 0);
+      setTimeout(() => { try{ setHangarChatMode?.(true, true); __v295_forceHangarChatLowered(); }catch(_){} }, 80);
+      setTimeout(() => { try{ setHangarChatMode?.(true, true); __v295_forceHangarChatLowered(); }catch(_){} }, 220);
+    });
+  }
+})();
+
+(function(){
+  const __origSyncHangarChatVisibilityV295 = typeof __syncHangarChatVisibility === 'function' ? __syncHangarChatVisibility : null;
+  if(__origSyncHangarChatVisibilityV295){
+    __syncHangarChatVisibility = function(){
+      const result = __origSyncHangarChatVisibilityV295.apply(this, arguments);
+      try{
+        const hangarWindow = document.getElementById('hangar-window');
+        const isVisible = !!(hangarWindow && !hangarWindow.classList.contains('hidden') && hangarWindow.style.display !== 'none');
+        if(isVisible) {
+          setHangarChatMode?.(true, true);
+          __v295_forceHangarChatLowered();
+        }
+      }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  try{ __v295_restorePmCache(); }catch(_){ }
+  setTimeout(() => {
+    try{ renderChatTabs?.(); if(currentChat?.startsWith?.('pm:')) renderLobbyMessages?.(); }catch(_){ }
+  }, 120);
+});
