@@ -15402,11 +15402,8 @@ async function leaveRoomPlayers(roomId) {
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
   if(!normalizedRoomId) return 0;
 
-  const selfPlayerId = String(getSelfBattlePlayerId() || '').trim()
-    || String(authState?.playerId || '').trim()
-    || String(player?.id || '').trim();
-
-  const selfNickname = String(player?.nickname || getDisplayPlayerTag?.() || 'Commander').trim() || 'Commander';
+  const selfPlayerId = String(getSelfBattlePlayerId() || authState?.playerId || player?.id || '').trim();
+  const selfNickname = String(player?.nickname || (typeof getDisplayPlayerTag === 'function' ? getDisplayPlayerTag() : '') || 'Commander').trim() || 'Commander';
 
   if(selfPlayerId){
     try{
