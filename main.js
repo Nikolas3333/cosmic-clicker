@@ -1477,6 +1477,7 @@ async function switchState(newState){
     }
 
     if((prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE"){
+        resetBattleSessionCounters();
         try{
             await cleanupCurrentBattleRoom();
         }catch(_){}
@@ -6927,8 +6928,7 @@ function enterBattleMap(mapName){
     selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
 
     clearBattleScene();
-    battleStats.playerKills = 0;
-    battleStats.playerDeaths = 0;
+    resetBattleSessionCounters();
 
     if(solarSystem && scene.children.includes(solarSystem)){
         scene.remove(solarSystem);
