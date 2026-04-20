@@ -6792,3 +6792,39 @@ body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper.hangar-inline-mode.hanga
   }
 }
 </style>
+
+
+<style id="hangar-chat-v296-fix">
+/* chat a tiny bit higher */
+body.hangar-chat-mode #chat-wrapper,
+body.hangar-chat-mode #chat-wrapper.hangar-inline-mode{
+  bottom: 26px !important;
+}
+
+/* lowered state still visible, just a little higher */
+body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper,
+body.hangar-chat-mode #chat-wrapper.hangar-chat-lowered{
+  transform: translateY(calc(100% - 52px)) !important;
+}
+
+/* fully hide wrong module block in hangar */
+#hangar-window .hangar-module-side,
+#hangar-window .hangar-side-title,
+#hangar-window .hangar-module-filter,
+#hangar-window .hangar-module-view,
+#hangar-window .hangar-module-preview,
+#hangar-window .hangar-module-meta,
+#hangar-window #hangar-module-up,
+#hangar-window #hangar-module-down,
+#hangar-window #hangar-module-name,
+#hangar-window #hangar-module-tier,
+#hangar-window #hangar-module-type,
+#hangar-window #hangar-module-desc,
+#hangar-window #hangar-module-price,
+#hangar-window #hangar-module-apply{
+  display:none !important;
+  visibility:hidden !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+}
+</style>
