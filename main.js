@@ -7147,6 +7147,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     mountBattleShipVisual(shipGroup, battleShipItem, team);
 
     scene.add(shipGroup);
+    shipGroup.userData.playerId = '';
     return {
         mesh: shipGroup,
         labelSprite,
@@ -7199,6 +7200,7 @@ function upsertRemoteBattlePresence(payload = {}){
     if(entry.mesh?.userData){
         entry.mesh.userData.pilotName = nickname;
         entry.mesh.userData.team = team;
+        entry.mesh.userData.playerId = entryId;
     }
 
     tryApplyRemoteShipTeamVisual(entry);
@@ -7869,6 +7871,7 @@ async function syncLiveBattlePlayers(){
         if(remoteState.mesh?.userData){
             remoteState.mesh.userData.team = team;
             remoteState.mesh.userData.pilotName = displayName;
+            remoteState.mesh.userData.playerId = entryId;
         }
         tryApplyRemoteShipTeamVisual(remoteState);
 
@@ -8000,21 +8003,62 @@ function handleIncomingBattleLeave(payload = {}){
     updateBattleScoreboard?.();
 }
 
+
+function forceRemoveRemoteSceneObjects(entryId){
+    const key = String(entryId || '').trim();
+    if(!key || !scene) return;
+
+    const nodesToRemove = [];
+    scene.traverse?.((node) => {
+        const nodePlayerId = String(node?.userData?.playerId || '').trim();
+        const isRemote = !!node?.userData?.remote;
+        if(isRemote && nodePlayerId && nodePlayerId === key){
+            nodesToRemove.push(node);
+        }
+    });
+
+    nodesToRemove.forEach((node) => {
+        try{
+            node.visible = false;
+            if(node.parent) node.parent.remove(node);
+            else scene.remove(node);
+            node.traverse?.((child) => {
+                if(child?.geometry) child.geometry.dispose?.();
+                if(child?.material){
+                    if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+                    else child.material.dispose?.();
+                }
+            });
+        }catch(_){}
+    });
+}
+
 function removeRemoteBattleShipById(entryId){
     const key = String(entryId || '').trim();
-    if(!key || !remoteBattleShips.has(key)) return;
-    const old = remoteBattleShips.get(key);
+    if(!key) return;
+
+    const old = remoteBattleShips instanceof Map ? remoteBattleShips.get(key) : null;
     if(old?.mesh){
-        scene.remove(old.mesh);
-        old.mesh.traverse?.((child) => {
-            if(child?.geometry) child.geometry.dispose?.();
-            if(child?.material){
-                if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
-                else child.material.dispose?.();
-            }
-        });
+        try{
+            old.mesh.visible = false;
+            old.mesh.userData = { ...(old.mesh.userData || {}), removed: true };
+            if(old.mesh.parent) old.mesh.parent.remove(old.mesh);
+            else scene.remove(old.mesh);
+            old.mesh.traverse?.((child) => {
+                if(child?.geometry) child.geometry.dispose?.();
+                if(child?.material){
+                    if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+                    else child.material.dispose?.();
+                }
+            });
+        }catch(_){}
     }
-    remoteBattleShips.delete(key);
+
+    if(remoteBattleShips instanceof Map){
+        remoteBattleShips.delete(key);
+    }
+
+    forceRemoveRemoteSceneObjects(key);
 }
 
 async function startLiveBattleSync(){
