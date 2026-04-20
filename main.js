@@ -6976,6 +6976,7 @@ function enterBattleMap(mapName){
 
 var remoteBattleShips = new Map();
 var lastBattlePresenceSnapshot = new Map();
+var battlePresenceBaselineReady = false;
 var liveBattleSyncTimer = null;
 var liveBattlePresencePushTimer = null;
 var liveBattlePresenceChannel = null;
@@ -7034,10 +7035,12 @@ function clearRemoteBattleShips(){
     });
     remoteBattleShips.clear();
     lastBattlePresenceSnapshot = new Map();
+    battlePresenceBaselineReady = false;
 }
 
 function stopLiveBattleSync(){
     lastBattlePresenceSnapshot = new Map();
+    battlePresenceBaselineReady = false;
     if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
         clearInterval(liveBattleSyncTimer);
         liveBattleSyncTimer = null;
@@ -7633,6 +7636,9 @@ function ensureLiveBattlePresenceChannel(){
         .on('broadcast', { event: 'pilot-kill' }, ({ payload }) => {
             handleIncomingBattleKill(payload || {});
         })
+        .on('broadcast', { event: 'pilot-left' }, ({ payload }) => {
+            handleIncomingBattleLeave(payload || {});
+        })
         .subscribe();
 }
 
@@ -7971,6 +7977,12 @@ function announceBattlePresenceChanges(livePlayers = []){
         nextSnapshot.set(entryId, nickname);
     });
 
+    if(!battlePresenceBaselineReady){
+        lastBattlePresenceSnapshot = nextSnapshot;
+        battlePresenceBaselineReady = true;
+        return;
+    }
+
     const myId = getSelfBattlePlayerId();
 
     nextSnapshot.forEach((nickname, entryId) => {
@@ -7988,6 +8000,29 @@ function announceBattlePresenceChanges(livePlayers = []){
     });
 
     lastBattlePresenceSnapshot = nextSnapshot;
+}
+
+function handleIncomingBattleLeave(payload = {}){
+    const entryId = String(payload?.playerId || payload?.player_id || '').trim();
+    if(!entryId) return;
+    const myId = getSelfBattlePlayerId();
+    if(entryId === myId) return;
+
+    const nickname = String(payload?.nickname || payload?.player_nickname || lastBattlePresenceSnapshot.get(entryId) || 'Pilot').trim() || 'Pilot';
+
+    removeRemoteBattleShipById(entryId);
+    lastBattlePresenceSnapshot.delete(entryId);
+
+    if(currentRoom){
+        const filterList = (list) => Array.isArray(list)
+            ? list.filter(row => String(row?.id || row?.player_id || row?.public_id || row?.player_public_id || '').trim() !== entryId)
+            : list;
+        currentRoom.currentPlayers = filterList(currentRoom.currentPlayers) || [];
+        currentRoom.players = filterList(currentRoom.players) || [];
+    }
+
+    pushKillFeed(`${nickname} покинул игру`, 'chat');
+    updateBattleScoreboard?.();
 }
 
 function removeRemoteBattleShipById(entryId){
@@ -15345,12 +15380,27 @@ return true;
 async function leaveRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return 0;
 
+  const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+  if(!normalizedRoomId) return 0;
+
   const identity = getCurrentPlayerIdentity();
+  if(identity?.playerId){
+    try{
+      await sendBattlePresenceEvent('pilot-left', {
+        playerId: identity.playerId,
+        nickname: identity.displayName || identity.nickname || player?.nickname || 'Commander',
+        roomId: normalizedRoomId
+      });
+    }catch(_){}
+    try{
+      lastBattlePresenceSnapshot.delete(String(identity.playerId).trim());
+    }catch(_){}
+  }
 
   const { error: deletePlayerError } = await window.supabaseClient
     .from('room_players')
     .delete()
-    .eq('room_id', roomId)
+    .eq('room_id', normalizedRoomId)
     .eq('player_id', identity.playerId);
 
   if (deletePlayerError) {
@@ -15368,14 +15418,14 @@ async function leaveRoomPlayers(roomId) {
     await window.supabaseClient
       .from('room_players')
       .delete()
-      .eq('room_id', roomId)
+      .eq('room_id', normalizedRoomId)
       .lt('updated_at', freshCutoff);
   }catch(_){}
 
   const { count, error: countError } = await window.supabaseClient
     .from('room_players')
     .select('*', { count: 'exact', head: true })
-    .eq('room_id', roomId)
+    .eq('room_id', normalizedRoomId)
     .gte('updated_at', freshCutoff);
 
   if (countError) {
@@ -15387,7 +15437,7 @@ async function leaveRoomPlayers(roomId) {
     const { error: roomDeleteError } = await window.supabaseClient
       .from('rooms')
       .delete()
-      .eq('id', roomId);
+      .eq('id', normalizedRoomId);
 
     if (roomDeleteError) {
       console.error('Ошибка удаления пустой комнаты:', roomDeleteError);
@@ -15421,6 +15471,17 @@ function cleanupBattleRoomSilently(){
   const roomId = roomSnapshot?.id || roomSnapshot?.roomId || null;
   const shouldLeave = !!(roomId && roomSnapshot?.state !== 'solo' && roomSnapshot?.observer !== true);
 
+  if(shouldLeave){
+    const selfId = String(getCurrentPlayerIdentity?.()?.playerId || '').trim();
+    if(selfId && roomSnapshot){
+      const filterList = (list) => Array.isArray(list)
+        ? list.filter(row => String(row?.id || row?.player_id || row?.public_id || row?.player_public_id || '').trim() !== selfId)
+        : list;
+      roomSnapshot.currentPlayers = filterList(roomSnapshot.currentPlayers) || [];
+      roomSnapshot.players = filterList(roomSnapshot.players) || [];
+    }
+  }
+
   currentRoom = null;
   window.currentRoomId = null;
   selectedLobbyMap = null;
@@ -15429,7 +15490,7 @@ function cleanupBattleRoomSilently(){
     leaveRoomPlayers(roomId)
       .then(async (leftCount) => {
         if((leftCount || 0) <= 0 && window.supabaseReady && window.supabaseClient){
-          await window.supabaseClient.from('rooms').delete().eq('id', roomId);
+          await window.supabaseClient.from('rooms').delete().eq('id', sanitizeOnlineRoomId(roomId));
         }
         await loadRoomsFromSupabase();
         if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
@@ -15440,7 +15501,7 @@ function cleanupBattleRoomSilently(){
         console.warn('cleanupBattleRoomSilently error:', error);
         try{
           if(window.supabaseReady && window.supabaseClient){
-            await window.supabaseClient.from('rooms').delete().eq('id', roomId);
+            await window.supabaseClient.from('rooms').delete().eq('id', sanitizeOnlineRoomId(roomId));
             await loadRoomsFromSupabase();
             if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
               renderLobbyListV27('battle');
