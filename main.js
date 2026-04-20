@@ -16153,3 +16153,39 @@ if(!window.__hangarPmNeonTicker){
         try{ __updateHangarPmNeon?.(); }catch(_){}
     }, 250);
 }
+
+// ===== V292 NEON FIX =====
+function __getPmUnreadCountSafe(){
+  try{
+    return Object.values(chatUnread?.pm||{}).reduce((a,b)=>a+(+b||0),0);
+  }catch(e){return 0;}
+}
+
+function __updateNeonV292(){
+  try{
+    const el=document.getElementById('chat-wrapper');
+    if(!el) return;
+    const lowered=el.classList.contains('hangar-chat-lowered');
+    const unread=__getPmUnreadCountSafe()>0;
+    if(lowered && unread){
+      el.classList.add('hangar-pm-neon');
+    }else{
+      el.classList.remove('hangar-pm-neon');
+    }
+  }catch(e){}
+}
+
+setInterval(__updateNeonV292,300);
+
+// force hangar collapsed
+setInterval(()=>{
+  try{
+    if(gameState==='HANGAR'){
+      const el=document.getElementById('chat-wrapper');
+      if(el){
+        el.classList.add('hangar-inline-mode');
+        el.classList.add('hangar-chat-lowered');
+      }
+    }
+  }catch(e){}
+},500);
