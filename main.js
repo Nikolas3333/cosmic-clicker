@@ -16189,3 +16189,39 @@ setInterval(()=>{
     }
   }catch(e){}
 },500);
+
+// ===== V293 CHAT NEON LOGIC =====
+function __v293_getUnread(){
+  try{
+    return Object.values(chatUnread?.pm||{}).reduce((a,b)=>a+(+b||0),0);
+  }catch(e){return 0;}
+}
+
+function __v293_updateNeon(){
+  const el = document.getElementById('chat-wrapper');
+  if(!el) return;
+
+  const lowered = el.classList.contains('hangar-chat-lowered');
+  const unread = __v293_getUnread();
+
+  if(lowered && unread > 0){
+    el.classList.add('hangar-pm-neon');
+  }else{
+    el.classList.remove('hangar-pm-neon');
+  }
+}
+
+setInterval(__v293_updateNeon,200);
+
+// force collapsed in hangar once
+document.addEventListener("DOMContentLoaded",()=>{
+  setTimeout(()=>{
+    if(gameState === "HANGAR"){
+      const el=document.getElementById("chat-wrapper");
+      if(el){
+        el.classList.add("hangar-inline-mode");
+        el.classList.add("hangar-chat-lowered");
+      }
+    }
+  },500);
+});
