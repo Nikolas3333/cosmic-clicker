@@ -6975,6 +6975,7 @@ function enterBattleMap(mapName){
 }
 
 var remoteBattleShips = new Map();
+let lastBattlePresenceSnapshot = new Map();
 var liveBattleSyncTimer = null;
 var liveBattlePresencePushTimer = null;
 var liveBattlePresenceChannel = null;
@@ -7032,9 +7033,11 @@ function clearRemoteBattleShips(){
         if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
     });
     remoteBattleShips.clear();
+    lastBattlePresenceSnapshot = new Map();
 }
 
 function stopLiveBattleSync(){
+    lastBattlePresenceSnapshot = new Map();
     if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
         clearInterval(liveBattleSyncTimer);
         liveBattleSyncTimer = null;
@@ -7848,6 +7851,7 @@ async function syncLiveBattlePlayers(){
 
     const livePlayers = await fetchCurrentRoomLivePlayers();
     if(livePlayers === null) return;
+    announceBattlePresenceChanges(livePlayers);
     const myId = getSelfBattlePlayerId();
 
     const activeIds = new Set();
@@ -7957,6 +7961,34 @@ async function syncLiveBattlePlayers(){
     updateBattleScoreboard();
 }
 
+
+function announceBattlePresenceChanges(livePlayers = []){
+    const nextSnapshot = new Map();
+    (Array.isArray(livePlayers) ? livePlayers : []).forEach((entry, index) => {
+        const entryId = entry?.player_id ? String(entry.player_id) : '';
+        if(!entryId) return;
+        const nickname = String(entry?.nickname || `Pilot ${index + 1}`).trim() || `Pilot ${index + 1}`;
+        nextSnapshot.set(entryId, nickname);
+    });
+
+    const myId = getSelfBattlePlayerId();
+
+    nextSnapshot.forEach((nickname, entryId) => {
+        if(entryId === myId) return;
+        if(!lastBattlePresenceSnapshot.has(entryId)){
+            pushKillFeed(`${nickname} присоединился`, 'chat');
+        }
+    });
+
+    lastBattlePresenceSnapshot.forEach((nickname, entryId) => {
+        if(entryId === myId) return;
+        if(!nextSnapshot.has(entryId)){
+            pushKillFeed(`${nickname} покинул игру`, 'chat');
+        }
+    });
+
+    lastBattlePresenceSnapshot = nextSnapshot;
+}
 
 function removeRemoteBattleShipById(entryId){
     const key = String(entryId || '').trim();
@@ -9297,7 +9329,7 @@ function computeShipBattleStats(shipId){
     stats.weaponDamage = Math.max(8, Math.round(stats.weaponDamage));
     stats.clipSize = Math.max(8, Math.round(stats.clipSize));
     stats.reloadTime = Math.max(650, Math.round(stats.reloadTime));
-    stats.laserVelocity = Number(Math.max(2.0, stats.laserVelocity).toFixed(2));
+    stats.laserVelocity = Number(Math.max(2.0, stats.laserVelocity + 0.85).toFixed(2));
     stats.laserScale = Number(Math.max(0.85, stats.laserScale).toFixed(2));
     stats.fireCooldown = Math.max(60, Math.round(stats.fireCooldown));
     stats.turnYaw = Number(stats.turnYaw.toFixed(4));
