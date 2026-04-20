@@ -1469,7 +1469,7 @@ function clearBattleScene(){
     const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = "";
 }
 
-function switchState(newState){
+async function switchState(newState){
     const prevState = gameState;
 
     if(document.pointerLockElement){
@@ -1477,7 +1477,9 @@ function switchState(newState){
     }
 
     if((prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE"){
-        cleanupBattleRoomSilently();
+        try{
+            await cleanupCurrentBattleRoom();
+        }catch(_){}
     }
 
     gameState = newState;
