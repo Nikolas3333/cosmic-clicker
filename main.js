@@ -943,7 +943,6 @@ async function touchJoinedLobbyRoomPresence(force = false){
 }
 
 function ensureSelfRoomPlayerState(){
-    if(battleLeavingInProgress) return;
     if(!window.supabaseClient || roomPlayerStateUpsertInFlight) return;
     const roomId = getBattleRoomIdSafe();
     const playerId = getSelfBattlePlayerId();
@@ -1478,7 +1477,6 @@ async function switchState(newState){
     }
 
     if((prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE"){
-        battleLeavingInProgress = true;
         resetBattleSessionCounters();
         try{
             await cleanupCurrentBattleRoom();
@@ -1486,7 +1484,7 @@ async function switchState(newState){
     }
 
     gameState = newState;
-    if(newState === "BATTLE" || newState === "OBSERVE") battleLeavingInProgress = false;
+    try{ window.gameState = newState; }catch(_){ }
 
     const canvas = document.querySelector("canvas");
     const lobby = document.getElementById("lobby-screen");
@@ -6980,7 +6978,6 @@ function enterBattleMap(mapName){
 }
 
 var remoteBattleShips = new Map();
-let battleLeavingInProgress = false;
 var lastBattlePresenceSnapshot = new Map();
 var battlePresenceBaselineReady = false;
 var liveBattleSyncTimer = null;
@@ -7651,7 +7648,6 @@ function ensureLiveBattlePresenceChannel(){
 }
 
 async function broadcastSelfBattleState(){
-    if(battleLeavingInProgress) return;
     if(gameState !== 'BATTLE' || !playerShip || !liveBattlePresenceChannel) return;
     const playerId = String(authState?.playerId || player?.id || '').trim();
     if(!playerId) return;
@@ -7831,7 +7827,6 @@ async function fetchCurrentRoomLivePlayers(){
 }
 
 async function syncLiveBattlePlayers(){
-    if(battleLeavingInProgress) return;
     if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
     if(gameState === 'BATTLE' && playerShip){
@@ -14341,8 +14336,8 @@ function closeShopView(){
     }
 
     const prevSwitchState = switchState;
-    switchState = function(newState){
-        prevSwitchState(newState);
+    switchState = async function(newState){
+        await prevSwitchState(newState);
         if(newState === 'LOBBY'){
             closeShopView();
         }
@@ -15094,8 +15089,8 @@ window.renderPlayersOnPlanet = function(entry = {}){
     }
 
     const prevSwitchState = switchState;
-    switchState = function(newState){
-        prevSwitchState(newState);
+    switchState = async function(newState){
+        await prevSwitchState(newState);
         if (window.gameState !== 'BATTLE') ensureSunStable();
         updateNebulaVisibility();
         if(newState === 'LOBBY'){
@@ -15405,8 +15400,6 @@ return true;
 async function leaveRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return 0;
 
-  battleLeavingInProgress = true;
-
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
   if(!normalizedRoomId) return 0;
 
@@ -15421,15 +15414,10 @@ async function leaveRoomPlayers(roomId) {
         roomId: normalizedRoomId
       });
     }catch(_){}
-    try{ lastBattlePresenceSnapshot.delete(selfPlayerId); }catch(_){}
-    try{ removeRemoteBattleShipById(selfPlayerId); }catch(_){}
+    try{
+      lastBattlePresenceSnapshot.delete(selfPlayerId);
+    }catch(_){}
   }
-
-  try{
-    selfRoomPlayerRowId = null;
-    lastSelfRoomPlayerStatePayload = '';
-    lastSelfRoomPlayerStateSentAt = 0;
-  }catch(_){}
 
   const { error: deletePlayerError } = await window.supabaseClient
     .from('room_players')
@@ -15441,6 +15429,10 @@ async function leaveRoomPlayers(roomId) {
     console.error('Ошибка выхода из room_players:', deletePlayerError);
     return -1;
   }
+
+  try {
+    removeRemoteBattleShipById(selfPlayerId);
+  } catch(_) {}
 
   const freshCutoff = getRoomPlayerFreshCutoffIso();
 
@@ -16197,7 +16189,7 @@ function startBattleRoomsRenderLoop(){
 }
 
 const previousSwitchStateOnline = window.switchState || switchState;
-switchState = function(newState){
+switchState = async function(newState){
     if(newState === 'AUTH'){
         deleteAllOwnPmHistory();
         resetPrivateChatState();
@@ -16205,13 +16197,13 @@ switchState = function(newState){
 
     if(isGuestAccount() && (newState === 'ORBIT' || newState === 'INVENTORY' || newState === 'COMBAT')){
         showGuestOnlyPvpMessage();
-        previousSwitchStateOnline('LOBBY');
+        await previousSwitchStateOnline('LOBBY');
         syncCurrentOnlinePresence();
         setTimeout(renderOnlinePlayers, 300);
         return;
     }
 
-    previousSwitchStateOnline(newState);
+    await previousSwitchStateOnline(newState);
     syncCurrentOnlinePresence();
     setTimeout(renderOnlinePlayers, 300);
     if(newState === 'LOBBY' && typeof renderRoomsInLobby === 'function'){
