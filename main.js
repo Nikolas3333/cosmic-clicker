@@ -16713,3 +16713,150 @@ document.addEventListener('DOMContentLoaded', () => {
     try{ renderChatTabs?.(); if(currentChat?.startsWith?.('pm:')) renderLobbyMessages?.(); }catch(_){ }
   }, 120);
 });
+
+
+// ===== V296 HANGAR CHAT FINAL MICRO FIX =====
+const COSMIC_PM_CACHE_KEY_V296 = 'cosmicPmCache:v296';
+
+function __v296_savePmCache(){
+  try{
+    const snapshot = (typeof __v295_collectPmCacheSnapshot === 'function')
+      ? __v295_collectPmCacheSnapshot()
+      : { tabs:{}, messages:{}, unread:{}, currentChat: currentChat || 'global', savedAt: Date.now() };
+    localStorage.setItem(COSMIC_PM_CACHE_KEY_V296, JSON.stringify(snapshot));
+  }catch(_){ }
+}
+
+function __v296_restorePmCache(){
+  try{
+    const raw = localStorage.getItem(COSMIC_PM_CACHE_KEY_V296)
+      || localStorage.getItem('cosmicPmCache:v295')
+      || localStorage.getItem('cosmicPmCache:v294');
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    const tabs = state?.tabs && typeof state.tabs === 'object' ? state.tabs : {};
+    const messages = state?.messages && typeof state.messages === 'object' ? state.messages : {};
+    const unread = state?.unread && typeof state.unread === 'object' ? state.unread : {};
+
+    Object.entries(tabs).forEach(([peerId, meta]) => {
+      const safePeerId = String(peerId || '').trim();
+      if(!safePeerId) return;
+      privateChatTabs[safePeerId] = {
+        label: String(meta?.label || `ID ${safePeerId}`),
+        updatedAt: Number(meta?.updatedAt) || Date.now(),
+        pinned: !!meta?.pinned,
+        preview: String(meta?.preview || '')
+      };
+      if(!chatCache.pm) chatCache.pm = {};
+      if(!Array.isArray(chatCache.pm[safePeerId])) chatCache.pm[safePeerId] = [];
+      const list = Array.isArray(messages?.[safePeerId]) ? messages[safePeerId] : [];
+      if(list.length) chatCache.pm[safePeerId] = list.slice(-60);
+      if(chatUnread?.pm) chatUnread.pm[safePeerId] = Math.max(0, Number(unread?.[safePeerId] || chatUnread.pm[safePeerId] || 0) || 0);
+    });
+
+    const savedCurrent = String(state?.currentChat || currentChat || 'global');
+    if(savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')){
+      currentChat = savedCurrent;
+    }
+  }catch(_){ }
+}
+
+(function(){
+  const __origLoadChatHistoryV296 = typeof loadChatHistory === 'function' ? loadChatHistory : null;
+  if(__origLoadChatHistoryV296){
+    loadChatHistory = async function(scopeName, ...rest){
+      const result = await __origLoadChatHistoryV296.call(this, scopeName, ...rest);
+      try{
+        if(String(scopeName || '').startsWith('pm:')){
+          __v296_restorePmCache();
+          renderChatTabs?.();
+          if(currentChat === scopeName) renderLobbyMessages?.();
+        }
+      }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origDeletePmHistoryWithPeerV296 = typeof deletePmHistoryWithPeer === 'function' ? deletePmHistoryWithPeer : null;
+  if(__origDeletePmHistoryWithPeerV296){
+    deletePmHistoryWithPeer = async function(peerId){
+      const result = await __origDeletePmHistoryWithPeerV296.apply(this, arguments);
+      try{ __v296_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origDeleteAllOwnPmHistoryV296 = typeof deleteAllOwnPmHistory === 'function' ? deleteAllOwnPmHistory : null;
+  if(__origDeleteAllOwnPmHistoryV296){
+    deleteAllOwnPmHistory = async function(){
+      const result = await __origDeleteAllOwnPmHistoryV296.apply(this, arguments);
+      try{ __v296_savePmCache(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origResetPrivateChatStateV296 = typeof resetPrivateChatState === 'function' ? resetPrivateChatState : null;
+  if(__origResetPrivateChatStateV296){
+    resetPrivateChatState = function(){
+      try{ __v296_savePmCache(); }catch(_){ }
+      const result = __origResetPrivateChatStateV296.apply(this, arguments);
+      try{ __v296_restorePmCache(); }catch(_){ }
+      try{ renderChatTabs?.(); renderLobbyMessages?.(); }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+(function(){
+  const __origHandleIncomingChatMessageV296 = typeof handleIncomingChatMessage === 'function' ? handleIncomingChatMessage : null;
+  if(__origHandleIncomingChatMessageV296){
+    handleIncomingChatMessage = function(msg){
+      const result = __origHandleIncomingChatMessageV296.apply(this, arguments);
+      try{
+        if(msg?.channel === 'pm'){
+          __hangarPmPulseUntil = Date.now() + 15000;
+          __v296_savePmCache();
+          __updateHangarPmNeon?.();
+        }
+      }catch(_){ }
+      return result;
+    };
+  }
+})();
+
+window.addEventListener('beforeunload', () => {
+  try{ __v296_savePmCache(); }catch(_){ }
+});
+
+document.addEventListener('visibilitychange', () => {
+  try{
+    if(document.visibilityState !== 'hidden') return;
+    __v296_savePmCache();
+  }catch(_){ }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  try{ __v296_restorePmCache(); }catch(_){ }
+  setTimeout(() => {
+    try{ __v296_restorePmCache(); renderChatTabs?.(); renderLobbyMessages?.(); }catch(_){ }
+  }, 700);
+  setTimeout(() => {
+    try{ __v296_restorePmCache(); renderChatTabs?.(); renderLobbyMessages?.(); }catch(_){ }
+  }, 1800);
+});
+
+setInterval(() => {
+  try{
+    if(gameState === 'HANGAR'){
+      setHangarChatMode?.(true, true);
+      __v295_forceHangarChatLowered?.();
+      __updateHangarPmNeon?.();
+    }
+  }catch(_){ }
+}, 250);
