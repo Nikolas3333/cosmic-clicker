@@ -15470,16 +15470,43 @@ function cleanupBattleRoomSilently(){
   const roomSnapshot = currentRoom ? { ...currentRoom } : null;
   const roomId = roomSnapshot?.id || roomSnapshot?.roomId || null;
   const shouldLeave = !!(roomId && roomSnapshot?.state !== 'solo' && roomSnapshot?.observer !== true);
+  const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+  const identity = getCurrentPlayerIdentity?.() || {};
+  const selfId = String(identity?.playerId || '').trim();
+  const selfNickname = identity?.displayName || identity?.nickname || player?.nickname || 'Commander';
 
-  if(shouldLeave){
-    const selfId = String(getCurrentPlayerIdentity?.()?.playerId || '').trim();
-    if(selfId && roomSnapshot){
-      const filterList = (list) => Array.isArray(list)
-        ? list.filter(row => String(row?.id || row?.player_id || row?.public_id || row?.player_public_id || '').trim() !== selfId)
-        : list;
-      roomSnapshot.currentPlayers = filterList(roomSnapshot.currentPlayers) || [];
-      roomSnapshot.players = filterList(roomSnapshot.players) || [];
-    }
+  if(shouldLeave && selfId && roomSnapshot){
+    const filterList = (list) => Array.isArray(list)
+      ? list.filter(row => String(row?.id || row?.player_id || row?.public_id || row?.player_public_id || '').trim() !== selfId)
+      : list;
+    roomSnapshot.currentPlayers = filterList(roomSnapshot.currentPlayers) || [];
+    roomSnapshot.players = filterList(roomSnapshot.players) || [];
+  }
+
+  if(shouldLeave && normalizedRoomId && selfId && window.supabaseReady && window.supabaseClient){
+    try{
+      sendBattlePresenceEvent?.('pilot-left', {
+        playerId: selfId,
+        nickname: selfNickname,
+        roomId: normalizedRoomId
+      });
+    }catch(_){}
+
+    try{
+      lastBattlePresenceSnapshot.delete(selfId);
+    }catch(_){}
+
+    try{
+      removeRemoteBattleShipById(selfId);
+    }catch(_){}
+
+    window.supabaseClient
+      .from('room_players')
+      .delete()
+      .eq('room_id', normalizedRoomId)
+      .eq('player_id', selfId)
+      .then(() => {})
+      .catch(() => {});
   }
 
   currentRoom = null;
