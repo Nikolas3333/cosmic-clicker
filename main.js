@@ -8753,6 +8753,70 @@ function toggleBattlePauseMenu(forceOpen=null){
     }
 }
 
+async function forceLeaveBattleToLobby(){
+    if(gameState !== "BATTLE" && gameState !== "OBSERVE") return;
+
+    const roomSnapshot = currentRoom ? { ...currentRoom } : null;
+
+    battleLeavingInProgress = true;
+
+    try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
+    try{ closeBattlePauseMenu(); }catch(_){ }
+    try{ hardResetBattleClientState(); }catch(_){ }
+    try{ resetBattleSessionCounters(); }catch(_){ }
+
+    gameState = 'LOBBY';
+    try{ window.gameState = 'LOBBY'; }catch(_){ }
+
+    const canvas = document.querySelector('canvas');
+    const lobby = document.getElementById('lobby-screen');
+    const orbitExit = document.getElementById('orbit-exit');
+    const topNav = document.getElementById('top-nav');
+    const battleScreen = document.getElementById('battle-screen');
+    const resourceBar = document.getElementById('resource-bar');
+    const ui = document.getElementById('ui');
+    const premiumBar = document.getElementById('premium-bar');
+    const authScreen = document.getElementById('auth-screen');
+    const settingsWindow = document.getElementById('settings-window');
+    const pauseMenu = document.getElementById('battle-pause-menu');
+
+    if(canvas) canvas.style.display = 'none';
+    if(authScreen) authScreen.style.display = 'none';
+    if(orbitExit) orbitExit.style.display = 'none';
+    if(battleScreen) battleScreen.style.display = 'none';
+    if(resourceBar) resourceBar.style.display = 'none';
+    if(ui) ui.style.display = 'none';
+    if(settingsWindow) settingsWindow.classList.add('hidden');
+    if(pauseMenu) pauseMenu.classList.add('hidden');
+
+    try{ setHangarChatMode(false, false); }catch(_){ }
+    try{ __restoreHangarChatPanel(); }catch(_){ }
+    try{ clearBattleScene(); }catch(_){ }
+    try{ stopBattleHudLoops(); }catch(_){ }
+    try{ updateNicknameSettingsState?.(); }catch(_){ }
+
+    if(lobby) lobby.style.display = 'flex';
+    if(topNav) topNav.style.display = 'flex';
+    updatePremiumAccountInfo?.();
+    if(premiumBar) premiumBar.style.display = 'flex';
+
+    currentRoom = null;
+    try{ window.currentRoomId = null; }catch(_){ }
+    selectedLobbyMap = null;
+
+    try{ renderRoomsInLobby?.(); }catch(_){ }
+
+    Promise.resolve()
+        .then(() => cleanupCurrentBattleRoom(roomSnapshot))
+        .catch(() => {})
+        .finally(() => {
+            try{ hardResetBattleClientState(); }catch(_){ }
+        });
+}
+
+
+try{ window.forceLeaveBattleToLobby = forceLeaveBattleToLobby; }catch(_){ }
+
 function initBattleUI(){
     const battleExitBtn = document.getElementById('battle-exit-btn');
     const battleLeaveBtn = document.getElementById('battle-leave-map-btn');
@@ -8761,8 +8825,7 @@ function initBattleUI(){
     const scoreboard = document.getElementById('battle-scoreboard');
 
     const leaveMap = async () => {
-        closeBattlePauseMenu();
-        await switchState('LOBBY');
+        await forceLeaveBattleToLobby();
         if(typeof renderRoomsInLobby === 'function'){
             await renderRoomsInLobby(true);
         }
