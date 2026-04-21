@@ -15506,39 +15506,36 @@ async function joinRoomPlayers(roomId) {
   if(!normalizedRoomId) return false;
 
   const identity = getCurrentPlayerIdentity();
-  const safePlayerId = String(identity?.playerId || '').trim();
-  if (!safePlayerId) {
+  if (!identity.playerId) {
     console.error('Ошибка входа в room_players: пустой playerId', identity);
     return false;
   }
 
-  const checkExistingMembership = async () => {
-    const { data: existingRows, error: existingError } = await window.supabaseClient
-      .from('room_players')
-      .select('id,room_id,player_id,nickname')
-      .eq('room_id', normalizedRoomId)
-      .eq('player_id', safePlayerId)
-      .limit(1);
+  const { data: existingRows, error: existingError } = await window.supabaseClient
+    .from('room_players')
+    .select('id,room_id,player_id,nickname')
+    .eq('room_id', normalizedRoomId)
+    .eq('player_id', identity.playerId)
+    .limit(1);
 
-    if (existingError) {
-      console.error('Ошибка проверки room_players:', existingError);
-      return false;
-    }
+  if (existingError) {
+    console.error('Ошибка проверки room_players:', existingError);
+    return false;
+  }
 
-    return Array.isArray(existingRows) && existingRows.length > 0;
-  };
+  if (Array.isArray(existingRows) && existingRows.length > 0) {
+    
+try {
+    renderBattleMessages && renderBattleMessages();
+    renderLobbyMessages && renderLobbyMessages();
+    renderChatTabs && renderChatTabs();
+} catch(e){}
 
-  if (await checkExistingMembership()) {
-    try {
-      renderBattleMessages && renderBattleMessages();
-      renderLobbyMessages && renderLobbyMessages();
-      renderChatTabs && renderChatTabs();
-    } catch(e){}
-    return true;
+return true;
   }
 
   let roomExists = false;
-  for(const waitMs of [0, 180, 420, 760, 1200, 1800, 2600, 3600]){
+  for(const waitMs of [0, 180, 420, 760, 1200, 1800, 2600]){
     if(waitMs > 0) await sleep(waitMs);
     try{
       const { data: roomProbe, error: roomProbeError } = await window.supabaseClient
@@ -15550,7 +15547,7 @@ async function joinRoomPlayers(roomId) {
         roomExists = true;
         break;
       }
-    }catch(_){ }
+    }catch(_){}
   }
 
   if(!roomExists){
@@ -15563,68 +15560,46 @@ async function joinRoomPlayers(roomId) {
       ? globalThis.crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     room_id: normalizedRoomId,
-    player_id: safePlayerId,
+    player_id: identity.playerId,
     nickname: identity.displayName,
     joined_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    team: getBattleRoomPlayerTeam(safePlayerId),
+    team: getBattleRoomPlayerTeam(identity.playerId),
     level: Number(player?.level || 1) || 1,
     ping: Number(getBattlePingValue() || 0) || 0
   };
 
-  let joined = false;
-  for(const waitMs of [0, 180, 420, 760, 1200]){
-    if(waitMs > 0) await sleep(waitMs);
+  const { data: insertedRow, error } = await window.supabaseClient
+    .from('room_players')
+    .insert([insertPayload])
+    .select('id,room_id,player_id,nickname,joined_at');
 
-    if (await checkExistingMembership()) {
-      joined = true;
-      break;
+  if (error) {
+    const errorCode = String(error?.code || '').trim();
+    if(errorCode === '23505' || errorCode === '409'){
+      return true;
     }
-
-    const { error } = await window.supabaseClient
-      .from('room_players')
-      .insert([insertPayload])
-      .select('id,room_id,player_id,nickname,joined_at');
-
-    if (!error) {
-      joined = true;
-      break;
-    }
-
-    const code = String(error?.code || '').trim();
-    const status = Number(error?.status || 0) || 0;
-
-    if(code === '23505' || status == 409){
-      joined = await checkExistingMembership();
-      if(joined) break;
-      continue;
-    }
-
-    if(code === '23503'){
+    if(errorCode === '23503'){
       console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
-      continue;
+      return false;
     }
-
     console.error('Ошибка входа в room_players:', error, insertPayload);
     return false;
   }
 
-  if (!joined && !(await checkExistingMembership())) {
-    return false;
-  }
 
   await loadRoomsFromSupabase();
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
   }
-
-  try {
+  
+try {
     renderBattleMessages && renderBattleMessages();
     renderLobbyMessages && renderLobbyMessages();
     renderChatTabs && renderChatTabs();
-  } catch(e){}
+} catch(e){}
 
-  return true;
+return true;
 }
 
 async function leaveRoomPlayers(roomId) {
@@ -15868,30 +15843,30 @@ async function loadRoomsFromSupabase() {
   const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
   let allRooms = Array.isArray(data) ? data : [];
 
-  const staleRoomEntries = [];
+  const staleRoomPlayers = [];
   allRooms.forEach(room => {
     const rows = Array.isArray(room?.room_players) ? room.room_players : [];
     rows.forEach(row => {
-      const staleRoomId = String(room?.id || row?.room_id || '').trim();
-      const stalePlayerId = String(row?.player_id || '').trim();
-      if(staleRoomId && stalePlayerId && !isFreshRoomPlayerRow(row)){
-        staleRoomEntries.push({ roomId: staleRoomId, playerId: stalePlayerId });
+      if(row?.room_id && row?.player_id && !isFreshRoomPlayerRow(row)){
+        staleRoomPlayers.push({
+          room_id: String(row.room_id).trim(),
+          player_id: String(row.player_id).trim()
+        });
       }
     });
     room.room_players = rows.filter(row => isFreshRoomPlayerRow(row));
   });
 
-  if(staleRoomEntries.length){
+  if(staleRoomPlayers.length){
     try{
-      for (const staleEntry of staleRoomEntries) {
+      for(const staleRow of staleRoomPlayers){
         await window.supabaseClient
           .from('room_players')
           .delete()
-          .eq('room_id', staleEntry.roomId)
-          .eq('player_id', staleEntry.playerId);
+          .eq('room_id', staleRow.room_id)
+          .eq('player_id', staleRow.player_id);
       }
-    }catch(_){ }
-  }catch(_){}
+    }catch(_){}
   }
 
   const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
@@ -16056,7 +16031,7 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
 
   let joined = await joinRoomPlayers(data.id);
   if (!joined) {
-    for(const retryDelay of [260, 520, 900, 1400, 2200, 3200, 4500]){
+    for(const retryDelay of [260, 520, 900, 1400, 2200]){
       await sleep(retryDelay);
       try{ await loadRoomsFromSupabase(); }catch(_){}
       joined = await joinRoomPlayers(data.id);
