@@ -8095,6 +8095,8 @@ async function syncLiveBattlePlayers(){
 
 function announceBattlePresenceChanges(livePlayers = []){
     const nextSnapshot = new Map();
+    const announcementsMuted = isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0);
+
     (Array.isArray(livePlayers) ? livePlayers : []).forEach((entry, index) => {
         const entryId = entry?.player_id ? String(entry.player_id) : '';
         if(!entryId) return;
@@ -8107,6 +8109,18 @@ function announceBattlePresenceChanges(livePlayers = []){
         battlePresenceBaselineReady = true;
         return;
     }
+
+    if(announcementsMuted){
+        lastBattlePresenceSnapshot = nextSnapshot;
+        return;
+    }
+
+    const myId = getSelfBattlePlayerId();
+    nextSnapshot.forEach((nickname, entryId) => {
+        if(entryId === myId) return;
+        if(lastBattlePresenceSnapshot.has(entryId)) return;
+        pushKillFeed(`${nickname} присоединился к игре`, 'chat');
+    });
 
     lastBattlePresenceSnapshot = nextSnapshot;
 }
