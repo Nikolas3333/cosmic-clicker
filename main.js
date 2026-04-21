@@ -1489,25 +1489,17 @@ function clearBattleScene(){
 
 async function switchState(newState){
     const prevState = gameState;
+    const leavingBattle = (prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE";
+    const leaveRoomSnapshot = leavingBattle && currentRoom ? { ...currentRoom } : currentRoom;
 
     if(document.pointerLockElement){
         document.exitPointerLock();
     }
 
-    if((prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE"){
+    if(leavingBattle){
         battleLeavingInProgress = true;
         hardResetBattleClientState();
         resetBattleSessionCounters();
-        try{
-            cleanupBattleRoomSilently();
-        }catch(_){
-            try{
-                currentRoom = null;
-                window.currentRoomId = null;
-                selectedLobbyMap = null;
-            }catch(__){}
-        }
-        hardResetBattleClientState();
     }
 
     gameState = newState;
@@ -1647,6 +1639,15 @@ if(gameState === "OBSERVE"){
     const chatBox = document.getElementById('battle-chat-box'); if(chatBox) chatBox.classList.add('hidden');
     const log = document.getElementById('battle-chat-log'); if(log) log.innerHTML = '';
     startLiveBattleSync();
+}
+
+if(leavingBattle){
+    Promise.resolve()
+        .then(() => cleanupCurrentBattleRoom(leaveRoomSnapshot))
+        .catch(() => {})
+        .finally(() => {
+            hardResetBattleClientState();
+        });
 }
 
 if(gameState === "INVENTORY"){
@@ -8761,10 +8762,9 @@ function initBattleUI(){
 
     const leaveMap = async () => {
         closeBattlePauseMenu();
-        battleLeavingInProgress = true;
         await switchState('LOBBY');
         if(typeof renderRoomsInLobby === 'function'){
-            try{ await renderRoomsInLobby(true); }catch(_){}
+            await renderRoomsInLobby(true);
         }
     };
 
@@ -15568,14 +15568,18 @@ async function leaveRoomPlayers(roomId) {
   return count || 0;
 }
 
-async function cleanupCurrentBattleRoom() {
-  if (currentRoom?.id && currentRoom?.state !== 'solo' && currentRoom?.observer !== true) {
-    await leaveRoomPlayers(currentRoom.id);
-  }
+async function cleanupCurrentBattleRoom(roomSnapshot = currentRoom) {
+  const targetRoom = roomSnapshot ? { ...roomSnapshot } : null;
+  const targetRoomId = targetRoom?.id || targetRoom?.roomId || null;
+  const shouldLeave = !!(targetRoomId && targetRoom?.state !== 'solo' && targetRoom?.observer !== true);
 
   currentRoom = null;
   window.currentRoomId = null;
   selectedLobbyMap = null;
+
+  if (shouldLeave) {
+    await leaveRoomPlayers(targetRoomId);
+  }
 
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function'){
     await loadRoomsFromSupabase();
