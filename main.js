@@ -7765,6 +7765,9 @@ function ensureLiveBattlePresenceChannel(){
         .on('broadcast', { event: 'pilot-kill' }, ({ payload }) => {
             handleIncomingBattleKill(payload || {});
         })
+        .on('broadcast', { event: 'pilot-join' }, ({ payload }) => {
+            handleIncomingBattleJoin(payload || {});
+        })
         .on('broadcast', { event: 'pilot-left' }, ({ payload }) => {
             handleIncomingBattleLeave(payload || {});
         })
@@ -8095,7 +8098,6 @@ async function syncLiveBattlePlayers(){
 
 function announceBattlePresenceChanges(livePlayers = []){
     const nextSnapshot = new Map();
-    const announcementsMuted = isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0);
 
     (Array.isArray(livePlayers) ? livePlayers : []).forEach((entry, index) => {
         const entryId = entry?.player_id ? String(entry.player_id) : '';
@@ -8104,25 +8106,21 @@ function announceBattlePresenceChanges(livePlayers = []){
         nextSnapshot.set(entryId, nickname);
     });
 
-    if(!battlePresenceBaselineReady){
-        lastBattlePresenceSnapshot = nextSnapshot;
-        battlePresenceBaselineReady = true;
-        return;
-    }
-
-    if(announcementsMuted){
-        lastBattlePresenceSnapshot = nextSnapshot;
-        return;
-    }
-
-    const myId = getSelfBattlePlayerId();
-    nextSnapshot.forEach((nickname, entryId) => {
-        if(entryId === myId) return;
-        if(lastBattlePresenceSnapshot.has(entryId)) return;
-        pushKillFeed(`${nickname} присоединился к игре`, 'chat');
-    });
-
     lastBattlePresenceSnapshot = nextSnapshot;
+    battlePresenceBaselineReady = true;
+}
+
+function handleIncomingBattleJoin(payload = {}){
+    const entryId = String(payload?.playerId || payload?.player_id || '').trim();
+    if(!entryId) return;
+    const myId = getSelfBattlePlayerId();
+    if(entryId === myId) return;
+    if(isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0)) return;
+
+    const nickname = String(payload?.nickname || payload?.player_nickname || 'Pilot').trim() || 'Pilot';
+    if(lastBattlePresenceSnapshot.get(entryId) === nickname) return;
+    lastBattlePresenceSnapshot.set(entryId, nickname);
+    pushKillFeed(`${nickname} присоединился к игре`, 'chat');
 }
 
 function handleIncomingBattleLeave(payload = {}){
@@ -8216,6 +8214,10 @@ async function startLiveBattleSync(){
     await initializeBattleHitCursor();
     syncLiveBattlePlayers();
     broadcastSelfBattleState();
+    sendBattlePresenceEvent?.('pilot-join', {
+        playerId: getSelfBattlePlayerId(),
+        nickname: player?.nickname || 'Commander'
+    });
     pollIncomingBattleHits();
     liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, LIVE_BATTLE_SYNC_INTERVAL_MS);
     liveBattlePresencePushTimer = setInterval(() => {
