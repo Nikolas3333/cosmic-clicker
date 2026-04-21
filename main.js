@@ -633,6 +633,9 @@ function safeRequestPointerLock(targetCanvas){
 let battleHudClockTimer = null;
 let battleHudPingTimer = null;
 let battlePresenceAnnounceMutedUntil = 0;
+    try{ battleJoinMuteByPlayer = new Map(); }catch(_){ battleJoinMuteByPlayer = new Map(); }
+let battleJoinMuteByPlayer = new Map();
+let liveBattlePresenceSubscribePromise = null;
 
 function getBattleRoomDisplayName(){
     return String(
@@ -789,6 +792,38 @@ function updateBattlePlayerWorldName(){
 function markBattlePresenceAnnouncementsMuted(durationMs = 0){
     const safeDuration = Math.max(0, Number(durationMs || 0) || 0);
     battlePresenceAnnounceMutedUntil = Math.max(Number(battlePresenceAnnounceMutedUntil || 0) || 0, Date.now() + safeDuration);
+}
+
+function markBattleJoinMutedForPlayer(playerId = '', durationMs = 0){
+    const entryId = String(playerId || '').trim();
+    if(!entryId) return;
+    const safeDuration = Math.max(0, Number(durationMs || 0) || 0);
+    if(safeDuration <= 0) return;
+    battleJoinMuteByPlayer.set(entryId, Date.now() + safeDuration);
+}
+
+function isBattleJoinMutedForPlayer(playerId = ''){
+    const entryId = String(playerId || '').trim();
+    if(!entryId) return false;
+    const until = Number(battleJoinMuteByPlayer.get(entryId) || 0) || 0;
+    if(!until) return false;
+    if(until <= Date.now()){
+        battleJoinMuteByPlayer.delete(entryId);
+        return false;
+    }
+    return true;
+}
+
+function isPlayerCurrentlyKnownInBattle(playerId = ''){
+    const entryId = String(playerId || '').trim();
+    if(!entryId) return false;
+    if(lastBattlePresenceSnapshot instanceof Map && lastBattlePresenceSnapshot.has(entryId)) return true;
+    if(remoteBattleShips instanceof Map && remoteBattleShips.has(entryId)) return true;
+    const lists = [
+        ...(Array.isArray(currentRoom?.currentPlayers) ? [currentRoom.currentPlayers] : []),
+        ...(Array.isArray(currentRoom?.players) ? [currentRoom.players] : [])
+    ];
+    return lists.some(list => list.some(row => String(row?.public_id || row?.player_public_id || row?.player_id || row?.id || '').trim() === entryId));
 }
 
 function refreshLobbyPingForCurrentPlayer(){
@@ -7064,6 +7099,7 @@ var liveBattleSyncTimer = null;
 var liveBattlePresencePushTimer = null;
 var liveBattlePresenceChannel = null;
 var liveBattlePresenceChannelName = '';
+    liveBattlePresenceSubscribePromise = null;
 var battleHitPollTimer = null;
 var battleHitCursorId = 0;
 var battleHitSessionStartedAt = 0;
@@ -7145,6 +7181,7 @@ function clearRemoteBattleShips(){
     lastBattlePresenceSnapshot = new Map();
     battlePresenceBaselineReady = false;
     battlePresenceAnnounceMutedUntil = 0;
+    try{ battleJoinMuteByPlayer = new Map(); }catch(_){ battleJoinMuteByPlayer = new Map(); }
 }
 
 function hardResetBattleClientState(){
@@ -7703,6 +7740,7 @@ function handleIncomingBattleKill(payload = {}){
 
     if(victimId){
         applyBattleScoreDelta(victimId, { deathsDelta: 1 });
+        markBattleJoinMutedForPlayer(victimId, 8000);
 
         const victimRemoteState = remoteBattleShips.get(victimId);
         if(victimRemoteState){
@@ -7739,11 +7777,13 @@ function handleIncomingBattleKill(payload = {}){
 }
 
 function ensureLiveBattlePresenceChannel(){
-    if(!window.supabaseClient) return;
-    if(!getBattleRoomIdSafe()) return;
+    if(!window.supabaseClient) return Promise.resolve(false);
+    if(!getBattleRoomIdSafe()) return Promise.resolve(false);
     const channelName = getLiveBattleChannelName();
-    if(!channelName) return;
-    if(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName) return;
+    if(!channelName) return Promise.resolve(false);
+    if(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName){
+        return liveBattlePresenceSubscribePromise || Promise.resolve(true);
+    }
 
     if(liveBattlePresenceChannel){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
@@ -7770,8 +7810,27 @@ function ensureLiveBattlePresenceChannel(){
         })
         .on('broadcast', { event: 'pilot-left' }, ({ payload }) => {
             handleIncomingBattleLeave(payload || {});
-        })
-        .subscribe();
+        });
+
+    liveBattlePresenceSubscribePromise = new Promise((resolve) => {
+        let settled = false;
+        const done = (ok) => {
+            if(settled) return;
+            settled = true;
+            resolve(!!ok);
+        };
+        try{
+            liveBattlePresenceChannel.subscribe((status) => {
+                if(status === 'SUBSCRIBED') done(true);
+                if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') done(false);
+            });
+        }catch(_){
+            done(false);
+        }
+        setTimeout(() => done(true), 900);
+    });
+
+    return liveBattlePresenceSubscribePromise;
 }
 
 async function broadcastSelfBattleState(){
@@ -8116,9 +8175,13 @@ function handleIncomingBattleJoin(payload = {}){
     const myId = getSelfBattlePlayerId();
     if(entryId === myId) return;
     if(isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0)) return;
+    if(isBattleJoinMutedForPlayer(entryId)) return;
 
     const nickname = String(payload?.nickname || payload?.player_nickname || 'Pilot').trim() || 'Pilot';
-    if(lastBattlePresenceSnapshot.get(entryId) === nickname) return;
+    if(isPlayerCurrentlyKnownInBattle(entryId)) {
+        lastBattlePresenceSnapshot.set(entryId, nickname);
+        return;
+    }
     lastBattlePresenceSnapshot.set(entryId, nickname);
     pushKillFeed(`${nickname} присоединился к игре`, 'chat');
 }
@@ -8210,14 +8273,24 @@ async function startLiveBattleSync(){
     stopLiveBattleSync();
     const onlineRoomId = getBattleRoomIdSafe();
     if(!onlineRoomId) return;
-    ensureLiveBattlePresenceChannel();
+    await ensureLiveBattlePresenceChannel();
     await initializeBattleHitCursor();
     syncLiveBattlePlayers();
     broadcastSelfBattleState();
-    sendBattlePresenceEvent?.('pilot-join', {
+    const selfJoinPayload = {
         playerId: getSelfBattlePlayerId(),
         nickname: player?.nickname || 'Commander'
-    });
+    };
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 250);
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 1200);
     pollIncomingBattleHits();
     liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, LIVE_BATTLE_SYNC_INTERVAL_MS);
     liveBattlePresencePushTimer = setInterval(() => {
