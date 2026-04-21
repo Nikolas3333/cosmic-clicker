@@ -1479,10 +1479,12 @@ async function switchState(newState){
 
     if((prevState === "BATTLE" || prevState === "OBSERVE") && newState !== "BATTLE" && newState !== "OBSERVE"){
         battleLeavingInProgress = true;
+        hardResetBattleClientState();
         resetBattleSessionCounters();
         try{
             await cleanupCurrentBattleRoom();
         }catch(_){}
+        hardResetBattleClientState();
     }
 
     gameState = newState;
@@ -7006,6 +7008,7 @@ var lastPresencePingValue = 0;
 var lastPresencePingAt = 0;
 var lobbyRoomPresenceInFlight = false;
 var lastLobbyRoomPresenceAt = 0;
+var battleClientResetSerial = 0;
 const ROOM_PLAYER_FETCH_CACHE_MS = 8000;
 const ROOM_PLAYER_PING_UPDATE_MS = 9000;
 const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
@@ -7033,18 +7036,58 @@ function getBattleScoreSnapshot(playerId){
 function clearRemoteBattleShips(){
     if(!(remoteBattleShips instanceof Map)){
         remoteBattleShips = new Map();
-        return;
     }
     remoteBattleShips.forEach(entry => {
-        if(entry?.mesh) scene.remove(entry.mesh);
-        if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
+        try{
+            if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
+        }catch(_){ }
+        try{
+            if(entry?.mesh){
+                entry.mesh.visible = false;
+                if(entry.mesh.parent) entry.mesh.parent.remove(entry.mesh);
+                else scene?.remove?.(entry.mesh);
+            }
+        }catch(_){ }
     });
     remoteBattleShips.clear();
+
+    if(scene?.traverse){
+        const nodesToRemove = [];
+        scene.traverse((node) => {
+            if(node?.userData?.remote){
+                nodesToRemove.push(node);
+            }
+        });
+        nodesToRemove.forEach((node) => {
+            try{
+                node.visible = false;
+                if(node.parent) node.parent.remove(node);
+                else scene.remove(node);
+            }catch(_){ }
+        });
+    }
+
     lastBattlePresenceSnapshot = new Map();
     battlePresenceBaselineReady = false;
 }
 
+function hardResetBattleClientState(){
+    battleClientResetSerial += 1;
+    try{ cachedRoomPlayersRows = []; }catch(_){ }
+    try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
+    try{ lastBattlePresenceSnapshot = new Map(); }catch(_){ }
+    try{ battlePresenceBaselineReady = false; }catch(_){ }
+    try{ battleScoreState = new Map(); }catch(_){ }
+    try{ clearRemoteBattleShips(); }catch(_){ }
+
+    if(currentRoom){
+        try{ currentRoom.currentPlayers = Array.isArray(currentRoom.currentPlayers) ? currentRoom.currentPlayers.filter(row => !row?.id || String(row.id).trim() === String(getSelfBattlePlayerId() || '').trim()) : []; }catch(_){ }
+        try{ currentRoom.players = Array.isArray(currentRoom.players) ? currentRoom.players.filter(row => !row?.id || String(row.id).trim() === String(getSelfBattlePlayerId() || '').trim()) : []; }catch(_){ }
+    }
+}
+
 function stopLiveBattleSync(){
+    battleClientResetSerial += 1;
     lastBattlePresenceSnapshot = new Map();
     battlePresenceBaselineReady = false;
     if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
@@ -7187,8 +7230,7 @@ function upsertRemoteBattlePresence(payload = {}){
 
     let entry = remoteBattleShips.get(entryId);
     if(!entry){
-        entry = createRemoteBattleShipMesh(nickname, remoteBattleShips.size, team);
-        remoteBattleShips.set(entryId, entry);
+        return;
     }
 
     entry.playerId = entryId;
@@ -7747,13 +7789,15 @@ function buildObserveRoomState(targetMap = ''){
 
 async function fetchCurrentRoomLivePlayers(){
     const now = Date.now();
+    const requestSerial = Number(battleClientResetSerial || 0);
+    const requestRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
     if((now - cachedRoomPlayersFetchedAt) < ROOM_PLAYER_FETCH_CACHE_MS && Array.isArray(cachedRoomPlayersRows)){
         return cachedRoomPlayersRows;
     }
 
     if(roomPlayersFetchInFlight) return null;
 
-    const roomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    const roomId = requestRoomId;
     if(!window.supabaseClient || !roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')){
         return [];
     }
@@ -7771,6 +7815,17 @@ async function fetchCurrentRoomLivePlayers(){
             if(error){
                 roomPlayersFetchInFlight = false;
                 return null;
+            }
+
+            if(requestSerial !== Number(battleClientResetSerial || 0)){
+                roomPlayersFetchInFlight = false;
+                return [];
+            }
+
+            const currentRoomIdNow = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+            if(currentRoomIdNow !== roomId){
+                roomPlayersFetchInFlight = false;
+                return [];
             }
 
             const mergedRows = new Map();
@@ -7834,12 +7889,18 @@ async function syncLiveBattlePlayers(){
     if(battleLeavingInProgress) return;
     if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
 
+    const syncSerial = Number(battleClientResetSerial || 0);
+    const syncRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+
     if(gameState === 'BATTLE' && playerShip){
         ensureSelfRoomPlayerState();
     }
 
     const livePlayers = await fetchCurrentRoomLivePlayers();
     if(livePlayers === null) return;
+    if(syncSerial !== Number(battleClientResetSerial || 0)) return;
+    if(syncRoomId !== sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null)) return;
+    if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
     announceBattlePresenceChanges(livePlayers);
     const myId = getSelfBattlePlayerId();
 
@@ -7989,6 +8050,7 @@ function announceBattlePresenceChanges(livePlayers = []){
 function handleIncomingBattleLeave(payload = {}){
     const entryId = String(payload?.playerId || payload?.player_id || '').trim();
     if(!entryId) return;
+    try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
     const myId = getSelfBattlePlayerId();
     if(entryId === myId) return;
 
@@ -8042,6 +8104,7 @@ function forceRemoveRemoteSceneObjects(entryId){
 function removeRemoteBattleShipById(entryId){
     const key = String(entryId || '').trim();
     if(!key) return;
+    try{ lastBattlePresenceSnapshot.delete(key); }catch(_){ }
 
     const old = remoteBattleShips instanceof Map ? remoteBattleShips.get(key) : null;
     if(old?.mesh){
