@@ -634,8 +634,7 @@ let battleHudClockTimer = null;
 let battleHudPingTimer = null;
 let battlePresenceAnnounceMutedUntil = 0;
 let battleJoinMuteByPlayer = new Map();
-let battleRecentPresenceNoticeByPlayer = new Map();
-let selfBattleJoinBroadcastDone = false;
+let battlePresenceRecentEvents = new Map();
 let liveBattlePresenceSubscribePromise = null;
 
 function getBattleRoomDisplayName(){
@@ -815,21 +814,24 @@ function isBattleJoinMutedForPlayer(playerId = ''){
     return true;
 }
 
-function shouldAnnounceBattlePresence(eventType = '', playerId = '', minGapMs = 4000){
-    const safeEvent = String(eventType || '').trim();
-    const entryId = String(playerId || '').trim();
-    if(!safeEvent || !entryId) return false;
-    const key = `${safeEvent}:${entryId}`;
+function shouldAnnounceBattlePresenceEvent(kind = '', playerId = '', nickname = ''){
+    const safeKind = String(kind || '').trim();
+    const safePlayerId = String(playerId || '').trim();
+    const safeNickname = String(nickname || '').trim();
+    if(!safeKind || !safePlayerId) return false;
+    const key = `${safeKind}:${safePlayerId}:${safeNickname}`;
     const now = Date.now();
-    const prevAt = Number(battleRecentPresenceNoticeByPlayer.get(key) || 0) || 0;
-    if(prevAt && (now - prevAt) < Math.max(250, Number(minGapMs || 0) || 0)) return false;
-    battleRecentPresenceNoticeByPlayer.set(key, now);
-    if(battleRecentPresenceNoticeByPlayer.size > 200){
-        const firstKey = battleRecentPresenceNoticeByPlayer.keys().next().value;
-        if(firstKey) battleRecentPresenceNoticeByPlayer.delete(firstKey);
+    const until = Number(battlePresenceRecentEvents.get(key) || 0) || 0;
+    if(until > now) return false;
+    battlePresenceRecentEvents.set(key, now + 4000);
+    if(battlePresenceRecentEvents.size > 200){
+        for(const [entryKey, entryUntil] of battlePresenceRecentEvents.entries()){
+            if(Number(entryUntil || 0) <= now) battlePresenceRecentEvents.delete(entryKey);
+        }
     }
     return true;
 }
+
 
 function isPlayerCurrentlyKnownInBattle(playerId = ''){
     const entryId = String(playerId || '').trim();
@@ -7198,11 +7200,9 @@ function clearRemoteBattleShips(){
     lastBattlePresenceSnapshot = new Map();
     battlePresenceBaselineReady = false;
     battlePresenceAnnounceMutedUntil = 0;
-    battleRecentPresenceNoticeByPlayer = new Map();
-    selfBattleJoinBroadcastDone = false;
+    try{ battleJoinMuteByPlayer.clear(); }catch(_){}
+    try{ battlePresenceRecentEvents.clear(); }catch(_){}
     try{ battleJoinMuteByPlayer = new Map(); }catch(_){ battleJoinMuteByPlayer = new Map(); }
-    try{ battleRecentPresenceNoticeByPlayer = new Map(); }catch(_){ battleRecentPresenceNoticeByPlayer = new Map(); }
-    selfBattleJoinBroadcastDone = false;
 }
 
 function hardResetBattleClientState(){
@@ -7212,8 +7212,6 @@ function hardResetBattleClientState(){
     try{ lastBattlePresenceSnapshot = new Map(); }catch(_){ }
     try{ battlePresenceBaselineReady = false; }catch(_){ }
     try{ battleScoreState = new Map(); }catch(_){ }
-    try{ battleRecentPresenceNoticeByPlayer = new Map(); }catch(_){ battleRecentPresenceNoticeByPlayer = new Map(); }
-    selfBattleJoinBroadcastDone = false;
     try{ clearRemoteBattleShips(); }catch(_){ }
 
     if(currentRoom){
@@ -7227,8 +7225,6 @@ function stopLiveBattleSync(){
     lastBattlePresenceSnapshot = new Map();
     battlePresenceBaselineReady = false;
     battlePresenceAnnounceMutedUntil = 0;
-    battleRecentPresenceNoticeByPlayer = new Map();
-    selfBattleJoinBroadcastDone = false;
     if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
         clearInterval(liveBattleSyncTimer);
         liveBattleSyncTimer = null;
@@ -7514,16 +7510,57 @@ function awardBattleKillRewards(victimName = ''){
     try{ saveGame?.(); }catch(_){}
 }
 
-async function sendBattlePresenceEvent(eventName, payload = {}){
-    if(!liveBattlePresenceChannel || !eventName) return false;
+async async function sendBattlePresenceEvent(eventName, payload = {}){
+    if(!eventName || !window.supabaseClient) return false;
+    const packet = { type:'broadcast', event:eventName, payload };
+
     try{
-        const packet = { type:'broadcast', event:eventName, payload };
-        if(typeof liveBattlePresenceChannel.httpSend === 'function'){
-            await liveBattlePresenceChannel.httpSend(packet);
-        }else{
-            await liveBattlePresenceChannel.send(packet);
+        if(liveBattlePresenceChannel){
+            if(typeof liveBattlePresenceChannel.httpSend === 'function'){
+                await liveBattlePresenceChannel.httpSend(packet);
+            }else{
+                await liveBattlePresenceChannel.send(packet);
+            }
+            return true;
         }
-        return true;
+    }catch(_){}
+
+    try{
+        const fallbackRoomId = sanitizeOnlineRoomId(
+            payload?.roomId || currentRoom?.id || currentRoom?.roomId || ''
+        );
+        if(!fallbackRoomId) return false;
+
+        const tempChannelName = `cosmic-battle-room:${fallbackRoomId}`;
+        const tempChannel = window.supabaseClient.channel(tempChannelName, {
+            config: { broadcast: { self: false, ack: false } }
+        });
+
+        await new Promise((resolve) => {
+            let settled = false;
+            const done = () => {
+                if(settled) return;
+                settled = true;
+                resolve(true);
+            };
+            try{
+                tempChannel.subscribe(() => done());
+            }catch(_){
+                done();
+            }
+            setTimeout(done, 220);
+        });
+
+        try{
+            if(typeof tempChannel.httpSend === 'function'){
+                await tempChannel.httpSend(packet);
+            }else{
+                await tempChannel.send(packet);
+            }
+            return true;
+        }finally{
+            try{ window.supabaseClient.removeChannel(tempChannel); }catch(_){}
+        }
     }catch(_){
         return false;
     }
@@ -8204,7 +8241,8 @@ function handleIncomingBattleJoin(payload = {}){
 
     const nickname = String(payload?.nickname || payload?.player_nickname || 'Pilot').trim() || 'Pilot';
     lastBattlePresenceSnapshot.set(entryId, nickname);
-    if(!shouldAnnounceBattlePresence('join', entryId, 5000)) return;
+
+    if(!shouldAnnounceBattlePresenceEvent('join', entryId, nickname)) return;
     pushKillFeed(`${nickname} присоединился к игре`, 'chat');
 }
 
@@ -8228,9 +8266,7 @@ function handleIncomingBattleLeave(payload = {}){
         currentRoom.players = filterList(currentRoom.players) || [];
     }
 
-    if(shouldAnnounceBattlePresence('leave', entryId, 2500)) {
-        pushKillFeed(`${nickname} покинул игру`, 'chat');
-    }
+    pushKillFeed(`${nickname} покинул игру`, 'chat');
     updateBattleScoreboard?.();
 }
 
@@ -8305,19 +8341,16 @@ async function startLiveBattleSync(){
         playerId: getSelfBattlePlayerId(),
         nickname: player?.nickname || 'Commander'
     };
-    if(!selfBattleJoinBroadcastDone && selfJoinPayload.playerId){
-        selfBattleJoinBroadcastDone = true;
-        setTimeout(() => {
-            if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
-            if(onlineRoomId !== getBattleRoomIdSafe()) return;
-            sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
-        }, 450);
-        setTimeout(() => {
-            if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
-            if(onlineRoomId !== getBattleRoomIdSafe()) return;
-            sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
-        }, 1600);
-    }
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 250);
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 1200);
     pollIncomingBattleHits();
     liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, LIVE_BATTLE_SYNC_INTERVAL_MS);
     liveBattlePresencePushTimer = setInterval(() => {
