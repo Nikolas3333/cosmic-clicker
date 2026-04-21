@@ -799,7 +799,11 @@ function getSelfBattlePlayerId(){
 }
 
 function getBattleRoomIdSafe(){
-    return String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    const rawRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    if(!rawRoomId) return '';
+    if(rawRoomId.startsWith('local_') || rawRoomId.startsWith('observe_') || rawRoomId.startsWith('tournament_')) return '';
+    const sanitizedRoomId = sanitizeOnlineRoomId(rawRoomId);
+    return sanitizedRoomId || '';
 }
 
 function getBattleRoomPlayerTeam(entryId = ''){
@@ -873,10 +877,16 @@ function getThrottledPresencePing(now = Date.now()){
 
 function getJoinedLobbyRoomId(){
     const currentId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
-    if(currentId) return currentId;
+    if(currentId){
+        const sanitizedCurrentId = sanitizeOnlineRoomId(currentId);
+        if(sanitizedCurrentId) return sanitizedCurrentId;
+    }
     const selectedId = String(selectedLobbyMap?.id || selectedLobbyMap?.roomId || '').trim();
     const isBaseMap = !!selectedLobbyMap?.isBaseMap;
-    if(selectedId && !isBaseMap) return selectedId;
+    if(selectedId && !isBaseMap){
+        const sanitizedSelectedId = sanitizeOnlineRoomId(selectedId);
+        if(sanitizedSelectedId) return sanitizedSelectedId;
+    }
     return '';
 }
 
@@ -884,6 +894,7 @@ async function touchJoinedLobbyRoomPresence(force = false){
     if(!window.supabaseReady || !window.supabaseClient) return;
     if(gameState !== 'LOBBY') return;
     const roomId = getJoinedLobbyRoomId();
+    if(!roomId || String(roomId).startsWith('local_') || !sanitizeOnlineRoomId(roomId)) return;
     const identity = getCurrentPlayerIdentity?.();
     const playerId = String(identity?.playerId || '').trim();
     if(!roomId || !playerId) return;
@@ -943,6 +954,7 @@ async function touchJoinedLobbyRoomPresence(force = false){
 }
 
 function ensureSelfRoomPlayerState(){
+    if(gameState !== 'BATTLE') return;
     if(battleLeavingInProgress) return;
     if(!window.supabaseClient || roomPlayerStateUpsertInFlight) return;
     const roomId = getBattleRoomIdSafe();
@@ -6939,6 +6951,35 @@ function getBattlePlanetConfig(mapKey){
     return configs[mapKey] || configs.earth;
 }
 
+
+function resetBattleSessionCounters(){
+    try{ stopLiveBattleSync(); }catch(_){ }
+    try{ stopBattleHudLoops?.(); }catch(_){ }
+    try{ battlePendingRespawnAt = 0; }catch(_){ }
+    try{ if(battleRespawnTimer){ clearTimeout(battleRespawnTimer); battleRespawnTimer = null; } }catch(_){ }
+    try{ battleShipCrash = null; }catch(_){ }
+    try{ battlePlanetCapture = null; }catch(_){ }
+    try{ battleChatOpen = false; }catch(_){ }
+    try{ battleMessages.length = 0; }catch(_){ }
+    try{ killFeedMessages.length = 0; }catch(_){ }
+    try{ activeLasers.forEach(laser => { try{ scene?.remove?.(laser?.mesh); }catch(__){} }); activeLasers = []; }catch(_){ }
+    try{ enemyLasers.forEach(laser => { try{ scene?.remove?.(laser?.mesh); }catch(__){} }); enemyLasers = []; }catch(_){ }
+    try{ selfRoomPlayerRowId = ''; }catch(_){ }
+    try{ lastSelfRoomPlayerStatePayload = ''; }catch(_){ }
+    try{ lastSelfRoomPlayerStateSentAt = 0; }catch(_){ }
+    try{ roomPlayerStateUpsertInFlight = false; }catch(_){ }
+    try{ roomPlayersFetchInFlight = false; }catch(_){ }
+    try{ cachedRoomPlayersRows = []; }catch(_){ }
+    try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
+    try{ lastRoomPlayerPingValue = 0; }catch(_){ }
+    try{ lastRoomPlayerPingAt = 0; }catch(_){ }
+    try{ lastBattlePresencePayload = ''; }catch(_){ }
+    try{ lastBattlePresenceSentAt = 0; }catch(_){ }
+    try{ lastPresencePingValue = 0; }catch(_){ }
+    try{ lastPresencePingAt = 0; }catch(_){ }
+    try{ battleScoreState = new Map(); }catch(_){ }
+}
+
 function enterBattleMap(mapName){
   // FIX: reset orbit leftovers
   try {
@@ -7687,6 +7728,7 @@ function handleIncomingBattleKill(payload = {}){
 
 function ensureLiveBattlePresenceChannel(){
     if(!window.supabaseClient) return;
+    if(!getBattleRoomIdSafe()) return;
     const channelName = getLiveBattleChannelName();
     if(!channelName) return;
     if(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName) return;
@@ -7916,6 +7958,7 @@ async function syncLiveBattlePlayers(){
 
     const syncSerial = Number(battleClientResetSerial || 0);
     const syncRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    if(!syncRoomId) return;
 
     if(gameState === 'BATTLE' && playerShip){
         ensureSelfRoomPlayerState();
@@ -8157,6 +8200,8 @@ function removeRemoteBattleShipById(entryId){
 
 async function startLiveBattleSync(){
     stopLiveBattleSync();
+    const onlineRoomId = getBattleRoomIdSafe();
+    if(!onlineRoomId) return;
     ensureLiveBattlePresenceChannel();
     await initializeBattleHitCursor();
     syncLiveBattlePlayers();
@@ -8759,6 +8804,7 @@ async function forceLeaveBattleToLobby(){
     const roomSnapshot = currentRoom ? { ...currentRoom } : null;
 
     battleLeavingInProgress = true;
+    try{ stopLiveBattleSync(); }catch(_){ }
 
     try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(_){ }
     try{ closeBattlePauseMenu(); }catch(_){ }
