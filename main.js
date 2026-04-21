@@ -8095,7 +8095,6 @@ async function syncLiveBattlePlayers(){
 
 function announceBattlePresenceChanges(livePlayers = []){
     const nextSnapshot = new Map();
-    const announcementsMuted = isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0);
     (Array.isArray(livePlayers) ? livePlayers : []).forEach((entry, index) => {
         const entryId = entry?.player_id ? String(entry.player_id) : '';
         if(!entryId) return;
@@ -8108,27 +8107,6 @@ function announceBattlePresenceChanges(livePlayers = []){
         battlePresenceBaselineReady = true;
         return;
     }
-
-    if(announcementsMuted){
-        lastBattlePresenceSnapshot = nextSnapshot;
-        return;
-    }
-
-    const myId = getSelfBattlePlayerId();
-
-    nextSnapshot.forEach((nickname, entryId) => {
-        if(entryId === myId) return;
-        if(!lastBattlePresenceSnapshot.has(entryId)){
-            pushKillFeed(`${nickname} присоединился`, 'chat');
-        }
-    });
-
-    lastBattlePresenceSnapshot.forEach((nickname, entryId) => {
-        if(entryId === myId) return;
-        if(!nextSnapshot.has(entryId)){
-            pushKillFeed(`${nickname} покинул игру`, 'chat');
-        }
-    });
 
     lastBattlePresenceSnapshot = nextSnapshot;
 }
@@ -15557,15 +15535,15 @@ return true;
   }
 
   let roomExists = false;
-  for(const waitMs of [0, 120, 260, 420]){
+  for(const waitMs of [0, 180, 420, 760, 1200, 1800, 2600]){
     if(waitMs > 0) await sleep(waitMs);
     try{
-      const { data: roomProbe } = await window.supabaseClient
+      const { data: roomProbe, error: roomProbeError } = await window.supabaseClient
         .from('rooms')
         .select('id')
         .eq('id', normalizedRoomId)
         .limit(1);
-      if(Array.isArray(roomProbe) && roomProbe.length > 0){
+      if(!roomProbeError && Array.isArray(roomProbe) && roomProbe.length > 0){
         roomExists = true;
         break;
       }
@@ -15573,7 +15551,7 @@ return true;
   }
 
   if(!roomExists){
-    console.error('Ошибка входа в room_players: комната ещё не подтверждена в rooms', normalizedRoomId);
+    console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
     return false;
   }
 
@@ -16002,7 +15980,14 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
     const existingRoom = existingRows[0];
-    const joinedExisting = await joinRoomPlayers(existingRoom.id);
+    let joinedExisting = await joinRoomPlayers(existingRoom.id);
+    if (!joinedExisting) {
+      for(const retryDelay of [260, 520, 900, 1400]){
+        await sleep(retryDelay);
+        joinedExisting = await joinRoomPlayers(existingRoom.id);
+        if(joinedExisting) break;
+      }
+    }
     if (!joinedExisting) return null;
     await loadRoomsFromSupabase();
     if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
@@ -16030,11 +16015,18 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
     return null;
   }
 
-  const joined = await joinRoomPlayers(data.id);
+  let joined = await joinRoomPlayers(data.id);
   if (!joined) {
-    console.error('Не удалось добавить создателя в room_players, комната будет удалена:', data);
-    await window.supabaseClient.from('rooms').delete().eq('id', data.id);
-    return null;
+    for(const retryDelay of [260, 520, 900, 1400, 2200]){
+      await sleep(retryDelay);
+      try{ await loadRoomsFromSupabase(); }catch(_){}
+      joined = await joinRoomPlayers(data.id);
+      if(joined) break;
+    }
+  }
+
+  if (!joined) {
+    console.warn('Создатель ещё не вошёл в room_players, оставляем комнату и продолжим без удаления:', data);
   }
 
   await loadRoomsFromSupabase();
