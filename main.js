@@ -1499,8 +1499,14 @@ async function switchState(newState){
         hardResetBattleClientState();
         resetBattleSessionCounters();
         try{
-            await cleanupCurrentBattleRoom();
-        }catch(_){}
+            cleanupBattleRoomSilently();
+        }catch(_){
+            try{
+                currentRoom = null;
+                window.currentRoomId = null;
+                selectedLobbyMap = null;
+            }catch(__){}
+        }
         hardResetBattleClientState();
     }
 
@@ -8755,9 +8761,10 @@ function initBattleUI(){
 
     const leaveMap = async () => {
         closeBattlePauseMenu();
+        battleLeavingInProgress = true;
         await switchState('LOBBY');
         if(typeof renderRoomsInLobby === 'function'){
-            await renderRoomsInLobby(true);
+            try{ await renderRoomsInLobby(true); }catch(_){}
         }
     };
 
