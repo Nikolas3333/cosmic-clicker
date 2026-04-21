@@ -824,11 +824,6 @@ function shouldAnnounceBattlePresenceEvent(kind = '', playerId = '', nickname = 
     const until = Number(battlePresenceRecentEvents.get(key) || 0) || 0;
     if(until > now) return false;
     battlePresenceRecentEvents.set(key, now + 4000);
-    if(battlePresenceRecentEvents.size > 200){
-        for(const [entryKey, entryUntil] of battlePresenceRecentEvents.entries()){
-            if(Number(entryUntil || 0) <= now) battlePresenceRecentEvents.delete(entryKey);
-        }
-    }
     return true;
 }
 
@@ -7510,57 +7505,16 @@ function awardBattleKillRewards(victimName = ''){
     try{ saveGame?.(); }catch(_){}
 }
 
-async async function sendBattlePresenceEvent(eventName, payload = {}){
-    if(!eventName || !window.supabaseClient) return false;
-    const packet = { type:'broadcast', event:eventName, payload };
-
+async function sendBattlePresenceEvent(eventName, payload = {}){
+    if(!liveBattlePresenceChannel || !eventName) return false;
     try{
-        if(liveBattlePresenceChannel){
-            if(typeof liveBattlePresenceChannel.httpSend === 'function'){
-                await liveBattlePresenceChannel.httpSend(packet);
-            }else{
-                await liveBattlePresenceChannel.send(packet);
-            }
-            return true;
+        const packet = { type:'broadcast', event:eventName, payload };
+        if(typeof liveBattlePresenceChannel.httpSend === 'function'){
+            await liveBattlePresenceChannel.httpSend(packet);
+        }else{
+            await liveBattlePresenceChannel.send(packet);
         }
-    }catch(_){}
-
-    try{
-        const fallbackRoomId = sanitizeOnlineRoomId(
-            payload?.roomId || currentRoom?.id || currentRoom?.roomId || ''
-        );
-        if(!fallbackRoomId) return false;
-
-        const tempChannelName = `cosmic-battle-room:${fallbackRoomId}`;
-        const tempChannel = window.supabaseClient.channel(tempChannelName, {
-            config: { broadcast: { self: false, ack: false } }
-        });
-
-        await new Promise((resolve) => {
-            let settled = false;
-            const done = () => {
-                if(settled) return;
-                settled = true;
-                resolve(true);
-            };
-            try{
-                tempChannel.subscribe(() => done());
-            }catch(_){
-                done();
-            }
-            setTimeout(done, 220);
-        });
-
-        try{
-            if(typeof tempChannel.httpSend === 'function'){
-                await tempChannel.httpSend(packet);
-            }else{
-                await tempChannel.send(packet);
-            }
-            return true;
-        }finally{
-            try{ window.supabaseClient.removeChannel(tempChannel); }catch(_){}
-        }
+        return true;
     }catch(_){
         return false;
     }
@@ -8266,10 +8220,10 @@ function handleIncomingBattleLeave(payload = {}){
         currentRoom.players = filterList(currentRoom.players) || [];
     }
 
+    if(!shouldAnnounceBattlePresenceEvent('leave', entryId, nickname)) return;
     pushKillFeed(`${nickname} покинул игру`, 'chat');
     updateBattleScoreboard?.();
 }
-
 
 function forceRemoveRemoteSceneObjects(entryId){
     const key = String(entryId || '').trim();
