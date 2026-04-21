@@ -632,6 +632,7 @@ function safeRequestPointerLock(targetCanvas){
 
 let battleHudClockTimer = null;
 let battleHudPingTimer = null;
+let battlePresenceAnnounceMutedUntil = 0;
 
 function getBattleRoomDisplayName(){
     return String(
@@ -785,6 +786,11 @@ function updateBattlePlayerWorldName(){
     label.classList.add('hidden');
 }
 
+function markBattlePresenceAnnouncementsMuted(durationMs = 0){
+    const safeDuration = Math.max(0, Number(durationMs || 0) || 0);
+    battlePresenceAnnounceMutedUntil = Math.max(Number(battlePresenceAnnounceMutedUntil || 0) || 0, Date.now() + safeDuration);
+}
+
 function refreshLobbyPingForCurrentPlayer(){
     const pingValue = getBattlePingValue();
     const labels = document.querySelectorAll('[data-player-ping-self="1"]');
@@ -812,7 +818,7 @@ function getBattleRoomPlayerTeam(entryId = ''){
     return String(key).slice(-1).charCodeAt(0) % 2 === 0 ? 'blue' : 'red';
 }
 
-const ROOM_PLAYER_STALE_MS = 3500;
+const ROOM_PLAYER_STALE_MS = 12000;
 
 function getRoomPlayerFreshCutoffIso(){
     return new Date(Date.now() - ROOM_PLAYER_STALE_MS).toISOString();
@@ -1622,6 +1628,7 @@ if(gameState === "BATTLE"){
     } else {
         const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'block';
         spawnPlayer();
+        markBattlePresenceAnnouncementsMuted(2500);
         setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
         updateEnemyHud();
         updateBattleScoreboard();
@@ -3941,6 +3948,7 @@ function isBattleRespawning(){
 function scheduleBattleRespawn(delayMs=2000){
     const safeDelay = Math.max(0, delayMs);
     battlePendingRespawnAt = Date.now() + safeDelay;
+    markBattlePresenceAnnouncementsMuted(safeDelay + 4000);
     if(battleRespawnTimer){
         clearTimeout(battleRespawnTimer);
         battleRespawnTimer = null;
@@ -3961,6 +3969,7 @@ function scheduleBattleRespawn(delayMs=2000){
             battlePendingRespawnAt = 0;
             playerHp = playerMaxHp;
             battleShipCrash = null;
+            markBattlePresenceAnnouncementsMuted(2500);
             spawnPlayer();
             updateBattlePlayerHud();
         }, safeDelay + 30);
@@ -3982,6 +3991,7 @@ function updateBattleRespawnState(){
     }
     playerHp = playerMaxHp;
     battleShipCrash = null;
+    markBattlePresenceAnnouncementsMuted(2500);
     spawnPlayer();
     updateBattlePlayerHud();
 }
@@ -7134,6 +7144,7 @@ function clearRemoteBattleShips(){
 
     lastBattlePresenceSnapshot = new Map();
     battlePresenceBaselineReady = false;
+    battlePresenceAnnounceMutedUntil = 0;
 }
 
 function hardResetBattleClientState(){
@@ -7155,6 +7166,7 @@ function stopLiveBattleSync(){
     battleClientResetSerial += 1;
     lastBattlePresenceSnapshot = new Map();
     battlePresenceBaselineReady = false;
+    battlePresenceAnnounceMutedUntil = 0;
     if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
         clearInterval(liveBattleSyncTimer);
         liveBattleSyncTimer = null;
@@ -8083,6 +8095,7 @@ async function syncLiveBattlePlayers(){
 
 function announceBattlePresenceChanges(livePlayers = []){
     const nextSnapshot = new Map();
+    const announcementsMuted = isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0);
     (Array.isArray(livePlayers) ? livePlayers : []).forEach((entry, index) => {
         const entryId = entry?.player_id ? String(entry.player_id) : '';
         if(!entryId) return;
@@ -8093,6 +8106,11 @@ function announceBattlePresenceChanges(livePlayers = []){
     if(!battlePresenceBaselineReady){
         lastBattlePresenceSnapshot = nextSnapshot;
         battlePresenceBaselineReady = true;
+        return;
+    }
+
+    if(announcementsMuted){
+        lastBattlePresenceSnapshot = nextSnapshot;
         return;
     }
 
