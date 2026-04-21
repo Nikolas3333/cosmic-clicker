@@ -808,7 +808,7 @@ function getBattleRoomPlayerTeam(entryId = ''){
     return String(key).slice(-1).charCodeAt(0) % 2 === 0 ? 'blue' : 'red';
 }
 
-const ROOM_PLAYER_STALE_MS = 12000;
+const ROOM_PLAYER_STALE_MS = 3500;
 
 function getRoomPlayerFreshCutoffIso(){
     return new Date(Date.now() - ROOM_PLAYER_STALE_MS).toISOString();
@@ -949,6 +949,7 @@ function ensureSelfRoomPlayerState(){
     const playerId = getSelfBattlePlayerId();
     if(!roomId || !playerId || !playerShip) return;
 
+    const stateSerial = Number(battleClientResetSerial || 0);
     const now = Date.now();
     const team = getBattleRoomPlayerTeam(playerId);
     const payload = {
@@ -997,6 +998,18 @@ function ensureSelfRoomPlayerState(){
 
     (async () => {
         try{
+            const isStillSameBattleSession = () => {
+                if(battleLeavingInProgress) return false;
+                if(stateSerial !== Number(battleClientResetSerial || 0)) return false;
+                if(gameState !== 'BATTLE') return false;
+                if(roomId !== getBattleRoomIdSafe()) return false;
+                if(playerId !== getSelfBattlePlayerId()) return false;
+                if(!window.supabaseClient) return false;
+                return true;
+            };
+
+            if(!isStillSameBattleSession()) return;
+
             const updatePayload = {
                 nickname: payload.nickname,
                 team: payload.team,
@@ -1025,6 +1038,7 @@ function ensureSelfRoomPlayerState(){
             }
 
             const { data: updatedRows, error: updateError } = await updateQuery;
+            if(!isStillSameBattleSession()) return;
 
             let activeRowId = selfRoomPlayerRowId;
             if(Array.isArray(updatedRows) && updatedRows[0]?.id){
@@ -1050,12 +1064,15 @@ function ensureSelfRoomPlayerState(){
                     rotation: payload.rotation
                 };
 
+                if(!isStillSameBattleSession()) return;
+
                 const { data: insertedRows, error: insertError } = await window.supabaseClient
                     .from('room_players')
                     .insert([insertPayload])
                     .select('id')
                     .limit(1);
 
+                if(!isStillSameBattleSession()) return;
                 if(insertError){
                     return;
                 }
@@ -7009,7 +7026,7 @@ var lastPresencePingAt = 0;
 var lobbyRoomPresenceInFlight = false;
 var lastLobbyRoomPresenceAt = 0;
 var battleClientResetSerial = 0;
-const ROOM_PLAYER_FETCH_CACHE_MS = 8000;
+const ROOM_PLAYER_FETCH_CACHE_MS = 300;
 const ROOM_PLAYER_PING_UPDATE_MS = 9000;
 const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
 const LIVE_BATTLE_SYNC_INTERVAL_MS = 900;
@@ -7219,6 +7236,7 @@ function getLiveBattleChannelName(){
 }
 
 function upsertRemoteBattlePresence(payload = {}){
+    try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
     const entryId = String(payload.playerId || payload.player_id || payload.id || '').trim();
     const myId = String(authState?.playerId || player?.id || '').trim();
     if(!entryId || (myId && entryId === myId)) return;
