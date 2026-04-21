@@ -633,7 +633,6 @@ function safeRequestPointerLock(targetCanvas){
 let battleHudClockTimer = null;
 let battleHudPingTimer = null;
 let battlePresenceAnnounceMutedUntil = 0;
-    try{ battleJoinMuteByPlayer = new Map(); }catch(_){ battleJoinMuteByPlayer = new Map(); }
 let battleJoinMuteByPlayer = new Map();
 let liveBattlePresenceSubscribePromise = null;
 
