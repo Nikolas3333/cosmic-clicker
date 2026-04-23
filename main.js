@@ -1565,6 +1565,18 @@ async function switchState(newState){
 
     if(leavingBattle){
         battleLeavingInProgress = true;
+        try{
+            const leaveRoomId = sanitizeOnlineRoomId(leaveRoomSnapshot?.id || leaveRoomSnapshot?.roomId || '');
+            const selfPlayerId = String(getSelfBattlePlayerId() || authState?.playerId || player?.id || '').trim();
+            const selfNickname = player?.nickname || 'Commander';
+            if(leaveRoomId && selfPlayerId){
+                await sendBattlePresenceEvent('pilot-left', {
+                    playerId: selfPlayerId,
+                    nickname: selfNickname,
+                    roomId: leaveRoomId
+                });
+            }
+        }catch(_){}
         hardResetBattleClientState();
         resetBattleSessionCounters();
     }
@@ -7254,6 +7266,7 @@ function stopLiveBattleSync(){
     }
     liveBattlePresenceChannel = null;
     liveBattlePresenceChannelName = '';
+    liveBattlePresenceSubscribePromise = null;
     clearRemoteBattleShips();
 }
 
@@ -7506,15 +7519,56 @@ function awardBattleKillRewards(victimName = ''){
 }
 
 async function sendBattlePresenceEvent(eventName, payload = {}){
-    if(!liveBattlePresenceChannel || !eventName) return false;
+    if(!eventName || !window.supabaseClient) return false;
+    const packet = { type:'broadcast', event:eventName, payload };
+
     try{
-        const packet = { type:'broadcast', event:eventName, payload };
-        if(typeof liveBattlePresenceChannel.httpSend === 'function'){
-            await liveBattlePresenceChannel.httpSend(packet);
-        }else{
-            await liveBattlePresenceChannel.send(packet);
+        if(liveBattlePresenceChannel){
+            if(typeof liveBattlePresenceChannel.httpSend === 'function'){
+                await liveBattlePresenceChannel.httpSend(packet);
+            }else{
+                await liveBattlePresenceChannel.send(packet);
+            }
+            return true;
         }
-        return true;
+    }catch(_){}
+
+    try{
+        const fallbackRoomId = sanitizeOnlineRoomId(
+            payload?.roomId || currentRoom?.id || currentRoom?.roomId || ''
+        );
+        if(!fallbackRoomId) return false;
+
+        const tempChannelName = `cosmic-battle-room:${fallbackRoomId}`;
+        const tempChannel = window.supabaseClient.channel(tempChannelName, {
+            config: { broadcast: { self: false, ack: false } }
+        });
+
+        await new Promise((resolve) => {
+            let settled = false;
+            const done = () => {
+                if(settled) return;
+                settled = true;
+                resolve(true);
+            };
+            try{
+                tempChannel.subscribe(() => done());
+            }catch(_){
+                done();
+            }
+            setTimeout(done, 250);
+        });
+
+        try{
+            if(typeof tempChannel.httpSend === 'function'){
+                await tempChannel.httpSend(packet);
+            }else{
+                await tempChannel.send(packet);
+            }
+            return true;
+        }finally{
+            try{ window.supabaseClient.removeChannel(tempChannel); }catch(_){}
+        }
     }catch(_){
         return false;
     }
@@ -8293,7 +8347,8 @@ async function startLiveBattleSync(){
     broadcastSelfBattleState();
     const selfJoinPayload = {
         playerId: getSelfBattlePlayerId(),
-        nickname: player?.nickname || 'Commander'
+        nickname: player?.nickname || 'Commander',
+        roomId: onlineRoomId
     };
     setTimeout(() => {
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
@@ -8305,6 +8360,11 @@ async function startLiveBattleSync(){
         if(onlineRoomId !== getBattleRoomIdSafe()) return;
         sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
     }, 1200);
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 2500);
     pollIncomingBattleHits();
     liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, LIVE_BATTLE_SYNC_INTERVAL_MS);
     liveBattlePresencePushTimer = setInterval(() => {
