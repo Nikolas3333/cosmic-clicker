@@ -635,6 +635,7 @@ let battleHudPingTimer = null;
 let battlePresenceAnnounceMutedUntil = 0;
 let battleJoinMuteByPlayer = new Map();
 let battlePresenceRecentEvents = new Map();
+let battlePresenceMissingCounts = new Map();
 let liveBattlePresenceSubscribePromise = null;
 
 function getBattleRoomDisplayName(){
@@ -7209,6 +7210,7 @@ function clearRemoteBattleShips(){
     battlePresenceAnnounceMutedUntil = 0;
     try{ battleJoinMuteByPlayer.clear(); }catch(_){}
     try{ battlePresenceRecentEvents.clear(); }catch(_){}
+    try{ battlePresenceMissingCounts.clear(); }catch(_){ }
     try{ battleJoinMuteByPlayer = new Map(); }catch(_){ battleJoinMuteByPlayer = new Map(); }
 }
 
@@ -8226,14 +8228,51 @@ async function syncLiveBattlePlayers(){
 
 
 function announceBattlePresenceChanges(livePlayers = []){
+    const prevSnapshot = lastBattlePresenceSnapshot instanceof Map ? lastBattlePresenceSnapshot : new Map();
     const nextSnapshot = new Map();
+    const selfId = getSelfBattlePlayerId();
+    const now = Date.now();
 
     (Array.isArray(livePlayers) ? livePlayers : []).forEach((entry, index) => {
-        const entryId = entry?.player_id ? String(entry.player_id) : '';
+        const entryId = entry?.player_id ? String(entry.player_id).trim() : '';
         if(!entryId) return;
         const nickname = String(entry?.nickname || `Pilot ${index + 1}`).trim() || `Pilot ${index + 1}`;
-        nextSnapshot.set(entryId, nickname);
+        const joinedAt = String(entry?.joined_at || '').trim();
+        const updatedAt = String(entry?.updated_at || '').trim();
+        nextSnapshot.set(entryId, { nickname, joinedAt, updatedAt });
+        battlePresenceMissingCounts.delete(entryId);
     });
+
+    if(battlePresenceBaselineReady){
+        nextSnapshot.forEach((info, entryId) => {
+            if(entryId === selfId) return;
+            if(prevSnapshot.has(entryId)) return;
+            if(isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0)) return;
+            if(isBattleJoinMutedForPlayer(entryId)) return;
+
+            const joinedAtMs = info?.joinedAt ? new Date(info.joinedAt).getTime() : NaN;
+            const joinedRecently = Number.isFinite(joinedAtMs) ? (now - joinedAtMs) <= 15000 : true;
+            if(!joinedRecently) return;
+
+            const nickname = String(info?.nickname || 'Pilot').trim() || 'Pilot';
+            if(!shouldAnnounceBattlePresenceEvent('join', entryId, nickname)) return;
+            pushKillFeed(`${nickname} присоединился к игре`, 'chat');
+        });
+
+        prevSnapshot.forEach((info, entryId) => {
+            if(entryId === selfId) return;
+            if(nextSnapshot.has(entryId)) return;
+
+            const misses = Number(battlePresenceMissingCounts.get(entryId) || 0) + 1;
+            battlePresenceMissingCounts.set(entryId, misses);
+            if(misses < 2) return;
+
+            const nickname = String((info && typeof info === 'object' ? info.nickname : info) || 'Pilot').trim() || 'Pilot';
+            if(!shouldAnnounceBattlePresenceEvent('leave', entryId, nickname)) return;
+            pushKillFeed(`${nickname} покинул игру`, 'chat');
+            battlePresenceMissingCounts.delete(entryId);
+        });
+    }
 
     lastBattlePresenceSnapshot = nextSnapshot;
     battlePresenceBaselineReady = true;
@@ -8261,7 +8300,9 @@ function handleIncomingBattleLeave(payload = {}){
     const myId = getSelfBattlePlayerId();
     if(entryId === myId) return;
 
-    const nickname = String(payload?.nickname || payload?.player_nickname || lastBattlePresenceSnapshot.get(entryId) || 'Pilot').trim() || 'Pilot';
+    const snapshotEntry = lastBattlePresenceSnapshot.get(entryId);
+    const snapshotNickname = snapshotEntry && typeof snapshotEntry === 'object' ? snapshotEntry.nickname : snapshotEntry;
+    const nickname = String(payload?.nickname || payload?.player_nickname || snapshotNickname || 'Pilot').trim() || 'Pilot';
 
     removeRemoteBattleShipById(entryId);
     lastBattlePresenceSnapshot.delete(entryId);
