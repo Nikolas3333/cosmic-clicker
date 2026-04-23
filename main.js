@@ -15801,7 +15801,26 @@ async function joinRoomPlayers(roomId) {
   }
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
-    
+    const existingRowId = String(existingRows[0]?.id || '').trim();
+    if(existingRowId){
+      try{
+        const refreshPayload = {
+          nickname: identity.displayName,
+          joined_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          team: getBattleRoomPlayerTeam(identity.playerId),
+          level: Number(player?.level || 1) || 1,
+          ping: Number(getBattlePingValue() || 0) || 0
+        };
+        await window.supabaseClient
+          .from('room_players')
+          .update(refreshPayload)
+          .eq('id', existingRowId)
+          .select('id')
+          .limit(1);
+      }catch(_){}
+    }
+
 try {
     renderBattleMessages && renderBattleMessages();
     renderLobbyMessages && renderLobbyMessages();
