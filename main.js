@@ -124,6 +124,7 @@ let observerCameraTarget = new THREE.Vector3();
 let observerFreeCameraPosition = new THREE.Vector3(0, 18, 48);
 let observerFollowTargetId = '';
 let observerCycleCursor = -1;
+let observerRoomResolveAt = 0;
 let battlePlanetVisualScale = 1;
 let battleShipCrash = null;
 let battlePendingRespawnAt = 0;
@@ -872,7 +873,14 @@ function refreshLobbyPingForCurrentPlayer(){
 
 
 function getSelfBattlePlayerId(){
-    return String(authState?.playerId || player?.id || '').trim();
+    const direct = String(authState?.playerId || player?.id || '').trim();
+    if(direct && direct !== 'local_player') return direct;
+    try{
+        const identity = getCurrentPlayerIdentity?.() || {};
+        const fallback = String(identity?.playerId || '').trim();
+        if(fallback) return fallback;
+    }catch(_){}
+    return direct && direct !== 'local_player' ? direct : '';
 }
 
 function getBattleRoomIdSafe(){
@@ -8021,10 +8029,54 @@ function buildObserveRoomState(targetMap = ''){
     };
 }
 
+
+async function resolveObservedRoomBinding(force = false){
+    if(gameState !== 'OBSERVE' && currentRoom?.observer !== true) return sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+
+    const now = Date.now();
+    if(!force && (now - Number(observerRoomResolveAt || 0)) < 1200){
+        return sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    }
+    observerRoomResolveAt = now;
+
+    try{
+        await loadRoomsFromSupabase();
+    }catch(_){}
+
+    const mapName = normalizeBattleMapName(currentRoom?.map || currentRoom?.real || selectedLobbyMap?.real || 'earth');
+    const nextRoomId = getObservedRoomId(mapName);
+    const prevRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+
+    if(nextRoomId && nextRoomId !== prevRoomId){
+        try{
+            if(remoteBattleShips instanceof Map){
+                Array.from(remoteBattleShips.keys()).forEach(entryId => removeRemoteBattleShipById(entryId));
+            }
+        }catch(_){}
+        try{ lastBattlePresenceSnapshot.clear(); }catch(_){}
+        try{ battlePresenceMissingCounts.clear(); }catch(_){}
+        try{ cachedRoomPlayersFetchedAt = 0; cachedRoomPlayersRows = []; }catch(_){}
+        currentRoom = {
+            ...(currentRoom || {}),
+            id: nextRoomId,
+            roomId: nextRoomId,
+            map: mapName,
+            real: mapName,
+            observer: true,
+            state: 'observe'
+        };
+        window.currentRoomId = nextRoomId;
+    }
+
+    return sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+}
+
 async function fetchCurrentRoomLivePlayers(){
     const now = Date.now();
     const requestSerial = Number(battleClientResetSerial || 0);
-    const requestRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    const requestRoomId = (gameState === 'OBSERVE' || currentRoom?.observer === true)
+        ? await resolveObservedRoomBinding()
+        : sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
     if((now - cachedRoomPlayersFetchedAt) < ROOM_PLAYER_FETCH_CACHE_MS && Array.isArray(cachedRoomPlayersRows)){
         return cachedRoomPlayersRows;
     }
@@ -8056,7 +8108,9 @@ async function fetchCurrentRoomLivePlayers(){
                 return [];
             }
 
-            const currentRoomIdNow = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+            const currentRoomIdNow = (gameState === 'OBSERVE' || currentRoom?.observer === true)
+                ? await resolveObservedRoomBinding(true)
+                : sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
             if(currentRoomIdNow !== roomId){
                 roomPlayersFetchInFlight = false;
                 return [];
