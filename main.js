@@ -15757,6 +15757,36 @@ async function ensureRoomPlayerRowJoined(roomId, identity){
 }
 
 
+async function waitForConfirmedRoom(roomId, maxWaitMs = 9000){
+  const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+  if(!normalizedRoomId || !window.supabaseClient) return false;
+
+  const delays = [0, 180, 420, 760, 1200, 1800, 2600, 3600];
+  const startedAt = Date.now();
+
+  for(const waitMs of delays){
+    if(waitMs > 0) await sleep(waitMs);
+    try{
+      const { data: roomProbe, error: roomProbeError } = await window.supabaseClient
+        .from('rooms')
+        .select('id')
+        .eq('id', normalizedRoomId)
+        .limit(1);
+
+      if(!roomProbeError && Array.isArray(roomProbe) && roomProbe.length > 0){
+        return true;
+      }
+    }catch(_){}
+
+    if((Date.now() - startedAt) >= maxWaitMs){
+      break;
+    }
+  }
+
+  return false;
+}
+
+
 function getRoomOccupantsFromPresence(roomId, presenceRows = []){
   if(!roomId) return [];
   return (presenceRows || [])
@@ -15900,6 +15930,12 @@ async function joinRoomPlayers(roomId) {
   const identity = getCurrentPlayerIdentity();
   if (!identity.playerId) {
     console.error('Ошибка входа в room_players: пустой playerId', identity);
+    return false;
+  }
+
+  const roomConfirmed = await waitForConfirmedRoom(normalizedRoomId, 9000);
+  if(!roomConfirmed){
+    console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
     return false;
   }
 
@@ -16413,6 +16449,7 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
     const existingRoom = existingRows[0];
+    await waitForConfirmedRoom(existingRoom.id, 9000);
     let joinedExisting = await joinRoomPlayers(existingRoom.id);
     if (!joinedExisting) {
       for(const retryDelay of [260, 520, 900, 1400]){
@@ -16446,6 +16483,11 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   if (error) {
     console.error('Ошибка создания комнаты:', error);
     return null;
+  }
+
+  const roomConfirmed = await waitForConfirmedRoom(data.id, 9000);
+  if(!roomConfirmed){
+    console.warn('createGameRoom: комната не подтвердилась в rooms вовремя', data?.id);
   }
 
   let joined = await joinRoomPlayers(data.id);
