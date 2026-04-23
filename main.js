@@ -898,6 +898,7 @@ function getBattleRoomPlayerTeam(entryId = ''){
 }
 
 const ROOM_PLAYER_STALE_MS = 12000;
+const ROOM_EMPTY_DELETE_GRACE_MS = 20000;
 
 function getRoomPlayerFreshCutoffIso(){
     return new Date(Date.now() - ROOM_PLAYER_STALE_MS).toISOString();
@@ -15902,27 +15903,6 @@ try {
 return true;
   }
 
-  let roomExists = false;
-  for(const waitMs of [0, 180, 420, 760, 1200, 1800, 2600]){
-    if(waitMs > 0) await sleep(waitMs);
-    try{
-      const { data: roomProbe, error: roomProbeError } = await window.supabaseClient
-        .from('rooms')
-        .select('id')
-        .eq('id', normalizedRoomId)
-        .limit(1);
-      if(!roomProbeError && Array.isArray(roomProbe) && roomProbe.length > 0){
-        roomExists = true;
-        break;
-      }
-    }catch(_){}
-  }
-
-  if(!roomExists){
-    console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
-    return false;
-  }
-
   const insertPayload = {
     id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
       ? globalThis.crypto.randomUUID()
@@ -15937,16 +15917,57 @@ return true;
     ping: Number(getBattlePingValue() || 0) || 0
   };
 
-  const { data: insertedRow, error } = await window.supabaseClient
-    .from('room_players')
-    .insert([insertPayload])
-    .select('id,room_id,player_id,nickname,joined_at');
+  let insertedRow = null;
+  let error = null;
+  for(const waitMs of [0, 180, 420, 760, 1200, 1800, 2600]){
+    if(waitMs > 0) await sleep(waitMs);
+
+    const result = await window.supabaseClient
+      .from('room_players')
+      .insert([insertPayload])
+      .select('id,room_id,player_id,nickname,joined_at');
+
+    insertedRow = result?.data || null;
+    error = result?.error || null;
+
+    const errorCode = String(error?.code || '').trim();
+    const errorMessage = String(error?.message || '').toLowerCase();
+
+    if(!error){
+      break;
+    }
+
+    if(errorCode === '23505' || errorCode === '409' || errorMessage.includes('duplicate')){
+      try{
+        await window.supabaseClient
+          .from('room_players')
+          .update({
+            nickname: identity.displayName,
+            joined_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            team: getBattleRoomPlayerTeam(identity.playerId),
+            level: Number(player?.level || 1) || 1,
+            ping: Number(getBattlePingValue() || 0) || 0
+          })
+          .eq('room_id', normalizedRoomId)
+          .eq('player_id', identity.playerId)
+          .select('id')
+          .limit(1);
+      }catch(_){}
+      error = null;
+      break;
+    }
+
+    if(errorCode === '23503'){
+      console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
+      continue;
+    }
+
+    break;
+  }
 
   if (error) {
     const errorCode = String(error?.code || '').trim();
-    if(errorCode === '23505' || errorCode === '409'){
-      return true;
-    }
     if(errorCode === '23503'){
       console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
       return false;
@@ -16237,7 +16258,15 @@ async function loadRoomsFromSupabase() {
     }catch(_){}
   }
 
-  const emptyRooms = allRooms.filter(room => room?.id && (!Array.isArray(room.room_players) || room.room_players.length <= 0));
+  const emptyRooms = allRooms.filter(room => {
+    if(!room?.id) return false;
+    if(Array.isArray(room.room_players) && room.room_players.length > 0) return false;
+    const createdAtMs = new Date(room?.created_at || 0).getTime();
+    if(Number.isFinite(createdAtMs) && (Date.now() - createdAtMs) < ROOM_EMPTY_DELETE_GRACE_MS){
+      return false;
+    }
+    return true;
+  });
   if (emptyRooms.length) {
     const emptyRoomIds = emptyRooms.map(room => room.id).filter(Boolean);
     const { error: emptyDeleteError } = await window.supabaseClient
