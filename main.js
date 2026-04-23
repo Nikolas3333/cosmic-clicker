@@ -829,11 +829,25 @@ function shouldAnnounceBattlePresenceEvent(kind = '', playerId = '', nickname = 
     if(!safeKind || !safePlayerId) return false;
     const key = `${safeKind}:${safePlayerId}:${safeNickname}`;
     const now = Date.now();
+    for(const [entryKey, entryUntil] of battlePresenceRecentEvents.entries()){
+        if(Number(entryUntil || 0) <= now){
+            battlePresenceRecentEvents.delete(entryKey);
+        }
+    }
     const until = Number(battlePresenceRecentEvents.get(key) || 0) || 0;
     if(until > now) return false;
-    battlePresenceRecentEvents.set(key, now + 4000);
+    battlePresenceRecentEvents.set(key, now + 2500);
     return true;
 }
+
+function clearBattlePresenceEventCooldown(kind = '', playerId = '', nickname = ''){
+    const safeKind = String(kind || '').trim();
+    const safePlayerId = String(playerId || '').trim();
+    const safeNickname = String(nickname || '').trim();
+    if(!safeKind || !safePlayerId) return;
+    battlePresenceRecentEvents.delete(`${safeKind}:${safePlayerId}:${safeNickname}`);
+}
+
 
 
 function isPlayerCurrentlyKnownInBattle(playerId = ''){
@@ -8271,6 +8285,7 @@ function announceBattlePresenceChanges(livePlayers = []){
             if(nextSnapshot.has(entryId)) return;
 
             const nickname = String((info && typeof info === 'object' ? info.nickname : info) || 'Pilot').trim() || 'Pilot';
+            clearBattlePresenceEventCooldown('join', entryId, nickname);
             if(!shouldAnnounceBattlePresenceEvent('leave', entryId, nickname)) return;
             pushKillFeed(`${nickname} покинул игру`, 'chat');
             battlePresenceMissingCounts.delete(entryId);
@@ -15634,7 +15649,10 @@ function getCurrentPlayerIdentity(){
     ? String(player.id)
     : '';
   const chatPlayerId = (typeof getValidChatPlayerId === 'function') ? String(getValidChatPlayerId() || '') : '';
-  const fallbackId = authPublicId || playerPublicId || chatPlayerId || '';
+  const guestKey = (typeof authState !== 'undefined' && authState?.mode === 'guest')
+    ? String(authState?.playerId || player?.id || chatPlayerId || '').trim()
+    : '';
+  const fallbackId = authPublicId || playerPublicId || guestKey || chatPlayerId || '';
   return {
     playerId: fallbackId,
     nickname: fallbackNickname,
