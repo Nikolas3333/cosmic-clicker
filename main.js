@@ -8263,10 +8263,6 @@ function announceBattlePresenceChanges(livePlayers = []){
             if(entryId === selfId) return;
             if(nextSnapshot.has(entryId)) return;
 
-            const misses = Number(battlePresenceMissingCounts.get(entryId) || 0) + 1;
-            battlePresenceMissingCounts.set(entryId, misses);
-            if(misses < 2) return;
-
             const nickname = String((info && typeof info === 'object' ? info.nickname : info) || 'Pilot').trim() || 'Pilot';
             if(!shouldAnnounceBattlePresenceEvent('leave', entryId, nickname)) return;
             pushKillFeed(`${nickname} покинул игру`, 'chat');
