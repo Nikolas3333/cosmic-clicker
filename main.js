@@ -122,6 +122,8 @@ let observerCameraPitch = -0.2;
 let observerCameraDistance = 34;
 let observerCameraTarget = new THREE.Vector3();
 let observerFreeCameraPosition = new THREE.Vector3(0, 18, 48);
+let observerFollowTargetId = '';
+let observerCycleCursor = -1;
 let battlePlanetVisualScale = 1;
 let battleShipCrash = null;
 let battlePendingRespawnAt = 0;
@@ -578,6 +580,11 @@ let mouseControl = false;
 document.addEventListener("keydown", (e) => {
 
     if(isBattleTyping()) return;
+    if((gameState === "OBSERVE" || battleObserverMode) && e.code === "Space"){
+        e.preventDefault();
+        cycleObserverTarget();
+        return;
+    }
     if (e.code === "KeyW") keys.w = true;
     if (e.code === "KeyA") keys.a = true;
     if (e.code === "KeyS") keys.s = true;
@@ -13188,18 +13195,69 @@ function createObserverBot(index=0){
     return botGroup;
 }
 
+
+function getObserverFollowCandidates(){
+    const items = [];
+    remoteBattleShips.forEach((entry, entryId) => {
+        const mesh = entry?.mesh;
+        if(!entryId || !mesh) return;
+        if(!mesh.parent) return;
+        items.push({
+            id: String(entryId),
+            mesh,
+            distance: mesh.position.distanceTo(observerFreeCameraPosition)
+        });
+    });
+    items.sort((a, b) => a.distance - b.distance);
+    return items;
+}
+
+function snapObserverCameraToTarget(targetEntry){
+    if(!targetEntry?.mesh) return;
+    const targetPos = targetEntry.mesh.position.clone();
+    observerCameraTarget.copy(targetPos);
+    const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(observerCameraPitch, observerCameraYaw, 0, 'YXZ')).normalize();
+    const desiredPos = targetPos.clone()
+        .add(new THREE.Vector3(0, 4.5, 0))
+        .add(forward.clone().multiplyScalar(-observerCameraDistance));
+    observerFreeCameraPosition.copy(desiredPos);
+    camera.position.copy(desiredPos);
+    camera.lookAt(targetPos);
+}
+
+function cycleObserverTarget(){
+    if(gameState !== "OBSERVE" && !battleObserverMode) return;
+    const candidates = getObserverFollowCandidates();
+    if(!candidates.length) return;
+
+    const currentIndex = candidates.findIndex(item => item.id === observerFollowTargetId);
+    const nextIndex = currentIndex >= 0
+        ? (currentIndex + 1) % candidates.length
+        : 0;
+
+    const selected = candidates[nextIndex];
+    observerFollowTargetId = selected.id;
+    observerCycleCursor = nextIndex;
+    snapObserverCameraToTarget(selected);
+}
+
 function setupObserverBattle(mapName){
     clearBattleScene();
     battleObserverMode = true;
     observerCameraYaw = 0;
     observerCameraPitch = 0;
     observerCameraDistance = 34;
+    observerFollowTargetId = '';
+    observerCycleCursor = -1;
     enterBattleMap(mapName);
     observerBots = [];
     observerFreeCameraPosition.set(0, 12, 38);
+    observerCameraTarget.set(0, 0, 0);
     camera.position.copy(observerFreeCameraPosition);
     const hud = document.getElementById('enemy-hud');
     if(hud) hud.style.display = 'none';
+    const observerName = String(player?.nickname || 'Commander').trim() || 'Commander';
+    pushKillFeed(`${observerName} наблюдает за игрой`, 'chat');
 }
 
 function updateObserverBattle(){
@@ -13215,12 +13273,31 @@ function updateObserverBattle(){
     if(keys.s) move.addScaledVector(forward, -1);
     if(keys.d) move.add(right);
     if(keys.a) move.addScaledVector(right, -1);
-    if(keys.space) move.add(up);
     if(keys.shift) move.addScaledVector(up, -1);
 
     if(move.lengthSq() > 0){
         move.normalize().multiplyScalar(flySpeed);
         observerFreeCameraPosition.add(move);
+        observerFollowTargetId = '';
+        observerCycleCursor = -1;
+    }
+
+    if(observerFollowTargetId){
+        const followed = remoteBattleShips.get(observerFollowTargetId);
+        const followedMesh = followed?.mesh;
+        if(followedMesh && followedMesh.parent){
+            const focus = followedMesh.position.clone();
+            observerCameraTarget.lerp(focus, 0.24);
+            const desiredPos = observerCameraTarget.clone()
+                .add(new THREE.Vector3(0, 4.5, 0))
+                .add(forward.clone().multiplyScalar(-observerCameraDistance));
+            observerFreeCameraPosition.lerp(desiredPos, 0.32);
+            camera.position.copy(observerFreeCameraPosition);
+            camera.lookAt(observerCameraTarget);
+            return;
+        }
+        observerFollowTargetId = '';
+        observerCycleCursor = -1;
     }
 
     camera.position.copy(observerFreeCameraPosition);
