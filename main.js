@@ -17717,3 +17717,253 @@ setInterval(() => {
     }
   }catch(_){ }
 }, 250);
+
+
+
+// ===== V339 PM CLOSED TABS + KILL DEDUPE FIX =====
+(function(){
+  const V339_KILL_DEDUPE_MS = 4500;
+  const V339_FEED_DEDUPE_MS = 2600;
+  const __v339KillSeen = new Map();
+  const __v339FeedSeen = new Map();
+
+  function __v339_now(){ return Date.now(); }
+  function __v339_trimMap(map, now){
+    try{
+      for(const [key, until] of map.entries()){
+        if(Number(until || 0) <= now - 500){ map.delete(key); }
+      }
+    }catch(_){ }
+  }
+  function __v339_getRoomKey(){
+    try{ return String(getBattleHitsRoomId?.() || getBattleRoomIdSafe?.() || currentRoom?.id || currentRoom?.roomId || '').trim(); }catch(_){ return ''; }
+  }
+  function __v339_getKillKey(payload = {}){
+    const room = __v339_getRoomKey();
+    const attacker = String(payload?.attackerId || '').trim();
+    const victim = String(payload?.victimId || '').trim();
+    if(!attacker || !victim) return '';
+    return `${room || 'room'}:${attacker}->${victim}`;
+  }
+
+  const __origHandleIncomingBattleKillV339 = typeof handleIncomingBattleKill === 'function' ? handleIncomingBattleKill : null;
+  if(__origHandleIncomingBattleKillV339){
+    handleIncomingBattleKill = function(payload = {}){
+      const key = __v339_getKillKey(payload);
+      const now = __v339_now();
+      __v339_trimMap(__v339KillSeen, now);
+      if(key){
+        const until = Number(__v339KillSeen.get(key) || 0) || 0;
+        if(until > now) return;
+        __v339KillSeen.set(key, now + V339_KILL_DEDUPE_MS);
+      }
+      return __origHandleIncomingBattleKillV339.apply(this, arguments);
+    };
+    try{ window.handleIncomingBattleKill = handleIncomingBattleKill; }catch(_){ }
+  }
+
+  const __origPushKillFeedV339 = typeof pushKillFeed === 'function' ? pushKillFeed : null;
+  if(__origPushKillFeedV339){
+    pushKillFeed = function(text, type = 'kill'){
+      const safeText = String(text || '').trim();
+      const safeType = String(type || 'kill').trim();
+      const now = __v339_now();
+      __v339_trimMap(__v339FeedSeen, now);
+      if(safeType === 'kill' && safeText){
+        const key = `${safeType}:${safeText}`;
+        const until = Number(__v339FeedSeen.get(key) || 0) || 0;
+        if(until > now) return;
+        __v339FeedSeen.set(key, now + V339_FEED_DEDUPE_MS);
+      }
+      return __origPushKillFeedV339.apply(this, arguments);
+    };
+    try{ window.pushKillFeed = pushKillFeed; }catch(_){ }
+  }
+})();
+
+(function(){
+  const V339_CLOSED_KEY = (typeof COSMIC_CLOSED_PM_TABS_KEY_V338 !== 'undefined') ? COSMIC_CLOSED_PM_TABS_KEY_V338 : 'cosmicClosedPmTabs:v338';
+  const V339_PM_CACHE_KEYS = ['cosmicPmCache:v294','cosmicPmCache:v295','cosmicPmCache:v296'];
+
+  function __v339_getClosedSet(){
+    try{
+      const raw = localStorage.getItem(V339_CLOSED_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(list) ? list.map(id => String(id || '').trim()).filter(Boolean) : []);
+    }catch(_){ return new Set(); }
+  }
+
+  function __v339_saveClosedSet(set){
+    try{ localStorage.setItem(V339_CLOSED_KEY, JSON.stringify(Array.from(set || []))); }catch(_){ }
+  }
+
+  function __v339_isClosed(peerId){
+    const key = String(peerId || '').trim();
+    return !!(key && __v339_getClosedSet().has(key));
+  }
+
+  function __v339_safeParse(raw){
+    try{ return raw ? JSON.parse(raw) : null; }catch(_){ return null; }
+  }
+
+  function __v339_cleanCacheObject(state, closedSet){
+    if(!state || typeof state !== 'object') return state;
+    const removePeer = (obj) => {
+      if(!obj || typeof obj !== 'object') return;
+      closedSet.forEach(id => { try{ delete obj[id]; }catch(_){} });
+    };
+    removePeer(state.tabs);
+    removePeer(state.privateTabs);
+    removePeer(state.messages);
+    removePeer(state.unread);
+    if(state.currentChat && String(state.currentChat).startsWith('pm:')){
+      const peer = String(state.currentChat).slice(3).trim();
+      if(closedSet.has(peer)) state.currentChat = 'global';
+    }
+    return state;
+  }
+
+  function __v339_purgeClosedPmCaches(peerId = ''){
+    try{
+      const closedSet = __v339_getClosedSet();
+      const single = String(peerId || '').trim();
+      if(single) closedSet.add(single);
+      __v339_saveClosedSet(closedSet);
+
+      if(typeof privateChatTabs === 'object') closedSet.forEach(id => { delete privateChatTabs[id]; });
+      if(chatCache?.pm) closedSet.forEach(id => { delete chatCache.pm[id]; });
+      if(chatUnread?.pm) closedSet.forEach(id => { delete chatUnread.pm[id]; });
+      try{ closedSet.forEach(id => onlinePmPeers?.delete?.(id)); }catch(_){ }
+      try{ closedSet.forEach(id => inGamePmPeers?.delete?.(id)); }catch(_){ }
+      try{ closedSet.forEach(id => pmPeerRoomIds?.delete?.(id)); }catch(_){ }
+      if(String(currentChat || '').startsWith('pm:')){
+        const peer = String(currentChat).slice(3).trim();
+        if(closedSet.has(peer)) currentChat = 'global';
+      }
+
+      const uiKey = (typeof CHAT_UI_STATE_KEY !== 'undefined') ? CHAT_UI_STATE_KEY : 'cosmicChatUiState:v27';
+      const uiState = __v339_cleanCacheObject(__v339_safeParse(localStorage.getItem(uiKey)), closedSet);
+      if(uiState) localStorage.setItem(uiKey, JSON.stringify(uiState));
+
+      V339_PM_CACHE_KEYS.forEach(storageKey => {
+        const state = __v339_cleanCacheObject(__v339_safeParse(localStorage.getItem(storageKey)), closedSet);
+        if(state) localStorage.setItem(storageKey, JSON.stringify(state));
+      });
+    }catch(_){ }
+  }
+
+  function __v339_cleanRuntimeClosed(){
+    try{ __v339_purgeClosedPmCaches(''); }catch(_){ }
+  }
+
+  const __origMarkClosedV339 = typeof markPmTabClosedV338 === 'function' ? markPmTabClosedV338 : null;
+  markPmTabClosedV338 = function(peerId){
+    if(__origMarkClosedV339) __origMarkClosedV339.apply(this, arguments);
+    __v339_purgeClosedPmCaches(peerId);
+  };
+  try{ window.markPmTabClosedV338 = markPmTabClosedV338; }catch(_){ }
+
+  const __origUnmarkClosedV339 = typeof unmarkPmTabClosedV338 === 'function' ? unmarkPmTabClosedV338 : null;
+  unmarkPmTabClosedV338 = function(peerId){
+    const key = String(peerId || '').trim();
+    if(__origUnmarkClosedV339) __origUnmarkClosedV339.apply(this, arguments);
+    if(!key) return;
+    try{
+      const closed = __v339_getClosedSet();
+      if(closed.delete(key)) __v339_saveClosedSet(closed);
+    }catch(_){ }
+  };
+  try{ window.unmarkPmTabClosedV338 = unmarkPmTabClosedV338; }catch(_){ }
+
+  isPmTabClosedV338 = function(peerId){ return __v339_isClosed(peerId); };
+  try{ window.isPmTabClosedV338 = isPmTabClosedV338; }catch(_){ }
+
+  const __origEnsurePmTabV339 = typeof ensurePmTab === 'function' ? ensurePmTab : null;
+  if(__origEnsurePmTabV339){
+    ensurePmTab = function(peerId, label = null){
+      const key = String(peerId || '').trim();
+      if(key && __v339_isClosed(key) && !window.__v339AllowClosedPmReopen){
+        __v339_purgeClosedPmCaches(key);
+        try{ renderChatTabs?.(); }catch(_){ }
+        return;
+      }
+      return __origEnsurePmTabV339.apply(this, arguments);
+    };
+    try{ window.ensurePmTab = ensurePmTab; }catch(_){ }
+  }
+
+  const __origOpenPrivateChatV339 = typeof openPrivateChat === 'function' ? openPrivateChat : null;
+  if(__origOpenPrivateChatV339){
+    openPrivateChat = function(peerId, label = null){
+      const key = String(peerId || '').trim();
+      if(key) unmarkPmTabClosedV338(key);
+      window.__v339AllowClosedPmReopen = true;
+      try{ return __origOpenPrivateChatV339.apply(this, arguments); }
+      finally{ window.__v339AllowClosedPmReopen = false; }
+    };
+    try{ window.openPrivateChat = openPrivateChat; }catch(_){ }
+  }
+
+  const __origLoadChatHistoryV339 = typeof loadChatHistory === 'function' ? loadChatHistory : null;
+  if(__origLoadChatHistoryV339){
+    loadChatHistory = async function(scopeName = currentChat, ...rest){
+      const scopeText = String(scopeName || '').trim();
+      if(scopeText.startsWith('pm:')){
+        const peer = scopeText.slice(3).trim();
+        if(peer && __v339_isClosed(peer) && !window.__v339AllowClosedPmReopen){
+          __v339_purgeClosedPmCaches(peer);
+          try{ renderChatTabs?.(); if(currentChat === 'global') renderLobbyMessages?.(); }catch(_){ }
+          return;
+        }
+      }
+      const result = await __origLoadChatHistoryV339.call(this, scopeName, ...rest);
+      __v339_cleanRuntimeClosed();
+      return result;
+    };
+    try{ window.loadChatHistory = loadChatHistory; }catch(_){ }
+  }
+
+  function __v339_wrapRestore(original){
+    if(typeof original !== 'function') return null;
+    return function(){
+      const result = original.apply(this, arguments);
+      __v339_cleanRuntimeClosed();
+      return result;
+    };
+  }
+
+  try{ if(typeof restoreChatUiState === 'function') restoreChatUiState = __v339_wrapRestore(restoreChatUiState); }catch(_){ }
+  try{ if(typeof __v294_restorePmCache === 'function') __v294_restorePmCache = __v339_wrapRestore(__v294_restorePmCache); }catch(_){ }
+  try{ if(typeof __v295_restorePmCache === 'function') __v295_restorePmCache = __v339_wrapRestore(__v295_restorePmCache); }catch(_){ }
+  try{ if(typeof __v296_restorePmCache === 'function') __v296_restorePmCache = __v339_wrapRestore(__v296_restorePmCache); }catch(_){ }
+
+  const __origHandleRealtimeV339 = typeof handleIncomingRealtimeMessage === 'function' ? handleIncomingRealtimeMessage : null;
+  if(__origHandleRealtimeV339){
+    handleIncomingRealtimeMessage = async function(msg){
+      if(msg?.channel === 'pm'){
+        const peerId = getPeerIdFromPmMessage?.(msg);
+        if(peerId && __v339_isClosed(peerId)){
+          __v339_purgeClosedPmCaches(peerId);
+          return;
+        }
+      }
+      return __origHandleRealtimeV339.apply(this, arguments);
+    };
+    try{ window.handleIncomingRealtimeMessage = handleIncomingRealtimeMessage; }catch(_){ }
+  }
+
+  window.addEventListener('storage', (event) => {
+    if(event?.key === V339_CLOSED_KEY) __v339_cleanRuntimeClosed();
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(__v339_cleanRuntimeClosed, 0);
+    setTimeout(() => { __v339_cleanRuntimeClosed(); try{ renderChatTabs?.(); renderLobbyMessages?.(); }catch(_){ } }, 350);
+    setTimeout(() => { __v339_cleanRuntimeClosed(); try{ renderChatTabs?.(); renderLobbyMessages?.(); }catch(_){ } }, 1200);
+    setTimeout(() => { __v339_cleanRuntimeClosed(); try{ renderChatTabs?.(); renderLobbyMessages?.(); }catch(_){ } }, 2500);
+  });
+
+  setInterval(() => {
+    try{ __v339_cleanRuntimeClosed(); renderChatTabs?.(); }catch(_){ }
+  }, 1800);
+})();
