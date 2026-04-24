@@ -6242,7 +6242,8 @@ async function loadChatHistory(scopeName = currentChat) {
             const sample = list[list.length - 1];
             ensurePmTab(peerId, getPeerLabelFromPmMessage(sample, peerId));
             setPrivateTabPreview(peerId, getLastMessagePreview(scopeName));
-            deletePmHistoryWithPeer(peerId);
+            // v342: PM history is preserved after reading; closed tabs are the only way to hide a conversation.
+            // deletePmHistoryWithPeer(peerId);
         }
     }
 
@@ -18111,4 +18112,94 @@ setInterval(() => {
     };
     try{ window.handleIncomingRealtimeMessage = handleIncomingRealtimeMessage; }catch(_){ }
   }
+})();
+
+
+// ===== V342 PM READ/PERSISTENCE FIX =====
+(function(){
+  function __v342_isPmScope(scopeName){
+    return String(scopeName || '').trim().startsWith('pm:');
+  }
+
+  function __v342_clearPmUnread(scopeName){
+    const scope = String(scopeName || currentChat || '').trim();
+    if(!__v342_isPmScope(scope)) return;
+    try{ setUnreadCount?.(scope, 0); }catch(_){
+      try{
+        const peerId = scope.slice(3).trim();
+        if(peerId && chatUnread?.pm) chatUnread.pm[peerId] = 0;
+      }catch(__){}
+    }
+    try{ __updateHangarPmNeon?.(); }catch(_){ }
+    try{ __v294_savePmCache?.(); }catch(_){ }
+    try{ __v295_savePmCache?.(); }catch(_){ }
+    try{ __v296_savePmCache?.(); }catch(_){ }
+  }
+
+  const __origClearUnreadForCurrentScopeV342 = typeof clearUnreadForCurrentScope === 'function' ? clearUnreadForCurrentScope : null;
+  if(__origClearUnreadForCurrentScopeV342){
+    clearUnreadForCurrentScope = function(){
+      const result = __origClearUnreadForCurrentScopeV342.apply(this, arguments);
+      __v342_clearPmUnread(currentChat);
+      try{ saveChatUiState?.(); }catch(_){ }
+      return result;
+    };
+    try{ window.clearUnreadForCurrentScope = clearUnreadForCurrentScope; }catch(_){ }
+  }
+
+  const __origLoadChatHistoryV342 = typeof loadChatHistory === 'function' ? loadChatHistory : null;
+  if(__origLoadChatHistoryV342){
+    loadChatHistory = async function(scopeName = currentChat, ...rest){
+      const result = await __origLoadChatHistoryV342.call(this, scopeName, ...rest);
+      if(String(scopeName || currentChat || '').trim() === String(currentChat || '').trim()){
+        __v342_clearPmUnread(scopeName);
+      }
+      if(__v342_isPmScope(scopeName)){
+        try{ saveChatUiState?.(); }catch(_){ }
+      }
+      return result;
+    };
+    try{ window.loadChatHistory = loadChatHistory; }catch(_){ }
+  }
+
+  const __origRenderChatTabsV342 = typeof renderChatTabs === 'function' ? renderChatTabs : null;
+  if(__origRenderChatTabsV342){
+    renderChatTabs = function(){
+      if(__v342_isPmScope(currentChat)) __v342_clearPmUnread(currentChat);
+      return __origRenderChatTabsV342.apply(this, arguments);
+    };
+    try{ window.renderChatTabs = renderChatTabs; }catch(_){ }
+  }
+
+  const __origHandleIncomingRealtimeMessageV342 = typeof handleIncomingRealtimeMessage === 'function' ? handleIncomingRealtimeMessage : null;
+  if(__origHandleIncomingRealtimeMessageV342){
+    handleIncomingRealtimeMessage = async function(msg){
+      const result = await __origHandleIncomingRealtimeMessageV342.apply(this, arguments);
+      try{
+        if(msg?.channel === 'pm'){
+          const peerId = getPeerIdFromPmMessage?.(msg);
+          const scope = peerId ? getPrivateScopeKey(peerId) : '';
+          if(scope && String(currentChat || '') === String(scope)){
+            __v342_clearPmUnread(scope);
+            renderChatTabs?.();
+          }
+          try{ __v294_savePmCache?.(); }catch(_){ }
+          try{ __v295_savePmCache?.(); }catch(_){ }
+          try{ __v296_savePmCache?.(); }catch(_){ }
+        }
+      }catch(_){ }
+      return result;
+    };
+    try{ window.handleIncomingRealtimeMessage = handleIncomingRealtimeMessage; }catch(_){ }
+  }
+
+  // PM messages must remain available after refresh/re-login until the user closes the tab.
+  deletePmHistoryWithPeer = async function(){ return; };
+  deleteAllOwnPmHistory = async function(){ return; };
+  try{ window.deletePmHistoryWithPeer = deletePmHistoryWithPeer; window.deleteAllOwnPmHistory = deleteAllOwnPmHistory; }catch(_){ }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => { try{ if(__v342_isPmScope(currentChat)){ __v342_clearPmUnread(currentChat); renderChatTabs?.(); } }catch(_){ } }, 250);
+    setTimeout(() => { try{ if(__v342_isPmScope(currentChat)){ __v342_clearPmUnread(currentChat); renderChatTabs?.(); } }catch(_){ } }, 1200);
+  });
 })();
