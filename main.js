@@ -961,6 +961,42 @@ function getThrottledPresencePing(now = Date.now()){
 }
 
 
+function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
+    const nowIso = base.updated_at || new Date().toISOString();
+    return {
+        id: base.id || ((globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+            ? globalThis.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+        room_id: roomId,
+        player_id: playerId,
+        nickname: base.nickname || player?.nickname || 'Commander',
+        joined_at: base.joined_at || nowIso,
+        updated_at: nowIso,
+        team: base.team || getBattleRoomPlayerTeam(playerId),
+        level: Number(base.level || player?.level || 1) || 1,
+        ping: Number(base.ping || 0) || 0,
+        ...(base.position ? { position: base.position } : {}),
+        ...(base.rotation ? { rotation: base.rotation } : {})
+    };
+}
+
+async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}, selectColumns = 'id'){
+    const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+    const safePlayerId = String(playerId || '').trim();
+    if(!normalizedRoomId || !safePlayerId || !window.supabaseClient) return { data:null, error:null, ok:false };
+    const payload = buildRoomPlayerRowPayload(normalizedRoomId, safePlayerId, base);
+    try{
+        const result = await window.supabaseClient
+            .from('room_players')
+            .upsert(payload, { onConflict: 'room_id,player_id' })
+            .select(selectColumns)
+            .limit(1);
+        return { data: result?.data || null, error: result?.error || null, ok: !result?.error, payload };
+    }catch(error){
+        return { data:null, error, ok:false, payload };
+    }
+}
+
 function getJoinedLobbyRoomId(){
     const currentId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
     if(currentId){
@@ -991,42 +1027,15 @@ async function touchJoinedLobbyRoomPresence(force = false){
 
     lobbyRoomPresenceInFlight = true;
     try{
-        const heartbeatPayload = {
+        const stamp = new Date(now).toISOString();
+        await upsertRoomPlayerRowSafe(roomId, playerId, {
             nickname: identity?.displayName || player?.nickname || 'Commander',
-            updated_at: new Date(now).toISOString(),
+            joined_at: stamp,
+            updated_at: stamp,
             team: getBattleRoomPlayerTeam(playerId),
             level: Number(player?.level || 1) || 1,
             ping: Number(getBattlePingValue() || 0) || 0
-        };
-
-        const { data: updatedRows, error: updateError } = await window.supabaseClient
-            .from('room_players')
-            .update(heartbeatPayload)
-            .eq('room_id', roomId)
-            .eq('player_id', playerId)
-            .select('id')
-            .limit(1);
-
-        const noUpdatedRows = !Array.isArray(updatedRows) || updatedRows.length <= 0;
-        if(updateError || noUpdatedRows){
-            const insertPayload = {
-                id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-                    ? globalThis.crypto.randomUUID()
-                    : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                room_id: roomId,
-                player_id: playerId,
-                nickname: heartbeatPayload.nickname,
-                joined_at: heartbeatPayload.updated_at,
-                updated_at: heartbeatPayload.updated_at,
-                team: heartbeatPayload.team,
-                level: heartbeatPayload.level,
-                ping: heartbeatPayload.ping
-            };
-
-            await window.supabaseClient
-                .from('room_players')
-                .insert([insertPayload]);
-        }
+        }, 'id');
 
         lastLobbyRoomPresenceAt = now;
         try{
@@ -1146,12 +1155,9 @@ function ensureSelfRoomPlayerState(){
 
             const noUpdatedRows = !Array.isArray(updatedRows) || updatedRows.length <= 0;
             if(updateError || noUpdatedRows){
-                const insertPayload = {
-                    id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-                        ? globalThis.crypto.randomUUID()
-                        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                    room_id: roomId,
-                    player_id: playerId,
+                if(!isStillSameBattleSession()) return;
+
+                const { data: insertedRows, error: insertError } = await upsertRoomPlayerRowSafe(roomId, playerId, {
                     nickname: payload.nickname,
                     joined_at: payload.updated_at,
                     updated_at: payload.updated_at,
@@ -1160,15 +1166,7 @@ function ensureSelfRoomPlayerState(){
                     ping: payload.ping,
                     position: payload.position,
                     rotation: payload.rotation
-                };
-
-                if(!isStillSameBattleSession()) return;
-
-                const { data: insertedRows, error: insertError } = await window.supabaseClient
-                    .from('room_players')
-                    .insert([insertPayload])
-                    .select('id')
-                    .limit(1);
+                }, 'id');
 
                 if(!isStillSameBattleSession()) return;
                 if(insertError){
@@ -15939,114 +15937,48 @@ async function joinRoomPlayers(roomId) {
     return false;
   }
 
-  const alreadyJoined = await ensureRoomPlayerRowJoined(normalizedRoomId, identity);
-  if (alreadyJoined) {
-
-try {
-    renderBattleMessages && renderBattleMessages();
-    renderLobbyMessages && renderLobbyMessages();
-    renderChatTabs && renderChatTabs();
-} catch(e){}
-
-return true;
-  }
-
-  const insertPayload = {
-    id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-      ? globalThis.crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    room_id: normalizedRoomId,
-    player_id: identity.playerId,
+  const stamp = new Date().toISOString();
+  const { data: joinedRows, error } = await upsertRoomPlayerRowSafe(normalizedRoomId, identity.playerId, {
     nickname: identity.displayName,
-    joined_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    joined_at: stamp,
+    updated_at: stamp,
     team: getBattleRoomPlayerTeam(identity.playerId),
     level: Number(player?.level || 1) || 1,
     ping: Number(getBattlePingValue() || 0) || 0
-  };
+  }, 'id,room_id,player_id,nickname,joined_at');
 
-  let insertedRow = null;
-  let error = null;
-  for(const waitMs of [0, 180, 420, 760, 1200, 1800, 2600]){
-    if(waitMs > 0) await sleep(waitMs);
-
-    const result = await window.supabaseClient
-      .from('room_players')
-      .insert([insertPayload])
-      .select('id,room_id,player_id,nickname,joined_at');
-
-    insertedRow = result?.data || null;
-    error = result?.error || null;
-
+  if(error){
     const errorCode = String(error?.code || '').trim();
-    const errorMessage = String(error?.message || '').toLowerCase();
-
-    if(!error){
-      break;
-    }
-
-    if(errorCode === '23505' || errorCode === '409' || errorMessage.includes('duplicate')){
-      try{
-        await window.supabaseClient
-          .from('room_players')
-          .update({
-            nickname: identity.displayName,
-            joined_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            team: getBattleRoomPlayerTeam(identity.playerId),
-            level: Number(player?.level || 1) || 1,
-            ping: Number(getBattlePingValue() || 0) || 0
-          })
-          .eq('room_id', normalizedRoomId)
-          .eq('player_id', identity.playerId)
-          .select('id')
-          .limit(1);
-      }catch(_){}
-      error = null;
-      break;
-    }
-
     if(errorCode === '23503'){
       console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
-      continue;
-    }
-
-    break;
-  }
-
-  if (error) {
-    const joinedAfterConflict = await ensureRoomPlayerRowJoined(normalizedRoomId, identity);
-    if(joinedAfterConflict){
-      try {
-          renderBattleMessages && renderBattleMessages();
-          renderLobbyMessages && renderLobbyMessages();
-          renderChatTabs && renderChatTabs();
-      } catch(e){}
-      return true;
-    }
-
-    const errorCode = String(error?.code || '').trim();
-    console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId, error);
-    if(errorCode === '23503'){
       return false;
     }
-    console.error('Ошибка входа в room_players:', error, insertPayload);
-    return false;
+
+    const joinedAfterConflict = await ensureRoomPlayerRowJoined(normalizedRoomId, identity);
+    if(!joinedAfterConflict){
+      console.error('Ошибка входа в room_players:', error);
+      return false;
+    }
   }
 
+  try{
+    if(Array.isArray(joinedRows) && joinedRows[0]?.id){
+      selfRoomPlayerRowId = String(joinedRows[0].id);
+    }
+  }catch(_){}
 
   await loadRoomsFromSupabase();
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
   }
-  
-try {
+
+  try {
     renderBattleMessages && renderBattleMessages();
     renderLobbyMessages && renderLobbyMessages();
     renderChatTabs && renderChatTabs();
-} catch(e){}
+  } catch(e){}
 
-return true;
+  return true;
 }
 
 async function leaveRoomPlayers(roomId) {
