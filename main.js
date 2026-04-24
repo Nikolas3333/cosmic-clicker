@@ -18204,68 +18204,300 @@ setInterval(() => {
   });
 })();
 
-// ===== V343 PM DURABLE SESSION CACHE FIX =====
+
+// ===== V344 PM OPEN TAB PERSISTENCE FIX =====
 (function(){
-  const V343_CACHE_KEY = 'cosmicPmCache:v343';
-  const V343_BACKUP_KEY = 'cosmicPmCache:v343:lastNonEmpty';
-  const V343_LEGACY_KEYS = ['cosmicPmCache:v296','cosmicPmCache:v295','cosmicPmCache:v294'];
+  const V344_BASE_KEY = 'cosmicPmOpenState:v344';
+  const LEGACY_KEYS = ['cosmicPmCache:v343','cosmicPmCache:v343:lastNonEmpty','cosmicPmCache:v342','cosmicPmCache:v296','cosmicPmCache:v295','cosmicPmCache:v294'];
+
+  function ownId(){
+    try{ return String(getOwnPublicChatId?.() || authState?.playerId || '').trim(); }catch(_){ return ''; }
+  }
+
+  function key(){
+    const id = ownId();
+    return id ? `${V344_BASE_KEY}:${id}` : V344_BASE_KEY;
+  }
+
   function parse(raw){ try{ return raw ? JSON.parse(raw) : null; }catch(_){ return null; } }
-  function ownId(){ try{ return String(getOwnPublicChatId?.() || authState?.playerId || player?.public_id || '').trim(); }catch(_){ return ''; } }
-  function closedSet(){ try{ const raw = localStorage.getItem((typeof COSMIC_CLOSED_PM_TABS_KEY_V338 !== 'undefined') ? COSMIC_CLOSED_PM_TABS_KEY_V338 : 'cosmicClosedPmTabs:v338'); const arr = raw ? JSON.parse(raw) : []; return new Set(Array.isArray(arr) ? arr.map(x => String(x || '').trim()).filter(Boolean) : []); }catch(_){ return new Set(); } }
-  function isClosed(id){ const key = String(id || '').trim(); return !!(key && closedSet().has(key)); }
-  function isSelf(id){ const own = ownId(); const key = String(id || '').trim(); return !!(own && key && own === key); }
-  function hasData(st){ try{ return Object.keys(st?.tabs || st?.privateTabs || {}).length > 0 || Object.values(st?.messages || {}).some(v => Array.isArray(v) && v.length); }catch(_){ return false; } }
-  function clean(st){
-    const out = { tabs:{}, messages:{}, unread:{}, currentChat:String(st?.currentChat || currentChat || 'global'), savedAt:Number(st?.savedAt || Date.now()) || Date.now() };
-    const tabs = (st?.tabs && typeof st.tabs === 'object') ? st.tabs : ((st?.privateTabs && typeof st.privateTabs === 'object') ? st.privateTabs : {});
-    const messages = (st?.messages && typeof st.messages === 'object') ? st.messages : {};
-    const unread = (st?.unread && typeof st.unread === 'object') ? st.unread : {};
-    const keys = new Set([...Object.keys(tabs), ...Object.keys(messages), ...Object.keys(unread)]);
-    keys.forEach(raw => {
-      const id = String(raw || '').trim();
-      if(!id || isClosed(id) || isSelf(id)) return;
-      const list = Array.isArray(messages[id]) ? messages[id].filter(Boolean).slice(-80) : [];
-      const meta = tabs[id] || {};
-      if(!tabs[id] && !list.length) return;
-      out.tabs[id] = { label:String(meta?.label || `ID ${id}`), updatedAt:Number(meta?.updatedAt || Date.now()) || Date.now(), pinned:!!meta?.pinned, preview:String(meta?.preview || (list[list.length-1]?.text || list[list.length-1]?.message || '')) };
-      out.messages[id] = list;
-      out.unread[id] = Math.max(0, Number(unread[id] || 0) || 0);
-    });
-    if(String(out.currentChat).startsWith('pm:')){ const peer = String(out.currentChat).slice(3).trim(); if(!out.tabs[peer]) out.currentChat = 'global'; }
+  function isNumericPeer(peerId){ return /^\d+$/.test(String(peerId || '').trim()); }
+  function isSelf(peerId){ const me = ownId(); const p = String(peerId || '').trim(); return !!(me && p && me === p); }
+
+  function getClosedSet(){
+    try{
+      const storageKey = (typeof COSMIC_CLOSED_PM_TABS_KEY_V338 !== 'undefined') ? COSMIC_CLOSED_PM_TABS_KEY_V338 : 'cosmicClosedPmTabs:v338';
+      const arr = parse(localStorage.getItem(storageKey)) || [];
+      return new Set(Array.isArray(arr) ? arr.map(v => String(v || '').trim()).filter(Boolean) : []);
+    }catch(_){ return new Set(); }
+  }
+
+  function removeClosedMarker(peerId){
+    const p = String(peerId || '').trim();
+    if(!p) return;
+    try{ unmarkPmTabClosedV338?.(p); }catch(_){
+      try{
+        const storageKey = (typeof COSMIC_CLOSED_PM_TABS_KEY_V338 !== 'undefined') ? COSMIC_CLOSED_PM_TABS_KEY_V338 : 'cosmicClosedPmTabs:v338';
+        const arr = parse(localStorage.getItem(storageKey)) || [];
+        const next = (Array.isArray(arr) ? arr : []).map(v => String(v || '').trim()).filter(v => v && v !== p);
+        localStorage.setItem(storageKey, JSON.stringify(next));
+      }catch(__){}
+    }
+  }
+
+  function messagePeer(msg){
+    try{
+      const me = ownId();
+      const sender = String(msg?.player_public_id || '').trim();
+      const rec = String(msg?.recipient_public_id || '').trim();
+      if(sender && sender === me) return rec;
+      if(rec && rec === me) return sender;
+    }catch(_){ }
+    return '';
+  }
+
+  function normalizeState(rawState){
+    const closed = getClosedSet();
+    const state = rawState && typeof rawState === 'object' ? rawState : {};
+    const rawTabs = state.tabs && typeof state.tabs === 'object' ? state.tabs : (state.privateTabs && typeof state.privateTabs === 'object' ? state.privateTabs : {});
+    const rawMessages = state.messages && typeof state.messages === 'object' ? state.messages : {};
+    const rawUnread = state.unread && typeof state.unread === 'object' ? state.unread : {};
+    const out = { tabs:{}, messages:{}, unread:{}, currentChat: String(state.currentChat || 'global'), savedAt: Number(state.savedAt || Date.now()) || Date.now() };
+    const allPeers = new Set([...Object.keys(rawTabs), ...Object.keys(rawMessages), ...Object.keys(rawUnread)]);
+    for(const rawPeer of allPeers){
+      const peer = String(rawPeer || '').trim();
+      if(!peer || !isNumericPeer(peer) || isSelf(peer) || closed.has(peer)) continue;
+      const meta = rawTabs[peer] || {};
+      const list = Array.isArray(rawMessages[peer]) ? rawMessages[peer].filter(Boolean).slice(-80) : [];
+      if(!rawTabs[peer] && !list.length) continue;
+      out.tabs[peer] = {
+        label: String(meta?.label || `ID ${peer}`),
+        updatedAt: Number(meta?.updatedAt || Date.now()) || Date.now(),
+        pinned: !!meta?.pinned,
+        preview: String(meta?.preview || (list[list.length - 1]?.message || list[list.length - 1]?.text || ''))
+      };
+      out.messages[peer] = list;
+      out.unread[peer] = Math.max(0, Number(rawUnread[peer] || 0) || 0);
+    }
+    if(String(out.currentChat || '').startsWith('pm:')){
+      const peer = String(out.currentChat).slice(3).trim();
+      if(!out.tabs[peer]) out.currentChat = 'global';
+    }
     return out;
   }
-  function collect(){
-    const st = { tabs:{}, messages:{}, unread:{}, currentChat: currentChat || 'global', savedAt: Date.now() };
-    try{ Object.entries(privateChatTabs || {}).forEach(([id, meta]) => { const key = String(id || '').trim(); if(!key || isClosed(key) || isSelf(key)) return; const list = Array.isArray(chatCache?.pm?.[key]) ? chatCache.pm[key].filter(Boolean).slice(-80) : []; st.tabs[key] = { label:String(meta?.label || `ID ${key}`), updatedAt:Number(meta?.updatedAt || Date.now()) || Date.now(), pinned:!!meta?.pinned, preview:String(meta?.preview || (list[list.length-1]?.text || list[list.length-1]?.message || '')) }; st.messages[key] = list; st.unread[key] = Math.max(0, Number(chatUnread?.pm?.[key] || 0) || 0); }); }catch(_){ }
-    return clean(st);
+
+  function collectState(){
+    const out = { tabs:{}, messages:{}, unread:{}, currentChat: String(currentChat || 'global'), savedAt: Date.now() };
+    try{
+      Object.entries(privateChatTabs || {}).forEach(([peer, meta]) => {
+        const p = String(peer || '').trim();
+        if(!p || !isNumericPeer(p) || isSelf(p)) return;
+        removeClosedMarker(p);
+        const list = Array.isArray(chatCache?.pm?.[p]) ? chatCache.pm[p].filter(Boolean).slice(-80) : [];
+        out.tabs[p] = {
+          label: String(meta?.label || `ID ${p}`),
+          updatedAt: Number(meta?.updatedAt || Date.now()) || Date.now(),
+          pinned: !!meta?.pinned,
+          preview: String(meta?.preview || (list[list.length - 1]?.message || list[list.length - 1]?.text || ''))
+        };
+        out.messages[p] = list;
+        out.unread[p] = Math.max(0, Number(chatUnread?.pm?.[p] || 0) || 0);
+      });
+    }catch(_){ }
+    return normalizeState(out);
   }
-  function bestStored(){
-    for(const key of [V343_CACHE_KEY, V343_BACKUP_KEY, ...V343_LEGACY_KEYS]){ try{ const st = clean(parse(localStorage.getItem(key))); if(hasData(st)) return st; }catch(_){ } }
-    return null;
+
+  function hasOpenTabs(state){
+    return !!(state && state.tabs && Object.keys(state.tabs).length);
   }
-  function save(forceEmpty = false){
-    try{ const st = collect(); if(!forceEmpty && !hasData(st) && hasData(bestStored())) return; localStorage.setItem(V343_CACHE_KEY, JSON.stringify(st)); if(hasData(st)) localStorage.setItem(V343_BACKUP_KEY, JSON.stringify(st)); }catch(_){ }
+
+  function loadStored(){
+    const keys = [key(), V344_BASE_KEY, ...LEGACY_KEYS];
+    for(const k of keys){
+      try{
+        const st = normalizeState(parse(localStorage.getItem(k)));
+        if(hasOpenTabs(st)) return st;
+      }catch(_){ }
+    }
+    return normalizeState(null);
   }
-  function restore(){
-    try{ const st = bestStored(); if(!st) return false; Object.entries(st.tabs || {}).forEach(([id, meta]) => { const key = String(id || '').trim(); if(!key || isClosed(key) || isSelf(key)) return; privateChatTabs[key] = { label:String(meta?.label || `ID ${key}`), updatedAt:Number(meta?.updatedAt || Date.now()) || Date.now(), pinned:!!meta?.pinned, preview:String(meta?.preview || '') }; if(!chatCache.pm) chatCache.pm = {}; const list = Array.isArray(st.messages?.[key]) ? st.messages[key].slice(-80) : []; if(list.length || !Array.isArray(chatCache.pm[key])) chatCache.pm[key] = list; if(chatUnread?.pm) chatUnread.pm[key] = Math.max(0, Number(st.unread?.[key] || chatUnread.pm[key] || 0) || 0); }); const savedCurrent = String(st.currentChat || 'global'); if(savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')) currentChat = savedCurrent; return true; }catch(_){ return false; }
+
+  function writeState(state){
+    try{ localStorage.setItem(key(), JSON.stringify(normalizeState(state))); }catch(_){ }
   }
-  function removePeerFromStorage(id){
-    try{ const key = String(id || '').trim(); const st = clean(bestStored() || collect()); if(key){ delete st.tabs[key]; delete st.messages[key]; delete st.unread[key]; if(st.currentChat === `pm:${key}`) st.currentChat = 'global'; } localStorage.setItem(V343_CACHE_KEY, JSON.stringify(st)); localStorage.setItem(V343_BACKUP_KEY, JSON.stringify(st)); }catch(_){ }
+
+  function saveOpenPmState(){
+    try{
+      const state = collectState();
+      if(hasOpenTabs(state)){
+        writeState(state);
+      }else{
+        const old = loadStored();
+        if(!hasOpenTabs(old)) writeState(state);
+      }
+    }catch(_){ }
   }
-  window.__v343_savePmCache = save; window.__v343_restorePmCache = restore;
-  const oldSaveChatUi = typeof saveChatUiState === 'function' ? saveChatUiState : null; if(oldSaveChatUi){ saveChatUiState = function(){ const r = oldSaveChatUi.apply(this, arguments); save(false); return r; }; window.saveChatUiState = saveChatUiState; }
-  try{ __v294_savePmCache = function(){ save(false); }; }catch(_){ }
-  try{ __v295_savePmCache = function(){ save(false); }; }catch(_){ }
-  try{ __v296_savePmCache = function(){ save(false); }; }catch(_){ }
-  const oldRestoreChatUi = typeof restoreChatUiState === 'function' ? restoreChatUiState : null; if(oldRestoreChatUi){ restoreChatUiState = function(){ const r = oldRestoreChatUi.apply(this, arguments); restore(); return r; }; window.restoreChatUiState = restoreChatUiState; }
-  const oldRenderTabs = typeof renderChatTabs === 'function' ? renderChatTabs : null; if(oldRenderTabs){ renderChatTabs = function(){ if(!Object.keys(privateChatTabs || {}).length) restore(); return oldRenderTabs.apply(this, arguments); }; window.renderChatTabs = renderChatTabs; }
-  const oldPushCache = typeof pushChatToCache === 'function' ? pushChatToCache : null; if(oldPushCache){ pushChatToCache = function(scope, msg){ const r = oldPushCache.apply(this, arguments); try{ if(scope?.channel === 'pm') save(false); }catch(_){ } return r; }; window.pushChatToCache = pushChatToCache; }
-  const oldEnsurePm = typeof ensurePmTab === 'function' ? ensurePmTab : null; if(oldEnsurePm){ ensurePmTab = function(peerId, label = null){ const r = oldEnsurePm.apply(this, arguments); save(false); return r; }; window.ensurePmTab = ensurePmTab; }
-  const oldSetUnread = typeof setUnreadCount === 'function' ? setUnreadCount : null; if(oldSetUnread){ setUnreadCount = function(scopeName, count = 0){ const r = oldSetUnread.apply(this, arguments); if(String(scopeName || '').startsWith('pm:')) save(false); return r; }; window.setUnreadCount = setUnreadCount; }
-  const oldMarkClosed = typeof markPmTabClosedV338 === 'function' ? markPmTabClosedV338 : null; if(oldMarkClosed){ markPmTabClosedV338 = function(peerId){ const r = oldMarkClosed.apply(this, arguments); const key = String(peerId || '').trim(); if(key){ try{ delete privateChatTabs[key]; delete chatCache.pm[key]; delete chatUnread.pm[key]; }catch(_){ } removePeerFromStorage(key); } return r; }; window.markPmTabClosedV338 = markPmTabClosedV338; }
-  const oldIncoming = typeof handleIncomingRealtimeMessage === 'function' ? handleIncomingRealtimeMessage : null; if(oldIncoming){ handleIncomingRealtimeMessage = async function(msg){ const r = await oldIncoming.apply(this, arguments); try{ if(msg?.channel === 'pm') save(false); }catch(_){ } return r; }; window.handleIncomingRealtimeMessage = handleIncomingRealtimeMessage; }
-  const oldLoadHistory = typeof loadChatHistory === 'function' ? loadChatHistory : null; if(oldLoadHistory){ loadChatHistory = async function(scopeName = currentChat, ...rest){ const r = await oldLoadHistory.call(this, scopeName, ...rest); try{ if(String(scopeName || '').startsWith('pm:')) save(false); }catch(_){ } return r; }; window.loadChatHistory = loadChatHistory; }
-  window.addEventListener('beforeunload', () => save(false));
-  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') save(false); });
-  document.addEventListener('DOMContentLoaded', () => { setTimeout(() => { try{ restore(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 0); setTimeout(() => { try{ restore(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 700); setTimeout(() => { try{ restore(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800); });
+
+  function purgePeer(peerId){
+    const p = String(peerId || '').trim();
+    if(!p) return;
+    try{
+      const st = loadStored();
+      delete st.tabs[p];
+      delete st.messages[p];
+      delete st.unread[p];
+      if(st.currentChat === `pm:${p}`) st.currentChat = 'global';
+      writeState(st);
+    }catch(_){ }
+  }
+
+  function restoreOpenPmState(){
+    try{
+      const st = loadStored();
+      if(!hasOpenTabs(st)) return false;
+      Object.entries(st.tabs).forEach(([peer, meta]) => {
+        const p = String(peer || '').trim();
+        if(!p || isSelf(p)) return;
+        removeClosedMarker(p);
+        privateChatTabs[p] = {
+          label: String(meta?.label || `ID ${p}`),
+          updatedAt: Number(meta?.updatedAt || Date.now()) || Date.now(),
+          pinned: !!meta?.pinned,
+          preview: String(meta?.preview || '')
+        };
+        if(!chatCache.pm) chatCache.pm = {};
+        if(!Array.isArray(chatCache.pm[p])) chatCache.pm[p] = [];
+        const list = Array.isArray(st.messages?.[p]) ? st.messages[p].filter(Boolean).slice(-80) : [];
+        if(list.length) chatCache.pm[p] = list;
+        if(chatUnread?.pm) chatUnread.pm[p] = Math.max(0, Number(st.unread?.[p] || chatUnread.pm[p] || 0) || 0);
+      });
+      const savedCurrent = String(st.currentChat || 'global');
+      if(savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || (savedCurrent.startsWith('pm:') && privateChatTabs[savedCurrent.slice(3)])){
+        currentChat = savedCurrent;
+      }
+      return true;
+    }catch(_){ return false; }
+  }
+
+  window.__v344_saveOpenPmState = saveOpenPmState;
+  window.__v344_restoreOpenPmState = restoreOpenPmState;
+
+  const origRestore = typeof restoreChatUiState === 'function' ? restoreChatUiState : null;
+  if(origRestore){
+    restoreChatUiState = function(){
+      const result = origRestore.apply(this, arguments);
+      restoreOpenPmState();
+      return result;
+    };
+    try{ window.restoreChatUiState = restoreChatUiState; }catch(_){ }
+  }
+
+  const origSave = typeof saveChatUiState === 'function' ? saveChatUiState : null;
+  if(origSave){
+    saveChatUiState = function(){
+      Object.keys(privateChatTabs || {}).forEach(removeClosedMarker);
+      const result = origSave.apply(this, arguments);
+      saveOpenPmState();
+      return result;
+    };
+    try{ window.saveChatUiState = saveChatUiState; }catch(_){ }
+  }
+
+  const origEnsure = typeof ensurePmTab === 'function' ? ensurePmTab : null;
+  if(origEnsure){
+    ensurePmTab = function(peerId, label = null){
+      const p = String(peerId || '').trim();
+      if(p) removeClosedMarker(p);
+      const result = origEnsure.apply(this, arguments);
+      saveOpenPmState();
+      return result;
+    };
+    try{ window.ensurePmTab = ensurePmTab; }catch(_){ }
+  }
+
+  const origOpen = typeof openPrivateChat === 'function' ? openPrivateChat : null;
+  if(origOpen){
+    openPrivateChat = function(peerId, label = null){
+      const p = String(peerId || '').trim();
+      if(p) removeClosedMarker(p);
+      const result = origOpen.apply(this, arguments);
+      saveOpenPmState();
+      return result;
+    };
+    try{ window.openPrivateChat = openPrivateChat; }catch(_){ }
+  }
+
+  const origPush = typeof pushChatToCache === 'function' ? pushChatToCache : null;
+  if(origPush){
+    pushChatToCache = function(scope, msg){
+      const result = origPush.apply(this, arguments);
+      try{
+        if(scope?.channel === 'pm'){
+          const p = String(scope?.peerId || messagePeer(msg) || '').trim();
+          if(p && !isSelf(p)) removeClosedMarker(p);
+          saveOpenPmState();
+        }
+      }catch(_){ }
+      return result;
+    };
+    try{ window.pushChatToCache = pushChatToCache; }catch(_){ }
+  }
+
+  const origSetUnread = typeof setUnreadCount === 'function' ? setUnreadCount : null;
+  if(origSetUnread){
+    setUnreadCount = function(scopeName, count = 0){
+      const result = origSetUnread.apply(this, arguments);
+      if(String(scopeName || '').startsWith('pm:')) saveOpenPmState();
+      return result;
+    };
+    try{ window.setUnreadCount = setUnreadCount; }catch(_){ }
+  }
+
+  const origMarkClosed = typeof markPmTabClosedV338 === 'function' ? markPmTabClosedV338 : null;
+  if(origMarkClosed){
+    markPmTabClosedV338 = function(peerId){
+      const p = String(peerId || '').trim();
+      const result = origMarkClosed.apply(this, arguments);
+      if(p) purgePeer(p);
+      return result;
+    };
+    try{ window.markPmTabClosedV338 = markPmTabClosedV338; }catch(_){ }
+  }
+
+  const origHandle = typeof handleIncomingRealtimeMessage === 'function' ? handleIncomingRealtimeMessage : null;
+  if(origHandle){
+    handleIncomingRealtimeMessage = async function(msg){
+      const p = msg?.channel === 'pm' ? messagePeer(msg) : '';
+      if(p && !isSelf(p)) removeClosedMarker(p);
+      const result = await origHandle.apply(this, arguments);
+      if(msg?.channel === 'pm') saveOpenPmState();
+      return result;
+    };
+    try{ window.handleIncomingRealtimeMessage = handleIncomingRealtimeMessage; }catch(_){ }
+  }
+
+  const origLoad = typeof loadChatHistory === 'function' ? loadChatHistory : null;
+  if(origLoad){
+    loadChatHistory = async function(scopeName = currentChat, ...rest){
+      const result = await origLoad.call(this, scopeName, ...rest);
+      if(String(scopeName || '').startsWith('pm:')) saveOpenPmState();
+      return result;
+    };
+    try{ window.loadChatHistory = loadChatHistory; }catch(_){ }
+  }
+
+  ['__v294_savePmCache','__v295_savePmCache','__v296_savePmCache','__v343_savePmCache'].forEach(name => {
+    try{ window[name] = saveOpenPmState; }catch(_){ }
+    try{ globalThis[name] = saveOpenPmState; }catch(_){ }
+  });
+  ['__v294_restorePmCache','__v295_restorePmCache','__v296_restorePmCache','__v343_restorePmCache'].forEach(name => {
+    try{ window[name] = restoreOpenPmState; }catch(_){ }
+    try{ globalThis[name] = restoreOpenPmState; }catch(_){ }
+  });
+
+  window.addEventListener('beforeunload', saveOpenPmState);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') saveOpenPmState(); });
+  window.addEventListener('load', () => {
+    setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')){ loadChatHistory?.(currentChat).then(() => renderLobbyMessages?.()); } }catch(_){ } }, 650);
+    setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800);
+  });
 })();
