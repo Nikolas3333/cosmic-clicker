@@ -18019,3 +18019,96 @@ setInterval(() => {
   });
   setInterval(() => { try{ __v340_purgeSelfPm(); }catch(_){ } }, 2500);
 })();
+
+// ===== V341 PM INCOMING RESTORE FIX =====
+(function(){
+  const __origHandleIncomingRealtimeMessageV341 = typeof handleIncomingRealtimeMessage === 'function' ? handleIncomingRealtimeMessage : null;
+
+  function __v341_ownPublicId(){
+    try{ return String(getOwnPublicChatId?.() || '').trim(); }catch(_){ return ''; }
+  }
+
+  function __v341_getPeerFromMessage(msg){
+    const ownId = __v341_ownPublicId();
+    if(!ownId || !msg) return '';
+    const senderId = String(msg?.player_public_id || '').trim();
+    const recipientId = String(msg?.recipient_public_id || '').trim();
+    if(senderId && senderId === ownId) return recipientId;
+    if(recipientId && recipientId === ownId) return senderId;
+    return '';
+  }
+
+  function __v341_isIncomingToMe(msg){
+    const ownId = __v341_ownPublicId();
+    if(!ownId || !msg) return false;
+    const senderId = String(msg?.player_public_id || '').trim();
+    const recipientId = String(msg?.recipient_public_id || '').trim();
+    return !!(recipientId && recipientId === ownId && senderId && senderId !== ownId);
+  }
+
+  function __v341_getLabel(msg, peerId){
+    try{
+      const ownId = __v341_ownPublicId();
+      const senderId = String(msg?.player_public_id || '').trim();
+      if(senderId && senderId !== ownId){
+        return String(msg?.player_nickname || '').trim() || `ID ${peerId}`;
+      }
+      return privateChatTabs?.[String(peerId)]?.label || `ID ${peerId}`;
+    }catch(_){
+      return `ID ${peerId}`;
+    }
+  }
+
+  if(__origHandleIncomingRealtimeMessageV341){
+    handleIncomingRealtimeMessage = async function(msg){
+      if(!msg || msg.channel !== 'pm'){
+        return __origHandleIncomingRealtimeMessageV341.apply(this, arguments);
+      }
+
+      try{ await hydrateStaffRolesForMessages?.([msg]); }catch(_){ }
+
+      const ownId = __v341_ownPublicId();
+      if(!ownId) return;
+
+      const peerId = __v341_getPeerFromMessage(msg);
+      if(!peerId || peerId === ownId) return;
+
+      const incomingToMe = __v341_isIncomingToMe(msg);
+      if(incomingToMe){
+        try{ unmarkPmTabClosedV338?.(peerId); }catch(_){ }
+      }else{
+        try{
+          if(typeof isPmTabClosedV338 === 'function' && isPmTabClosedV338(peerId)){
+            return;
+          }
+        }catch(_){ }
+      }
+
+      const scope = { key: getPrivateScopeKey(peerId), channel: 'pm', peerId };
+      const pushed = pushChatToCache(scope, msg);
+      if(!pushed){
+        return;
+      }
+
+      ensurePmTab(peerId, __v341_getLabel(msg, peerId));
+      syncPrivateTabFromScope(scope.key);
+
+      const chatWrapper = document.getElementById('chat-wrapper');
+      const isHangarLowered = document.body.classList.contains('hangar-chat-lowered') || chatWrapper?.classList.contains('hangar-chat-lowered');
+
+      if(currentChat !== scope.key){
+        incrementUnread(scope.key);
+      }else if(isHangarLowered){
+        try{ __hangarPmPulseUntil = Date.now() + 12000; }catch(_){ }
+      }
+
+      if(currentChat === scope.key){
+        try{ renderLobbyMessages?.(); }catch(_){ }
+      }
+      try{ renderChatTabs?.(); }catch(_){ }
+      try{ __updateHangarPmNeon?.(); }catch(_){ }
+      try{ saveChatUiState?.(); }catch(_){ }
+    };
+    try{ window.handleIncomingRealtimeMessage = handleIncomingRealtimeMessage; }catch(_){ }
+  }
+})();
