@@ -18203,3 +18203,69 @@ setInterval(() => {
     setTimeout(() => { try{ if(__v342_isPmScope(currentChat)){ __v342_clearPmUnread(currentChat); renderChatTabs?.(); } }catch(_){ } }, 1200);
   });
 })();
+
+// ===== V343 PM DURABLE SESSION CACHE FIX =====
+(function(){
+  const V343_CACHE_KEY = 'cosmicPmCache:v343';
+  const V343_BACKUP_KEY = 'cosmicPmCache:v343:lastNonEmpty';
+  const V343_LEGACY_KEYS = ['cosmicPmCache:v296','cosmicPmCache:v295','cosmicPmCache:v294'];
+  function parse(raw){ try{ return raw ? JSON.parse(raw) : null; }catch(_){ return null; } }
+  function ownId(){ try{ return String(getOwnPublicChatId?.() || authState?.playerId || player?.public_id || '').trim(); }catch(_){ return ''; } }
+  function closedSet(){ try{ const raw = localStorage.getItem((typeof COSMIC_CLOSED_PM_TABS_KEY_V338 !== 'undefined') ? COSMIC_CLOSED_PM_TABS_KEY_V338 : 'cosmicClosedPmTabs:v338'); const arr = raw ? JSON.parse(raw) : []; return new Set(Array.isArray(arr) ? arr.map(x => String(x || '').trim()).filter(Boolean) : []); }catch(_){ return new Set(); } }
+  function isClosed(id){ const key = String(id || '').trim(); return !!(key && closedSet().has(key)); }
+  function isSelf(id){ const own = ownId(); const key = String(id || '').trim(); return !!(own && key && own === key); }
+  function hasData(st){ try{ return Object.keys(st?.tabs || st?.privateTabs || {}).length > 0 || Object.values(st?.messages || {}).some(v => Array.isArray(v) && v.length); }catch(_){ return false; } }
+  function clean(st){
+    const out = { tabs:{}, messages:{}, unread:{}, currentChat:String(st?.currentChat || currentChat || 'global'), savedAt:Number(st?.savedAt || Date.now()) || Date.now() };
+    const tabs = (st?.tabs && typeof st.tabs === 'object') ? st.tabs : ((st?.privateTabs && typeof st.privateTabs === 'object') ? st.privateTabs : {});
+    const messages = (st?.messages && typeof st.messages === 'object') ? st.messages : {};
+    const unread = (st?.unread && typeof st.unread === 'object') ? st.unread : {};
+    const keys = new Set([...Object.keys(tabs), ...Object.keys(messages), ...Object.keys(unread)]);
+    keys.forEach(raw => {
+      const id = String(raw || '').trim();
+      if(!id || isClosed(id) || isSelf(id)) return;
+      const list = Array.isArray(messages[id]) ? messages[id].filter(Boolean).slice(-80) : [];
+      const meta = tabs[id] || {};
+      if(!tabs[id] && !list.length) return;
+      out.tabs[id] = { label:String(meta?.label || `ID ${id}`), updatedAt:Number(meta?.updatedAt || Date.now()) || Date.now(), pinned:!!meta?.pinned, preview:String(meta?.preview || (list[list.length-1]?.text || list[list.length-1]?.message || '')) };
+      out.messages[id] = list;
+      out.unread[id] = Math.max(0, Number(unread[id] || 0) || 0);
+    });
+    if(String(out.currentChat).startsWith('pm:')){ const peer = String(out.currentChat).slice(3).trim(); if(!out.tabs[peer]) out.currentChat = 'global'; }
+    return out;
+  }
+  function collect(){
+    const st = { tabs:{}, messages:{}, unread:{}, currentChat: currentChat || 'global', savedAt: Date.now() };
+    try{ Object.entries(privateChatTabs || {}).forEach(([id, meta]) => { const key = String(id || '').trim(); if(!key || isClosed(key) || isSelf(key)) return; const list = Array.isArray(chatCache?.pm?.[key]) ? chatCache.pm[key].filter(Boolean).slice(-80) : []; st.tabs[key] = { label:String(meta?.label || `ID ${key}`), updatedAt:Number(meta?.updatedAt || Date.now()) || Date.now(), pinned:!!meta?.pinned, preview:String(meta?.preview || (list[list.length-1]?.text || list[list.length-1]?.message || '')) }; st.messages[key] = list; st.unread[key] = Math.max(0, Number(chatUnread?.pm?.[key] || 0) || 0); }); }catch(_){ }
+    return clean(st);
+  }
+  function bestStored(){
+    for(const key of [V343_CACHE_KEY, V343_BACKUP_KEY, ...V343_LEGACY_KEYS]){ try{ const st = clean(parse(localStorage.getItem(key))); if(hasData(st)) return st; }catch(_){ } }
+    return null;
+  }
+  function save(forceEmpty = false){
+    try{ const st = collect(); if(!forceEmpty && !hasData(st) && hasData(bestStored())) return; localStorage.setItem(V343_CACHE_KEY, JSON.stringify(st)); if(hasData(st)) localStorage.setItem(V343_BACKUP_KEY, JSON.stringify(st)); }catch(_){ }
+  }
+  function restore(){
+    try{ const st = bestStored(); if(!st) return false; Object.entries(st.tabs || {}).forEach(([id, meta]) => { const key = String(id || '').trim(); if(!key || isClosed(key) || isSelf(key)) return; privateChatTabs[key] = { label:String(meta?.label || `ID ${key}`), updatedAt:Number(meta?.updatedAt || Date.now()) || Date.now(), pinned:!!meta?.pinned, preview:String(meta?.preview || '') }; if(!chatCache.pm) chatCache.pm = {}; const list = Array.isArray(st.messages?.[key]) ? st.messages[key].slice(-80) : []; if(list.length || !Array.isArray(chatCache.pm[key])) chatCache.pm[key] = list; if(chatUnread?.pm) chatUnread.pm[key] = Math.max(0, Number(st.unread?.[key] || chatUnread.pm[key] || 0) || 0); }); const savedCurrent = String(st.currentChat || 'global'); if(savedCurrent === 'global' || savedCurrent === 'battle' || savedCurrent === 'clan' || savedCurrent.startsWith('pm:')) currentChat = savedCurrent; return true; }catch(_){ return false; }
+  }
+  function removePeerFromStorage(id){
+    try{ const key = String(id || '').trim(); const st = clean(bestStored() || collect()); if(key){ delete st.tabs[key]; delete st.messages[key]; delete st.unread[key]; if(st.currentChat === `pm:${key}`) st.currentChat = 'global'; } localStorage.setItem(V343_CACHE_KEY, JSON.stringify(st)); localStorage.setItem(V343_BACKUP_KEY, JSON.stringify(st)); }catch(_){ }
+  }
+  window.__v343_savePmCache = save; window.__v343_restorePmCache = restore;
+  const oldSaveChatUi = typeof saveChatUiState === 'function' ? saveChatUiState : null; if(oldSaveChatUi){ saveChatUiState = function(){ const r = oldSaveChatUi.apply(this, arguments); save(false); return r; }; window.saveChatUiState = saveChatUiState; }
+  try{ __v294_savePmCache = function(){ save(false); }; }catch(_){ }
+  try{ __v295_savePmCache = function(){ save(false); }; }catch(_){ }
+  try{ __v296_savePmCache = function(){ save(false); }; }catch(_){ }
+  const oldRestoreChatUi = typeof restoreChatUiState === 'function' ? restoreChatUiState : null; if(oldRestoreChatUi){ restoreChatUiState = function(){ const r = oldRestoreChatUi.apply(this, arguments); restore(); return r; }; window.restoreChatUiState = restoreChatUiState; }
+  const oldRenderTabs = typeof renderChatTabs === 'function' ? renderChatTabs : null; if(oldRenderTabs){ renderChatTabs = function(){ if(!Object.keys(privateChatTabs || {}).length) restore(); return oldRenderTabs.apply(this, arguments); }; window.renderChatTabs = renderChatTabs; }
+  const oldPushCache = typeof pushChatToCache === 'function' ? pushChatToCache : null; if(oldPushCache){ pushChatToCache = function(scope, msg){ const r = oldPushCache.apply(this, arguments); try{ if(scope?.channel === 'pm') save(false); }catch(_){ } return r; }; window.pushChatToCache = pushChatToCache; }
+  const oldEnsurePm = typeof ensurePmTab === 'function' ? ensurePmTab : null; if(oldEnsurePm){ ensurePmTab = function(peerId, label = null){ const r = oldEnsurePm.apply(this, arguments); save(false); return r; }; window.ensurePmTab = ensurePmTab; }
+  const oldSetUnread = typeof setUnreadCount === 'function' ? setUnreadCount : null; if(oldSetUnread){ setUnreadCount = function(scopeName, count = 0){ const r = oldSetUnread.apply(this, arguments); if(String(scopeName || '').startsWith('pm:')) save(false); return r; }; window.setUnreadCount = setUnreadCount; }
+  const oldMarkClosed = typeof markPmTabClosedV338 === 'function' ? markPmTabClosedV338 : null; if(oldMarkClosed){ markPmTabClosedV338 = function(peerId){ const r = oldMarkClosed.apply(this, arguments); const key = String(peerId || '').trim(); if(key){ try{ delete privateChatTabs[key]; delete chatCache.pm[key]; delete chatUnread.pm[key]; }catch(_){ } removePeerFromStorage(key); } return r; }; window.markPmTabClosedV338 = markPmTabClosedV338; }
+  const oldIncoming = typeof handleIncomingRealtimeMessage === 'function' ? handleIncomingRealtimeMessage : null; if(oldIncoming){ handleIncomingRealtimeMessage = async function(msg){ const r = await oldIncoming.apply(this, arguments); try{ if(msg?.channel === 'pm') save(false); }catch(_){ } return r; }; window.handleIncomingRealtimeMessage = handleIncomingRealtimeMessage; }
+  const oldLoadHistory = typeof loadChatHistory === 'function' ? loadChatHistory : null; if(oldLoadHistory){ loadChatHistory = async function(scopeName = currentChat, ...rest){ const r = await oldLoadHistory.call(this, scopeName, ...rest); try{ if(String(scopeName || '').startsWith('pm:')) save(false); }catch(_){ } return r; }; window.loadChatHistory = loadChatHistory; }
+  window.addEventListener('beforeunload', () => save(false));
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') save(false); });
+  document.addEventListener('DOMContentLoaded', () => { setTimeout(() => { try{ restore(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 0); setTimeout(() => { try{ restore(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 700); setTimeout(() => { try{ restore(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800); });
+})();
