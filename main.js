@@ -3643,6 +3643,7 @@ if (gameState === "BATTLE" && playerShip) {
         });
         if(bestRemoteId && bestRemoteEntry){
             hitRemoteShip = true;
+            applyPredictedRemoteDamageV338(bestRemoteId, bestRemoteEntry, laser.damage);
             broadcastBattleHit(bestRemoteId, laser.damage, bestRemoteEntry?.nickname || bestRemoteEntry?.mesh?.userData?.pilotName || 'Pilot');
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
@@ -4802,6 +4803,41 @@ const onlinePmPeers = new Set();
 const inGamePmPeers = new Set();
 const pmPeerRoomIds = new Map();
 const CHAT_UI_STATE_KEY = 'cosmicChatUiState:v27';
+const COSMIC_CLOSED_PM_TABS_KEY_V338 = 'cosmicClosedPmTabs:v338';
+
+function getClosedPmTabsV338(){
+    try{
+        const raw = localStorage.getItem(COSMIC_CLOSED_PM_TABS_KEY_V338);
+        const list = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(list) ? list.map(id => String(id || '').trim()).filter(Boolean) : []);
+    }catch(_){
+        return new Set();
+    }
+}
+
+function saveClosedPmTabsV338(set){
+    try{ localStorage.setItem(COSMIC_CLOSED_PM_TABS_KEY_V338, JSON.stringify(Array.from(set || []))); }catch(_){ }
+}
+
+function markPmTabClosedV338(peerId){
+    const key = String(peerId || '').trim();
+    if(!key) return;
+    const closed = getClosedPmTabsV338();
+    closed.add(key);
+    saveClosedPmTabsV338(closed);
+}
+
+function unmarkPmTabClosedV338(peerId){
+    const key = String(peerId || '').trim();
+    if(!key) return;
+    const closed = getClosedPmTabsV338();
+    if(closed.delete(key)) saveClosedPmTabsV338(closed);
+}
+
+function isPmTabClosedV338(peerId){
+    const key = String(peerId || '').trim();
+    return !!(key && getClosedPmTabsV338().has(key));
+}
 const localHandledChatMessageIds = new Set();
 const BATTLE_HISTORY_SEARCH_LIMIT = 80;
 const battleHistorySearchState = {
@@ -5031,6 +5067,7 @@ function restoreChatUiState() {
         Object.entries(tabs).forEach(([peerId, meta]) => {
             const safePeerId = String(peerId || '').trim();
             if (!safePeerId || !/^\d+$/.test(safePeerId)) return;
+            if (isPmTabClosedV338(safePeerId)) return;
             privateChatTabs[safePeerId] = {
                 label: String(meta?.label || `ID ${safePeerId}`),
                 updatedAt: Number(meta?.updatedAt) || Date.now(),
@@ -5562,6 +5599,7 @@ function clearUnreadForCurrentScope() {
 function ensurePmTab(peerId, label = null) {
     const key = String(peerId || "").trim();
     if (!key) return;
+    unmarkPmTabClosedV338(key);
     const previous = privateChatTabs[key] || {};
     const safeLabel = (label || previous.label || `ID ${key}`).trim();
     privateChatTabs[key] = {
@@ -5963,8 +6001,9 @@ function renderChatTabs() {
             onlinePmPeers.delete(String(peerId));
             inGamePmPeers.delete(String(peerId));
             pmPeerRoomIds.delete(String(peerId));
-            deletePmHistoryWithPeer(peerId);
+            markPmTabClosedV338(peerId);
             saveChatUiState();
+            try{ __v295_savePmCache?.(); }catch(_){ }
 
             if (currentChat === `pm:${peerId}`) {
                 currentChat = "global";
@@ -7380,6 +7419,8 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         playerId: '',
         kills: 0,
         deaths: 0,
+        hp: 100,
+        maxHp: 100,
         team
     };
 }
@@ -7416,6 +7457,10 @@ function upsertRemoteBattlePresence(payload = {}){
     entry.deaths = Math.max(0, Number(payload.deaths || scoreSnapshot.deaths || entry.deaths || 0) || 0);
     entry.team = team;
     entry.lastSeenAt = Date.now();
+    if(Number(entry.deadUntil || 0) <= Date.now() && Number(entry.hp || 0) <= 0){
+        entry.hp = Math.max(1, Number(entry.maxHp || entry.mesh?.userData?.maxHp || 100) || 100);
+        if(entry.mesh?.userData) entry.mesh.userData.hp = entry.hp;
+    }
 
     if(entry.mesh?.userData){
         entry.mesh.userData.pilotName = nickname;
@@ -7670,6 +7715,45 @@ async function broadcastBattleKill(attackerId, attackerName, victimId, victimNam
     });
 }
 
+function resolveRemoteBattleHp(entry){
+    const hp = Number(entry?.hp ?? entry?.mesh?.userData?.hp ?? 100);
+    return Number.isFinite(hp) ? hp : 100;
+}
+
+function applyPredictedRemoteDamageV338(victimId, entry, damageValue){
+    const safeVictimId = String(victimId || '').trim();
+    if(!safeVictimId || !entry) return false;
+    const damage = Math.max(0, Number(damageValue || 0) || 0);
+    if(!damage) return false;
+    const now = Date.now();
+    if(Number(entry.deadUntil || 0) > now) return true;
+
+    const nextHp = Math.max(0, resolveRemoteBattleHp(entry) - damage);
+    entry.hp = nextHp;
+    if(entry.mesh?.userData){
+        entry.mesh.userData.hp = nextHp;
+        entry.mesh.userData.maxHp = Math.max(1, Number(entry.mesh.userData.maxHp || entry.maxHp || 100) || 100);
+    }
+
+    if(nextHp > 0) return false;
+
+    entry.deadUntil = now + 2000;
+    const self = getBattleSelfIdentity();
+    const victimName = String(entry.nickname || entry.mesh?.userData?.pilotName || resolveBattlePlayerNameById(safeVictimId, 'Pilot')).trim() || 'Pilot';
+    if(self.playerId){
+        handleIncomingBattleKill({
+            hitId: 'local-kill:' + safeVictimId + ':' + now,
+            attackerId: self.playerId,
+            attackerName: self.nickname || 'Commander',
+            victimId: safeVictimId,
+            victimName,
+            source: 'local-predicted'
+        });
+        broadcastBattleKill(self.playerId, self.nickname || 'Commander', safeVictimId, victimName).catch(() => {});
+    }
+    return true;
+}
+
 async function initializeBattleHitCursor(){
     if(!window.supabaseClient) return;
     const self = getBattleSelfIdentity();
@@ -7831,6 +7915,10 @@ function handleIncomingBattleKill(payload = {}){
     const victimName = String(payload?.victimName || resolveBattlePlayerNameById(victimId, 'Pilot')).trim() || 'Pilot';
     const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
     const self = getBattleSelfIdentity();
+    const existingVictimRemote = victimId && remoteBattleShips instanceof Map ? remoteBattleShips.get(victimId) : null;
+    if(existingVictimRemote && Number(existingVictimRemote.deadUntil || 0) > Date.now() && String(payload?.source || '') !== 'local-predicted'){
+        return;
+    }
 
     const isSelfAttacker = !!(attackerId && self.playerId && attackerId === self.playerId);
     if(attackerId){
@@ -17268,6 +17356,7 @@ function __v295_restorePmCache(){
     Object.entries(tabs).forEach(([peerId, meta]) => {
       const safePeerId = String(peerId || '').trim();
       if(!safePeerId) return;
+      if(isPmTabClosedV338(safePeerId)) return;
       privateChatTabs[safePeerId] = {
         label: String(meta?.label || `ID ${safePeerId}`),
         updatedAt: Number(meta?.updatedAt) || Date.now(),
@@ -17320,6 +17409,7 @@ function __v295_restorePmCache(){
         Object.entries(tabs).forEach(([peerId, meta]) => {
           const safePeerId = String(peerId || '').trim();
           if (!safePeerId) return;
+          if (isPmTabClosedV338(safePeerId)) return;
           privateChatTabs[safePeerId] = {
             label: String(meta?.label || `ID ${safePeerId}`),
             updatedAt: Number(meta?.updatedAt) || Date.now(),
