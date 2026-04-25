@@ -8669,10 +8669,40 @@ function createEnemyBot(){
             if(!enemyBot || enemyBot !== botGroup) return;
             const model = gltf.scene;
             model.name = 'Solo UFO Bot Visual';
-            model.scale.setScalar(3.2);
+
+            // v346: GLB ships can arrive with a huge authoring scale / offset.
+            // Normalize the saucer into a small combat-sized wrapper so it cannot
+            // cover the camera or draw giant planes across the map.
             model.rotation.set(0, Math.PI, 0);
+            model.updateMatrixWorld(true);
+            const rawBox = new THREE.Box3().setFromObject(model);
+            const rawSize = rawBox.getSize(new THREE.Vector3());
+            const rawCenter = rawBox.getCenter(new THREE.Vector3());
+            const maxDim = Math.max(rawSize.x || 0, rawSize.y || 0, rawSize.z || 0);
+            const targetDim = 7.2;
+            const safeScale = (Number.isFinite(maxDim) && maxDim > 0.001)
+                ? THREE.MathUtils.clamp(targetDim / maxDim, 0.0005, 4.5)
+                : 1;
+            model.scale.setScalar(safeScale);
+            model.position.sub(rawCenter.multiplyScalar(safeScale));
+            model.traverse?.((child) => {
+                if(child?.isMesh){
+                    child.frustumCulled = false;
+                    if(child.material){
+                        const mats = Array.isArray(child.material) ? child.material : [child.material];
+                        mats.forEach(mat => {
+                            if(mat){
+                                mat.depthWrite = true;
+                                mat.depthTest = true;
+                            }
+                        });
+                    }
+                }
+            });
+
             while(botGroup.children.length){ botGroup.remove(botGroup.children[0]); }
             botGroup.add(model);
+            botGroup.userData.hitRadius = 4.2;
             const modelLight = new THREE.PointLight(0x66eaff, 1.15, 28);
             modelLight.position.set(0, 1.1, 0);
             botGroup.add(modelLight);
