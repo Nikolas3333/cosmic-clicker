@@ -458,6 +458,8 @@ const SOLO_BOT_MODEL_PATH = 'ships/Flying saucer.glb';
 const SOLO_MISSION_STORAGE_PREFIX = 'cosmicSoloMissionCompleted';
 let activeSoloMission = null;
 let activeSoloMissionCompleted = false;
+let activeSoloMissionEnded = false;
+const SOLO_DEFAULT_PLAYER_LIVES = 5;
 function getCosmicLocalDateKey(){ const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
 function getSoloMissionPlayerKey(){ return String(authState?.playerId || player?.id || authState?.email || player?.nickname || 'guest').trim() || 'guest'; }
 function getSoloMissionId(entry = {}){ return String(entry?.real || entry?.map || entry?.name || entry?.title || '').trim().toLowerCase() || 'mission'; }
@@ -465,13 +467,52 @@ function getSoloMissionStorageKey(entry = {}){ return `${SOLO_MISSION_STORAGE_PR
 function isSoloMissionCompletedToday(entry = {}){ try{ return localStorage.getItem(getSoloMissionStorageKey(entry)) === '1'; }catch(_){ return false; } }
 function markSoloMissionCompletedToday(entry = {}){ try{ localStorage.setItem(getSoloMissionStorageKey(entry), '1'); }catch(_){ } }
 function isSoloBattleActive(){ return !!(currentRoom?.solo || currentRoom?.state === 'solo' || activeSoloMission); }
-function getActiveSoloMissionGoal(){ return Math.max(1, Number(activeSoloMission?.goalKills || currentRoom?.goalKills || 1) || 1); }
-function completeActiveSoloMission(){
-    if(!isSoloBattleActive() || activeSoloMissionCompleted) return;
-    activeSoloMissionCompleted = true;
+function getActiveSoloMissionGoal(){ return Math.max(1, Number(activeSoloMission?.goalKills || currentRoom?.goalKills || 6) || 6); }
+function getActiveSoloMissionLives(){ return Math.max(1, Number(activeSoloMission?.playerLives || currentRoom?.playerLives || SOLO_DEFAULT_PLAYER_LIVES) || SOLO_DEFAULT_PLAYER_LIVES); }
+function getSoloLivesLeft(){ return Math.max(0, getActiveSoloMissionLives() - (Number(battleStats.playerDeaths || 0) || 0)); }
+function updateSoloMissionHud(){
+    const hud = document.getElementById('solo-mission-hud');
+    if(!hud) return;
+    if(!isSoloBattleActive() || gameState !== 'BATTLE'){
+        hud.style.display = 'none';
+        return;
+    }
+    hud.style.display = 'flex';
+    const goal = getActiveSoloMissionGoal();
+    const kills = Math.max(0, Number(battleStats.playerKills || 0) || 0);
+    const lives = getSoloLivesLeft();
+    const botKills = Math.max(0, Number(battleStats.botKills || 0) || 0);
+    const total = document.getElementById('solo-total-kills');
+    const life = document.getElementById('solo-lives-left');
+    const botDefeated = document.getElementById('solo-bots-defeated');
+    const botScore = document.getElementById('solo-bot-score');
+    const goalText = document.getElementById('solo-goal-text');
+    if(total) total.textContent = String(kills);
+    if(life) life.textContent = String(lives);
+    if(botDefeated) botDefeated.textContent = `${kills}/${goal}`;
+    if(botScore) botScore.textContent = String(botKills);
+    if(goalText) goalText.textContent = `Цель: уничтожить ${goal} НЛО`;
+}
+function showSoloMissionResult(victory = true){
+    const box = document.getElementById('solo-result-banner');
+    if(!box) return;
+    box.textContent = victory ? 'ВЫ ПОБЕДИЛИ' : 'ВЫ ПРОИГРАЛИ';
+    box.classList.toggle('lost', !victory);
+    box.classList.toggle('win', !!victory);
+    box.style.display = 'block';
+}
+function hideSoloMissionResult(){
+    const box = document.getElementById('solo-result-banner');
+    if(box) box.style.display = 'none';
+}
+function finishSoloMission(victory = true){
+    if(!isSoloBattleActive() || activeSoloMissionEnded) return;
+    activeSoloMissionEnded = true;
+    activeSoloMissionCompleted = !!victory;
     const mission = activeSoloMission || currentRoom || selectedLobbyMap || {};
-    markSoloMissionCompletedToday(mission);
-    pushKillFeed(`Миссия выполнена: ${mission.title || 'Solo'}`, 'kill');
+    if(victory) markSoloMissionCompletedToday(mission);
+    showSoloMissionResult(!!victory);
+    updateSoloMissionHud();
     updateBattleScoreboard?.();
     setTimeout(() => {
         try{
@@ -480,8 +521,10 @@ function completeActiveSoloMission(){
                 setTimeout(() => { try{ renderLobbyListV27?.('solo'); }catch(_){} }, 80);
             }
         }catch(_){ }
-    }, 1400);
+    }, 4200);
 }
+function completeActiveSoloMission(){ finishSoloMission(true); }
+function failActiveSoloMission(){ finishSoloMission(false); }
 
 let battleChatOpen = false;
 const battleMessages = [];
@@ -1644,6 +1687,7 @@ async function switchState(newState){
     gameState = newState;
     try{ window.gameState = newState; }catch(_){ }
     if(newState === "BATTLE" || newState === "OBSERVE") battleLeavingInProgress = false;
+    if(newState !== "BATTLE") { try{ updateSoloMissionHud?.(); hideSoloMissionResult?.(); }catch(_){} }
 
     const canvas = document.querySelector("canvas");
     const lobby = document.getElementById("lobby-screen");
@@ -1752,13 +1796,19 @@ if(gameState === "BATTLE"){
         if(isSoloBattleActive()){
             activeSoloMission = { ...(currentRoom || selectedLobbyMap || {}), real: targetMap, name: targetMap };
             activeSoloMissionCompleted = false;
+            activeSoloMissionEnded = false;
+            hideSoloMissionResult?.();
             battleStats.playerKills = 0; battleStats.playerDeaths = 0; battleStats.botKills = 0; battleStats.botDeaths = 0;
             createEnemyBot();
             updateEnemyHud();
+            updateSoloMissionHud?.();
             updateBattleScoreboard();
         }else{
             activeSoloMission = null;
             activeSoloMissionCompleted = false;
+            activeSoloMissionEnded = false;
+            updateSoloMissionHud?.();
+            hideSoloMissionResult?.();
             markBattlePresenceAnnouncementsMuted(2500);
             setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
             updateEnemyHud();
@@ -3665,11 +3715,12 @@ if (gameState === "BATTLE" && playerShip) {
                 enemyBot = null;
                 battleStats.playerKills += 1;
                 battleStats.botDeaths += 1;
-                pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
+                if(!isSoloBattleActive()) pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
                 updateEnemyHud();
+                updateSoloMissionHud?.();
                 updateBattleScoreboard();
                 if(isSoloBattleActive() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
-                else if(isSoloBattleActive()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !enemyBot) createEnemyBot(); }, 1400);
+                else if(isSoloBattleActive()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, 1400);
             }
             continue;
         }
@@ -3733,15 +3784,20 @@ if (gameState === "BATTLE" && playerShip) {
 
         if (playerShip && laser.mesh.position.distanceTo(playerShip.position) < 2.1) {
             playerHp = Math.max(0, playerHp - laser.damage);
-            if(playerHp <= 0){
+            if(playerHp <= 0 && !isBattleRespawning() && !activeSoloMissionEnded){
                 battleStats.botKills += 1;
                 battleStats.playerDeaths += 1;
-                pushKillFeed(`${enemyBot?.userData?.name || 'Drone_x1'} уничтожил ${player?.nickname || 'Commander'}`);
+                if(!isSoloBattleActive()) pushKillFeed(`${enemyBot?.userData?.name || 'Drone_x1'} уничтожил ${player?.nickname || 'Commander'}`);
+                updateSoloMissionHud?.();
                 updateBattleScoreboard();
                 if(playerShip){
                     spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
                 }
-                scheduleBattleRespawn(2000);
+                if(isSoloBattleActive() && getSoloLivesLeft() <= 0){
+                    failActiveSoloMission();
+                }else{
+                    scheduleBattleRespawn(2000);
+                }
             }
             scene.remove(laser.mesh);
             enemyLasers.splice(i, 1);
@@ -4100,10 +4156,11 @@ function scheduleBattleRespawn(delayMs=2000){
     firing = false;
     updateBattlePlayerHud();
 
-    if(isTournamentRespawnMatch()){
+    if(isTournamentRespawnMatch() || isSoloBattleActive()){
         battleRespawnTimer = setTimeout(() => {
             battleRespawnTimer = null;
             if(!battlePendingRespawnAt) return;
+            if(isSoloBattleActive() && activeSoloMissionEnded) return;
             battlePendingRespawnAt = 0;
             playerHp = playerMaxHp;
             battleShipCrash = null;
@@ -8644,6 +8701,7 @@ function animateRemoteBattleShips(){
 }
 
 function createEnemyBot(){
+    if(isSoloBattleActive() && activeSoloMissionEnded) return;
     if(enemyBot){ scene.remove(enemyBot); enemyBot = null; }
     const botGroup = new THREE.Group();
     botGroup.rotation.order = 'YXZ';
@@ -8729,8 +8787,10 @@ function updateEnemyHud(){
     const hp = Math.max(0, enemyBot.userData.hp);
     const maxHp = Math.max(1, enemyBot.userData.maxHp);
     const percent = (hp / maxHp) * 100;
-    name.textContent = enemyBot.userData.name || 'BOT DRONE';
+    name.textContent = isSoloBattleActive() ? '' : (enemyBot.userData.name || 'BOT DRONE');
+    name.style.display = isSoloBattleActive() ? 'none' : 'block';
     hpBar.style.width = percent + '%';
+    updateSoloMissionHud?.();
     hpText.textContent = hp + ' / ' + maxHp;
     if(hpInlineText) hpInlineText.textContent = hp + ' / ' + maxHp;
 }
@@ -14435,7 +14495,7 @@ function limitBattleArea(){
                 document.querySelectorAll('#match-list .match-item').forEach(el => el.classList.remove('selected'));
                 item.classList.add('selected');
                 selectedLobbyMap = { ...entry, name: entry.real };
-                currentRoom = { map: entry.real, state: mode, solo: mode === 'solo', title: entry.title, mission: entry.mission || '' };
+                currentRoom = { map: entry.real, state: mode, solo: mode === 'solo', title: entry.title, mission: entry.mission || '', goalKills: entry.goalKills || 6, playerLives: entry.playerLives || 5, minLevel: entry.minLevel || 1 };
                 if(preview){
                     preview.style.backgroundImage = `url(maps/${entry.img}.jpg)`;
                     preview.style.backgroundSize = 'cover';
@@ -14471,6 +14531,8 @@ function limitBattleArea(){
                     map: selected.real,
                     state: lobbyMode,
                     solo: lobbyMode === 'solo',
+                    goalKills: selectedLobbyMap?.goalKills || 6,
+                    playerLives: selectedLobbyMap?.playerLives || 5,
                     title: selected.title,
                     mission: selected.mission || '',
                     players: [{ name: getDisplayPlayerTag() }]
