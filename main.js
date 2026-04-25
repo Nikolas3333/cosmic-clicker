@@ -452,6 +452,37 @@ const battleWeapon = {
     reloadEndsAt: 0
 };
 
+
+// ================= SOLO MISSIONS DAILY STATE =================
+const SOLO_BOT_MODEL_PATH = 'ships/Flying saucer.glb';
+const SOLO_MISSION_STORAGE_PREFIX = 'cosmicSoloMissionCompleted';
+let activeSoloMission = null;
+let activeSoloMissionCompleted = false;
+function getCosmicLocalDateKey(){ const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
+function getSoloMissionPlayerKey(){ return String(authState?.playerId || player?.id || authState?.email || player?.nickname || 'guest').trim() || 'guest'; }
+function getSoloMissionId(entry = {}){ return String(entry?.real || entry?.map || entry?.name || entry?.title || '').trim().toLowerCase() || 'mission'; }
+function getSoloMissionStorageKey(entry = {}){ return `${SOLO_MISSION_STORAGE_PREFIX}:${getSoloMissionPlayerKey()}:${getCosmicLocalDateKey()}:${getSoloMissionId(entry)}`; }
+function isSoloMissionCompletedToday(entry = {}){ try{ return localStorage.getItem(getSoloMissionStorageKey(entry)) === '1'; }catch(_){ return false; } }
+function markSoloMissionCompletedToday(entry = {}){ try{ localStorage.setItem(getSoloMissionStorageKey(entry), '1'); }catch(_){ } }
+function isSoloBattleActive(){ return !!(currentRoom?.solo || currentRoom?.state === 'solo' || activeSoloMission); }
+function getActiveSoloMissionGoal(){ return Math.max(1, Number(activeSoloMission?.goalKills || currentRoom?.goalKills || 1) || 1); }
+function completeActiveSoloMission(){
+    if(!isSoloBattleActive() || activeSoloMissionCompleted) return;
+    activeSoloMissionCompleted = true;
+    const mission = activeSoloMission || currentRoom || selectedLobbyMap || {};
+    markSoloMissionCompletedToday(mission);
+    pushKillFeed(`Миссия выполнена: ${mission.title || 'Solo'}`, 'kill');
+    updateBattleScoreboard?.();
+    setTimeout(() => {
+        try{
+            if(gameState === 'BATTLE' && isSoloBattleActive()){
+                switchState('LOBBY');
+                setTimeout(() => { try{ renderLobbyListV27?.('solo'); }catch(_){} }, 80);
+            }
+        }catch(_){ }
+    }, 1400);
+}
+
 let battleChatOpen = false;
 const battleMessages = [];
 const killFeedMessages = [];
@@ -1718,11 +1749,22 @@ if(gameState === "BATTLE"){
     } else {
         const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'block';
         spawnPlayer();
-        markBattlePresenceAnnouncementsMuted(2500);
-        setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
-        updateEnemyHud();
-        updateBattleScoreboard();
-        startLiveBattleSync();
+        if(isSoloBattleActive()){
+            activeSoloMission = { ...(currentRoom || selectedLobbyMap || {}), real: targetMap, name: targetMap };
+            activeSoloMissionCompleted = false;
+            battleStats.playerKills = 0; battleStats.playerDeaths = 0; battleStats.botKills = 0; battleStats.botDeaths = 0;
+            createEnemyBot();
+            updateEnemyHud();
+            updateBattleScoreboard();
+        }else{
+            activeSoloMission = null;
+            activeSoloMissionCompleted = false;
+            markBattlePresenceAnnouncementsMuted(2500);
+            setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
+            updateEnemyHud();
+            updateBattleScoreboard();
+            startLiveBattleSync();
+        }
     }
 }
 
@@ -3608,21 +3650,26 @@ if (gameState === "BATTLE" && playerShip) {
         laser.mesh.position.add(laser.velocity);
         laser.life -= 1;
 
-        if (enemyBot && laser.mesh.position.distanceTo(enemyBot.position) < 2.5) {
-            enemyBot.userData.hp -= laser.damage;
+        if (enemyBot && laser.mesh.position.distanceTo(enemyBot.position) < (Number(enemyBot.userData?.hitRadius || 0) || 3.4)) {
+            const armor = Math.max(0, Math.min(0.65, Number(enemyBot.userData?.armor || 0) || 0));
+            const dealtDamage = Math.max(1, Math.round((Number(laser.damage || 0) || 1) * (1 - armor)));
+            enemyBot.userData.hp -= dealtDamage;
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
             updateEnemyHud();
             if (enemyBot.userData.hp <= 0) {
-                spawnShipDebris(enemyBot.position.clone(), 0xff7755);
+                const defeatedName = enemyBot?.userData?.name || 'UFO Raider';
+                const defeatedPos = enemyBot.position.clone();
+                spawnShipDebris(defeatedPos, 0xff7755);
                 scene.remove(enemyBot);
                 enemyBot = null;
                 battleStats.playerKills += 1;
                 battleStats.botDeaths += 1;
-                pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${enemyBot?.userData?.name || 'Drone_x1'}`, 'kill');
+                pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
                 updateEnemyHud();
                 updateBattleScoreboard();
-                // live PvP: bot respawn отключен
+                if(isSoloBattleActive() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
+                else if(isSoloBattleActive()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !enemyBot) createEnemyBot(); }, 1400);
             }
             continue;
         }
@@ -8539,6 +8586,7 @@ function removeRemoteBattleShipById(entryId){
 }
 
 async function startLiveBattleSync(){
+    if(isSoloBattleActive()) return;
     stopLiveBattleSync();
     const onlineRoomId = getBattleRoomIdSafe();
     if(!onlineRoomId) return;
@@ -8596,10 +8644,40 @@ function animateRemoteBattleShips(){
 }
 
 function createEnemyBot(){
-    if(enemyBot){
-        scene.remove(enemyBot);
-        enemyBot = null;
-    }
+    if(enemyBot){ scene.remove(enemyBot); enemyBot = null; }
+    const botGroup = new THREE.Group();
+    botGroup.rotation.order = 'YXZ';
+    const playerLevel = Math.max(1, Number(player?.level || 1) || 1);
+    const missionPower = Math.max(1, Number(activeSoloMission?.minLevel || currentRoom?.minLevel || 1) || 1);
+    const botMaxHp = Math.max(135, Math.round((playerMaxHp || 100) * 1.45 + missionPower * 3));
+    botGroup.userData = { name: activeSoloMission?.botName || 'UFO Raider', hp: botMaxHp, maxHp: botMaxHp, armor: Math.min(0.38, 0.18 + playerLevel * 0.006), damageBoost: 1.18, strafePhase: Math.random() * Math.PI * 2, alive: true, isSoloBot: true, hitRadius: 3.4 };
+    const placeholderMat = new THREE.MeshStandardMaterial({ color:0x76eaff, emissive:0x124a66, roughness:0.45, metalness:0.35 });
+    const placeholder = new THREE.Mesh(new THREE.SphereGeometry(2.4, 24, 12), placeholderMat);
+    placeholder.scale.set(1.45, 0.34, 1.45);
+    botGroup.add(placeholder);
+    const glow = new THREE.PointLight(0x55ddff, 1.4, 22);
+    glow.position.set(0, 0.8, 0);
+    botGroup.add(glow);
+    const spawnBase = spawnPointB?.clone?.() || new THREE.Vector3(130, 10, -120);
+    botGroup.position.copy(spawnBase.add(new THREE.Vector3(0, 8, 0)));
+    if(playerShip) botGroup.lookAt(playerShip.position);
+    enemyBot = botGroup;
+    scene.add(enemyBot);
+    try{
+        const loader = new GLTFLoader();
+        loader.load(SOLO_BOT_MODEL_PATH, (gltf) => {
+            if(!enemyBot || enemyBot !== botGroup) return;
+            const model = gltf.scene;
+            model.name = 'Solo UFO Bot Visual';
+            model.scale.setScalar(3.2);
+            model.rotation.set(0, Math.PI, 0);
+            while(botGroup.children.length){ botGroup.remove(botGroup.children[0]); }
+            botGroup.add(model);
+            const modelLight = new THREE.PointLight(0x66eaff, 1.15, 28);
+            modelLight.position.set(0, 1.1, 0);
+            botGroup.add(modelLight);
+        }, undefined, () => {});
+    }catch(_){ }
     updateEnemyHud();
     updateBattleScoreboard();
 }
@@ -8648,7 +8726,7 @@ function fireBotLaser(){
             velocity: toPlayer.clone().multiplyScalar(1.9),
             life: 100,
             maxLife: 100,
-            damage: 8,
+            damage: Math.round(8 * (Number(enemyBot?.userData?.damageBoost || 1) || 1)),
             weaponType: 'pulse'
         });
     });
@@ -8678,6 +8756,9 @@ function updateBattleScoreboard(){
 
     const rows = [];
     if(selfRow) rows.push(selfRow);
+    if(isSoloBattleActive() && enemyBot){
+        rows.push({ nickname: enemyBot.userData?.name || 'UFO Raider', clan: '', level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), kills: Number(battleStats.botKills || 0) || 0, deaths: Number(battleStats.botDeaths || 0) || 0, id: 'BOT', ping: 0, deadUntil: 0, team: 'red' });
+    }
 
     roomPlayers.forEach((entry) => {
         const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
@@ -15399,11 +15480,13 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     extra = '';
                 }
                 if(entry.id) item.dataset.roomId = entry.id;
+                const soloLocked = mode === 'solo' && isSoloMissionCompletedToday(entry);
+                if(soloLocked) item.classList.add('solo-locked');
                 item.innerHTML =
-                    `<span class="map-title">${entry.title}</span>`+
+                    `<span class="map-title">${entry.title}${soloLocked ? ' ✅' : ''}</span>`+
                     `<span class="map-real">${String(entry.real || '').toUpperCase()}</span>`+
-                    `<span class="map-mode">${entry.mode || (mode === 'solo' ? 'SOLO' : mode === 'tournament' ? 'TOURNAMENT' : 'DM')}</span>`+
-                    `<span class="map-players">${entry.currentPlayers ? entry.currentPlayers.length : (entry.players ? entry.players.length : 0)}/${entry.maxPlayers || entry.playerCount || (mode === 'solo' ? 1 : 8)}</span>`+
+                    `<span class="map-mode">${soloLocked ? 'DONE TODAY' : (entry.mode || (mode === 'solo' ? 'SOLO' : mode === 'tournament' ? 'TOURNAMENT' : 'DM'))}</span>`+
+                    `<span class="map-players">${mode === 'solo' ? '1/1' : (entry.currentPlayers ? entry.currentPlayers.length : (entry.players ? entry.players.length : 0)) + '/' + (entry.maxPlayers || entry.playerCount || 8)}</span>`+
                     `<span class="map-level">★ ${entry.minLevel || 1} - ★ ${entry.maxLevel || 120}</span>`+
                     extra;
                 item.addEventListener('click', () => {
@@ -15526,7 +15609,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
                         showGuestOnlyPvpMessage();
                         return;
                     }
-                    currentRoom = { ...selectedLobbyMap, solo:true, state:'solo', players:[getDisplayPlayerTag()] };
+                    if(isSoloMissionCompletedToday(selectedLobbyMap)){
+                        const note = document.getElementById('match-status-note');
+                        if(note) note.textContent = '✅ Миссия уже выполнена сегодня. Будет доступна завтра.';
+                        return;
+                    }
+                    currentRoom = { ...selectedLobbyMap, solo:true, state:'solo', private:true, currentPlayers:[{ name:getDisplayPlayerTag() }], players:[{ name:getDisplayPlayerTag() }] };
                     switchState('BATTLE');
                     return;
                 }
