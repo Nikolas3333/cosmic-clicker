@@ -515,12 +515,13 @@ function awardSoloBotKillReward(worldPosition = null){
 
     if(player){
         player.experience = Math.max(0, Number(player.experience || 0) + expReward);
+        player.exp = Math.max(0, Number(player.exp || 0) + expReward);
         player.credits = Math.max(0, Number(player.credits || 0) + coinReward);
+        player.coins = Math.max(0, Number(player.coins || 0) + coinReward);
     }
 
     if(typeof playerResources === 'object' && playerResources){
         playerResources.coins = Math.max(0, Number(playerResources.coins || 0) + coinReward);
-        playerResources.credits = Math.max(0, Number(playerResources.credits || 0) + coinReward);
     }
 
     try{ showBattleFloatingReward(expReward, coinReward, worldPosition || playerShip?.position || null); }catch(_){}
@@ -5059,7 +5060,7 @@ function __installHangarChatWatcher(){
             btn.addEventListener('click', () => {
                 setHangarChatMode(false, false);
                 setTimeout(__syncHangarChatVisibility, 0);
-            }); }
+            });
         });
 
         return true;
@@ -8393,7 +8394,7 @@ function handleIncomingBattleKill(payload = {}){
                 if(rowId && rowId === victimId){
                     row.deadUntil = remoteDeadUntil;
                 }
-            }); }
+            });
         });
     }
     if(isSelfAttacker){
@@ -8445,7 +8446,7 @@ function ensureLiveBattlePresenceChannel(){
             handleIncomingBattleJoin(payload || {});
         })
         .on('broadcast', { event: 'pilot-left' }, ({ payload }) => {
-            handleIncomingBattleLeave(payload || {}); }
+            handleIncomingBattleLeave(payload || {});
         });
 
     liveBattlePresenceSubscribePromise = new Promise((resolve) => {
@@ -9445,6 +9446,7 @@ function updateBattleScoreboard(){
                 };
                 soloBotScoreRows.set(id, row);
             }else{
+                row.id = row.id || id;
                 row.nickname = row.nickname || bot?.userData?.name || 'UFO Raider';
                 row.level = Number(row.level || activeSoloMission?.minLevel || player?.level || 1) || 1;
                 bot.userData.scoreKills = Number(row.kills || 0) || 0;
@@ -9452,18 +9454,22 @@ function updateBattleScoreboard(){
             }
         });
 
-        soloBotScoreRows.forEach((row, id) => {
-            if(!rows.some(r=>String(r.id)===String(row.id||id))){ rows.push({
+        const pushedBotIds = new Set();
+        soloBotScoreRows.forEach((row, key) => {
+            const id = String(row?.id || key || 'BOT');
+            if(pushedBotIds.has(id)) return;
+            pushedBotIds.add(id);
+            rows.push({
                 nickname: row.nickname || 'UFO Raider',
                 clan: '',
                 level: Number(row.level || 1) || 1,
                 kills: Number(row.kills || 0) || 0,
                 deaths: Number(row.deaths || 0) || 0,
-                id: row.id || id || 'BOT',
+                id,
                 ping: 0,
                 deadUntil: 0,
                 team: 'red'
-            }); }
+            });
         });
     }
     roomPlayers.forEach((entry) => {
@@ -9474,7 +9480,7 @@ function updateBattleScoreboard(){
 
         const team = String(entry?.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
         const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
-        if(!rows.some(r=>String(r.id)===String(row.id||id))){ rows.push({
+        rows.push({
             nickname: remoteState?.nickname || safeName || 'Pilot',
             clan: '',
             level: Number(remoteState?.level || entry?.level || 1) || 1,
@@ -9911,7 +9917,7 @@ window.addEventListener('load', () => {
             item.addEventListener('click', () => {
                 const realKey = item.querySelector('.map-real')?.textContent?.trim()?.toLowerCase();
                 selectLobbyMap(realKey || 'earth');
-            }); }
+            });
         });
         selectLobbyMap('earth');
     }, 60);
@@ -13330,7 +13336,7 @@ function ensureHangarRenderer(){
                 const nextChildScale = currentChildScale + (hoverScale - currentChildScale) * 0.14;
                 child.scale.setScalar(nextChildScale);
                 child.position.y = 1.02 + (isHoveredDock ? 0.05 : 0.0) + Math.sin(time * 1.7 + idx * 0.4) * 0.02;
-            }); }
+            });
         });
 
         if(hangarState.showcaseGroup){
@@ -19309,26 +19315,3 @@ setInterval(() => {
     setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800);
   });
 })();
-
-// === AUTO REWARD FIX ===
-let __lastAwardedKills = 0;
-function __checkRewards(){
-    try{
-        const kills = Number(battleStats?.playerKills||0)||0;
-        if(kills > __lastAwardedKills){
-            const diff = kills - __lastAwardedKills;
-            for(let i=0;i<diff;i++){
-                awardSoloBotKillReward?.();
-            }
-            __lastAwardedKills = kills;
-        }
-    }catch(e){}
-}
-
-if(typeof updateBattle === "function"){
-    const __oldUpd = updateBattle;
-    updateBattle = function(){
-        __oldUpd.apply(this, arguments);
-        __checkRewards();
-    }
-}
