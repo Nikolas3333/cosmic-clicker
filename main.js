@@ -596,42 +596,56 @@ function updateBattleBotNameLabel(){
             label.id = 'battle-bot-name-label';
             document.body.appendChild(label);
         }
-        if(gameState !== 'BATTLE' || !isSoloBattleActive()){
+
+        if(gameState !== 'BATTLE' || !isSoloBattleActive() || !camera || !renderer){
             label.style.display = 'none';
             return;
         }
+
         const bots = getActiveSoloBots();
         const bot = enemyBot?.userData?.alive !== false ? enemyBot : (bots[0] || null);
         const name = String(bot?.userData?.name || '').trim();
-        if(!name){
+
+        if(!bot || !name){
             label.style.display = 'none';
             return;
         }
-        label.textContent = name;
 
-        const hpCandidates = [
-            document.getElementById('battle-hp-bar'),
-            document.getElementById('battle-hp-fill'),
-            document.getElementById('battle-player-hp-bar'),
-            document.querySelector('.battle-hp-bar'),
-            document.querySelector('#battle-hud .hp-bar')
-        ].filter(Boolean);
+        const botPos = new THREE.Vector3();
+        try{ bot.getWorldPosition(botPos); }catch(_){ botPos.copy(bot.position || new THREE.Vector3()); }
 
-        const hpEl = hpCandidates[0];
-        if(hpEl){
-            const rect = hpEl.getBoundingClientRect();
-            label.style.left = `${rect.left + rect.width / 2}px`;
-            label.style.top = `${Math.max(8, rect.top - 28)}px`;
-            label.style.bottom = 'auto';
-            label.style.transform = 'translateX(-50%)';
-        }else{
-            label.style.left = '50%';
-            label.style.top = 'auto';
-            label.style.bottom = '112px';
-            label.style.transform = 'translateX(-50%)';
+        const distance = camera.position.distanceTo(botPos);
+        if(!Number.isFinite(distance) || distance > 900){
+            label.style.display = 'none';
+            return;
         }
+
+        const screenPos = botPos.clone();
+        screenPos.y += Number(bot?.userData?.hpLabelYOffset || bot?.userData?.hitRadius || 8) + 4;
+        screenPos.project(camera);
+
+        if(screenPos.z < -1 || screenPos.z > 1){
+            label.style.display = 'none';
+            return;
+        }
+
+        const canvas = renderer.domElement;
+        const rect = canvas.getBoundingClientRect();
+        const x = rect.left + (screenPos.x * 0.5 + 0.5) * rect.width;
+        const y = rect.top + (-screenPos.y * 0.5 + 0.5) * rect.height;
+
+        label.textContent = name;
+        label.style.left = `${x}px`;
+        label.style.top = `${y - 12}px`;
+        label.style.bottom = 'auto';
+        label.style.transform = 'translate(-50%, -100%)';
         label.style.display = 'block';
-    }catch(_){}
+    }catch(_){
+        try{
+            const label = document.getElementById('battle-bot-name-label');
+            if(label) label.style.display = 'none';
+        }catch(__){}
+    }
 }
 
 function updateSoloMissionHud(){
@@ -19507,3 +19521,14 @@ function startV373BotNameLoop(){
     __v373BotNameRaf = requestAnimationFrame(tick);
 }
 try{ startV373BotNameLoop(); }catch(_){}
+
+let __v374BotNameLoop = 0;
+function startV374BotNameLoop(){
+    if(__v374BotNameLoop) return;
+    const tick = () => {
+        try{ updateBattleBotNameLabel?.(); }catch(_){}
+        __v374BotNameLoop = requestAnimationFrame(tick);
+    };
+    __v374BotNameLoop = requestAnimationFrame(tick);
+}
+try{ startV374BotNameLoop(); }catch(_){}
