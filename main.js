@@ -102,7 +102,7 @@ let endlessSoloLastBannerStage = 1;
 let endlessSoloLastKillCount = 0;
 
 
-const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 999999999; // disabled by huge cooldown
+const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 2400; // disabled by huge cooldown
 let enemyLasers = [];
 let battleObjects = [];
 let battleMapPlanet = null;
@@ -1853,7 +1853,12 @@ if(gameState === "BATTLE"){
             activeSoloMissionEnded = false;
             hideSoloMissionResult?.();
             battleStats.playerKills = 0; battleStats.playerDeaths = 0; battleStats.botKills = 0; battleStats.botDeaths = 0;
+            soloBotScoreRows = new Map();
+            soloEnemyBots.forEach(bot => { try{ if(bot?.parent) bot.parent.remove(bot); else scene?.remove?.(bot); }catch(_){} });
+            soloEnemyBots = [];
+            enemyBot = null;
             endlessSoloCurrentStage = 1; endlessSoloLastBannerStage = 1; endlessSoloLastKillCount = 0;
+            lastEndlessBotSpawnAt = 0;
             createEnemyBot();
             updateEnemyHud();
             updateSoloMissionHud?.();
@@ -3785,7 +3790,7 @@ if (gameState === "BATTLE" && playerShip) {
                 battleStats.botDeaths += 1;
                 const savedRow = soloBotScoreRows.get(defeatedId) || { id:defeatedId, nickname:defeatedName, kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' };
                 savedRow.deaths = Number(savedRow.deaths || 0) + 1;
-                soloBotScoreRows.set(defeatedId, savedRow);
+                soloBotScoreRows.delete(defeatedId);
                 if(isSoloBattleActive()) awardSoloBotKillReward(defeatedPos);
                 if(!isSoloBattleActive()) pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
                 updateEnemyHud();
@@ -3793,7 +3798,7 @@ if (gameState === "BATTLE" && playerShip) {
                 updateBattleScoreboard();
                 if(isSoloBattleActive() && !isEndlessSoloBattle() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
                 else if(isSoloBattleActive() && !isEndlessSoloBattle()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, 1400);
-                else if(isEndlessSoloBattle()) lastEndlessBotSpawnAt = 0;
+                else if(isEndlessSoloBattle()) lastEndlessBotSpawnAt = Date.now();
             }
             continue;
         }
@@ -9386,18 +9391,42 @@ function updateBattleScoreboard(){
     const rows = [];
     if(selfRow) rows.push(selfRow);
     if(isSoloBattleActive()){
-        const botRows = new Map(soloBotScoreRows instanceof Map ? soloBotScoreRows : []);
-        getActiveSoloBots().forEach((bot, idx) => {
-            const id = String(bot?.userData?.id || `BOT-${idx+1}`);
-            if(!botRows.has(id)){
-                botRows.set(id, { id, nickname: bot?.userData?.name || 'UFO Raider', kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' });
+        const activeBots = getActiveSoloBots();
+        const activeIds = new Set(activeBots.map((bot, idx) => String(bot?.userData?.id || `BOT-${idx+1}`)));
+        if(soloBotScoreRows instanceof Map){
+            for(const key of Array.from(soloBotScoreRows.keys())){
+                if(!activeIds.has(String(key))) soloBotScoreRows.delete(key);
             }
-        });
-        botRows.forEach((row) => {
-            rows.push({ nickname: row.nickname || 'UFO Raider', clan: '', level: Number(row.level || 1) || 1, kills: Number(row.kills || 0) || 0, deaths: Number(row.deaths || 0) || 0, id: row.id || 'BOT', ping: 0, deadUntil: 0, team: 'red' });
+        }else{
+            soloBotScoreRows = new Map();
+        }
+        activeBots.forEach((bot, idx) => {
+            const id = String(bot?.userData?.id || `BOT-${idx+1}`);
+            let row = soloBotScoreRows.get(id);
+            if(!row){
+                row = {
+                    id,
+                    nickname: bot?.userData?.name || 'UFO Raider',
+                    kills: Number(bot?.userData?.scoreKills || 0) || 0,
+                    deaths: Number(bot?.userData?.scoreDeaths || 0) || 0,
+                    level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
+                    team: 'red'
+                };
+                soloBotScoreRows.set(id, row);
+            }
+            rows.push({
+                nickname: row.nickname || bot?.userData?.name || 'UFO Raider',
+                clan: '',
+                level: Number(row.level || 1) || 1,
+                kills: Number(row.kills || bot?.userData?.scoreKills || 0) || 0,
+                deaths: Number(row.deaths || bot?.userData?.scoreDeaths || 0) || 0,
+                id,
+                ping: 0,
+                deadUntil: 0,
+                team: 'red'
+            });
         });
     }
-
     roomPlayers.forEach((entry) => {
         const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
         const safeName = String(entry?.nickname || entry?.name || entry || '').trim();
@@ -19241,87 +19270,3 @@ setInterval(() => {
     setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800);
   });
 })();
-
-
-// ===== FINAL HARD FIX BOT CONTROL =====
-function __forceBotControl(){
-    if(!isEndlessSoloBattle()) return;
-
-    const kills = Math.max(0, Number(battleStats.playerKills||0)||0);
-    const allowed = Math.min(ENDLESS_SOLO_MAX_BOTS, 1 + Math.floor(kills / ENDLESS_SOLO_KILLS_PER_EXTRA_BOT));
-
-    // REMOVE extra bots (this kills spawn-on-death bug)
-    while(soloEnemyBots.length > allowed){
-        const b = soloEnemyBots.pop();
-        try{ scene.remove(b.mesh); }catch(e){}
-    }
-
-    // ADD only if needed (controlled)
-    while(soloEnemyBots.length < allowed){
-        spawnEnemyBot();
-    }
-}
-
-// hook into game loop
-try{
-    const __oldUpdate = updateBattle || (()=>{});
-    updateBattle = function(){
-        __oldUpdate.apply(this, arguments);
-        __forceBotControl();
-    }
-}catch(e){}
-
-
-// === SAFE BOT LIMIT FIX ===
-function __limitBots(){
-    if(!isEndlessSoloBattle()) return;
-    const kills = Math.max(0, Number(battleStats.playerKills||0));
-    const allowed = Math.min(10, 1 + Math.floor(kills/20));
-
-    while(soloEnemyBots.length > allowed){
-        const b = soloEnemyBots.pop();
-        try{scene.remove(b.mesh);}catch(e){}
-    }
-}
-
-if(typeof updateBattle === "function"){
-    const __oldUpdateBattle = updateBattle;
-    updateBattle = function(){
-        __oldUpdateBattle.apply(this, arguments);
-        __limitBots();
-    }
-}
-
-// === FINAL BOT SPAWN FIX (VISIBLE BOTS) ===
-function __updateBotsFinal(){
-    if(!isEndlessSoloBattle()) return;
-
-    const kills = Math.max(0, Number(battleStats.playerKills||0));
-    const allowed = Math.min(10, 1 + Math.floor(kills / 20));
-
-    // remove extra bots
-    while(soloEnemyBots.length > allowed){
-        const b = soloEnemyBots.pop();
-        try{ if(b?.mesh) scene.remove(b.mesh); }catch(e){}
-    }
-
-    // add missing bots (REAL spawn)
-    while(soloEnemyBots.length < allowed){
-        try{
-            const bot = createEnemyBot({ append:true, controlledWave:true });
-            if(bot){
-                soloEnemyBots.push(bot);
-                if(bot.mesh) scene.add(bot.mesh);
-            }
-        }catch(e){}
-    }
-}
-
-// hook
-if(typeof updateBattle === "function"){
-    const __oldUpdateBattle2 = updateBattle;
-    updateBattle = function(){
-        __oldUpdateBattle2.apply(this, arguments);
-        __updateBotsFinal();
-    }
-}
