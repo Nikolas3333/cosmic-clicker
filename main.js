@@ -102,7 +102,7 @@ let endlessSoloLastBannerStage = 1;
 let endlessSoloLastKillCount = 0;
 
 
-const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 5200;
+const // removed cooldown spawn
 let enemyLasers = [];
 let battleObjects = [];
 let battleMapPlanet = null;
@@ -1854,7 +1854,7 @@ if(gameState === "BATTLE"){
             hideSoloMissionResult?.();
             battleStats.playerKills = 0; battleStats.playerDeaths = 0; battleStats.botKills = 0; battleStats.botDeaths = 0;
             endlessSoloCurrentStage = 1; endlessSoloLastBannerStage = 1; endlessSoloLastKillCount = 0;
-            createEnemyBot();
+            // blocked spawn
             updateEnemyHud();
             updateSoloMissionHud?.();
             updateBattleScoreboard();
@@ -3792,7 +3792,7 @@ if (gameState === "BATTLE" && playerShip) {
                 updateSoloMissionHud?.();
                 updateBattleScoreboard();
                 if(isSoloBattleActive() && !isEndlessSoloBattle() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
-                else if(isSoloBattleActive() && !isEndlessSoloBattle()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, 1400);
+                else if(isSoloBattleActive() && !isEndlessSoloBattle()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) // blocked spawn }, 1400);
                 else if(isEndlessSoloBattle()) lastEndlessBotSpawnAt = 0;
             }
             continue;
@@ -9097,10 +9097,10 @@ function ensureEndlessSoloBotWave(){
     const now = Date.now();
     // removed instant respawn block
 
-    if((now - lastEndlessBotSpawnAt) < ENDLESS_SOLO_SPAWN_COOLDOWN_MS) return;
+    if((now - lastEndlessBotSpawnAt) < // removed cooldown spawn
 
     lastEndlessBotSpawnAt = now;
-    if(soloEnemyBots.length < getEndlessSoloDesiredBotCount()){ createEnemyBot({ append:true, controlledWave:true }); }
+    if(soloEnemyBots.length < getEndlessSoloDesiredBotCount()){ // blocked spawn }
     pruneEndlessSoloBotsToLimit();
 }
 
@@ -19270,3 +19270,40 @@ try{
         __forceBotControl();
     }
 }catch(e){}
+
+// === CLEAN SPAWN SYSTEM ===
+function __updateBots(){
+    if(!isEndlessSoloBattle()) return;
+    const kills = Math.max(0, Number(battleStats.playerKills||0));
+    const allowed = Math.min(10, 1 + Math.floor(kills/20));
+
+    while(soloEnemyBots.length > allowed){
+        const b = soloEnemyBots.pop();
+        try{scene.remove(b.mesh);}catch(e){}
+    }
+
+    while(soloEnemyBots.length < allowed){
+        __spawnCleanBot();
+    }
+}
+
+function __spawnCleanBot(){
+    try{
+        const bot = new THREE.Object3D();
+        bot.position.set(
+            (Math.random()-0.5)*200,
+            (Math.random()-0.5)*200,
+            (Math.random()-0.5)*200
+        );
+        soloEnemyBots.push({mesh:bot});
+        scene.add(bot);
+    }catch(e){}
+}
+
+if(typeof updateBattle === "function"){
+    const old=updateBattle;
+    updateBattle=function(){
+        old.apply(this,arguments);
+        __updateBots();
+    }
+}
