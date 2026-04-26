@@ -19291,3 +19291,37 @@ if(typeof updateBattle === "function"){
         __limitBots();
     }
 }
+
+// === FINAL BOT SPAWN FIX (VISIBLE BOTS) ===
+function __updateBotsFinal(){
+    if(!isEndlessSoloBattle()) return;
+
+    const kills = Math.max(0, Number(battleStats.playerKills||0));
+    const allowed = Math.min(10, 1 + Math.floor(kills / 20));
+
+    // remove extra bots
+    while(soloEnemyBots.length > allowed){
+        const b = soloEnemyBots.pop();
+        try{ if(b?.mesh) scene.remove(b.mesh); }catch(e){}
+    }
+
+    // add missing bots (REAL spawn)
+    while(soloEnemyBots.length < allowed){
+        try{
+            const bot = createEnemyBot({ append:true, controlledWave:true });
+            if(bot){
+                soloEnemyBots.push(bot);
+                if(bot.mesh) scene.add(bot.mesh);
+            }
+        }catch(e){}
+    }
+}
+
+// hook
+if(typeof updateBattle === "function"){
+    const __oldUpdateBattle2 = updateBattle;
+    updateBattle = function(){
+        __oldUpdateBattle2.apply(this, arguments);
+        __updateBotsFinal();
+    }
+}
