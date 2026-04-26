@@ -3790,7 +3790,8 @@ if (gameState === "BATTLE" && playerShip) {
                 battleStats.botDeaths += 1;
                 const savedRow = soloBotScoreRows.get(defeatedId) || { id:defeatedId, nickname:defeatedName, kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' };
                 savedRow.deaths = Number(savedRow.deaths || 0) + 1;
-                soloBotScoreRows.delete(defeatedId);
+                try{ hitEnemyBot.userData.scoreDeaths = savedRow.deaths; }catch(_){}
+                soloBotScoreRows.set(defeatedId, savedRow);
                 if(isSoloBattleActive()) awardSoloBotKillReward(defeatedPos);
                 if(!isSoloBattleActive()) pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
                 updateEnemyHud();
@@ -9392,14 +9393,7 @@ function updateBattleScoreboard(){
     if(selfRow) rows.push(selfRow);
     if(isSoloBattleActive()){
         const activeBots = getActiveSoloBots();
-        const activeIds = new Set(activeBots.map((bot, idx) => String(bot?.userData?.id || `BOT-${idx+1}`)));
-        if(soloBotScoreRows instanceof Map){
-            for(const key of Array.from(soloBotScoreRows.keys())){
-                if(!activeIds.has(String(key))) soloBotScoreRows.delete(key);
-            }
-        }else{
-            soloBotScoreRows = new Map();
-        }
+        if(!(soloBotScoreRows instanceof Map)) soloBotScoreRows = new Map();
         activeBots.forEach((bot, idx) => {
             const id = String(bot?.userData?.id || `BOT-${idx+1}`);
             let row = soloBotScoreRows.get(id);
@@ -9418,8 +9412,8 @@ function updateBattleScoreboard(){
                 nickname: row.nickname || bot?.userData?.name || 'UFO Raider',
                 clan: '',
                 level: Number(row.level || 1) || 1,
-                kills: Number(row.kills || bot?.userData?.scoreKills || 0) || 0,
-                deaths: Number(row.deaths || bot?.userData?.scoreDeaths || 0) || 0,
+                kills: Number(row.kills ?? bot?.userData?.scoreKills ?? 0) || 0,
+                deaths: Number(row.deaths ?? bot?.userData?.scoreDeaths ?? 0) || 0,
                 id,
                 ping: 0,
                 deadUntil: 0,
