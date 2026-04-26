@@ -97,6 +97,102 @@ let lastEndlessBotSpawnAt = 0;
 const ENDLESS_SOLO_MAX_BOTS = 10;
 const ENDLESS_SOLO_BASE_BOTS = 1;
 const ENDLESS_SOLO_KILLS_PER_EXTRA_BOT = 20; // controlled spawn
+
+
+// ===== FIX: CONTROL BOT SPAWN (no spawn on death, only by kills) =====
+let __allowBotSpawn = false;
+let __originalSpawnEnemyBot = typeof spawnEnemyBot === 'function' ? spawnEnemyBot : null;
+
+function __spawnEnemyBotControlled(){
+    if(!__allowBotSpawn) return;
+    try{ __originalSpawnEnemyBot && __originalSpawnEnemyBot(); }catch(_){}
+}
+
+if(__originalSpawnEnemyBot){
+    spawnEnemyBot = __spawnEnemyBotControlled;
+}
+
+// ensure start = 1 bot only
+function __initEndlessBotsOnce(){
+    try{
+        if(!Array.isArray(soloEnemyBots)) return;
+        soloEnemyBots.length = 0;
+        __allowBotSpawn = true;
+        __originalSpawnEnemyBot && __originalSpawnEnemyBot();
+    }catch(_){}
+    finally{ __allowBotSpawn = false; }
+}
+
+// call on battle start for endless
+try{
+    const __oldSwitchState = switchState;
+    switchState = function(next){
+        const prev = gameState;
+        const res = __oldSwitchState.apply(this, arguments);
+        if(next === 'BATTLE'){
+            setTimeout(()=>{ try{ if(isEndlessSoloBattle && isEndlessSoloBattle()){ __initEndlessBotsOnce(); } }catch(_){} }, 50);
+        }
+        return res;
+    }
+}catch(_){}
+
+// spawn by kills each 20 up to 10
+function __trySpawnByKills(){
+    try{
+        if(!isEndlessSoloBattle || !isEndlessSoloBattle()) return;
+        const kills = Number(battleStats?.playerKills||0)||0;
+        const allowed = Math.min(ENDLESS_SOLO_MAX_BOTS, 1 + Math.floor(kills / ENDLESS_SOLO_KILLS_PER_EXTRA_BOT));
+        if((soloEnemyBots?.length||0) >= allowed) return;
+        __allowBotSpawn = true;
+        __originalSpawnEnemyBot && __originalSpawnEnemyBot();
+    }catch(_){}
+    finally{ __allowBotSpawn = false; }
+}
+
+// hook after player kill increment
+try{
+    const __oldAward = awardSoloBotKillReward;
+    awardSoloBotKillReward = function(){
+        const r = __oldAward.apply(this, arguments);
+        __trySpawnByKills();
+        __updateStageUI();
+        return r;
+    }
+}catch(_){}
+
+// ===== STAGE SYSTEM UI =====
+let __currentStage = 1;
+function __calcStage(){
+    const k = Number(battleStats?.playerKills||0)||0;
+    return 1 + Math.floor(k / ENDLESS_SOLO_KILLS_PER_EXTRA_BOT);
+}
+function __updateStageUI(){
+    const s = __calcStage();
+    if(s === __currentStage) return;
+    __currentStage = s;
+    try{
+        let el = document.getElementById('solo-stage-banner');
+        if(!el){
+            el = document.createElement('div');
+            el.id = 'solo-stage-banner';
+            el.style.position = 'fixed';
+            el.style.top = '60px';
+            el.style.left = '50%';
+            el.style.transform = 'translateX(-50%)';
+            el.style.padding = '10px 16px';
+            el.style.borderRadius = '10px';
+            el.style.background = 'rgba(0,0,0,0.7)';
+            el.style.border = '1px solid #00ffff';
+            el.style.boxShadow = '0 0 16px rgba(0,255,255,0.5)';
+            el.style.zIndex = '99999';
+            document.body.appendChild(el);
+        }
+        el.textContent = 'НОВАЯ СТАДИЯ: ' + s;
+        el.style.display = 'block';
+        setTimeout(()=>{ el.style.display = 'none'; }, 2200);
+    }catch(_){}
+}
+
 const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 5200;
 let enemyLasers = [];
 let battleObjects = [];
