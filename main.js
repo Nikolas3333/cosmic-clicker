@@ -3889,26 +3889,57 @@ if (gameState === "BATTLE" && playerShip) {
     if (playerShip && activeBots.length) {
         activeBots.forEach((bot, botIndex) => {
             if(!bot || bot.userData?.alive === false) return;
-            bot.userData.strafePhase += 0.014 + botIndex * 0.0018;
+            const endlessMode = isEndlessSoloBattle();
+            bot.userData.strafePhase += (endlessMode ? 0.009 : 0.014) + botIndex * 0.0014;
             const toPlayerVector = playerShip.position.clone().sub(bot.position);
             const distanceToPlayer = Math.max(1, toPlayerVector.length());
             const desiredForward = toPlayerVector.clone().normalize();
-            const side = new THREE.Vector3(1,0,0).cross(desiredForward).normalize();
-            const preferredDistance = isEndlessSoloBattle() ? Number(bot.userData?.preferredDistance || 190) : 36;
-            const keepOffset = distanceToPlayer < preferredDistance ? -preferredDistance : -Math.min(preferredDistance, Math.max(42, distanceToPlayer * 0.32));
-            const botStrafeDistance = isEndlessSoloBattle() ? (42 + botIndex * 7) : 7;
-            const desiredPos = playerShip.position.clone()
-                .add(desiredForward.clone().multiplyScalar(keepOffset))
-                .add(side.multiplyScalar(Math.sin(bot.userData.strafePhase) * botStrafeDistance));
-            desiredPos.y += Math.cos(bot.userData.strafePhase * 1.7) * (isEndlessSoloBattle() ? 9.5 : 2.2);
-            const lerpSpeed = isEndlessSoloBattle() ? 0.018 : 0.045;
-            bot.position.lerp(desiredPos, lerpSpeed);
-            handleBattleCollisions(bot);
-            bot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(6)));
-            bot.rotation.z += ((Math.sin(bot.userData.strafePhase) * 0.45) - bot.rotation.z) * 0.04;
+            const sideRaw = new THREE.Vector3(0,1,0).cross(desiredForward);
+            const side = sideRaw.lengthSq() > 0.0001 ? sideRaw.normalize() : new THREE.Vector3(1,0,0);
 
-            const cooldown = isEndlessSoloBattle()
-                ? (1800 + botIndex * 260 + Math.random() * 320)
+            let desiredPos;
+            if(endlessMode){
+                const playerForward = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
+                const slotAngle = (botIndex / Math.max(1, activeBots.length)) * Math.PI * 2 + Number(bot.userData.strafePhase || 0) * 0.34;
+                const attackDistance = THREE.MathUtils.clamp(Number(bot.userData?.preferredDistance || 120) || 120, 90, 175);
+                const ringOffset = side.clone().multiplyScalar(Math.sin(slotAngle) * (48 + botIndex * 5));
+                const verticalOffset = new THREE.Vector3(0, Math.cos(slotAngle * 1.37) * 28, 0);
+                const frontOffset = playerForward.clone().multiplyScalar(-(attackDistance + Math.cos(slotAngle) * 26));
+
+                if(distanceToPlayer > 430 || Number(bot.userData.edgeReturnUntil || 0) > Date.now()){
+                    desiredPos = playerShip.position.clone()
+                        .add(playerForward.clone().multiplyScalar(-Math.min(210, attackDistance + 55)))
+                        .add(ringOffset.multiplyScalar(0.55))
+                        .add(verticalOffset.multiplyScalar(0.45));
+                }else if(distanceToPlayer < 70){
+                    desiredPos = playerShip.position.clone()
+                        .add(desiredForward.clone().multiplyScalar(-105))
+                        .add(ringOffset.multiplyScalar(0.32));
+                }else{
+                    desiredPos = playerShip.position.clone()
+                        .add(frontOffset)
+                        .add(ringOffset)
+                        .add(verticalOffset);
+                }
+                desiredPos = clampVectorToEndlessCombatZone(desiredPos, 120);
+            }else{
+                const preferredDistance = 36;
+                const keepOffset = distanceToPlayer < preferredDistance ? -preferredDistance : -Math.min(preferredDistance, Math.max(42, distanceToPlayer * 0.32));
+                desiredPos = playerShip.position.clone()
+                    .add(desiredForward.clone().multiplyScalar(keepOffset))
+                    .add(side.multiplyScalar(Math.sin(bot.userData.strafePhase) * 7));
+                desiredPos.y += Math.cos(bot.userData.strafePhase * 1.7) * 2.2;
+            }
+
+            const lerpSpeed = endlessMode ? (distanceToPlayer > 430 ? 0.052 : 0.034) : 0.045;
+            bot.position.lerp(desiredPos, lerpSpeed);
+            clampEndlessBotToCombatZone(bot);
+            handleBattleCollisions(bot);
+            bot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(endlessMode ? 2.2 : 6)));
+            bot.rotation.z += ((Math.sin(bot.userData.strafePhase) * (endlessMode ? 0.24 : 0.45)) - bot.rotation.z) * 0.04;
+
+            const cooldown = endlessMode
+                ? (2300 + botIndex * 310 + Math.random() * 520)
                 : botShotCooldown;
             if (Date.now() - Number(bot.userData.lastShotAt || 0) > cooldown) {
                 bot.userData.lastShotAt = Date.now();
@@ -7424,15 +7455,40 @@ function updateBattleSolarSystemView(){
     });
 }
 
+function getEndlessCombatRadius(){
+    return 1180;
+}
+
+function clampVectorToEndlessCombatZone(position, margin = 0){
+    if(!position || typeof position.clone !== 'function') return position;
+    const safeLimit = Math.max(120, getEndlessCombatRadius() - Math.max(0, Number(margin || 0) || 0));
+    const center = new THREE.Vector3(0, 0, 0);
+    const offset = position.clone().sub(center);
+    const dist = offset.length();
+    if(dist <= safeLimit) return position;
+    const normal = dist > 0.001 ? offset.normalize() : new THREE.Vector3(0, 0, 1);
+    return center.add(normal.multiplyScalar(safeLimit));
+}
+
+function clampEndlessBotToCombatZone(bot){
+    if(!bot || !isEndlessSoloBattle()) return;
+    const clamped = clampVectorToEndlessCombatZone(bot.position, 90);
+    if(clamped && clamped !== bot.position){
+        bot.position.lerp(clamped, 0.42);
+        bot.userData.edgeReturnUntil = Date.now() + 1600;
+    }
+}
+
 function getSoloBotSpawnPosition(){
     if(isEndlessSoloBattle()){
-        const minDist = 520;
-        const maxDist = 980;
+        const minDist = 340;
+        const maxDist = 620;
         const angle = Math.random() * Math.PI * 2;
         const dist = minDist + Math.random() * (maxDist - minDist);
-        const y = -120 + Math.random() * 240;
+        const y = -70 + Math.random() * 140;
         const base = playerShip?.position?.clone?.() || new THREE.Vector3(0, 20, 0);
-        return base.add(new THREE.Vector3(Math.cos(angle) * dist, y, Math.sin(angle) * dist));
+        const pos = base.add(new THREE.Vector3(Math.cos(angle) * dist, y, Math.sin(angle) * dist));
+        return clampVectorToEndlessCombatZone(pos, 180);
     }
     const spawnBase = spawnPointB?.clone?.() || new THREE.Vector3(130, 10, -120);
     return spawnBase.add(new THREE.Vector3((Math.random()-0.5)*34, 8 + Math.random()*12, (Math.random()-0.5)*34));
@@ -8943,7 +8999,7 @@ function ensureEndlessSoloBotWave(){
     if(alive.length >= desired) return;
     if(alive.length === 0){
         lastEndlessBotSpawnAt = now;
-        for(let i=0;i<Math.min(3, desired);i++) createEnemyBot({ append:true });
+        for(let i=0;i<Math.min(6, desired);i++) createEnemyBot({ append:true });
         return;
     }
     if((now - lastEndlessBotSpawnAt) < ENDLESS_SOLO_SPAWN_COOLDOWN_MS) return;
@@ -8987,7 +9043,7 @@ function createEnemyBot(options = {}){
         weaponType,
         lastShotAt: Date.now() + Math.random() * 1800,
         tractorReadyAt: Date.now() + 60000 + Math.random() * 90000,
-        preferredDistance: endlessMode ? (145 + Math.random() * 190) : 36,
+        preferredDistance: endlessMode ? (105 + Math.random() * 58) : 36,
         scoreKills: 0,
         scoreDeaths: 0
     };
@@ -14323,7 +14379,7 @@ function limitBattleArea(){
     if(!playerShip) return;
     const center = new THREE.Vector3(0, 0, 0);
     const toShip = playerShip.position.clone().sub(center);
-    const limit = isEndlessSoloBattle() ? 2400 : 760;
+    const limit = isEndlessSoloBattle() ? getEndlessCombatRadius() : 760;
     const dist = toShip.length();
     if(dist <= limit) return;
     const normal = toShip.normalize();
@@ -14689,7 +14745,7 @@ function limitBattleArea(){
         if(gameState !== 'BATTLE' || !playerShip) return;
         const center = new THREE.Vector3(0, 0, 0);
         const toShip = playerShip.position.clone().sub(center);
-        const limit = 1320;
+        const limit = isEndlessSoloBattle() ? getEndlessCombatRadius() : 1320;
         const dist = toShip.length();
         if(dist <= limit) return;
         const normal = toShip.normalize();
