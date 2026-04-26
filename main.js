@@ -480,19 +480,55 @@ function isEndlessSoloBattle(){ return !!(isSoloBattleActive() && (activeSoloMis
 function addPlayerBattleCurrency(kind = 'coins', amount = 0){
     const value = Math.max(0, Number(amount || 0) || 0);
     if(!value) return;
-    if(typeof playerResources !== 'object' || !playerResources) return;
-    if(kind === 'crystals'){
-        playerResources.crystals = Math.max(0, Number(playerResources.crystals || 0) + value);
-    }else{
-        playerResources.coins = Math.max(0, Number(playerResources.coins || player?.credits || 0) + value);
-        if(player) player.credits = playerResources.coins;
+
+    if(typeof playerResources !== 'object' || !playerResources){
+        try{ window.playerResources = window.playerResources || {}; }catch(_){}
     }
+
+    if(kind === 'crystals'){
+        if(typeof playerResources === 'object' && playerResources){
+            playerResources.crystals = Math.max(0, Number(playerResources.crystals || 0) + value);
+            playerResources.diamonds = Math.max(0, Number(playerResources.diamonds || 0) + value);
+        }
+        if(player){
+            player.crystals = Math.max(0, Number(player.crystals || 0) + value);
+            player.diamonds = Math.max(0, Number(player.diamonds || 0) + value);
+        }
+    }else{
+        if(typeof playerResources === 'object' && playerResources){
+            playerResources.coins = Math.max(0, Number(playerResources.coins || 0) + value);
+            playerResources.credits = Math.max(0, Number(playerResources.credits || 0) + value);
+        }
+        if(player){
+            player.credits = Math.max(0, Number(player.credits || 0) + value);
+            player.coins = Math.max(0, Number(player.coins || 0) + value);
+        }
+    }
+
+    try{ inventory?.syncFromPlayerResources?.(); }catch(_){}
+    try{ updateHUD?.(); updateUI?.(); updatePremiumBar?.(); updateBattlePlayerHud?.(); }catch(_){}
+    try{ saveGame?.(); }catch(_){}
 }
 function awardSoloBotKillReward(worldPosition = null){
-    player.experience = Math.max(0, Number(player.experience || 0) + SOLO_KILL_EXP_REWARD);
-    addPlayerBattleCurrency('coins', SOLO_KILL_COIN_REWARD);
-    try{ showBattleFloatingReward(SOLO_KILL_EXP_REWARD, SOLO_KILL_COIN_REWARD, worldPosition || playerShip?.position || null); }catch(_){}
-    try{ updateHUD?.(); updateUI?.(); updatePremiumBar?.(); updateBattlePlayerHud?.(); saveGame?.(); }catch(_){}
+    const expReward = Math.max(0, Number(SOLO_KILL_EXP_REWARD || 0) || 0);
+    const coinReward = Math.max(0, Number(SOLO_KILL_COIN_REWARD || 0) || 0);
+
+    if(player){
+        player.experience = Math.max(0, Number(player.experience || 0) + expReward);
+        player.credits = Math.max(0, Number(player.credits || 0) + coinReward);
+    }
+
+    if(typeof playerResources === 'object' && playerResources){
+        playerResources.coins = Math.max(0, Number(playerResources.coins || 0) + coinReward);
+        playerResources.credits = Math.max(0, Number(playerResources.credits || 0) + coinReward);
+    }
+
+    try{ showBattleFloatingReward(expReward, coinReward, worldPosition || playerShip?.position || null); }catch(_){}
+    try{ inventory?.syncFromPlayerResources?.(); }catch(_){}
+    try{ updateHUD?.(); updateUI?.(); updatePremiumBar?.(); updateBattlePlayerHud?.(); updateBattleScoreboard?.(); }catch(_){}
+    try{ saveGame?.(); }catch(_){}
+    try{ savePlayerData?.(); }catch(_){}
+    try{ savePlayerProfile?.(); }catch(_){}
 }
 function awardSoloMissionWinReward(){
     if(isEndlessSoloBattle()) return;
@@ -9394,6 +9430,7 @@ function updateBattleScoreboard(){
     if(isSoloBattleActive()){
         const activeBots = getActiveSoloBots();
         if(!(soloBotScoreRows instanceof Map)) soloBotScoreRows = new Map();
+
         activeBots.forEach((bot, idx) => {
             const id = String(bot?.userData?.id || `BOT-${idx+1}`);
             let row = soloBotScoreRows.get(id);
@@ -9407,14 +9444,22 @@ function updateBattleScoreboard(){
                     team: 'red'
                 };
                 soloBotScoreRows.set(id, row);
+            }else{
+                row.nickname = row.nickname || bot?.userData?.name || 'UFO Raider';
+                row.level = Number(row.level || activeSoloMission?.minLevel || player?.level || 1) || 1;
+                bot.userData.scoreKills = Number(row.kills || 0) || 0;
+                bot.userData.scoreDeaths = Number(row.deaths || 0) || 0;
             }
+        });
+
+        soloBotScoreRows.forEach((row, id) => {
             rows.push({
-                nickname: row.nickname || bot?.userData?.name || 'UFO Raider',
+                nickname: row.nickname || 'UFO Raider',
                 clan: '',
                 level: Number(row.level || 1) || 1,
-                kills: Number(row.kills ?? bot?.userData?.scoreKills ?? 0) || 0,
-                deaths: Number(row.deaths ?? bot?.userData?.scoreDeaths ?? 0) || 0,
-                id,
+                kills: Number(row.kills || 0) || 0,
+                deaths: Number(row.deaths || 0) || 0,
+                id: row.id || id || 'BOT',
                 ping: 0,
                 deadUntil: 0,
                 team: 'red'
