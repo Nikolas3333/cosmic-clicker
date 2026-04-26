@@ -544,6 +544,56 @@ function isSoloBattleActive(){ return !!(currentRoom?.solo || currentRoom?.state
 function getActiveSoloMissionGoal(){ return Math.max(1, Number(activeSoloMission?.goalKills || currentRoom?.goalKills || 6) || 6); }
 function getActiveSoloMissionLives(){ return Math.max(1, Number(activeSoloMission?.playerLives || currentRoom?.playerLives || SOLO_DEFAULT_PLAYER_LIVES) || SOLO_DEFAULT_PLAYER_LIVES); }
 function getSoloLivesLeft(){ return Math.max(0, getActiveSoloMissionLives() - (Number(battleStats.playerDeaths || 0) || 0)); }
+
+// ===== V372 SOLO KILLFEED / BOT LABEL / TEAM SCOREBOARD HELPERS =====
+function pushBattleKillFeedLine(text = ''){
+    try{
+        const safeText = String(text || '').trim();
+        if(!safeText) return;
+        let feed = document.getElementById('battle-kill-feed');
+        if(!feed){
+            feed = document.createElement('div');
+            feed.id = 'battle-kill-feed';
+            document.body.appendChild(feed);
+        }
+        const item = document.createElement('div');
+        item.className = 'battle-kill-feed-item';
+        item.textContent = safeText;
+        feed.prepend(item);
+        while(feed.children.length > 5) feed.removeChild(feed.lastElementChild);
+        setTimeout(() => {
+            try{
+                item.style.opacity = '0';
+                setTimeout(() => item.remove(), 350);
+            }catch(_){}
+        }, 5200);
+    }catch(_){}
+}
+
+function updateBattleBotNameLabel(){
+    try{
+        let label = document.getElementById('battle-bot-name-label');
+        if(!label){
+            label = document.createElement('div');
+            label.id = 'battle-bot-name-label';
+            document.body.appendChild(label);
+        }
+        if(gameState !== 'BATTLE' || !isSoloBattleActive()){
+            label.style.display = 'none';
+            return;
+        }
+        const bots = getActiveSoloBots();
+        const bot = enemyBot?.userData?.alive !== false ? enemyBot : (bots[0] || null);
+        const name = String(bot?.userData?.name || '').trim();
+        if(!name){
+            label.style.display = 'none';
+            return;
+        }
+        label.textContent = name;
+        label.style.display = 'block';
+    }catch(_){}
+}
+
 function updateSoloMissionHud(){
     const hud = document.getElementById('solo-mission-hud');
     if(!hud) return;
@@ -3825,8 +3875,10 @@ if (gameState === "BATTLE" && playerShip) {
                 battleStats.botDeaths += 1;
                 const savedRow = soloBotScoreRows.get(defeatedId) || { id:defeatedId, nickname:defeatedName, kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' };
                 savedRow.deaths = Number(savedRow.deaths || 0) + 1;
+                savedRow.deadUntil = Date.now() + 3000;
                 try{ hitEnemyBot.userData.scoreDeaths = savedRow.deaths; }catch(_){}
                 soloBotScoreRows.set(defeatedId, savedRow);
+                try{ pushBattleKillFeedLine(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`); }catch(_){}
                 if(isSoloBattleActive()) awardSoloBotKillReward(defeatedPos);
                 if(!isSoloBattleActive()) pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
                 updateEnemyHud();
@@ -3905,6 +3957,7 @@ if (gameState === "BATTLE" && playerShip) {
             if(playerHp <= 0 && !isBattleRespawning() && !activeSoloMissionEnded){
                 battleStats.botKills += 1;
                 battleStats.playerDeaths += 1;
+    try{ pushBattleKillFeedLine(`${enemyBot?.userData?.name || 'UFO Raider'} уничтожил ${player?.nickname || 'Commander'}`); }catch(_){}
                 const killerBot = laser.shooter || enemyBot;
                 const killerId = String(killerBot?.userData?.id || 'BOT');
                 if(killerId){
@@ -4461,6 +4514,7 @@ function startShipCrashAnimation(){
     battleShipCrash = { startAt: Date.now(), duration: 250 };
     spawnShipDebris(playerShip.position.clone(), 0xffa36a);
     battleStats.playerDeaths += 1;
+    try{ pushBattleKillFeedLine(`${enemyBot?.userData?.name || 'UFO Raider'} уничтожил ${player?.nickname || 'Commander'}`); }catch(_){}
     updateBattleScoreboard();
     pushKillFeed(`${player?.nickname || 'Commander'} разбился о планету`, 'kill');
     scheduleBattleRespawn(2000);
@@ -4477,6 +4531,7 @@ function startSunProminenceDeath(){
     if(!playerShip || battleShipCrash || isBattleRespawning()) return;
     spawnShipDebris(playerShip.position.clone(), 0xffd36a);
     battleStats.playerDeaths += 1;
+    try{ pushBattleKillFeedLine(`${enemyBot?.userData?.name || 'UFO Raider'} уничтожил ${player?.nickname || 'Commander'}`); }catch(_){}
     updateBattleScoreboard();
     pushKillFeed(`${player?.nickname || 'Commander'} сгорел в протуберанце`, 'kill');
     scheduleBattleRespawn(2000);
@@ -9229,7 +9284,7 @@ function createEnemyBot(options = {}){
             deaths: 0,
             weaponType,
             level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
-            team: 'red'
+            team: 'blue'
         });
     }
 
@@ -9440,10 +9495,10 @@ function updateBattleScoreboard(){
     if(!body) return;
 
     const myId = getSelfBattlePlayerId();
-    const selfTeam = getBattleRoomPlayerTeam(myId);
+    const selfTeam = isSoloBattleActive() ? 'red' : getBattleRoomPlayerTeam(myId);
     const selfRow = (gameState === 'OBSERVE') ? null : {
         nickname: player?.nickname || 'Commander',
-        clan: '',
+        clan: isSoloBattleActive() ? 'RED' : '',
         level: Number(player?.level || 1) || 1,
         kills: Number(battleStats.playerKills || 0) || 0,
         deaths: Number(battleStats.playerDeaths || 0) || 0,
@@ -9473,7 +9528,7 @@ function updateBattleScoreboard(){
                     kills: Number(bot?.userData?.scoreKills || 0) || 0,
                     deaths: Number(bot?.userData?.scoreDeaths || 0) || 0,
                     level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
-                    team: 'red'
+                    team: 'blue'
                 };
                 soloBotScoreRows.set(id, row);
             }else{
@@ -9501,7 +9556,7 @@ function updateBattleScoreboard(){
                     kills: Number(activeBot?.userData?.scoreKills || 0) || 0,
                     deaths: Number(activeBot?.userData?.scoreDeaths || 0) || 0,
                     level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
-                    team: 'red'
+                    team: 'blue'
                 };
                 soloBotScoreRows.set(id, row);
             }
@@ -9510,14 +9565,14 @@ function updateBattleScoreboard(){
             pushedBotIds.add(id);
             rows.push({
                 nickname: row.nickname || (isEndlessSoloBattle() ? getEndlessSoloBotSlotName(slot) : 'UFO Raider'),
-                clan: '',
+                clan: row.team === 'blue' ? 'BLUE' : 'RED',
                 level: Number(row.level || 1) || 1,
                 kills: Number(row.kills || 0) || 0,
                 deaths: Number(row.deaths || 0) || 0,
                 id,
                 ping: 0,
-                deadUntil: 0,
-                team: 'red'
+                deadUntil: Number(row.deadUntil || 0) || 0,
+                team: 'blue'
             });
         }
     }
@@ -9531,7 +9586,7 @@ function updateBattleScoreboard(){
         const remoteState = entryId ? remoteBattleShips.get(entryId) : null;
         rows.push({
             nickname: remoteState?.nickname || safeName || 'Pilot',
-            clan: '',
+            clan: team === 'red' ? 'RED' : 'BLUE',
             level: Number(remoteState?.level || entry?.level || 1) || 1,
             kills: Number(remoteState?.kills || entry?.kills || 0) || 0,
             deaths: Number(remoteState?.deaths || entry?.deaths || 0) || 0,
@@ -19364,3 +19419,15 @@ setInterval(() => {
     setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800);
   });
 })();
+
+try{
+    if(typeof updateBattle === 'function' && !updateBattle.__v372BotLabelHooked){
+        const __oldUpdateBattleV372 = updateBattle;
+        updateBattle = function(){
+            const r = __oldUpdateBattleV372.apply(this, arguments);
+            updateBattleBotNameLabel?.();
+            return r;
+        };
+        updateBattle.__v372BotLabelHooked = true;
+    }
+}catch(_){}
