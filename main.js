@@ -19247,3 +19247,32 @@ setInterval(() => {
     setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800);
   });
 })();
+
+
+// ===== FINAL HARD FIX BOT CONTROL =====
+function __forceBotControl(){
+    if(!isEndlessSoloBattle()) return;
+
+    const kills = Math.max(0, Number(battleStats.playerKills||0)||0);
+    const allowed = Math.min(ENDLESS_SOLO_MAX_BOTS, 1 + Math.floor(kills / ENDLESS_SOLO_KILLS_PER_EXTRA_BOT));
+
+    // REMOVE extra bots (this kills spawn-on-death bug)
+    while(soloEnemyBots.length > allowed){
+        const b = soloEnemyBots.pop();
+        try{ scene.remove(b.mesh); }catch(e){}
+    }
+
+    // ADD only if needed (controlled)
+    while(soloEnemyBots.length < allowed){
+        spawnEnemyBot();
+    }
+}
+
+// hook into game loop
+try{
+    const __oldUpdate = updateBattle || (()=>{});
+    updateBattle = function(){
+        __oldUpdate.apply(this, arguments);
+        __forceBotControl();
+    }
+}catch(e){}
