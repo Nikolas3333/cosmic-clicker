@@ -96,7 +96,7 @@ let battleObjects = [];
 let battleMapPlanet = null;
 let selectedLobbyMap = null;
 let lastBotShotAt = 0;
-const botShotCooldown = 900;
+const botShotCooldown = 1300;
 let playerHp = 100;
 let playerMaxHp = 100;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
@@ -460,12 +460,6 @@ let activeSoloMission = null;
 let activeSoloMissionCompleted = false;
 let activeSoloMissionEnded = false;
 let battleSolarSystemGroup = null;
-let soloEnemyBots = [];
-let lastEndlessBotSpawnAt = 0;
-const ENDLESS_SOLO_MAX_BOTS = 7;
-const ENDLESS_SOLO_RESPAWN_DELAY_MS = 6500;
-const ENDLESS_SOLO_MIN_SPAWN_DISTANCE = 420;
-const ENDLESS_SOLO_MAX_SPAWN_DISTANCE = 900;
 const SOLO_DEFAULT_PLAYER_LIVES = 5;
 const SOLO_KILL_EXP_REWARD = 2;
 const SOLO_KILL_COIN_REWARD = 2;
@@ -1327,7 +1321,7 @@ function showBattleFloatingReward(expValue = 0, coinValue = 0, worldPosition = n
 
     const node = document.createElement('div');
     node.className = 'battle-floating-reward';
-    node.innerHTML = `${expAmount ? `<span class="reward-chip exp"><span class="reward-icon">EXP</span><span class="reward-amount">+${expAmount}</span></span>` : ''}${coinAmount ? `<span class="reward-chip coin"><span class="reward-icon">⬤</span><span class="reward-amount">+${coinAmount}</span></span>` : ''}`;
+    node.innerHTML = `${expAmount ? `<span class="reward-chip exp">EXP +${expAmount}</span>` : ''}${coinAmount ? `<span class="reward-chip coin">● +${coinAmount}</span>` : ''}`;
     node.style.left = `${(projected.x * 0.5 + 0.5) * window.innerWidth}px`;
     node.style.top = `${(-projected.y * 0.5 + 0.5) * window.innerHeight}px`;
     document.body.appendChild(node);
@@ -1660,7 +1654,6 @@ function clearBattleScene(){
         try{ scene.remove(battleSolarSystemGroup); }catch(_){}
         battleSolarSystemGroup = null;
     }
-    try{ (Array.isArray(soloEnemyBots) ? soloEnemyBots : []).forEach(bot => { try{ if(bot?.parent) scene.remove(bot); }catch(_){} }); soloEnemyBots = []; enemyBot = null; }catch(_){}
 
     shipVelocity.set(0, 0, 0);
     shipRotationVelocity.set(0, 0, 0);
@@ -1842,15 +1835,7 @@ if(gameState === "BATTLE"){
             activeSoloMissionEnded = false;
             hideSoloMissionResult?.();
             battleStats.playerKills = 0; battleStats.playerDeaths = 0; battleStats.botKills = 0; battleStats.botDeaths = 0;
-            soloEnemyBots = [];
-            lastEndlessBotSpawnAt = 0;
             createEnemyBot();
-            if(isEndlessSoloBattle()){
-                try{ createBattleSolarSystemView(); }catch(_){}
-                for(let i = 0; i < ENDLESS_SOLO_MAX_BOTS - 1; i++){
-                    setTimeout(() => { if(gameState === 'BATTLE' && isEndlessSoloBattle() && !activeSoloMissionEnded) createEnemyBot(); }, 1000 + i * 850);
-                }
-            }
             updateEnemyHud();
             updateSoloMissionHud?.();
             updateBattleScoreboard();
@@ -3751,26 +3736,19 @@ if (gameState === "BATTLE" && playerShip) {
         laser.mesh.position.add(laser.velocity);
         laser.life -= 1;
 
-        const hitSoloBots = isSoloBattleActive() ? getActiveSoloEnemyBots() : (enemyBot ? [enemyBot] : []);
-        let hitEnemyBot = null;
-        for(const bot of hitSoloBots){
-            if(bot && laser.mesh.position.distanceTo(bot.position) < (Number(bot.userData?.hitRadius || 0) || 3.4)){
-                hitEnemyBot = bot;
-                break;
-            }
-        }
-        if (hitEnemyBot) {
-            const armor = Math.max(0, Math.min(0.65, Number(hitEnemyBot.userData?.armor || 0) || 0));
+        if (enemyBot && laser.mesh.position.distanceTo(enemyBot.position) < (Number(enemyBot.userData?.hitRadius || 0) || 3.4)) {
+            const armor = Math.max(0, Math.min(0.65, Number(enemyBot.userData?.armor || 0) || 0));
             const dealtDamage = Math.max(1, Math.round((Number(laser.damage || 0) || 1) * (1 - armor)));
-            hitEnemyBot.userData.hp -= dealtDamage;
+            enemyBot.userData.hp -= dealtDamage;
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
             updateEnemyHud();
-            if (hitEnemyBot.userData.hp <= 0) {
-                const defeatedName = hitEnemyBot?.userData?.name || 'UFO Raider';
-                const defeatedPos = hitEnemyBot.position.clone();
+            if (enemyBot.userData.hp <= 0) {
+                const defeatedName = enemyBot?.userData?.name || 'UFO Raider';
+                const defeatedPos = enemyBot.position.clone();
                 spawnShipDebris(defeatedPos, 0xff7755);
-                removeSoloEnemyBot(hitEnemyBot);
+                scene.remove(enemyBot);
+                enemyBot = null;
                 battleStats.playerKills += 1;
                 battleStats.botDeaths += 1;
                 if(isSoloBattleActive()) awardSoloBotKillReward(defeatedPos);
@@ -3779,8 +3757,7 @@ if (gameState === "BATTLE" && playerShip) {
                 updateSoloMissionHud?.();
                 updateBattleScoreboard();
                 if(isSoloBattleActive() && !isEndlessSoloBattle() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
-                else if(isSoloBattleActive() && !isEndlessSoloBattle()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, 1400);
-                else if(isEndlessSoloBattle()) lastEndlessBotSpawnAt = 0;
+                else if(isSoloBattleActive()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, isEndlessSoloBattle() ? 5200 : 1400);
             }
             continue;
         }
@@ -3870,34 +3847,25 @@ if (gameState === "BATTLE" && playerShip) {
         }
     }
 
-    if (playerShip) {
-        const botsToUpdate = isSoloBattleActive() ? getActiveSoloEnemyBots() : (enemyBot ? [enemyBot] : []);
-        botsToUpdate.forEach((bot, botIndex) => {
-            if(!bot || bot.userData?.alive === false) return;
-            bot.userData.strafePhase += 0.016 + botIndex * 0.0015;
-            const desiredForward = playerShip.position.clone().sub(bot.position).normalize();
-            const side = new THREE.Vector3(1,0,0).cross(desiredForward).normalize();
-            const endless = isEndlessSoloBattle();
-            const botKeepDistance = endless ? -(145 + (botIndex % 3) * 52) : -18;
-            const botStrafeDistance = endless ? (68 + (botIndex % 4) * 20) : 7;
-            const desiredPos = playerShip.position.clone()
-                .add(desiredForward.clone().multiplyScalar(botKeepDistance))
-                .add(side.multiplyScalar(Math.sin(bot.userData.strafePhase) * botStrafeDistance));
-            desiredPos.y += Math.cos(bot.userData.strafePhase * 1.35) * (endless ? 34 : 2.2);
-            bot.position.lerp(desiredPos, endless ? 0.014 : 0.045);
-            handleBattleCollisions(bot);
-            bot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(6)));
-            bot.rotation.z += ((Math.sin(bot.userData.strafePhase) * 0.45) - bot.rotation.z) * 0.04;
-            updateEndlessBotSpecials(bot);
-            const loadout = bot.userData?.loadout || {};
-            const cooldown = Number(loadout.cooldown || botShotCooldown) || botShotCooldown;
-            if (Date.now() - (Number(bot.userData.lastShotAt || 0) || 0) > cooldown) {
-                bot.userData.lastShotAt = Date.now();
-                fireBotLaser(bot);
-            }
-        });
-        setPrimaryEnemyBot();
-        ensureEndlessSoloBots();
+    if (enemyBot && playerShip) {
+        enemyBot.userData.strafePhase += 0.025;
+        const desiredForward = playerShip.position.clone().sub(enemyBot.position).normalize();
+        const side = new THREE.Vector3(1,0,0).cross(desiredForward).normalize();
+        const botKeepDistance = isEndlessSoloBattle() ? -34 : -18;
+        const botStrafeDistance = isEndlessSoloBattle() ? 15 : 7;
+        const desiredPos = playerShip.position.clone()
+            .add(desiredForward.clone().multiplyScalar(botKeepDistance))
+            .add(side.multiplyScalar(Math.sin(enemyBot.userData.strafePhase) * botStrafeDistance));
+        desiredPos.y += Math.cos(enemyBot.userData.strafePhase * 1.7) * 2.2;
+        enemyBot.position.lerp(desiredPos, 0.045);
+        handleBattleCollisions(enemyBot);
+        enemyBot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(6)));
+        enemyBot.rotation.z += ((Math.sin(enemyBot.userData.strafePhase) * 0.45) - enemyBot.rotation.z) * 0.04;
+
+        if (Date.now() - lastBotShotAt > botShotCooldown) {
+            lastBotShotAt = Date.now();
+            fireBotLaser();
+        }
     }
 
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
@@ -3915,6 +3883,7 @@ updateDebrisPieces();
 if((gameState === "BATTLE" || gameState === "OBSERVE") && battleObserverMode){
     updateObserverBattle();
 }
+if(isEndlessSoloBattle() && !battleSolarSystemGroup){ try{ createBattleSolarSystemView?.(); }catch(_){} }
 updateBattleSolarSystemView?.();
 limitBattleArea();
 updateBattlePlayerHud();
@@ -7304,7 +7273,6 @@ function createBattleSolarSystemView(){
         try{ scene.remove(battleSolarSystemGroup); }catch(_){}
         battleSolarSystemGroup = null;
     }
-    try{ (Array.isArray(soloEnemyBots) ? soloEnemyBots : []).forEach(bot => { try{ if(bot?.parent) scene.remove(bot); }catch(_){} }); soloEnemyBots = []; enemyBot = null; }catch(_){}
     battleSolarSystemGroup = new THREE.Group();
     battleSolarSystemGroup.name = 'Solo Endless Battle Solar System';
     const planetDefs = [
@@ -7350,24 +7318,13 @@ function createBattleSolarSystemView(){
         }
         battleSolarSystemGroup.add(pivot);
     });
-    battleSolarSystemGroup.position.set(0, -180, -900);
-    battleSolarSystemGroup.scale.setScalar(2.8);
-    const sunLight = new THREE.PointLight(0xffdd88, 2.4, 1800);
-    sunLight.position.set(0, 0, 0);
-    battleSolarSystemGroup.add(sunLight);
+    battleSolarSystemGroup.position.set(0, -170, -260);
+    battleSolarSystemGroup.scale.setScalar(2.25);
     scene.add(battleSolarSystemGroup);
 }
 
 function updateBattleSolarSystemView(){
-    if(isEndlessSoloBattle() && gameState === 'BATTLE' && !battleSolarSystemGroup){
-        try{ createBattleSolarSystemView(); }catch(_){}
-    }
     if(!battleSolarSystemGroup) return;
-    if(isEndlessSoloBattle() && playerShip){
-        const forward = new THREE.Vector3(0,0,-1).applyQuaternion(playerShip.quaternion).normalize();
-        const anchor = playerShip.position.clone().add(forward.multiplyScalar(1150)).add(new THREE.Vector3(0,-190,0));
-        battleSolarSystemGroup.position.lerp(anchor, 0.015);
-    }
     battleSolarSystemGroup.children.forEach((child) => {
         if(child?.isGroup){
             child.rotation.y += Number(child.userData?.orbitSpeed || 0) || 0;
@@ -7380,81 +7337,1510 @@ function updateBattleSolarSystemView(){
 
 function getSoloBotSpawnPosition(){
     if(isEndlessSoloBattle()){
-        const minDist = ENDLESS_SOLO_MIN_SPAWN_DISTANCE;
-        const maxDist = ENDLESS_SOLO_MAX_SPAWN_DISTANCE;
+        const minDist = 240;
+        const maxDist = 620;
         const angle = Math.random() * Math.PI * 2;
         const dist = minDist + Math.random() * (maxDist - minDist);
-        const y = -90 + Math.random() * 210;
-        const base = playerShip?.position?.clone?.() || new THREE.Vector3(0, 20, 0);
-        const pos = base.add(new THREE.Vector3(Math.cos(angle) * dist, y, Math.sin(angle) * dist));
-        // не спавнить прямо перед носом игрока: даём игроку время развернуться и подготовиться
-        return pos;
+        const y = -35 + Math.random() * 90;
+        const base = playerShip?.position?.clone?.() || new THREE.Vector3(0, 10, 0);
+        return base.add(new THREE.Vector3(Math.cos(angle) * dist, y, Math.sin(angle) * dist));
     }
     const spawnBase = spawnPointB?.clone?.() || new THREE.Vector3(130, 10, -120);
     return spawnBase.add(new THREE.Vector3((Math.random()-0.5)*34, 8 + Math.random()*12, (Math.random()-0.5)*34));
 }
 
-function getActiveSoloEnemyBots(){
-    soloEnemyBots = (Array.isArray(soloEnemyBots) ? soloEnemyBots : []).filter(bot => bot && bot.parent && bot.userData?.alive !== false);
-    if(enemyBot && enemyBot.parent && enemyBot.userData?.alive !== false && !soloEnemyBots.includes(enemyBot)) soloEnemyBots.push(enemyBot);
-    return soloEnemyBots;
-}
-
-function setPrimaryEnemyBot(){
-    const bots = getActiveSoloEnemyBots();
-    if(!bots.length){ enemyBot = null; return null; }
-    if(playerShip){
-        bots.sort((a,b) => a.position.distanceToSquared(playerShip.position) - b.position.distanceToSquared(playerShip.position));
+function enterBattleMap(mapName){
+  // FIX: reset orbit leftovers
+  try {
+    if (window.selectedPlanet) {
+      if (window.selectedPlanet.mesh && window.selectedPlanet.mesh.parent) {
+        window.selectedPlanet.mesh.parent.remove(window.selectedPlanet.mesh);
+      }
+      if (window.selectedPlanet.resourceLabel && window.selectedPlanet.resourceLabel.parent) {
+        window.selectedPlanet.resourceLabel.parent.remove(window.selectedPlanet.resourceLabel);
+      }
     }
-    enemyBot = bots[0];
-    return enemyBot;
+    window.selectedPlanet = null;
+  } catch(e){}
+
+    const mapKey = normalizeBattleMapName(mapName);
+    selectedLobbyMap = { ...(selectedLobbyMap || {}), real: mapKey, name: mapKey };
+
+    clearBattleScene();
+    resetBattleSessionCounters();
+
+    if(solarSystem && scene.children.includes(solarSystem)){
+        scene.remove(solarSystem);
+    }
+
+    const config = getBattlePlanetConfig(mapKey);
+    const endlessSoloMap = isEndlessSoloBattle();
+
+    const ambient = new THREE.AmbientLight(0xffffff, endlessSoloMap ? 1.55 : 1.25);
+    const point = new THREE.PointLight(config.light, 2.6, 250);
+    point.position.set(12, 9, 10);
+    battleObjects.push(ambient, point);
+    scene.add(ambient);
+    scene.add(point);
+
+    if(endlessSoloMap){
+        createBattleSolarSystemView();
+        battleMapPlanet = null;
+    }else{
+        const planetGeometry = new THREE.SphereGeometry(config.size, 48, 48);
+        const planetMaterial = new THREE.MeshStandardMaterial({
+            color: config.color,
+            roughness: 0.9,
+            metalness: 0.05
+        });
+        battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
+        battleMapPlanet.position.set(0, -6, -320);
+        battleMapPlanet.userData.radius = config.size;
+        battleMapPlanet.userData.solidRadius = config.size + 10;
+        battleMapPlanet.userData.atmosphereRadius = config.size + 42;
+        battleMapPlanet.userData.nearSurfaceRadius = config.size + 14;
+        battleMapPlanet.userData.crashRadius = config.size + 10;
+        scene.add(battleMapPlanet);
+    }
+
+    if(!endlessSoloMap && mapKey === 'saturn'){
+        const ringGeo = new THREE.RingGeometry(config.size * 1.35, config.size * 2.0, 96);
+        const ringMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.65 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2.45;
+        battleMapPlanet.add(ring);
+    }
+
+    spawnPointA = endlessSoloMap ? new THREE.Vector3(0, 0, 140) : new THREE.Vector3(-150, -10, 120);
+    spawnPointB = endlessSoloMap ? new THREE.Vector3(220, 20, -220) : new THREE.Vector3(150, 12, -140);
+
+    camera.position.set(0, 18, 70);
+    camera.lookAt(0, 0, 0);
+
+    createBattleObstacles(mapKey);
+    updateBattleScoreboard();
 }
 
-function removeSoloEnemyBot(bot){
-    if(!bot) return;
-    bot.userData.alive = false;
-    try{ scene.remove(bot); }catch(_){}
-    soloEnemyBots = (Array.isArray(soloEnemyBots) ? soloEnemyBots : []).filter(entry => entry && entry !== bot);
-    if(enemyBot === bot) enemyBot = null;
-    setPrimaryEnemyBot();
+var remoteBattleShips = new Map();
+let battleLeavingInProgress = false;
+var lastBattlePresenceSnapshot = new Map();
+var battlePresenceBaselineReady = false;
+var liveBattleSyncTimer = null;
+var liveBattlePresencePushTimer = null;
+var liveBattlePresenceChannel = null;
+var liveBattlePresenceChannelName = '';
+    liveBattlePresenceSubscribePromise = null;
+var battleHitPollTimer = null;
+var battleHitCursorId = 0;
+var battleHitSessionStartedAt = 0;
+var roomPlayerStateUpsertInFlight = false;
+var roomPlayersFetchInFlight = false;
+var battleHitPollInFlight = false;
+var selfRoomPlayerRowId = '';
+var lastSelfRoomPlayerStatePayload = '';
+var lastSelfRoomPlayerStateSentAt = 0;
+var lastBattlePresencePayload = '';
+var lastBattlePresenceSentAt = 0;
+var cachedRoomPlayersRows = [];
+var cachedRoomPlayersFetchedAt = 0;
+var lastRoomPlayerPingValue = 0;
+var lastRoomPlayerPingAt = 0;
+var lastPresencePingValue = 0;
+var lastPresencePingAt = 0;
+var lobbyRoomPresenceInFlight = false;
+var lastLobbyRoomPresenceAt = 0;
+var battleClientResetSerial = 0;
+const ROOM_PLAYER_FETCH_CACHE_MS = 300;
+const ROOM_PLAYER_PING_UPDATE_MS = 9000;
+const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
+const LIVE_BATTLE_SYNC_INTERVAL_MS = 900;
+const LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS = 900;
+const LIVE_BATTLE_HIT_POLL_INTERVAL_MS = 180;
+const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 2800;
+const ROOM_PLAYER_POSITION_EPSILON = 0.65;
+const ROOM_PLAYER_ROTATION_EPSILON = 0.06;
+const BATTLE_PRESENCE_FORCE_INTERVAL_MS = 900;
+const BATTLE_PRESENCE_POSITION_EPSILON = 0.28;
+const BATTLE_PRESENCE_ROTATION_EPSILON = 0.035;
+var battleScoreState = new Map();
+
+function getBattleScoreSnapshot(playerId){
+    const key = String(playerId || '').trim();
+    if(!key) return { kills:0, deaths:0 };
+    const current = battleScoreState.get(key) || { kills:0, deaths:0 };
+    return {
+        kills: Math.max(0, Number(current.kills || 0) || 0),
+        deaths: Math.max(0, Number(current.deaths || 0) || 0)
+    };
 }
 
-function getEndlessBotLoadout(index = 0){
-    const loadouts = [
-        { name:'UFO Pulse', weapon:'pulse', color:'#55d7ff', core:'#ffffff', damage:8, speed:1.9, cooldown:1250, burst:2 },
-        { name:'UFO Plasma', weapon:'plasma', color:'#ff8844', core:'#fff2a6', damage:11, speed:1.55, cooldown:1650, burst:1 },
-        { name:'UFO Phase', weapon:'phase', color:'#cc77ff', core:'#ffffff', damage:10, speed:1.75, cooldown:1450, burst:2 },
-        { name:'UFO Beam', weapon:'beam', color:'#8fb7ff', core:'#ffffff', damage:13, speed:2.15, cooldown:2100, burst:1 },
-        { name:'UFO Death Ray', weapon:'beam', color:'#ff2222', core:'#ffffff', damage:20, speed:2.35, cooldown:5200, burst:1, deathRay:true },
-        { name:'UFO Gravity', weapon:'pulse', color:'#7dffb5', core:'#eaffff', damage:7, speed:1.35, cooldown:1850, burst:2, tractor:true },
-        { name:'UFO Ion', weapon:'laser', color:'#fff05a', core:'#ffffff', damage:9, speed:2.0, cooldown:1100, burst:3 }
-    ];
-    return loadouts[Math.abs(index) % loadouts.length];
+function clearRemoteBattleShips(){
+    if(!(remoteBattleShips instanceof Map)){
+        remoteBattleShips = new Map();
+    }
+    remoteBattleShips.forEach(entry => {
+        try{
+            if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
+        }catch(_){ }
+        try{
+            if(entry?.mesh){
+                entry.mesh.visible = false;
+                if(entry.mesh.parent) entry.mesh.parent.remove(entry.mesh);
+                else scene?.remove?.(entry.mesh);
+            }
+        }catch(_){ }
+    });
+    remoteBattleShips.clear();
+
+    if(scene?.traverse){
+        const nodesToRemove = [];
+        scene.traverse((node) => {
+            if(node?.userData?.remote){
+                nodesToRemove.push(node);
+            }
+        });
+        nodesToRemove.forEach((node) => {
+            try{
+                node.visible = false;
+                if(node.parent) node.parent.remove(node);
+                else scene.remove(node);
+            }catch(_){ }
+        });
+    }
+
+    lastBattlePresenceSnapshot = new Map();
+    battlePresenceBaselineReady = false;
+    battlePresenceAnnounceMutedUntil = 0;
+    try{ battleJoinMuteByPlayer.clear(); }catch(_){}
+    try{ battlePresenceRecentEvents.clear(); }catch(_){}
+    try{ battlePresenceMissingCounts.clear(); }catch(_){ }
+    try{ battleJoinMuteByPlayer = new Map(); }catch(_){ battleJoinMuteByPlayer = new Map(); }
 }
 
-function ensureEndlessSoloBots(){
-    if(!isEndlessSoloBattle() || gameState !== 'BATTLE' || activeSoloMissionEnded) return;
-    const bots = getActiveSoloEnemyBots();
+function hardResetBattleClientState(){
+    battleClientResetSerial += 1;
+    try{ cachedRoomPlayersRows = []; }catch(_){ }
+    try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
+    try{ lastBattlePresenceSnapshot = new Map(); }catch(_){ }
+    try{ battlePresenceBaselineReady = false; }catch(_){ }
+    try{ battleScoreState = new Map(); }catch(_){ }
+    try{ clearRemoteBattleShips(); }catch(_){ }
+
+    if(currentRoom){
+        try{ currentRoom.currentPlayers = Array.isArray(currentRoom.currentPlayers) ? currentRoom.currentPlayers.filter(row => !row?.id || String(row.id).trim() === String(getSelfBattlePlayerId() || '').trim()) : []; }catch(_){ }
+        try{ currentRoom.players = Array.isArray(currentRoom.players) ? currentRoom.players.filter(row => !row?.id || String(row.id).trim() === String(getSelfBattlePlayerId() || '').trim()) : []; }catch(_){ }
+    }
+}
+
+function stopLiveBattleSync(){
+    battleClientResetSerial += 1;
+    lastBattlePresenceSnapshot = new Map();
+    battlePresenceBaselineReady = false;
+    battlePresenceAnnounceMutedUntil = 0;
+    if(typeof liveBattleSyncTimer !== 'undefined' && liveBattleSyncTimer){
+        clearInterval(liveBattleSyncTimer);
+        liveBattleSyncTimer = null;
+    }
+    if(typeof liveBattlePresencePushTimer !== 'undefined' && liveBattlePresencePushTimer){
+        clearInterval(liveBattlePresencePushTimer);
+        liveBattlePresencePushTimer = null;
+    }
+    if(typeof battleHitPollTimer !== 'undefined' && battleHitPollTimer){
+        clearInterval(battleHitPollTimer);
+        battleHitPollTimer = null;
+    }
+    battleHitCursorId = 0;
+    battleHitSessionStartedAt = 0;
+    roomPlayerStateUpsertInFlight = false;
+    roomPlayersFetchInFlight = false;
+    battleHitPollInFlight = false;
+    selfRoomPlayerRowId = '';
+    lastSelfRoomPlayerStatePayload = '';
+    lastSelfRoomPlayerStateSentAt = 0;
+    lastBattlePresencePayload = '';
+    lastBattlePresenceSentAt = 0;
+    cachedRoomPlayersRows = [];
+    cachedRoomPlayersFetchedAt = 0;
+    lastRoomPlayerPingValue = 0;
+    lastRoomPlayerPingAt = 0;
+    lastPresencePingValue = 0;
+    lastPresencePingAt = 0;
+    battleScoreState = new Map();
+    if(liveBattlePresenceChannel && window.supabaseClient){
+        try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+    }
+    liveBattlePresenceChannel = null;
+    liveBattlePresenceChannelName = '';
+    liveBattlePresenceSubscribePromise = null;
+    clearRemoteBattleShips();
+}
+
+function createRemotePilotLabel(name, team = 'blue'){
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(5,10,18,0.78)';
+    ctx.fillRect(0, 18, canvas.width, 50);
+    ctx.strokeStyle = getRemoteShipLabelColor(team);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(3, 18, canvas.width - 6, 50);
+    ctx.font = 'bold 42px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f3fbff';
+    ctx.fillText(String(name || 'Pilot'), canvas.width / 2, 43);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false
+    });
+
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(9.2, 1.7, 1);
+    sprite.position.set(0, 3.4, 0);
+    sprite.renderOrder = 1000;
+    sprite.center.set(0.5, 0.0);
+    return sprite;
+}
+
+function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
+    const shipGroup = new THREE.Group();
+    shipGroup.rotation.order = 'YXZ';
+
+    const labelSprite = createRemotePilotLabel(name, team);
+    shipGroup.add(labelSprite);
+
+    const side = slotIndex % 2 === 0 ? 1 : -1;
+    const rank = Math.floor(slotIndex / 2);
+    shipGroup.position.set(side * (70 + rank * 28), 8 + ((slotIndex % 3) - 1) * 6, -40 - rank * 26);
+    shipGroup.lookAt(new THREE.Vector3(0, 0, 0));
+
+    const targetPosition = shipGroup.position.clone();
+    const targetQuaternion = shipGroup.quaternion.clone();
+
+    shipGroup.userData = {
+        remote: true,
+        pilotName: String(name || 'Pilot'),
+        orbitSeed: Math.random() * Math.PI * 2,
+        slotIndex,
+        hp: 100,
+        maxHp: 100,
+        hitRadius: 2.6,
+        team
+    };
+
+    const battleShipItem = getSelectedShipItem() || getShopShipById('scout_1') || { id:'scout_1', modelPath:'ships/Spaceship.glb' };
+    mountBattleShipVisual(shipGroup, battleShipItem, team);
+
+    scene.add(shipGroup);
+    shipGroup.userData.playerId = '';
+    return {
+        mesh: shipGroup,
+        labelSprite,
+        targetPosition,
+        targetQuaternion,
+        lastSeenAt: Date.now(),
+        nickname: String(name || 'Pilot'),
+        level: 1,
+        ping: 0,
+        playerId: '',
+        kills: 0,
+        deaths: 0,
+        hp: 100,
+        maxHp: 100,
+        team
+    };
+}
+
+function getLiveBattleChannelName(){
+    const rawRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    const roomId = sanitizeOnlineRoomId(rawRoomId);
+    if(!roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')) return '';
+    return `cosmic-battle-room:${roomId}`;
+}
+
+function upsertRemoteBattlePresence(payload = {}){
+    try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
+    const entryId = String(payload.playerId || payload.player_id || payload.id || '').trim();
+    const myId = String(authState?.playerId || player?.id || '').trim();
+    if(!entryId || (myId && entryId === myId)) return;
+
+    const nickname = String(payload.nickname || payload.name || 'Pilot').trim() || 'Pilot';
+    const level = Math.max(1, Number(payload.level || 1) || 1);
+    const ping = Math.max(0, Number(payload.ping || 0) || 0);
+    const team = String(payload.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+
+    let entry = remoteBattleShips.get(entryId);
+    if(!entry){
+        return;
+    }
+
+    entry.playerId = entryId;
+    const scoreSnapshot = getBattleScoreSnapshot(entryId);
+    entry.nickname = nickname;
+    entry.level = level;
+    entry.ping = ping;
+    entry.kills = Math.max(0, Number(payload.kills || scoreSnapshot.kills || entry.kills || 0) || 0);
+    entry.deaths = Math.max(0, Number(payload.deaths || scoreSnapshot.deaths || entry.deaths || 0) || 0);
+    entry.team = team;
+    entry.lastSeenAt = Date.now();
+    if(Number(entry.deadUntil || 0) <= Date.now() && Number(entry.hp || 0) <= 0){
+        entry.hp = Math.max(1, Number(entry.maxHp || entry.mesh?.userData?.maxHp || 100) || 100);
+        if(entry.mesh?.userData) entry.mesh.userData.hp = entry.hp;
+    }
+
+    if(entry.mesh?.userData){
+        entry.mesh.userData.pilotName = nickname;
+        entry.mesh.userData.team = team;
+        entry.mesh.userData.playerId = entryId;
+    }
+
+    tryApplyRemoteShipTeamVisual(entry);
+
+    const x = Number(payload.x);
+    const y = Number(payload.y);
+    const z = Number(payload.z);
+    if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+        entry.targetPosition.set(x, y, z);
+    }
+
+    const qx = Number(payload.qx);
+    const qy = Number(payload.qy);
+    const qz = Number(payload.qz);
+    const qw = Number(payload.qw);
+    if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
+        entry.targetQuaternion.set(qx, qy, qz, qw);
+    }
+
+    updateBattleScoreboard?.();
+}
+
+function getBattleSelfIdentity(){
+    return {
+        playerId: String(authState?.playerId || player?.id || '').trim(),
+        nickname: String(player?.nickname || 'Commander').trim() || 'Commander'
+    };
+}
+
+function resolveBattlePlayerNameById(playerId, fallback = 'Pilot'){
+    const safeId = String(playerId || '').trim();
+    if(!safeId) return String(fallback || 'Pilot').trim() || 'Pilot';
+
+    if(safeId === String(authState?.playerId || player?.id || '').trim()){
+        return String(player?.nickname || fallback || 'Pilot').trim() || 'Pilot';
+    }
+
+    const remote = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
+    const remoteName = String(remote?.nickname || remote?.mesh?.userData?.pilotName || '').trim();
+    if(remoteName) return remoteName;
+
+    const roomPlayers = Array.isArray(currentRoom?.currentPlayers) ? currentRoom.currentPlayers : (Array.isArray(currentRoom?.players) ? currentRoom.players : []);
+    for(const row of roomPlayers){
+        const rowId = String(row?.id || row?.player_id || row?.public_id || '').trim();
+        if(rowId && rowId === safeId){
+            const rowName = String(row?.nickname || row?.name || '').trim();
+            if(rowName) return rowName;
+        }
+    }
+
+    return String(fallback || 'Pilot').trim() || 'Pilot';
+}
+
+function applyBattleScoreDelta(playerId, changes = {}){
+    const safeId = String(playerId || '').trim();
+    if(!safeId) return;
+
+    const killsDelta = Number(changes?.killsDelta || 0) || 0;
+    const deathsDelta = Number(changes?.deathsDelta || 0) || 0;
+    const snapshot = getBattleScoreSnapshot(safeId);
+    const nextKills = Math.max(0, snapshot.kills + killsDelta);
+    const nextDeaths = Math.max(0, snapshot.deaths + deathsDelta);
+    battleScoreState.set(safeId, { kills: nextKills, deaths: nextDeaths });
+
+    const selfId = getSelfBattlePlayerId();
+    const isSelf = !!(selfId && safeId === selfId);
+
+    if(isSelf){
+        battleStats.playerKills = nextKills;
+        battleStats.playerDeaths = nextDeaths;
+    }
+
+    const remoteEntry = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
+    if(remoteEntry){
+        remoteEntry.kills = nextKills;
+        remoteEntry.deaths = nextDeaths;
+    }
+
+    const lists = [];
+    if(Array.isArray(currentRoom?.currentPlayers)) lists.push(currentRoom.currentPlayers);
+    if(Array.isArray(currentRoom?.players) && currentRoom.players !== currentRoom.currentPlayers) lists.push(currentRoom.players);
+
+    for(const list of lists){
+        const row = list.find((entry) => {
+            const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
+            return !!entryId && entryId === safeId;
+        });
+        if(!row) continue;
+        row.kills = nextKills;
+        row.deaths = nextDeaths;
+    }
+}
+
+function awardBattleKillRewards(victimName = ''){
     const now = Date.now();
-    if(bots.length >= ENDLESS_SOLO_MAX_BOTS) return;
-    if(lastEndlessBotSpawnAt && now - lastEndlessBotSpawnAt < ENDLESS_SOLO_RESPAWN_DELAY_MS) return;
-    lastEndlessBotSpawnAt = now;
-    createEnemyBot();
+    if(now - battleLastKillAt <= BATTLE_COMBO_WINDOW_MS){
+        battleKillCombo = Math.min(10, Math.max(1, Number(battleKillCombo || 0) + 1));
+    }else{
+        battleKillCombo = 1;
+    }
+    battleLastKillAt = now;
+
+    const rewardValue = Math.max(1, Math.min(10, Number(battleKillCombo || 1) || 1));
+    const killerName = String(getDisplayPlayerTag?.() || player?.nickname || 'Commander').trim() || 'Commander';
+    player.experience = Math.max(0, Number(player.experience || 0) + rewardValue);
+    player.credits = Math.max(0, Number(player.credits || 0) + rewardValue);
+    if(typeof playerResources === 'object' && playerResources){
+        playerResources.coins = Math.max(0, Number(playerResources.coins || 0) + rewardValue);
+    }
+
+    if(rewardValue >= 2){
+        pushKillFeed(`${killerName} уничтожил ${victimName || 'цель'} • комбо x${rewardValue}`, 'kill');
+    }else{
+        pushKillFeed(`${killerName} уничтожил ${victimName || 'противник'}`, 'kill');
+    }
+
+    try{
+        if(playerShip?.position){
+            showBattleFloatingReward(rewardValue, rewardValue, playerShip.position);
+        }
+    }catch(_){}
+    try{ updateHUD?.(); }catch(_){}
+    try{ updateUI?.(); }catch(_){}
+    try{ updateBattleScoreboard?.(); }catch(_){}
+    try{ saveGame?.(); }catch(_){}
+}
+
+async function sendBattlePresenceEvent(eventName, payload = {}){
+    if(!eventName || !window.supabaseClient) return false;
+    const packet = { type:'broadcast', event:eventName, payload };
+
+    try{
+        if(liveBattlePresenceChannel){
+            if(typeof liveBattlePresenceChannel.httpSend === 'function'){
+                await liveBattlePresenceChannel.httpSend(packet);
+            }else{
+                await liveBattlePresenceChannel.send(packet);
+            }
+            return true;
+        }
+    }catch(_){}
+
+    try{
+        const fallbackRoomId = sanitizeOnlineRoomId(
+            payload?.roomId || currentRoom?.id || currentRoom?.roomId || ''
+        );
+        if(!fallbackRoomId) return false;
+
+        const tempChannelName = `cosmic-battle-room:${fallbackRoomId}`;
+        const tempChannel = window.supabaseClient.channel(tempChannelName, {
+            config: { broadcast: { self: false, ack: false } }
+        });
+
+        await new Promise((resolve) => {
+            let settled = false;
+            const done = () => {
+                if(settled) return;
+                settled = true;
+                resolve(true);
+            };
+            try{
+                tempChannel.subscribe(() => done());
+            }catch(_){
+                done();
+            }
+            setTimeout(done, 250);
+        });
+
+        try{
+            if(typeof tempChannel.httpSend === 'function'){
+                await tempChannel.httpSend(packet);
+            }else{
+                await tempChannel.send(packet);
+            }
+            return true;
+        }finally{
+            try{ window.supabaseClient.removeChannel(tempChannel); }catch(_){}
+        }
+    }catch(_){
+        return false;
+    }
+}
+
+function getBattleHitsRoomId(){
+    const rawRoomId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
+    return sanitizeOnlineRoomId(rawRoomId);
+}
+
+async function insertBattleHitRecord(targetPlayerId, damage, victimName = ''){
+    if(!window.supabaseClient) return false;
+    const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
+    const targetId = String(targetPlayerId || '').trim();
+    const damageValue = Math.max(0, Number(damage || 0) || 0);
+    if(!self.playerId || !roomId || !targetId || !damageValue) return false;
+
+    try{
+        const { error } = await window.supabaseClient
+            .from('battle_hits')
+            .insert({
+                room_id: roomId,
+                attacker_id: self.playerId,
+                target_id: targetId,
+                damage: damageValue
+            });
+        if(error) return false;
+        return true;
+    }catch(_){
+        return false;
+    }
+}
+
+async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
+    return insertBattleHitRecord(targetPlayerId, damage, victimName);
+}
+
+async function insertBattleKillAckRecord(targetPlayerId, victimName = ''){
+    if(!window.supabaseClient) return false;
+    const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
+    const targetId = String(targetPlayerId || '').trim();
+    if(!self.playerId || !roomId || !targetId) return false;
+
+    try{
+        const { error } = await window.supabaseClient
+            .from('battle_hits')
+            .insert({
+                room_id: roomId,
+                attacker_id: self.playerId,
+                target_id: targetId,
+                damage: BATTLE_KILL_ACK_DAMAGE
+            });
+        if(error) return false;
+        return true;
+    }catch(_){
+        return false;
+    }
+}
+
+async function broadcastBattleKill(attackerId, attackerName, victimId, victimName){
+    return sendBattlePresenceEvent('pilot-kill', {
+        attackerId: String(attackerId || '').trim(),
+        attackerName: String(attackerName || '').trim() || 'Commander',
+        victimId: String(victimId || '').trim(),
+        victimName: String(victimName || '').trim() || 'Pilot',
+        at: Date.now()
+    });
+}
+
+function resolveRemoteBattleHp(entry){
+    const hp = Number(entry?.hp ?? entry?.mesh?.userData?.hp ?? 100);
+    return Number.isFinite(hp) ? hp : 100;
+}
+
+function applyPredictedRemoteDamageV338(victimId, entry, damageValue){
+    const safeVictimId = String(victimId || '').trim();
+    if(!safeVictimId || !entry) return false;
+    const damage = Math.max(0, Number(damageValue || 0) || 0);
+    if(!damage) return false;
+    const now = Date.now();
+    if(Number(entry.deadUntil || 0) > now) return true;
+
+    const nextHp = Math.max(0, resolveRemoteBattleHp(entry) - damage);
+    entry.hp = nextHp;
+    if(entry.mesh?.userData){
+        entry.mesh.userData.hp = nextHp;
+        entry.mesh.userData.maxHp = Math.max(1, Number(entry.mesh.userData.maxHp || entry.maxHp || 100) || 100);
+    }
+
+    if(nextHp > 0) return false;
+
+    entry.deadUntil = now + 2000;
+    const self = getBattleSelfIdentity();
+    const victimName = String(entry.nickname || entry.mesh?.userData?.pilotName || resolveBattlePlayerNameById(safeVictimId, 'Pilot')).trim() || 'Pilot';
+    if(self.playerId){
+        handleIncomingBattleKill({
+            hitId: 'local-kill:' + safeVictimId + ':' + now,
+            attackerId: self.playerId,
+            attackerName: self.nickname || 'Commander',
+            victimId: safeVictimId,
+            victimName,
+            source: 'local-predicted'
+        });
+        broadcastBattleKill(self.playerId, self.nickname || 'Commander', safeVictimId, victimName).catch(() => {});
+    }
+    return true;
+}
+
+async function initializeBattleHitCursor(){
+    if(!window.supabaseClient) return;
+    const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
+    battleHitSessionStartedAt = Date.now();
+    if(!self.playerId || !roomId){
+        battleHitCursorId = 0;
+        return;
+    }
+
+    try{
+        const { data, error } = await window.supabaseClient
+            .from('battle_hits')
+            .select('id,created_at')
+            .eq('room_id', roomId)
+            .eq('target_id', self.playerId)
+            .order('id', { ascending: false })
+            .limit(1);
+
+        if(!error && Array.isArray(data) && data.length){
+            battleHitCursorId = Number(data[0]?.id || 0) || 0;
+        }else{
+            battleHitCursorId = 0;
+        }
+    }catch(_){
+        battleHitCursorId = 0;
+    }
+}
+
+async function pollIncomingBattleHits(){
+    if(battleHitPollInFlight) return;
+    if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || !window.supabaseClient) return;
+    const self = getBattleSelfIdentity();
+    const roomId = getBattleHitsRoomId();
+    if(!self.playerId || !roomId) return;
+
+    battleHitPollInFlight = true;
+    try{
+        let query = window.supabaseClient
+            .from('battle_hits')
+            .select('id,attacker_id,target_id,damage,created_at')
+            .eq('room_id', roomId)
+            .eq('target_id', self.playerId)
+            .order('id', { ascending: true })
+            .limit(50);
+
+        if(Number.isFinite(battleHitCursorId) && battleHitCursorId > 0){
+            query = query.gt('id', battleHitCursorId);
+        }
+
+        const { data, error } = await query;
+        if(error || !Array.isArray(data) || !data.length) return;
+
+        for(const row of data){
+            const hitRowId = Number(row?.id || 0) || 0;
+            if(hitRowId > battleHitCursorId) battleHitCursorId = hitRowId;
+
+            const createdAtMs = row?.created_at ? new Date(row.created_at).getTime() : 0;
+            if(Number.isFinite(battleHitSessionStartedAt) && battleHitSessionStartedAt > 0 && Number.isFinite(createdAtMs) && createdAtMs > 0){
+                if(createdAtMs < (battleHitSessionStartedAt - 150)){
+                    continue;
+                }
+            }
+
+            const attackerId = String(row?.attacker_id || '').trim();
+            const targetPlayerId = String(row?.target_id || '').trim();
+            const damageValue = Number(row?.damage || 0) || 0;
+            const attackerName = resolveBattlePlayerNameById(attackerId, 'Pilot');
+
+            if(damageValue <= BATTLE_KILL_ACK_DAMAGE){
+                handleIncomingBattleKill({
+                    hitId: `db:${hitRowId}`,
+                    attackerId: targetPlayerId,
+                    attackerName: resolveBattlePlayerNameById(targetPlayerId, 'Commander'),
+                    victimId: attackerId,
+                    victimName: attackerName,
+                    source: 'db-ack'
+                });
+                continue;
+            }
+
+            applyIncomingBattleHit({
+                hitId: `db:${hitRowId}`,
+                attackerId,
+                attackerName,
+                targetPlayerId,
+                damage: damageValue
+            });
+        }
+    }catch(_){
+    }finally{
+        battleHitPollInFlight = false;
+    }
+}
+
+
+function applyIncomingBattleHit(payload = {}){
+    if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || isBattleRespawning() || battleShipCrash) return;
+    const self = getBattleSelfIdentity();
+    const targetId = String(payload?.targetPlayerId || '').trim();
+    if(!self.playerId || !targetId || self.playerId !== targetId) return;
+    if(Number(playerHp || 0) <= 0) return;
+
+    const hitId = String(payload?.hitId || '').trim();
+    if(hitId){
+        if(battleProcessedHitIds.has(hitId)) return;
+        battleProcessedHitIds.add(hitId);
+        if(battleProcessedHitIds.size > 120){
+            const firstKey = battleProcessedHitIds.values().next().value;
+            if(firstKey) battleProcessedHitIds.delete(firstKey);
+        }
+    }
+
+    const damageValue = Math.max(0, Number(payload?.damage || 0) || 0);
+    if(!damageValue) return;
+
+    playerHp = Math.max(0, Number(playerHp || 0) - damageValue);
+    updateBattlePlayerHud?.();
+    updateBattlePlayerWorldHp?.();
+
+    if(playerHp > 0) return;
+
+    const attackerId = String(payload?.attackerId || '').trim();
+    const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
+    playerHp = 0;
+    battleKillCombo = 0;
+    battleLastKillAt = 0;
+
+    applyBattleScoreDelta(self.playerId, { deathsDelta: 1 });
+    if(attackerId){
+        applyBattleScoreDelta(attackerId, { killsDelta: 1 });
+    }
+
+    if(playerShip){
+        spawnShipDebris(playerShip.position.clone(), 0x64d8ff);
+    }
+    pushKillFeed(`${attackerName} уничтожил ${player?.nickname || 'Commander'}`, 'kill');
+    scheduleBattleRespawn(2000);
+    updateBattleScoreboard?.();
+
+    if(attackerId){
+        insertBattleKillAckRecord(attackerId, player?.nickname || 'Commander').catch(() => {});
+    }
+}
+
+function handleIncomingBattleKill(payload = {}){
+    const killHitId = String(payload?.hitId || '').trim();
+    if(killHitId){
+        if(battleProcessedHitIds.has(killHitId)) return;
+        battleProcessedHitIds.add(killHitId);
+        if(battleProcessedHitIds.size > 120){
+            const firstKey = battleProcessedHitIds.values().next().value;
+            if(firstKey) battleProcessedHitIds.delete(firstKey);
+        }
+    }
+
+    const attackerId = String(payload?.attackerId || '').trim();
+    const victimId = String(payload?.victimId || '').trim();
+    const victimName = String(payload?.victimName || resolveBattlePlayerNameById(victimId, 'Pilot')).trim() || 'Pilot';
+    const attackerName = String(payload?.attackerName || resolveBattlePlayerNameById(attackerId, 'Pilot')).trim() || 'Pilot';
+    const self = getBattleSelfIdentity();
+    const existingVictimRemote = victimId && remoteBattleShips instanceof Map ? remoteBattleShips.get(victimId) : null;
+    if(existingVictimRemote && Number(existingVictimRemote.deadUntil || 0) > Date.now() && String(payload?.source || '') !== 'local-predicted'){
+        return;
+    }
+
+    const isSelfAttacker = !!(attackerId && self.playerId && attackerId === self.playerId);
+    if(attackerId){
+        applyBattleScoreDelta(attackerId, { killsDelta: 1 });
+    }
+    const remoteDeadUntil = Date.now() + 2000;
+
+    if(victimId){
+        applyBattleScoreDelta(victimId, { deathsDelta: 1 });
+        markBattleJoinMutedForPlayer(victimId, 8000);
+
+        const victimRemoteState = remoteBattleShips.get(victimId);
+        if(victimRemoteState){
+            victimRemoteState.deadUntil = remoteDeadUntil;
+        }
+
+        const roomLists = [
+            ...(Array.isArray(currentRoom?.currentPlayers) ? [currentRoom.currentPlayers] : []),
+            ...(Array.isArray(currentRoom?.players) ? [currentRoom.players] : [])
+        ];
+        roomLists.forEach(list => {
+            list.forEach(row => {
+                const rowId = String(row?.public_id || row?.player_public_id || row?.player_id || row?.id || '').trim();
+                if(rowId && rowId === victimId){
+                    row.deadUntil = remoteDeadUntil;
+                }
+            });
+        });
+    }
+    if(isSelfAttacker){
+        awardBattleKillRewards(victimName);
+    }
+
+    const victimRemote = victimId ? remoteBattleShips.get(victimId) : null;
+    if(victimRemote?.mesh){
+        spawnShipDebris(victimRemote.mesh.position.clone(), 0xff7755);
+        removeRemoteBattleShipById(victimId);
+    }
+
+    updateBattleScoreboard?.();
+    if(attackerName && victimName && !isSelfAttacker){
+        pushKillFeed(`${attackerName} уничтожил ${victimName}`, 'kill');
+    }
+}
+
+function ensureLiveBattlePresenceChannel(){
+    if(!window.supabaseClient) return Promise.resolve(false);
+    if(!getBattleRoomIdSafe()) return Promise.resolve(false);
+    const channelName = getLiveBattleChannelName();
+    if(!channelName) return Promise.resolve(false);
+    if(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName){
+        return liveBattlePresenceSubscribePromise || Promise.resolve(true);
+    }
+
+    if(liveBattlePresenceChannel){
+        try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+        liveBattlePresenceChannel = null;
+    }
+
+    liveBattlePresenceChannelName = channelName;
+    liveBattlePresenceChannel = window.supabaseClient.channel(channelName, {
+        config: { broadcast: { self: false, ack: false } }
+    });
+
+    liveBattlePresenceChannel
+        .on('broadcast', { event: 'pilot-state' }, ({ payload }) => {
+            upsertRemoteBattlePresence(payload || {});
+        })
+        .on('broadcast', { event: 'pilot-hit' }, ({ payload }) => {
+            applyIncomingBattleHit(payload || {});
+        })
+        .on('broadcast', { event: 'pilot-kill' }, ({ payload }) => {
+            handleIncomingBattleKill(payload || {});
+        })
+        .on('broadcast', { event: 'pilot-join' }, ({ payload }) => {
+            handleIncomingBattleJoin(payload || {});
+        })
+        .on('broadcast', { event: 'pilot-left' }, ({ payload }) => {
+            handleIncomingBattleLeave(payload || {});
+        });
+
+    liveBattlePresenceSubscribePromise = new Promise((resolve) => {
+        let settled = false;
+        const done = (ok) => {
+            if(settled) return;
+            settled = true;
+            resolve(!!ok);
+        };
+        try{
+            liveBattlePresenceChannel.subscribe((status) => {
+                if(status === 'SUBSCRIBED') done(true);
+                if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') done(false);
+            });
+        }catch(_){
+            done(false);
+        }
+        setTimeout(() => done(true), 900);
+    });
+
+    return liveBattlePresenceSubscribePromise;
+}
+
+async function broadcastSelfBattleState(){
+    if(battleLeavingInProgress) return;
+    if(gameState !== 'BATTLE' || !playerShip || !liveBattlePresenceChannel) return;
+    const playerId = String(authState?.playerId || player?.id || '').trim();
+    if(!playerId) return;
+
+    const now = Date.now();
+    const payload = {
+        playerId,
+        nickname: player?.nickname || 'Commander',
+        level: Number(player?.level || 1) || 1,
+        team: getBattleRoomPlayerTeam(playerId),
+        ping: getThrottledPresencePing(now),
+        kills: Number(battleStats.playerKills || 0) || 0,
+        deaths: Number(battleStats.playerDeaths || 0) || 0,
+        x: Number(playerShip.position.x || 0),
+        y: Number(playerShip.position.y || 0),
+        z: Number(playerShip.position.z || 0),
+        qx: Number(playerShip.quaternion.x || 0),
+        qy: Number(playerShip.quaternion.y || 0),
+        qz: Number(playerShip.quaternion.z || 0),
+        qw: Number(playerShip.quaternion.w || 1)
+    };
+
+    let previousPayload = null;
+    if(lastBattlePresencePayload){
+        try{ previousPayload = JSON.parse(lastBattlePresencePayload); }catch(_){ previousPayload = null; }
+    }
+
+    const needsForceSend = (now - lastBattlePresenceSentAt) >= BATTLE_PRESENCE_FORCE_INTERVAL_MS;
+    const presencePingWindowPassed = (now - lastPresencePingAt) <= 60 || (now - lastPresencePingAt) >= BATTLE_PRESENCE_PING_UPDATE_MS;
+    const changedMeta = !previousPayload
+        || previousPayload.playerId !== payload.playerId
+        || previousPayload.nickname !== payload.nickname
+        || Number(previousPayload.level || 0) !== Number(payload.level || 0)
+        || previousPayload.team !== payload.team
+        || (presencePingWindowPassed && Number(previousPayload.ping || 0) !== Number(payload.ping || 0))
+        || Number(previousPayload.kills || 0) !== Number(payload.kills || 0)
+        || Number(previousPayload.deaths || 0) !== Number(payload.deaths || 0);
+    const changedPosition = !previousPayload || hasMeaningfulBattleVectorDelta(previousPayload, payload, BATTLE_PRESENCE_POSITION_EPSILON);
+    const changedRotation = !previousPayload || hasMeaningfulBattleQuaternionDelta(
+        { x: previousPayload?.qx, y: previousPayload?.qy, z: previousPayload?.qz, w: previousPayload?.qw },
+        { x: payload.qx, y: payload.qy, z: payload.qz, w: payload.qw },
+        BATTLE_PRESENCE_ROTATION_EPSILON
+    );
+
+    if(!needsForceSend && !changedMeta && !changedPosition && !changedRotation){
+        return;
+    }
+
+    try{
+        const eventPayload = {
+            type: 'broadcast',
+            event: 'pilot-state',
+            payload
+        };
+        if(typeof liveBattlePresenceChannel.httpSend === 'function'){
+            await liveBattlePresenceChannel.httpSend(eventPayload);
+        }else{
+            await liveBattlePresenceChannel.send(eventPayload);
+        }
+        lastBattlePresencePayload = JSON.stringify(payload);
+        lastBattlePresenceSentAt = now;
+    }catch(_){ }
+}
+
+function getObservedRoomId(targetMap = ''){
+    const directRoomId = sanitizeOnlineRoomId(selectedLobbyMap?.id || selectedLobbyMap?.roomId || currentRoom?.id || currentRoom?.roomId || null);
+    if(directRoomId) return directRoomId;
+
+    const normalizedMap = normalizeBattleMapName(targetMap || selectedLobbyMap?.real || currentRoom?.map || 'earth');
+    const publicRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find((room) => {
+        const roomMap = normalizeBattleMapName(room?.real || room?.map || room?.rawRoom?.map_name || '');
+        return roomMap === normalizedMap && isPublicBattleRoom(room?.rawRoom || room);
+    });
+
+    return sanitizeOnlineRoomId(publicRoom?.id || publicRoom?.roomId || null);
+}
+
+function buildObserveRoomState(targetMap = ''){
+    const normalizedMap = normalizeBattleMapName(targetMap || selectedLobbyMap?.real || currentRoom?.map || 'earth');
+    const roomId = getObservedRoomId(normalizedMap);
+    return {
+        id: roomId || null,
+        roomId: roomId || null,
+        map: normalizedMap,
+        real: normalizedMap,
+        observer: true,
+        state: 'observe',
+        currentPlayers: [],
+        players: [],
+        title: selectedLobbyMap?.title || currentRoom?.title || normalizedMap
+    };
+}
+
+
+async function resolveObservedRoomBinding(force = false){
+    if(gameState !== 'OBSERVE' && currentRoom?.observer !== true) return sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+
+    const now = Date.now();
+    if(!force && (now - Number(observerRoomResolveAt || 0)) < 1200){
+        return sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    }
+    observerRoomResolveAt = now;
+
+    try{
+        await loadRoomsFromSupabase();
+    }catch(_){}
+
+    const mapName = normalizeBattleMapName(currentRoom?.map || currentRoom?.real || selectedLobbyMap?.real || 'earth');
+    const nextRoomId = getObservedRoomId(mapName);
+    const prevRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+
+    if(nextRoomId && nextRoomId !== prevRoomId){
+        try{
+            if(remoteBattleShips instanceof Map){
+                Array.from(remoteBattleShips.keys()).forEach(entryId => removeRemoteBattleShipById(entryId));
+            }
+        }catch(_){}
+        try{ lastBattlePresenceSnapshot.clear(); }catch(_){}
+        try{ battlePresenceMissingCounts.clear(); }catch(_){}
+        try{ cachedRoomPlayersFetchedAt = 0; cachedRoomPlayersRows = []; }catch(_){}
+        currentRoom = {
+            ...(currentRoom || {}),
+            id: nextRoomId,
+            roomId: nextRoomId,
+            map: mapName,
+            real: mapName,
+            observer: true,
+            state: 'observe'
+        };
+        window.currentRoomId = nextRoomId;
+    }
+
+    return sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+}
+
+async function fetchCurrentRoomLivePlayers(){
+    const now = Date.now();
+    const requestSerial = Number(battleClientResetSerial || 0);
+    const requestRoomId = (gameState === 'OBSERVE' || currentRoom?.observer === true)
+        ? await resolveObservedRoomBinding()
+        : sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    if((now - cachedRoomPlayersFetchedAt) < ROOM_PLAYER_FETCH_CACHE_MS && Array.isArray(cachedRoomPlayersRows)){
+        return cachedRoomPlayersRows;
+    }
+
+    if(roomPlayersFetchInFlight) return null;
+
+    const roomId = requestRoomId;
+    if(!window.supabaseClient || !roomId || roomId.startsWith('observe_') || roomId.startsWith('tournament_')){
+        return [];
+    }
+
+    roomPlayersFetchInFlight = true;
+
+    return (async () => {
+        try{
+            const { data, error } = await window.supabaseClient
+                .from('room_players')
+                .select('player_id,nickname,joined_at,team,level,ping,position,rotation,updated_at')
+                .eq('room_id', roomId)
+                .order('joined_at', { ascending: true });
+
+            if(error){
+                roomPlayersFetchInFlight = false;
+                return null;
+            }
+
+            if(requestSerial !== Number(battleClientResetSerial || 0)){
+                roomPlayersFetchInFlight = false;
+                return [];
+            }
+
+            const currentRoomIdNow = (gameState === 'OBSERVE' || currentRoom?.observer === true)
+                ? await resolveObservedRoomBinding(true)
+                : sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+            if(currentRoomIdNow !== roomId){
+                roomPlayersFetchInFlight = false;
+                return [];
+            }
+
+            const mergedRows = new Map();
+
+            (Array.isArray(data) ? data : []).forEach((item, index) => {
+                const entryId = item?.player_id ? String(item.player_id) : `guest_${index}`;
+                mergedRows.set(entryId, {
+                    player_id: entryId,
+                    nickname: item?.nickname || `Pilot ${index + 1}`,
+                    joined_at: item?.joined_at || null,
+                    team: item?.team || getBattleRoomPlayerTeam(entryId),
+                    level: Number(item?.level || 1) || 1,
+                    ping: Number(item?.ping || 0) || 0,
+                    position: item?.position || null,
+                    rotation: item?.rotation || null,
+                    updated_at: item?.updated_at || item?.joined_at || null
+                });
+            });
+
+            const myId = getSelfBattlePlayerId();
+            if(gameState === "BATTLE" && playerShip && myId){
+                mergedRows.set(myId, {
+                    player_id: myId,
+                    nickname: player?.nickname || "Commander",
+                    joined_at: new Date(now).toISOString(),
+                    team: getBattleRoomPlayerTeam(myId),
+                    level: Number(player?.level || 1) || 1,
+                    ping: Number(getBattlePingValue() || 0) || 0,
+                    position: {
+                        x: Number(playerShip.position.x || 0),
+                        y: Number(playerShip.position.y || 0),
+                        z: Number(playerShip.position.z || 0)
+                    },
+                    rotation: {
+                        x: Number(playerShip.quaternion.x || 0),
+                        y: Number(playerShip.quaternion.y || 0),
+                        z: Number(playerShip.quaternion.z || 0),
+                        w: Number(playerShip.quaternion.w || 1)
+                    },
+                    updated_at: new Date(now).toISOString()
+                });
+            }
+
+            // ghost-fix v303:
+            // Не подмешиваем remoteBattleShips в live roster.
+            // Источником истины остаётся только room_players (+ локальный self),
+            // иначе вышедший игрок может визуально зависать у другого клиента.
+
+            cachedRoomPlayersFetchedAt = now;
+            cachedRoomPlayersRows = Array.from(mergedRows.values()).filter(item => isFreshRoomPlayerRow(item));
+            roomPlayersFetchInFlight = false;
+            return cachedRoomPlayersRows;
+        }catch(_){
+            roomPlayersFetchInFlight = false;
+            return null;
+        }
+    })();
+}
+
+async function syncLiveBattlePlayers(){
+    if(battleLeavingInProgress) return;
+    if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+
+    const syncSerial = Number(battleClientResetSerial || 0);
+    const syncRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+    if(!syncRoomId) return;
+
+    if(gameState === 'BATTLE' && playerShip){
+        ensureSelfRoomPlayerState();
+    }
+
+    const livePlayers = await fetchCurrentRoomLivePlayers();
+    if(livePlayers === null) return;
+    if(syncSerial !== Number(battleClientResetSerial || 0)) return;
+    if(syncRoomId !== sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null)) return;
+    if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+    announceBattlePresenceChanges(livePlayers);
+    const myId = getSelfBattlePlayerId();
+
+    const activeIds = new Set();
+    const visiblePlayers = [];
+
+    livePlayers.forEach(entry => {
+        const entryId = entry?.player_id ? String(entry.player_id) : '';
+        const isMe = !!(entryId && myId && entryId === myId);
+        const team = String(entry?.team || getBattleRoomPlayerTeam(entryId)).trim().toLowerCase() === 'red' ? 'red' : 'blue';
+        const displayName = String(entry?.nickname || 'Pilot').trim() || 'Pilot';
+
+        if(entryId) activeIds.add(entryId);
+
+        if(isMe){
+            return;
+        }
+        if(!entryId) return;
+
+        let remoteState = remoteBattleShips.get(entryId);
+        if(!remoteState){
+            remoteState = createRemoteBattleShipMesh(displayName, remoteBattleShips.size, team);
+            remoteBattleShips.set(entryId, remoteState);
+        }
+
+        const scoreSnapshot = getBattleScoreSnapshot(entryId);
+        remoteState.nickname = displayName;
+        remoteState.level = Number(entry?.level || remoteState.level || 1) || 1;
+        remoteState.ping = Number(entry?.ping || remoteState.ping || 0) || 0;
+        remoteState.team = team;
+        remoteState.lastSeenAt = Date.now();
+        remoteState.kills = Math.max(0, Number(scoreSnapshot.kills || remoteState.kills || 0) || 0);
+        remoteState.deaths = Math.max(0, Number(scoreSnapshot.deaths || remoteState.deaths || 0) || 0);
+
+        if(remoteState.mesh?.userData){
+            remoteState.mesh.userData.team = team;
+            remoteState.mesh.userData.pilotName = displayName;
+            remoteState.mesh.userData.playerId = entryId;
+        }
+        tryApplyRemoteShipTeamVisual(remoteState);
+
+        const pos = entry?.position || {};
+        const x = Number(pos?.x);
+        const y = Number(pos?.y);
+        const z = Number(pos?.z);
+        if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+            remoteState.targetPosition.set(x, y, z);
+            if(remoteState.mesh && !remoteState.mesh.userData.hasInitialSync){
+                remoteState.mesh.position.copy(remoteState.targetPosition);
+                remoteState.mesh.userData.hasInitialSync = true;
+            }
+        }
+
+        const rot = entry?.rotation || {};
+        const qx = Number(rot?.x);
+        const qy = Number(rot?.y);
+        const qz = Number(rot?.z);
+        const qw = Number(rot?.w);
+        if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
+            remoteState.targetQuaternion.set(qx, qy, qz, qw);
+            if(remoteState.mesh && !remoteState.mesh.userData.hasInitialQuatSync){
+                remoteState.mesh.quaternion.copy(remoteState.targetQuaternion);
+                remoteState.mesh.userData.hasInitialQuatSync = true;
+            }
+        }
+
+        visiblePlayers.push({
+            nickname: displayName,
+            clan: team === 'red' ? 'RED' : 'BLUE',
+            level: Number(entry?.level || remoteState.level || 1) || 1,
+            deaths: Number(remoteState?.deaths || 0) || 0,
+            kills: Number(remoteState?.kills || 0) || 0,
+            id: entryId,
+            ping: Number(entry?.ping || remoteState?.ping || 0) || 0,
+            team
+        });
+    });
+
+    const expireBefore = Date.now() - Math.max(ROOM_PLAYER_STALE_MS, 12000);
+    Array.from(remoteBattleShips.keys()).forEach(entryId => {
+        const item = remoteBattleShips.get(entryId);
+        const stale = !!item && Number(item.lastSeenAt || 0) < expireBefore;
+        if(!activeIds.has(String(entryId)) || stale){
+            removeRemoteBattleShipById(entryId);
+        }
+    });
+
+    const selfRow = gameState === 'OBSERVE'
+        ? null
+        : {
+            nickname: player?.nickname || 'Commander',
+            clan: getBattleRoomPlayerTeam(myId) === 'red' ? 'RED' : 'BLUE',
+            level: Number(player?.level || 1) || 1,
+            kills: Number(battleStats.playerKills || 0) || 0,
+            deaths: Number(battleStats.playerDeaths || 0) || 0,
+            id: myId,
+            ping: Number(getBattlePingValue() || 0) || 0,
+            team: getBattleRoomPlayerTeam(myId)
+        };
+
+    if(currentRoom){
+        const nextPlayers = [];
+        if(selfRow) nextPlayers.push(selfRow);
+        nextPlayers.push(...visiblePlayers);
+        currentRoom.currentPlayers = nextPlayers;
+        currentRoom.players = [...nextPlayers];
+    }
+
+    updateBattleScoreboard();
+}
+
+
+function announceBattlePresenceChanges(livePlayers = []){
+    const prevSnapshot = lastBattlePresenceSnapshot instanceof Map ? lastBattlePresenceSnapshot : new Map();
+    const nextSnapshot = new Map();
+    const selfId = getSelfBattlePlayerId();
+    const now = Date.now();
+
+    (Array.isArray(livePlayers) ? livePlayers : []).forEach((entry, index) => {
+        const entryId = entry?.player_id ? String(entry.player_id).trim() : '';
+        if(!entryId) return;
+        const nickname = String(entry?.nickname || `Pilot ${index + 1}`).trim() || `Pilot ${index + 1}`;
+        const joinedAt = String(entry?.joined_at || '').trim();
+        const updatedAt = String(entry?.updated_at || '').trim();
+        nextSnapshot.set(entryId, { nickname, joinedAt, updatedAt });
+        battlePresenceMissingCounts.delete(entryId);
+    });
+
+    if(battlePresenceBaselineReady){
+        nextSnapshot.forEach((info, entryId) => {
+            if(entryId === selfId) return;
+            if(prevSnapshot.has(entryId)) return;
+            if(isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0)) return;
+            if(isBattleJoinMutedForPlayer(entryId)) return;
+
+            const joinedAtMs = info?.joinedAt ? new Date(info.joinedAt).getTime() : NaN;
+            const joinedRecently = Number.isFinite(joinedAtMs) ? (now - joinedAtMs) <= 15000 : true;
+            if(!joinedRecently) return;
+
+            const nickname = String(info?.nickname || 'Pilot').trim() || 'Pilot';
+            if(!shouldAnnounceBattlePresenceEvent('join', entryId, nickname)) return;
+            pushKillFeed(`${nickname} присоединился к игре`, 'chat');
+        });
+
+        prevSnapshot.forEach((info, entryId) => {
+            if(entryId === selfId) return;
+            if(nextSnapshot.has(entryId)) return;
+
+            const nickname = String((info && typeof info === 'object' ? info.nickname : info) || 'Pilot').trim() || 'Pilot';
+            clearBattlePresenceEventCooldown('join', entryId, nickname);
+            if(!shouldAnnounceBattlePresenceEvent('leave', entryId, nickname)) return;
+            pushKillFeed(`${nickname} покинул игру`, 'chat');
+            battlePresenceMissingCounts.delete(entryId);
+        });
+    }
+
+    lastBattlePresenceSnapshot = nextSnapshot;
+    battlePresenceBaselineReady = true;
+}
+
+function handleIncomingBattleJoin(payload = {}){
+    const entryId = String(payload?.playerId || payload?.player_id || '').trim();
+    if(!entryId) return;
+    const myId = getSelfBattlePlayerId();
+    if(entryId === myId) return;
+    if(isBattleRespawning() || Date.now() < (Number(battlePresenceAnnounceMutedUntil || 0) || 0)) return;
+    if(isBattleJoinMutedForPlayer(entryId)) return;
+
+    const nickname = String(payload?.nickname || payload?.player_nickname || 'Pilot').trim() || 'Pilot';
+    lastBattlePresenceSnapshot.set(entryId, nickname);
+
+    if(!shouldAnnounceBattlePresenceEvent('join', entryId, nickname)) return;
+    pushKillFeed(`${nickname} присоединился к игре`, 'chat');
+}
+
+function handleIncomingBattleLeave(payload = {}){
+    const entryId = String(payload?.playerId || payload?.player_id || '').trim();
+    if(!entryId) return;
+    try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
+    const myId = getSelfBattlePlayerId();
+    if(entryId === myId) return;
+
+    const snapshotEntry = lastBattlePresenceSnapshot.get(entryId);
+    const snapshotNickname = snapshotEntry && typeof snapshotEntry === 'object' ? snapshotEntry.nickname : snapshotEntry;
+    const nickname = String(payload?.nickname || payload?.player_nickname || snapshotNickname || 'Pilot').trim() || 'Pilot';
+
+    removeRemoteBattleShipById(entryId);
+    lastBattlePresenceSnapshot.delete(entryId);
+
+    if(currentRoom){
+        const filterList = (list) => Array.isArray(list)
+            ? list.filter(row => String(row?.id || row?.player_id || row?.public_id || row?.player_public_id || '').trim() !== entryId)
+            : list;
+        currentRoom.currentPlayers = filterList(currentRoom.currentPlayers) || [];
+        currentRoom.players = filterList(currentRoom.players) || [];
+    }
+
+    if(!shouldAnnounceBattlePresenceEvent('leave', entryId, nickname)) return;
+    pushKillFeed(`${nickname} покинул игру`, 'chat');
+    updateBattleScoreboard?.();
+}
+
+function forceRemoveRemoteSceneObjects(entryId){
+    const key = String(entryId || '').trim();
+    if(!key || !scene) return;
+
+    const nodesToRemove = [];
+    scene.traverse?.((node) => {
+        const nodePlayerId = String(node?.userData?.playerId || '').trim();
+        const isRemote = !!node?.userData?.remote;
+        if(isRemote && nodePlayerId && nodePlayerId === key){
+            nodesToRemove.push(node);
+        }
+    });
+
+    nodesToRemove.forEach((node) => {
+        try{
+            node.visible = false;
+            if(node.parent) node.parent.remove(node);
+            else scene.remove(node);
+            node.traverse?.((child) => {
+                if(child?.geometry) child.geometry.dispose?.();
+                if(child?.material){
+                    if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+                    else child.material.dispose?.();
+                }
+            });
+        }catch(_){}
+    });
+}
+
+function removeRemoteBattleShipById(entryId){
+    const key = String(entryId || '').trim();
+    if(!key) return;
+    try{ lastBattlePresenceSnapshot.delete(key); }catch(_){ }
+
+    const old = remoteBattleShips instanceof Map ? remoteBattleShips.get(key) : null;
+    if(old?.mesh){
+        try{
+            old.mesh.visible = false;
+            old.mesh.userData = { ...(old.mesh.userData || {}), removed: true };
+            if(old.mesh.parent) old.mesh.parent.remove(old.mesh);
+            else scene.remove(old.mesh);
+            old.mesh.traverse?.((child) => {
+                if(child?.geometry) child.geometry.dispose?.();
+                if(child?.material){
+                    if(Array.isArray(child.material)) child.material.forEach(mat => mat?.dispose?.());
+                    else child.material.dispose?.();
+                }
+            });
+        }catch(_){}
+    }
+
+    if(remoteBattleShips instanceof Map){
+        remoteBattleShips.delete(key);
+    }
+
+    forceRemoveRemoteSceneObjects(key);
+}
+
+async function startLiveBattleSync(){
+    if(isSoloBattleActive()) return;
+    stopLiveBattleSync();
+    const onlineRoomId = getBattleRoomIdSafe();
+    if(!onlineRoomId) return;
+    await ensureLiveBattlePresenceChannel();
+    await initializeBattleHitCursor();
+    syncLiveBattlePlayers();
+    broadcastSelfBattleState();
+    const selfJoinPayload = {
+        playerId: getSelfBattlePlayerId(),
+        nickname: player?.nickname || 'Commander',
+        roomId: onlineRoomId
+    };
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 250);
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 1200);
+    setTimeout(() => {
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(onlineRoomId !== getBattleRoomIdSafe()) return;
+        sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
+    }, 2500);
+    pollIncomingBattleHits();
+    liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, LIVE_BATTLE_SYNC_INTERVAL_MS);
+    liveBattlePresencePushTimer = setInterval(() => {
+        broadcastSelfBattleState();
+    }, LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS);
+    battleHitPollTimer = setInterval(() => {
+        pollIncomingBattleHits();
+    }, LIVE_BATTLE_HIT_POLL_INTERVAL_MS);
+}
+
+function animateRemoteBattleShips(){
+    if(!remoteBattleShips.size) return;
+    remoteBattleShips.forEach((entry) => {
+        const mesh = entry?.mesh;
+        if(!mesh) return;
+
+        if(entry.targetPosition){
+            mesh.position.lerp(entry.targetPosition, 0.16);
+        }
+        if(entry.targetQuaternion){
+            mesh.quaternion.slerp(entry.targetQuaternion, 0.18);
+        }
+
+        if(entry.labelSprite){
+            entry.labelSprite.position.set(0, 3.4, 0);
+        }
+    });
 }
 
 function createEnemyBot(){
     if(isSoloBattleActive() && activeSoloMissionEnded) return;
-    const endlessMode = isEndlessSoloBattle();
-    if(!endlessMode && enemyBot){ removeSoloEnemyBot(enemyBot); enemyBot = null; }
-    if(endlessMode && getActiveSoloEnemyBots().length >= ENDLESS_SOLO_MAX_BOTS) return;
+    if(enemyBot){ scene.remove(enemyBot); enemyBot = null; }
     const botGroup = new THREE.Group();
     botGroup.rotation.order = 'YXZ';
     const playerLevel = Math.max(1, Number(player?.level || 1) || 1);
     const missionPower = Math.max(1, Number(activeSoloMission?.minLevel || currentRoom?.minLevel || 1) || 1);
-    const botIndex = (Array.isArray(soloEnemyBots) ? soloEnemyBots.length : 0);
-    const loadout = endlessMode ? getEndlessBotLoadout(botIndex) : { name: activeSoloMission?.botName || 'UFO Raider', weapon:'pulse', color:'#55d7ff', core:'#ffffff', damage:8, speed:1.9, cooldown:botShotCooldown, burst:2 };
+    const endlessMode = isEndlessSoloBattle();
     const botMaxHp = Math.max(endlessMode ? 185 : 135, Math.round((playerMaxHp || 100) * (endlessMode ? 1.9 : 1.45) + missionPower * 3));
-    botGroup.userData = { name: loadout.name || activeSoloMission?.botName || 'UFO Raider', hp: botMaxHp, maxHp: botMaxHp, armor: Math.min(endlessMode ? 0.48 : 0.38, (endlessMode ? 0.25 : 0.18) + playerLevel * 0.006), damageBoost: endlessMode ? 1.32 : 1.18, strafePhase: Math.random() * Math.PI * 2, alive: true, isSoloBot: true, hitRadius: endlessMode ? 7.8 : 3.4, loadout, lastShotAt: Date.now() + Math.random()*1800, lastTractorAt: Date.now() - 50000 + Math.random()*20000, botIndex };
+    botGroup.userData = { name: activeSoloMission?.botName || 'UFO Raider', hp: botMaxHp, maxHp: botMaxHp, armor: Math.min(endlessMode ? 0.48 : 0.38, (endlessMode ? 0.25 : 0.18) + playerLevel * 0.006), damageBoost: endlessMode ? 1.32 : 1.18, strafePhase: Math.random() * Math.PI * 2, alive: true, isSoloBot: true, hitRadius: endlessMode ? 6.2 : 3.4 };
     const placeholderMat = new THREE.MeshStandardMaterial({ color:0x76eaff, emissive:0x124a66, roughness:0.45, metalness:0.35 });
     const placeholder = new THREE.Mesh(new THREE.SphereGeometry(2.4, 24, 12), placeholderMat);
     placeholder.scale.set(1.45, 0.34, 1.45);
@@ -7464,13 +8850,12 @@ function createEnemyBot(){
     botGroup.add(glow);
     botGroup.position.copy(getSoloBotSpawnPosition());
     if(playerShip) botGroup.lookAt(playerShip.position);
-    soloEnemyBots.push(botGroup);
-    enemyBot = setPrimaryEnemyBot() || botGroup;
-    scene.add(botGroup);
+    enemyBot = botGroup;
+    scene.add(enemyBot);
     try{
         const loader = new GLTFLoader();
         loader.load(SOLO_BOT_MODEL_PATH, (gltf) => {
-            if(!botGroup || !botGroup.parent) return;
+            if(!enemyBot || enemyBot !== botGroup) return;
             const model = gltf.scene;
             model.name = 'Solo UFO Bot Visual';
 
@@ -7524,7 +8909,6 @@ function updateEnemyHud(){
     const hpInlineText = document.getElementById('enemy-hp-inline-text');
     if(!hud || !name || !hpBar || !hpText) return;
 
-    setPrimaryEnemyBot();
     if(!enemyBot){
         hud.style.display = 'none';
         return;
@@ -7542,76 +8926,31 @@ function updateEnemyHud(){
     if(hpInlineText) hpInlineText.textContent = hp + ' / ' + maxHp;
 }
 
-function fireBotLaser(bot = null){
-    const shooter = bot || enemyBot;
-    if(!shooter || !playerShip || shooter.userData?.alive === false) return;
-    const loadout = shooter.userData?.loadout || { weapon:'pulse', color:'#55d7ff', core:'#ffffff', damage:8, speed:1.9, burst:2 };
-    const toPlayer = playerShip.position.clone().sub(shooter.position).normalize();
-    const burst = Math.max(1, Number(loadout.burst || 1) || 1);
-    const offsets = burst === 1 ? [0] : Array.from({length: burst}, (_, i) => (i - (burst - 1) / 2) * 0.68);
+function fireBotLaser(){
+    if(!enemyBot || !playerShip) return;
+    const toPlayer = playerShip.position.clone().sub(enemyBot.position).normalize();
 
-    offsets.forEach((offsetX, idx) => {
-        const laserMesh = createProjectileVisual(loadout.weapon || 'pulse', {
-            color: loadout.color || '#55d7ff',
-            coreColor: loadout.core || '#ffffff',
-            width: loadout.deathRay ? 0.22 : 0.13,
-            length: loadout.deathRay ? 4.4 : 1.9,
-            scale: loadout.deathRay ? 1.35 : 1.05
+    [-0.7, 0.7].forEach(offsetX => {
+        const laserMesh = createProjectileVisual('pulse', {
+            color: '#55d7ff',
+            coreColor: '#ffffff',
+            width: 0.13,
+            length: 1.9,
+            scale: 1.05
         });
-        const spread = (idx - (offsets.length - 1) / 2) * 0.018;
-        const shotDirection = new THREE.Vector3(toPlayer.x + spread, toPlayer.y, toPlayer.z + spread).normalize();
-        const localOffset = new THREE.Vector3(offsetX, 0, -2.4).applyQuaternion(shooter.quaternion);
-        laserMesh.position.copy(shooter.position.clone().add(localOffset));
-        laserMesh.lookAt(laserMesh.position.clone().add(shotDirection));
+        const localOffset = new THREE.Vector3(offsetX, 0, -1.8).applyQuaternion(enemyBot.quaternion);
+        laserMesh.position.copy(enemyBot.position.clone().add(localOffset));
+        laserMesh.lookAt(enemyBot.position.clone().add(toPlayer));
         scene.add(laserMesh);
         enemyLasers.push({
             mesh: laserMesh,
-            velocity: shotDirection.clone().multiplyScalar(Number(loadout.speed || 1.9) || 1.9),
-            life: loadout.deathRay ? 145 : 105,
-            maxLife: loadout.deathRay ? 145 : 105,
-            damage: Math.round(Number(loadout.damage || 8) * (Number(shooter?.userData?.damageBoost || 1) || 1)),
-            weaponType: loadout.weapon || 'pulse',
-            shooter
+            velocity: toPlayer.clone().multiplyScalar(1.9),
+            life: 100,
+            maxLife: 100,
+            damage: Math.round(8 * (Number(enemyBot?.userData?.damageBoost || 1) || 1)),
+            weaponType: 'pulse'
         });
     });
-}
-
-function updateEndlessBotSpecials(bot){
-    if(!bot || !playerShip || !isEndlessSoloBattle() || bot.userData?.alive === false) return;
-    const loadout = bot.userData?.loadout || {};
-    const now = Date.now();
-    if(loadout.tractor && now - (Number(bot.userData.lastTractorAt || 0) || 0) > 70000){
-        bot.userData.lastTractorAt = now;
-        bot.userData.tractorUntil = now + 4200;
-        try{ pushKillFeed('UFO Gravity активировал притягивание', 'chat'); }catch(_){}
-    }
-    if(Number(bot.userData.tractorUntil || 0) > now){
-        const pull = bot.position.clone().sub(playerShip.position);
-        const dist = pull.length();
-        if(dist > 22 && dist < 760){
-            pull.normalize();
-            shipVelocity.addScaledVector(pull, 0.018);
-        }
-        if(bot.userData.tractorBeam){
-            bot.userData.tractorBeam.geometry.dispose?.();
-            bot.remove(bot.userData.tractorBeam);
-            bot.userData.tractorBeam = null;
-        }
-        const beamLength = Math.max(8, dist);
-        const beam = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.16, 1.7, beamLength, 14, 1, true),
-            new THREE.MeshBasicMaterial({ color:0x73ffb2, transparent:true, opacity:0.16, depthWrite:false, side:THREE.DoubleSide })
-        );
-        beam.position.copy(bot.worldToLocal(playerShip.position.clone().lerp(bot.position, 0.5)));
-        beam.lookAt(bot.worldToLocal(playerShip.position.clone()));
-        beam.rotation.x += Math.PI / 2;
-        bot.userData.tractorBeam = beam;
-        bot.add(beam);
-    }else if(bot.userData.tractorBeam){
-        bot.userData.tractorBeam.geometry.dispose?.();
-        bot.remove(bot.userData.tractorBeam);
-        bot.userData.tractorBeam = null;
-    }
 }
 
 function updateBattleScoreboard(){
