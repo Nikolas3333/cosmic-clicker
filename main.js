@@ -3793,7 +3793,7 @@ if (gameState === "BATTLE" && playerShip) {
                 updateBattleScoreboard();
                 if(isSoloBattleActive() && !isEndlessSoloBattle() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
                 else if(isSoloBattleActive() && !isEndlessSoloBattle()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, 1400);
-                else if(isEndlessSoloBattle()) lastEndlessBotSpawnAt = Date.now();
+                else if(isEndlessSoloBattle()) lastEndlessBotSpawnAt = 0;
             }
             continue;
         }
@@ -3943,9 +3943,9 @@ if (gameState === "BATTLE" && playerShip) {
             if(!bot.userData.botMoveVelocity || typeof bot.userData.botMoveVelocity.add !== 'function') bot.userData.botMoveVelocity = new THREE.Vector3();
             const toDesired = desiredPos.clone().sub(bot.position);
             const desiredDistance = toDesired.length();
-            const botMaxStep = endlessMode ? 0.95 : 0.82;
-            const botAccel = endlessMode ? 0.032 : 0.036;
-            const botDamping = endlessMode ? 0.925 : 0.935;
+            const botMaxStep = endlessMode ? 1.55 : 0.82;
+            const botAccel = endlessMode ? 0.062 : 0.036;
+            const botDamping = endlessMode ? 0.905 : 0.935;
             if(desiredDistance > 0.001){
                 const acceleration = toDesired.normalize().multiplyScalar(Math.min(botAccel * desiredDistance, botMaxStep * 0.28));
                 bot.userData.botMoveVelocity.add(acceleration);
@@ -3965,7 +3965,7 @@ if (gameState === "BATTLE" && playerShip) {
             const cooldown = endlessMode
                 ? (850 + botIndex * 85 + Math.random() * 260)
                 : botShotCooldown;
-            if (distanceToPlayer < (endlessMode ? 520 : 180) && Date.now() - Number(bot.userData.lastShotAt || 0) > cooldown) {
+            if (Date.now() - Number(bot.userData.lastShotAt || 0) > cooldown) {
                 bot.userData.lastShotAt = Date.now();
                 fireBotLaser(bot);
             }
@@ -7506,11 +7506,11 @@ function clampEndlessBotToCombatZone(bot){
 
 function getSoloBotSpawnPosition(){
     if(isEndlessSoloBattle()){
-        const minDist = 820;
-        const maxDist = 1350;
+        const minDist = 340;
+        const maxDist = 620;
         const angle = Math.random() * Math.PI * 2;
         const dist = minDist + Math.random() * (maxDist - minDist);
-        const y = -120 + Math.random() * 240;
+        const y = -70 + Math.random() * 140;
         const base = playerShip?.position?.clone?.() || new THREE.Vector3(0, 20, 0);
         const pos = base.add(new THREE.Vector3(Math.cos(angle) * dist, y, Math.sin(angle) * dist));
         return clampVectorToEndlessCombatZone(pos, 180);
@@ -9075,6 +9075,12 @@ function pruneEndlessSoloBotsToLimit(){
 function ensureEndlessSoloBotWave(){
     if(!isEndlessSoloBattle() || gameState !== 'BATTLE' || activeSoloMissionEnded) return;
 
+    // Главное: во время респавна игрока ничего не добавляем.
+    if(typeof isBattleRespawning === 'function' && isBattleRespawning()){
+        pruneEndlessSoloBotsToLimit();
+        return;
+    }
+
     const alive = getActiveSoloBots();
     const desired = getEndlessSoloDesiredBotCount();
     const stage = getEndlessSoloStage();
@@ -9086,17 +9092,24 @@ function ensureEndlessSoloBotWave(){
 
     pruneEndlessSoloBotsToLimit();
 
-    // Больше не создаём нового НЛО сразу после уничтожения старого.
-    // Замена появляется только после паузы, а увеличение количества — только каждые 20 убийств.
     if(alive.length >= desired) return;
 
     const now = Date.now();
+    if(alive.length === 0){
+        // Разрешаем восстановить волну только до текущего лимита, без добавления сверху.
+        lastEndlessBotSpawnAt = now;
+        createEnemyBot({ append:true, controlledWave:true });
+        pruneEndlessSoloBotsToLimit();
+        return;
+    }
+
     if((now - lastEndlessBotSpawnAt) < ENDLESS_SOLO_SPAWN_COOLDOWN_MS) return;
 
     lastEndlessBotSpawnAt = now;
     createEnemyBot({ append:true, controlledWave:true });
     pruneEndlessSoloBotsToLimit();
 }
+
 function createEnemyBot(options = {}){
     if(isSoloBattleActive() && activeSoloMissionEnded) return null;
     const endlessMode = isEndlessSoloBattle();
@@ -9134,9 +9147,9 @@ function createEnemyBot(options = {}){
         isSoloBot: true,
         hitRadius: endlessMode ? 7.2 : 3.4,
         weaponType,
-        lastShotAt: Date.now() + 4500 + Math.random() * 3500,
+        lastShotAt: Date.now() + 600 + Math.random() * 900,
         tractorReadyAt: Date.now() + 60000 + Math.random() * 90000,
-        preferredDistance: endlessMode ? (190 + Math.random() * 130) : 36,
+        preferredDistance: endlessMode ? (42 + Math.random() * 24) : 36,
         scoreKills: 0,
         scoreDeaths: 0,
         botMoveVelocity: new THREE.Vector3(),
@@ -19234,3 +19247,51 @@ setInterval(() => {
     setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800);
   });
 })();
+
+
+// ===== FINAL HARD FIX BOT CONTROL =====
+function __forceBotControl(){
+    if(!isEndlessSoloBattle()) return;
+
+    const kills = Math.max(0, Number(battleStats.playerKills||0)||0);
+    const allowed = Math.min(ENDLESS_SOLO_MAX_BOTS, 1 + Math.floor(kills / ENDLESS_SOLO_KILLS_PER_EXTRA_BOT));
+
+    // REMOVE extra bots (this kills spawn-on-death bug)
+    while(soloEnemyBots.length > allowed){
+        const b = soloEnemyBots.pop();
+        try{ scene.remove(b.mesh); }catch(e){}
+    }
+
+    // ADD only if needed (controlled)
+    while(soloEnemyBots.length < allowed){
+        spawnEnemyBot();
+    }
+}
+
+// hook into game loop
+try{
+    const __oldUpdate = updateBattle || (()=>{});
+    updateBattle = function(){
+        __oldUpdate.apply(this, arguments);
+        __forceBotControl();
+    }
+}catch(e){}
+
+// ===== TRUE FINAL SPAWN SYSTEM =====
+function updateEndlessBotsByKills(){
+    if(!isEndlessSoloBattle()) return;
+
+    const kills = Math.max(0, Number(battleStats.playerKills||0));
+    const allowed = Math.min(10, 1 + Math.floor(kills / 20));
+
+    // remove extra
+    while(soloEnemyBots.length > allowed){
+        const b = soloEnemyBots.pop();
+        try{ scene.remove(b.mesh); }catch(e){}
+    }
+
+    // add missing
+    while(soloEnemyBots.length < allowed){
+        spawnEnemyBot();
+    }
+}
