@@ -102,7 +102,7 @@ let endlessSoloLastBannerStage = 1;
 let endlessSoloLastKillCount = 0;
 
 
-// removed cooldown
+const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 999999999; // disabled by huge cooldown
 let enemyLasers = [];
 let battleObjects = [];
 let battleMapPlanet = null;
