@@ -6030,6 +6030,54 @@ shop-main-head{
   100%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
 }
 
+
+/* ===== SOLO/BATTLE KILLFEED + BOT NAME PATCH V372 ===== */
+#battle-kill-feed{
+  position:fixed;
+  left:18px;
+  top:86px;
+  width:360px;
+  max-width:40vw;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index:23000;
+  pointer-events:none;
+}
+.battle-kill-feed-item{
+  padding:9px 12px;
+  border-radius:10px;
+  background:rgba(4,12,24,0.82);
+  border:1px solid rgba(90,210,255,0.28);
+  color:#ffdede;
+  font-weight:700;
+  text-shadow:0 0 6px rgba(255,80,80,0.35);
+  box-shadow:0 0 14px rgba(0,180,255,0.14);
+}
+#battle-bot-name-label{
+  position:fixed;
+  left:50%;
+  bottom:92px;
+  transform:translateX(-50%);
+  padding:4px 12px;
+  min-width:160px;
+  text-align:center;
+  color:#9fe8ff;
+  font-weight:800;
+  font-size:14px;
+  text-shadow:0 0 8px rgba(0,220,255,0.65);
+  z-index:22500;
+  pointer-events:none;
+}
+#battle-scoreboard-body tr.team-red{ background:rgba(120,18,42,0.56) !important; }
+#battle-scoreboard-body tr.team-blue{ background:rgba(15,62,130,0.52) !important; }
+#battle-scoreboard-body .dead-marker{
+  display:inline-flex;
+  margin-left:8px;
+  color:#fff;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,0.45));
+}
+
 </style>
 </head>
 
@@ -6703,6 +6751,54 @@ document.querySelectorAll('.hangar-class-chip').forEach(btn=>{
   100%{ box-shadow:0 0 5px rgba(255,0,60,0.2);}
 }
 
+
+/* ===== SOLO/BATTLE KILLFEED + BOT NAME PATCH V372 ===== */
+#battle-kill-feed{
+  position:fixed;
+  left:18px;
+  top:86px;
+  width:360px;
+  max-width:40vw;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index:23000;
+  pointer-events:none;
+}
+.battle-kill-feed-item{
+  padding:9px 12px;
+  border-radius:10px;
+  background:rgba(4,12,24,0.82);
+  border:1px solid rgba(90,210,255,0.28);
+  color:#ffdede;
+  font-weight:700;
+  text-shadow:0 0 6px rgba(255,80,80,0.35);
+  box-shadow:0 0 14px rgba(0,180,255,0.14);
+}
+#battle-bot-name-label{
+  position:fixed;
+  left:50%;
+  bottom:92px;
+  transform:translateX(-50%);
+  padding:4px 12px;
+  min-width:160px;
+  text-align:center;
+  color:#9fe8ff;
+  font-weight:800;
+  font-size:14px;
+  text-shadow:0 0 8px rgba(0,220,255,0.65);
+  z-index:22500;
+  pointer-events:none;
+}
+#battle-scoreboard-body tr.team-red{ background:rgba(120,18,42,0.56) !important; }
+#battle-scoreboard-body tr.team-blue{ background:rgba(15,62,130,0.52) !important; }
+#battle-scoreboard-body .dead-marker{
+  display:inline-flex;
+  margin-left:8px;
+  color:#fff;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,0.45));
+}
+
 </style>
 
 
@@ -6817,7 +6913,59 @@ body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper.hangar-inline-mode.hanga
       inset 0 0 0 1px rgba(255,210,222,0.16);
   }
 }
+
+/* ===== SOLO/BATTLE KILLFEED + BOT NAME PATCH V372 ===== */
+#battle-kill-feed{
+  position:fixed;
+  left:18px;
+  top:86px;
+  width:360px;
+  max-width:40vw;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index:23000;
+  pointer-events:none;
+}
+.battle-kill-feed-item{
+  padding:9px 12px;
+  border-radius:10px;
+  background:rgba(4,12,24,0.82);
+  border:1px solid rgba(90,210,255,0.28);
+  color:#ffdede;
+  font-weight:700;
+  text-shadow:0 0 6px rgba(255,80,80,0.35);
+  box-shadow:0 0 14px rgba(0,180,255,0.14);
+}
+#battle-bot-name-label{
+  position:fixed;
+  left:50%;
+  bottom:92px;
+  transform:translateX(-50%);
+  padding:4px 12px;
+  min-width:160px;
+  text-align:center;
+  color:#9fe8ff;
+  font-weight:800;
+  font-size:14px;
+  text-shadow:0 0 8px rgba(0,220,255,0.65);
+  z-index:22500;
+  pointer-events:none;
+}
+#battle-scoreboard-body tr.team-red{ background:rgba(120,18,42,0.56) !important; }
+#battle-scoreboard-body tr.team-blue{ background:rgba(15,62,130,0.52) !important; }
+#battle-scoreboard-body .dead-marker{
+  display:inline-flex;
+  margin-left:8px;
+  color:#fff;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,0.45));
+}
+
 </style>
+
+
+<div id="battle-kill-feed"></div>
+<div id="battle-bot-name-label" style="display:none;"></div>
 
 </body>
 </html>
@@ -6874,6 +7022,54 @@ body.hangar-chat-mode.hangar-chat-lowered #chat-wrapper.hangar-inline-mode.hanga
       inset 0 0 0 1px rgba(255,214,226,0.18);
   }
 }
+
+/* ===== SOLO/BATTLE KILLFEED + BOT NAME PATCH V372 ===== */
+#battle-kill-feed{
+  position:fixed;
+  left:18px;
+  top:86px;
+  width:360px;
+  max-width:40vw;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index:23000;
+  pointer-events:none;
+}
+.battle-kill-feed-item{
+  padding:9px 12px;
+  border-radius:10px;
+  background:rgba(4,12,24,0.82);
+  border:1px solid rgba(90,210,255,0.28);
+  color:#ffdede;
+  font-weight:700;
+  text-shadow:0 0 6px rgba(255,80,80,0.35);
+  box-shadow:0 0 14px rgba(0,180,255,0.14);
+}
+#battle-bot-name-label{
+  position:fixed;
+  left:50%;
+  bottom:92px;
+  transform:translateX(-50%);
+  padding:4px 12px;
+  min-width:160px;
+  text-align:center;
+  color:#9fe8ff;
+  font-weight:800;
+  font-size:14px;
+  text-shadow:0 0 8px rgba(0,220,255,0.65);
+  z-index:22500;
+  pointer-events:none;
+}
+#battle-scoreboard-body tr.team-red{ background:rgba(120,18,42,0.56) !important; }
+#battle-scoreboard-body tr.team-blue{ background:rgba(15,62,130,0.52) !important; }
+#battle-scoreboard-body .dead-marker{
+  display:inline-flex;
+  margin-left:8px;
+  color:#fff;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,0.45));
+}
+
 </style>
 
 
@@ -6920,4 +7116,52 @@ body.hangar-chat-mode #chat-wrapper.hangar-chat-lowered{
 body.hangar-chat-mode #chat-wrapper.hangar-pm-neon {
   animation: hangarNeonSmooth 3.5s ease-in-out infinite;
 }
+
+/* ===== SOLO/BATTLE KILLFEED + BOT NAME PATCH V372 ===== */
+#battle-kill-feed{
+  position:fixed;
+  left:18px;
+  top:86px;
+  width:360px;
+  max-width:40vw;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index:23000;
+  pointer-events:none;
+}
+.battle-kill-feed-item{
+  padding:9px 12px;
+  border-radius:10px;
+  background:rgba(4,12,24,0.82);
+  border:1px solid rgba(90,210,255,0.28);
+  color:#ffdede;
+  font-weight:700;
+  text-shadow:0 0 6px rgba(255,80,80,0.35);
+  box-shadow:0 0 14px rgba(0,180,255,0.14);
+}
+#battle-bot-name-label{
+  position:fixed;
+  left:50%;
+  bottom:92px;
+  transform:translateX(-50%);
+  padding:4px 12px;
+  min-width:160px;
+  text-align:center;
+  color:#9fe8ff;
+  font-weight:800;
+  font-size:14px;
+  text-shadow:0 0 8px rgba(0,220,255,0.65);
+  z-index:22500;
+  pointer-events:none;
+}
+#battle-scoreboard-body tr.team-red{ background:rgba(120,18,42,0.56) !important; }
+#battle-scoreboard-body tr.team-blue{ background:rgba(15,62,130,0.52) !important; }
+#battle-scoreboard-body .dead-marker{
+  display:inline-flex;
+  margin-left:8px;
+  color:#fff;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,0.45));
+}
+
 </style>
