@@ -94,8 +94,10 @@ let enemyBot = null;
 let soloEnemyBots = [];
 let soloBotScoreRows = new Map();
 let lastEndlessBotSpawnAt = 0;
-const ENDLESS_SOLO_MAX_BOTS = 7;
-const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 6800;
+const ENDLESS_SOLO_MAX_BOTS = 10;
+const ENDLESS_SOLO_BASE_BOTS = 3;
+const ENDLESS_SOLO_KILLS_PER_EXTRA_BOT = 20;
+const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 5200;
 let enemyLasers = [];
 let battleObjects = [];
 let battleMapPlanet = null;
@@ -3902,20 +3904,20 @@ if (gameState === "BATTLE" && playerShip) {
             if(endlessMode){
                 const playerForward = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
                 const slotAngle = (botIndex / Math.max(1, activeBots.length)) * Math.PI * 2 + Number(bot.userData.strafePhase || 0) * 0.13;
-                const attackDistance = THREE.MathUtils.clamp(Number(bot.userData?.preferredDistance || 120) || 120, 90, 175);
-                const ringOffset = side.clone().multiplyScalar(Math.sin(slotAngle) * (48 + botIndex * 5));
-                const verticalOffset = new THREE.Vector3(0, Math.cos(slotAngle * 1.37) * 28, 0);
-                const frontOffset = playerForward.clone().multiplyScalar(-(attackDistance + Math.cos(slotAngle) * 26));
+                const attackDistance = THREE.MathUtils.clamp(Number(bot.userData?.preferredDistance || 74) || 74, 48, 105);
+                const ringOffset = side.clone().multiplyScalar(Math.sin(slotAngle) * (24 + botIndex * 3));
+                const verticalOffset = new THREE.Vector3(0, Math.cos(slotAngle * 1.37) * 12, 0);
+                const frontOffset = playerForward.clone().multiplyScalar(-(attackDistance + Math.cos(slotAngle) * 12));
 
                 if(distanceToPlayer > 430 || Number(bot.userData.edgeReturnUntil || 0) > Date.now()){
                     desiredPos = playerShip.position.clone()
-                        .add(playerForward.clone().multiplyScalar(-Math.min(210, attackDistance + 55)))
+                        .add(playerForward.clone().multiplyScalar(-Math.min(135, attackDistance + 30)))
                         .add(ringOffset.multiplyScalar(0.55))
                         .add(verticalOffset.multiplyScalar(0.45));
-                }else if(distanceToPlayer < 70){
+                }else if(distanceToPlayer < 46){
                     desiredPos = playerShip.position.clone()
-                        .add(desiredForward.clone().multiplyScalar(-105))
-                        .add(ringOffset.multiplyScalar(0.32));
+                        .add(desiredForward.clone().multiplyScalar(-62))
+                        .add(ringOffset.multiplyScalar(0.22));
                 }else{
                     desiredPos = playerShip.position.clone()
                         .add(frontOffset)
@@ -3935,12 +3937,15 @@ if (gameState === "BATTLE" && playerShip) {
             if(!bot.userData.botMoveVelocity || typeof bot.userData.botMoveVelocity.add !== 'function') bot.userData.botMoveVelocity = new THREE.Vector3();
             const toDesired = desiredPos.clone().sub(bot.position);
             const desiredDistance = toDesired.length();
-            const botMaxStep = endlessMode ? 1.05 : 0.82;
-            const botAccel = endlessMode ? 0.030 : 0.036;
-            const botDamping = endlessMode ? 0.945 : 0.935;
+            const botMaxStep = endlessMode ? 1.55 : 0.82;
+            const botAccel = endlessMode ? 0.062 : 0.036;
+            const botDamping = endlessMode ? 0.905 : 0.935;
             if(desiredDistance > 0.001){
-                const acceleration = toDesired.normalize().multiplyScalar(Math.min(botAccel * desiredDistance, botMaxStep * 0.16));
+                const acceleration = toDesired.normalize().multiplyScalar(Math.min(botAccel * desiredDistance, botMaxStep * 0.28));
                 bot.userData.botMoveVelocity.add(acceleration);
+            }
+            if(endlessMode && distanceToPlayer > 150){
+                bot.userData.botMoveVelocity.add(desiredForward.clone().multiplyScalar(0.075));
             }
             bot.userData.botMoveVelocity.clampLength(0, botMaxStep);
             bot.position.add(bot.userData.botMoveVelocity);
@@ -3952,7 +3957,7 @@ if (gameState === "BATTLE" && playerShip) {
             bot.rotation.z += ((Math.sin(bot.userData.strafePhase) * (endlessMode ? 0.16 : 0.34)) - bot.rotation.z) * 0.08;
 
             const cooldown = endlessMode
-                ? (2300 + botIndex * 310 + Math.random() * 520)
+                ? (850 + botIndex * 85 + Math.random() * 260)
                 : botShotCooldown;
             if (Date.now() - Number(bot.userData.lastShotAt || 0) > cooldown) {
                 bot.userData.lastShotAt = Date.now();
@@ -9005,15 +9010,21 @@ function getEndlessBotWeaponType(index = 0){
     return weapons[Math.abs(Number(index || 0)) % weapons.length] || 'pulse';
 }
 
+function getEndlessSoloDesiredBotCount(){
+    const kills = Math.max(0, Number(battleStats?.playerKills || 0) || 0);
+    const extra = Math.floor(kills / ENDLESS_SOLO_KILLS_PER_EXTRA_BOT);
+    return Math.min(ENDLESS_SOLO_MAX_BOTS, ENDLESS_SOLO_BASE_BOTS + extra);
+}
+
 function ensureEndlessSoloBotWave(){
     if(!isEndlessSoloBattle() || gameState !== 'BATTLE' || activeSoloMissionEnded) return;
     const alive = getActiveSoloBots();
     const now = Date.now();
-    const desired = ENDLESS_SOLO_MAX_BOTS;
+    const desired = getEndlessSoloDesiredBotCount();
     if(alive.length >= desired) return;
     if(alive.length === 0){
         lastEndlessBotSpawnAt = now;
-        for(let i=0;i<Math.min(6, desired);i++) createEnemyBot({ append:true });
+        for(let i = 0; i < desired; i++) createEnemyBot({ append:true });
         return;
     }
     if((now - lastEndlessBotSpawnAt) < ENDLESS_SOLO_SPAWN_COOLDOWN_MS) return;
@@ -9049,15 +9060,15 @@ function createEnemyBot(options = {}){
         hp: botMaxHp,
         maxHp: botMaxHp,
         armor: Math.min(endlessMode ? 0.44 : 0.38, (endlessMode ? 0.22 : 0.18) + playerLevel * 0.006),
-        damageBoost: endlessMode ? 1.18 + Math.min(0.45, botIndex * 0.045) : 1.18,
+        damageBoost: endlessMode ? 1.35 + Math.min(0.75, botIndex * 0.065) : 1.18,
         strafePhase: Math.random() * Math.PI * 2,
         alive: true,
         isSoloBot: true,
         hitRadius: endlessMode ? 7.2 : 3.4,
         weaponType,
-        lastShotAt: Date.now() + Math.random() * 1800,
+        lastShotAt: Date.now() + 600 + Math.random() * 900,
         tractorReadyAt: Date.now() + 60000 + Math.random() * 90000,
-        preferredDistance: endlessMode ? (105 + Math.random() * 58) : 36,
+        preferredDistance: endlessMode ? (58 + Math.random() * 34) : 36,
         scoreKills: 0,
         scoreDeaths: 0,
         botMoveVelocity: new THREE.Vector3(),
