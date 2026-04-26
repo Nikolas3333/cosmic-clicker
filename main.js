@@ -459,7 +459,35 @@ const SOLO_MISSION_STORAGE_PREFIX = 'cosmicSoloMissionCompleted';
 let activeSoloMission = null;
 let activeSoloMissionCompleted = false;
 let activeSoloMissionEnded = false;
+let battleSolarSystemGroup = null;
 const SOLO_DEFAULT_PLAYER_LIVES = 5;
+const SOLO_KILL_EXP_REWARD = 2;
+const SOLO_KILL_COIN_REWARD = 2;
+const SOLO_WIN_CRYSTAL_REWARD = 3;
+function isEndlessSoloBattle(){ return !!(isSoloBattleActive() && (activeSoloMission?.endless || currentRoom?.endless)); }
+function addPlayerBattleCurrency(kind = 'coins', amount = 0){
+    const value = Math.max(0, Number(amount || 0) || 0);
+    if(!value) return;
+    if(typeof playerResources !== 'object' || !playerResources) return;
+    if(kind === 'crystals'){
+        playerResources.crystals = Math.max(0, Number(playerResources.crystals || 0) + value);
+    }else{
+        playerResources.coins = Math.max(0, Number(playerResources.coins || player?.credits || 0) + value);
+        if(player) player.credits = playerResources.coins;
+    }
+}
+function awardSoloBotKillReward(worldPosition = null){
+    player.experience = Math.max(0, Number(player.experience || 0) + SOLO_KILL_EXP_REWARD);
+    addPlayerBattleCurrency('coins', SOLO_KILL_COIN_REWARD);
+    try{ showBattleFloatingReward(SOLO_KILL_EXP_REWARD, SOLO_KILL_COIN_REWARD, worldPosition || playerShip?.position || null); }catch(_){}
+    try{ updateHUD?.(); updateUI?.(); updatePremiumBar?.(); updateBattlePlayerHud?.(); saveGame?.(); }catch(_){}
+}
+function awardSoloMissionWinReward(){
+    if(isEndlessSoloBattle()) return;
+    addPlayerBattleCurrency('crystals', SOLO_WIN_CRYSTAL_REWARD);
+    try{ pushKillFeed(`Награда за победу: 💎 +${SOLO_WIN_CRYSTAL_REWARD}`, 'kill'); }catch(_){}
+    try{ updateHUD?.(); updateUI?.(); updatePremiumBar?.(); updateBattlePlayerHud?.(); saveGame?.(); }catch(_){}
+}
 function getCosmicLocalDateKey(){ const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
 function getSoloMissionPlayerKey(){ return String(authState?.playerId || player?.id || authState?.email || player?.nickname || 'guest').trim() || 'guest'; }
 function getSoloMissionId(entry = {}){ return String(entry?.real || entry?.map || entry?.name || entry?.title || '').trim().toLowerCase() || 'mission'; }
@@ -491,7 +519,7 @@ function updateSoloMissionHud(){
     if(life) life.textContent = String(lives);
     if(botDefeated) botDefeated.textContent = `${kills}/${goal}`;
     if(botScore) botScore.textContent = String(botKills);
-    if(goalText) goalText.textContent = `Цель: уничтожить ${goal} НЛО`;
+    if(goalText) goalText.textContent = isEndlessSoloBattle() ? 'Цель: бесконечный бой с НЛО' : `Цель: уничтожить ${goal} НЛО`;
 }
 function showSoloMissionResult(victory = true){
     const box = document.getElementById('solo-result-banner');
@@ -510,7 +538,10 @@ function finishSoloMission(victory = true){
     activeSoloMissionEnded = true;
     activeSoloMissionCompleted = !!victory;
     const mission = activeSoloMission || currentRoom || selectedLobbyMap || {};
-    if(victory) markSoloMissionCompletedToday(mission);
+    if(victory){
+        markSoloMissionCompletedToday(mission);
+        awardSoloMissionWinReward?.();
+    }
     showSoloMissionResult(!!victory);
     updateSoloMissionHud();
     updateBattleScoreboard?.();
@@ -1290,7 +1321,7 @@ function showBattleFloatingReward(expValue = 0, coinValue = 0, worldPosition = n
 
     const node = document.createElement('div');
     node.className = 'battle-floating-reward';
-    node.innerHTML = `${expAmount ? `<span class="reward-chip exp">EXP</span>` : ''}${coinAmount ? `<span class="reward-chip coin">🪙</span>` : ''}`;
+    node.innerHTML = `${expAmount ? `<span class="reward-chip exp">EXP</span>` : ''}${coinAmount ? `<span class="reward-chip coin">🟡</span>` : ''}`;
     node.style.left = `${(projected.x * 0.5 + 0.5) * window.innerWidth}px`;
     node.style.top = `${(-projected.y * 0.5 + 0.5) * window.innerHeight}px`;
     document.body.appendChild(node);
@@ -1617,6 +1648,11 @@ function clearBattleScene(){
     if(battleMapPlanet){
         scene.remove(battleMapPlanet);
         battleMapPlanet = null;
+    }
+
+    if(battleSolarSystemGroup){
+        try{ scene.remove(battleSolarSystemGroup); }catch(_){}
+        battleSolarSystemGroup = null;
     }
 
     shipVelocity.set(0, 0, 0);
@@ -2881,7 +2917,7 @@ const resourceInfo = {
 "neptune_methane": { icon: "🔵", name: "Метан" },
 "solar_energy": { icon: "⚡", name: "Энергия" },
 
-"coins": { icon: "🪙", name: "Монеты" },
+"coins": { icon: "🟡", name: "Монеты" },
 "crystals": { icon: "💎", name: "Кристаллы" }
 
 };
@@ -3715,12 +3751,13 @@ if (gameState === "BATTLE" && playerShip) {
                 enemyBot = null;
                 battleStats.playerKills += 1;
                 battleStats.botDeaths += 1;
+                if(isSoloBattleActive()) awardSoloBotKillReward(defeatedPos);
                 if(!isSoloBattleActive()) pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
                 updateEnemyHud();
                 updateSoloMissionHud?.();
                 updateBattleScoreboard();
-                if(isSoloBattleActive() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
-                else if(isSoloBattleActive()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, 1400);
+                if(isSoloBattleActive() && !isEndlessSoloBattle() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
+                else if(isSoloBattleActive()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, isEndlessSoloBattle() ? 850 : 1400);
             }
             continue;
         }
@@ -3814,9 +3851,11 @@ if (gameState === "BATTLE" && playerShip) {
         enemyBot.userData.strafePhase += 0.025;
         const desiredForward = playerShip.position.clone().sub(enemyBot.position).normalize();
         const side = new THREE.Vector3(1,0,0).cross(desiredForward).normalize();
+        const botKeepDistance = isEndlessSoloBattle() ? -34 : -18;
+        const botStrafeDistance = isEndlessSoloBattle() ? 15 : 7;
         const desiredPos = playerShip.position.clone()
-            .add(desiredForward.clone().multiplyScalar(-18))
-            .add(side.multiplyScalar(Math.sin(enemyBot.userData.strafePhase) * 7));
+            .add(desiredForward.clone().multiplyScalar(botKeepDistance))
+            .add(side.multiplyScalar(Math.sin(enemyBot.userData.strafePhase) * botStrafeDistance));
         desiredPos.y += Math.cos(enemyBot.userData.strafePhase * 1.7) * 2.2;
         enemyBot.position.lerp(desiredPos, 0.045);
         handleBattleCollisions(enemyBot);
@@ -3844,6 +3883,7 @@ updateDebrisPieces();
 if((gameState === "BATTLE" || gameState === "OBSERVE") && battleObserverMode){
     updateObserverBattle();
 }
+updateBattleSolarSystemView?.();
 limitBattleArea();
 updateBattlePlayerHud();
 renderer.render(scene,camera);
@@ -7156,6 +7196,7 @@ function enterMap(mapName) {
 function normalizeBattleMapName(mapName){
     const raw = String(mapName || '').trim().toLowerCase();
 
+    if(raw.includes('solar') || raw.includes('system') || raw.includes('систем')) return 'solar';
     if(raw.includes('sun') || raw.includes('солн')) return 'sun';
     if(raw.includes('mercury') || raw.includes('меркур')) return 'mercury';
     if(raw.includes('venus') || raw.includes('венер')) return 'venus';
@@ -7182,6 +7223,7 @@ function normalizeBattleMapName(mapName){
 
 function getBattlePlanetConfig(mapKey){
     const configs = {
+        solar:{ color:0xffc84a, size:40, light:0xffdd88 },
         sun:{ color:0xffc84a, size:86, light:0xffdd88 },
         mercury:{ color:0xb7b7b7, size:52, light:0xffffff },
         venus:{ color:0xe4b382, size:62, light:0xffe1b3 },
@@ -7224,6 +7266,88 @@ function resetBattleSessionCounters(){
     try{ battleScoreState = new Map(); }catch(_){ }
 }
 
+
+function createBattleSolarSystemView(){
+    if(battleSolarSystemGroup){
+        try{ scene.remove(battleSolarSystemGroup); }catch(_){}
+        battleSolarSystemGroup = null;
+    }
+    battleSolarSystemGroup = new THREE.Group();
+    battleSolarSystemGroup.name = 'Solo Endless Battle Solar System';
+    const planetDefs = [
+        { name:'Sun', radius:28, dist:0, color:0xffcc44, emissive:0xff8a22 },
+        { name:'Mercury', radius:3.6, dist:62, color:0xb7b7b7 },
+        { name:'Venus', radius:5.2, dist:88, color:0xe4b382 },
+        { name:'Earth', radius:5.8, dist:118, color:0x3b7cff },
+        { name:'Mars', radius:4.6, dist:150, color:0xc1583a },
+        { name:'Jupiter', radius:13.5, dist:202, color:0xcda27f },
+        { name:'Saturn', radius:11.5, dist:252, color:0xd9c08a, ring:true },
+        { name:'Uranus', radius:8.5, dist:302, color:0x86d8dd },
+        { name:'Neptune', radius:8.5, dist:350, color:0x4469ff }
+    ];
+    planetDefs.forEach((def, index) => {
+        const pivot = new THREE.Group();
+        pivot.userData.orbitSpeed = index === 0 ? 0.0018 : 0.0006 + index * 0.00008;
+        const mat = new THREE.MeshStandardMaterial({
+            color:def.color,
+            roughness:0.82,
+            metalness:0.04,
+            emissive:def.emissive || 0x000000,
+            emissiveIntensity:def.emissive ? 0.55 : 0
+        });
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(def.radius, 32, 24), mat);
+        mesh.position.set(def.dist, 0, 0);
+        mesh.userData.selfRotateSpeed = 0.004 + index * 0.0007;
+        pivot.add(mesh);
+        if(def.ring){
+            const ring = new THREE.Mesh(
+                new THREE.RingGeometry(def.radius * 1.35, def.radius * 2.2, 64),
+                new THREE.MeshBasicMaterial({ color:def.color, side:THREE.DoubleSide, transparent:true, opacity:0.62 })
+            );
+            ring.rotation.x = Math.PI / 2.5;
+            mesh.add(ring);
+        }
+        if(def.dist > 0){
+            const orbit = new THREE.Mesh(
+                new THREE.RingGeometry(def.dist - 0.08, def.dist + 0.08, 128),
+                new THREE.MeshBasicMaterial({ color:0x1b6d92, side:THREE.DoubleSide, transparent:true, opacity:0.18 })
+            );
+            orbit.rotation.x = Math.PI / 2;
+            battleSolarSystemGroup.add(orbit);
+        }
+        battleSolarSystemGroup.add(pivot);
+    });
+    battleSolarSystemGroup.position.set(0, -90, -520);
+    battleSolarSystemGroup.scale.setScalar(1.35);
+    scene.add(battleSolarSystemGroup);
+}
+
+function updateBattleSolarSystemView(){
+    if(!battleSolarSystemGroup) return;
+    battleSolarSystemGroup.children.forEach((child) => {
+        if(child?.isGroup){
+            child.rotation.y += Number(child.userData?.orbitSpeed || 0) || 0;
+            child.children.forEach(mesh => {
+                if(mesh?.isMesh) mesh.rotation.y += Number(mesh.userData?.selfRotateSpeed || 0.003) || 0.003;
+            });
+        }
+    });
+}
+
+function getSoloBotSpawnPosition(){
+    if(isEndlessSoloBattle()){
+        const minDist = 95;
+        const maxDist = 310;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = minDist + Math.random() * (maxDist - minDist);
+        const y = -35 + Math.random() * 90;
+        const base = playerShip?.position?.clone?.() || new THREE.Vector3(0, 10, 0);
+        return base.add(new THREE.Vector3(Math.cos(angle) * dist, y, Math.sin(angle) * dist));
+    }
+    const spawnBase = spawnPointB?.clone?.() || new THREE.Vector3(130, 10, -120);
+    return spawnBase.add(new THREE.Vector3((Math.random()-0.5)*34, 8 + Math.random()*12, (Math.random()-0.5)*34));
+}
+
 function enterBattleMap(mapName){
   // FIX: reset orbit leftovers
   try {
@@ -7249,30 +7373,36 @@ function enterBattleMap(mapName){
     }
 
     const config = getBattlePlanetConfig(mapKey);
+    const endlessSoloMap = isEndlessSoloBattle();
 
-    const ambient = new THREE.AmbientLight(0xffffff, 1.25);
+    const ambient = new THREE.AmbientLight(0xffffff, endlessSoloMap ? 1.55 : 1.25);
     const point = new THREE.PointLight(config.light, 2.6, 250);
     point.position.set(12, 9, 10);
     battleObjects.push(ambient, point);
     scene.add(ambient);
     scene.add(point);
 
-    const planetGeometry = new THREE.SphereGeometry(config.size, 48, 48);
-    const planetMaterial = new THREE.MeshStandardMaterial({
-        color: config.color,
-        roughness: 0.9,
-        metalness: 0.05
-    });
-    battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
-    battleMapPlanet.position.set(0, -6, -320);
-    battleMapPlanet.userData.radius = config.size;
-    battleMapPlanet.userData.solidRadius = config.size + 10;
-    battleMapPlanet.userData.atmosphereRadius = config.size + 42;
-    battleMapPlanet.userData.nearSurfaceRadius = config.size + 14;
-    battleMapPlanet.userData.crashRadius = config.size + 10;
-    scene.add(battleMapPlanet);
+    if(endlessSoloMap){
+        createBattleSolarSystemView();
+        battleMapPlanet = null;
+    }else{
+        const planetGeometry = new THREE.SphereGeometry(config.size, 48, 48);
+        const planetMaterial = new THREE.MeshStandardMaterial({
+            color: config.color,
+            roughness: 0.9,
+            metalness: 0.05
+        });
+        battleMapPlanet = new THREE.Mesh(planetGeometry, planetMaterial);
+        battleMapPlanet.position.set(0, -6, -320);
+        battleMapPlanet.userData.radius = config.size;
+        battleMapPlanet.userData.solidRadius = config.size + 10;
+        battleMapPlanet.userData.atmosphereRadius = config.size + 42;
+        battleMapPlanet.userData.nearSurfaceRadius = config.size + 14;
+        battleMapPlanet.userData.crashRadius = config.size + 10;
+        scene.add(battleMapPlanet);
+    }
 
-    if(mapKey === 'saturn'){
+    if(!endlessSoloMap && mapKey === 'saturn'){
         const ringGeo = new THREE.RingGeometry(config.size * 1.35, config.size * 2.0, 96);
         const ringMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.65 });
         const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -7280,8 +7410,8 @@ function enterBattleMap(mapName){
         battleMapPlanet.add(ring);
     }
 
-    spawnPointA = new THREE.Vector3(-150, -10, 120);
-    spawnPointB = new THREE.Vector3(150, 12, -140);
+    spawnPointA = endlessSoloMap ? new THREE.Vector3(0, 0, 140) : new THREE.Vector3(-150, -10, 120);
+    spawnPointB = endlessSoloMap ? new THREE.Vector3(220, 20, -220) : new THREE.Vector3(150, 12, -140);
 
     camera.position.set(0, 18, 70);
     camera.lookAt(0, 0, 0);
@@ -8707,8 +8837,9 @@ function createEnemyBot(){
     botGroup.rotation.order = 'YXZ';
     const playerLevel = Math.max(1, Number(player?.level || 1) || 1);
     const missionPower = Math.max(1, Number(activeSoloMission?.minLevel || currentRoom?.minLevel || 1) || 1);
-    const botMaxHp = Math.max(135, Math.round((playerMaxHp || 100) * 1.45 + missionPower * 3));
-    botGroup.userData = { name: activeSoloMission?.botName || 'UFO Raider', hp: botMaxHp, maxHp: botMaxHp, armor: Math.min(0.38, 0.18 + playerLevel * 0.006), damageBoost: 1.18, strafePhase: Math.random() * Math.PI * 2, alive: true, isSoloBot: true, hitRadius: 3.4 };
+    const endlessMode = isEndlessSoloBattle();
+    const botMaxHp = Math.max(endlessMode ? 185 : 135, Math.round((playerMaxHp || 100) * (endlessMode ? 1.9 : 1.45) + missionPower * 3));
+    botGroup.userData = { name: activeSoloMission?.botName || 'UFO Raider', hp: botMaxHp, maxHp: botMaxHp, armor: Math.min(endlessMode ? 0.48 : 0.38, (endlessMode ? 0.25 : 0.18) + playerLevel * 0.006), damageBoost: endlessMode ? 1.32 : 1.18, strafePhase: Math.random() * Math.PI * 2, alive: true, isSoloBot: true, hitRadius: endlessMode ? 6.2 : 3.4 };
     const placeholderMat = new THREE.MeshStandardMaterial({ color:0x76eaff, emissive:0x124a66, roughness:0.45, metalness:0.35 });
     const placeholder = new THREE.Mesh(new THREE.SphereGeometry(2.4, 24, 12), placeholderMat);
     placeholder.scale.set(1.45, 0.34, 1.45);
@@ -8716,8 +8847,7 @@ function createEnemyBot(){
     const glow = new THREE.PointLight(0x55ddff, 1.4, 22);
     glow.position.set(0, 0.8, 0);
     botGroup.add(glow);
-    const spawnBase = spawnPointB?.clone?.() || new THREE.Vector3(130, 10, -120);
-    botGroup.position.copy(spawnBase.add(new THREE.Vector3(0, 8, 0)));
+    botGroup.position.copy(getSoloBotSpawnPosition());
     if(playerShip) botGroup.lookAt(playerShip.position);
     enemyBot = botGroup;
     scene.add(enemyBot);
@@ -8737,7 +8867,7 @@ function createEnemyBot(){
             const rawSize = rawBox.getSize(new THREE.Vector3());
             const rawCenter = rawBox.getCenter(new THREE.Vector3());
             const maxDim = Math.max(rawSize.x || 0, rawSize.y || 0, rawSize.z || 0);
-            const targetDim = 7.2;
+            const targetDim = isEndlessSoloBattle() ? 13.5 : 7.2;
             const safeScale = (Number.isFinite(maxDim) && maxDim > 0.001)
                 ? THREE.MathUtils.clamp(targetDim / maxDim, 0.0005, 4.5)
                 : 1;
@@ -8760,7 +8890,7 @@ function createEnemyBot(){
 
             while(botGroup.children.length){ botGroup.remove(botGroup.children[0]); }
             botGroup.add(model);
-            botGroup.userData.hitRadius = 4.2;
+            botGroup.userData.hitRadius = isEndlessSoloBattle() ? 7.2 : 4.2;
             const modelLight = new THREE.PointLight(0x66eaff, 1.15, 28);
             modelLight.position.set(0, 1.1, 0);
             botGroup.add(modelLight);
@@ -9686,7 +9816,7 @@ function canSellModule(moduleId){
 
 function getSellActionLabel(kind, itemId){
     const price = kind === 'ship' ? getHullSellPrice(itemId) : getModuleSellPrice(itemId);
-    return `Продать за ${price} 🪙`;
+    return `Продать за ${price} 🟡`;
 }
 
 function getCurrentHangarModuleType(){
@@ -13266,7 +13396,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
                   <div id="hangar-ship-subtitle" style="display:none;">Центральная платформа показывает корпус.</div>
                   <div id="hangar-ship-desc" style="display:none;"></div>
                   <div id="hangar-ship-price-row" style="display:none;">
-                    <span class="hangar-price-chip">🪙 <b id="hangar-ship-price-coins">0</b></span>
+                    <span class="hangar-price-chip">🟡 <b id="hangar-ship-price-coins">0</b></span>
                     <span class="hangar-price-chip">💎 <b id="hangar-ship-price-diamonds">0</b></span>
                   </div>
                   <button id="hangar-ship-action" class="hangar-main-btn ready" type="button" style="display:none;">Выбрать</button>
@@ -13417,6 +13547,7 @@ function clearBattleObstacles(){
 
 function createBattleObstacles(mapKey){
     clearBattleObstacles();
+    if(isEndlessSoloBattle()) return;
     const obstaclePalette = {
         mercury:0x7f8287, venus:0x946f52, earth:0x5c6575, mars:0x8f523f,
         jupiter:0x8e7563, saturn:0x9b8a69, uranus:0x5d7984, neptune:0x50658c, sun:0x7c4f2e
@@ -13731,7 +13862,7 @@ function updatePremiumAccountInfo(){
         coinsEl.querySelectorAll(':scope > .premium-currency-text').forEach(node => node.remove());
         const textNode = document.createElement('span');
         textNode.className = 'premium-currency-text';
-        textNode.textContent = `🪙 ${playerResources?.coins || 0}`;
+        textNode.textContent = `🟡 ${playerResources?.coins || 0}`;
         coinsEl.prepend(textNode);
     }
     ensurePremiumCurrencyUi?.();
@@ -13998,7 +14129,7 @@ function limitBattleArea(){
     if(!playerShip) return;
     const center = new THREE.Vector3(0, 0, 0);
     const toShip = playerShip.position.clone().sub(center);
-    const limit = 760;
+    const limit = isEndlessSoloBattle() ? 2400 : 760;
     const dist = toShip.length();
     if(dist <= limit) return;
     const normal = toShip.normalize();
@@ -14412,7 +14543,8 @@ function limitBattleArea(){
         { title:'Шторм Венеры', real:'venus', img:'venus', mode:'Solo', mission:'Пережить атаку ботов', players:'1/1', minLevel:5, maxLevel:20 },
         { title:'Оборона Земли', real:'earth', img:'earth', mode:'Solo', mission:'Уничтожить 3 волны ботов', players:'1/1', minLevel:1, maxLevel:30 },
         { title:'Марсианская зачистка', real:'mars', img:'mars', mode:'Solo', mission:'Очистить сектор от ботов', players:'1/1', minLevel:10, maxLevel:40 },
-        { title:'Патруль Юпитера', real:'jupiter', img:'jupiter', mode:'Solo', mission:'Выжить в тяжёлом секторе', players:'1/1', minLevel:20, maxLevel:60 }
+        { title:'Патруль Юпитера', real:'jupiter', img:'jupiter', mode:'Solo', mission:'Выжить в тяжёлом секторе', players:'1/1', minLevel:20, maxLevel:60 },
+        { title:'Бесконечный бой', real:'solar', img:'sun', mode:'Solo ∞', mission:'Бесконечная охота на усиленные НЛО', players:'1/1', minLevel:1, maxLevel:120, endless:true }
     ];
 
     let lobbyMode = 'battle';
@@ -14495,7 +14627,7 @@ function limitBattleArea(){
                 document.querySelectorAll('#match-list .match-item').forEach(el => el.classList.remove('selected'));
                 item.classList.add('selected');
                 selectedLobbyMap = { ...entry, name: entry.real };
-                currentRoom = { map: entry.real, state: mode, solo: mode === 'solo', title: entry.title, mission: entry.mission || '', goalKills: entry.goalKills || 6, playerLives: entry.playerLives || 5, minLevel: entry.minLevel || 1 };
+                currentRoom = { map: entry.real, state: mode, solo: mode === 'solo', title: entry.title, mission: entry.mission || '', goalKills: entry.goalKills || 6, playerLives: entry.playerLives || 5, minLevel: entry.minLevel || 1, endless: !!entry.endless };
                 if(preview){
                     preview.style.backgroundImage = `url(maps/${entry.img}.jpg)`;
                     preview.style.backgroundSize = 'cover';
@@ -14533,6 +14665,7 @@ function limitBattleArea(){
                     solo: lobbyMode === 'solo',
                     goalKills: selectedLobbyMap?.goalKills || 6,
                     playerLives: selectedLobbyMap?.playerLives || 5,
+                    endless: !!selectedLobbyMap?.endless,
                     title: selected.title,
                     mission: selected.mission || '',
                     players: [{ name: getDisplayPlayerTag() }]
@@ -15006,8 +15139,8 @@ function renderShopCatalog(){
         const coinPrice = item.type === 'ship' ? getShipCoinPrice(item) : Number(item.price || 0);
         const diamondPrice = item.type === 'ship' ? getShipDiamondPrice(item) : 0;
         const priceLine = item.type === 'ship'
-            ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${coinPrice}</span><span class="shop-price-chip"><span class="shop-coin">💎</span>${diamondPrice}</span></div>`
-            : (item.price ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🪙</span>${item.price}</span></div>` : '');
+            ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🟡</span>${coinPrice}</span><span class="shop-price-chip"><span class="shop-coin">💎</span>${diamondPrice}</span></div>`
+            : (item.price ? `<div class="shop-price-line"><span class="shop-price-chip"><span class="shop-coin">🟡</span>${item.price}</span></div>` : '');
         const moduleInstalled = item.type === 'module' && !!getInstalledModuleForType(player?.selectedShipId || '', item.classId || '');
         const buyText = item.type === 'module'
             ? (owned ? (moduleInstalled && getInstalledModuleForType(player?.selectedShipId || '', item.classId || '')?.id === item.id ? 'Снять' : 'Оснастить') : 'Купить')
@@ -15194,7 +15327,8 @@ function closeShopView(){
         { title:'Шторм Венеры', real:'venus', img:'venus', mode:'Solo', mission:'Пережить атаку газовых дронов', players:'1/1', minLevel:5, maxLevel:20, goalKills:10 },
         { title:'Оборона Земли', real:'earth', img:'earth', mode:'Solo', mission:'Защитить орбиту от трёх волн', players:'1/1', minLevel:1, maxLevel:30, goalKills:20 },
         { title:'Марсианская зачистка', real:'mars', img:'mars', mode:'Solo', mission:'Очистить сектор от ботов', players:'1/1', minLevel:10, maxLevel:40, goalKills:10 },
-        { title:'Тяжёлый Юпитер', real:'jupiter', img:'jupiter', mode:'Solo', mission:'Выжить в зоне тяжёлых турелей', players:'1/1', minLevel:20, maxLevel:60, goalKills:20 }
+        { title:'Тяжёлый Юпитер', real:'jupiter', img:'jupiter', mode:'Solo', mission:'Выжить в зоне тяжёлых турелей', players:'1/1', minLevel:20, maxLevel:60, goalKills:20 },
+        { title:'Бесконечный бой', real:'solar', img:'sun', mode:'Solo ∞', mission:'Бесконечная охота на усиленные НЛО во всей солнечной системе', players:'1/1', minLevel:1, maxLevel:120, goalKills:999999, playerLives:999999, endless:true }
     ];
 
     const createdBattleRooms = [];
@@ -15572,12 +15706,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     extra = '';
                 }
                 if(entry.id) item.dataset.roomId = entry.id;
-                const soloLocked = mode === 'solo' && isSoloMissionCompletedToday(entry);
+                const soloLocked = mode === 'solo' && !entry.endless && isSoloMissionCompletedToday(entry);
                 if(soloLocked) item.classList.add('solo-locked');
                 item.innerHTML =
                     `<span class="map-title">${entry.title}${soloLocked ? ' ✅' : ''}</span>`+
                     `<span class="map-real">${String(entry.real || '').toUpperCase()}</span>`+
-                    `<span class="map-mode">${soloLocked ? 'DONE TODAY' : (entry.mode || (mode === 'solo' ? 'SOLO' : mode === 'tournament' ? 'TOURNAMENT' : 'DM'))}</span>`+
+                    `<span class="map-mode">${soloLocked ? 'DONE TODAY' : (entry.endless ? 'SOLO ∞' : (entry.mode || (mode === 'solo' ? 'SOLO' : mode === 'tournament' ? 'TOURNAMENT' : 'DM')))}</span>`+
                     `<span class="map-players">${mode === 'solo' ? '1/1' : (entry.currentPlayers ? entry.currentPlayers.length : (entry.players ? entry.players.length : 0)) + '/' + (entry.maxPlayers || entry.playerCount || 8)}</span>`+
                     `<span class="map-level">★ ${entry.minLevel || 1} - ★ ${entry.maxLevel || 120}</span>`+
                     extra;
@@ -15701,7 +15835,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
                         showGuestOnlyPvpMessage();
                         return;
                     }
-                    if(isSoloMissionCompletedToday(selectedLobbyMap)){
+                    if(!selectedLobbyMap.endless && isSoloMissionCompletedToday(selectedLobbyMap)){
                         const note = document.getElementById('match-status-note');
                         if(note) note.textContent = '✅ Миссия уже выполнена сегодня. Будет доступна завтра.';
                         return;
