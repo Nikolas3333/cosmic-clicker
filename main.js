@@ -515,21 +515,18 @@ function awardSoloBotKillReward(worldPosition = null){
 
     if(player){
         player.experience = Math.max(0, Number(player.experience || 0) + expReward);
-        player.exp = Math.max(0, Number(player.exp || 0) + expReward);
         player.credits = Math.max(0, Number(player.credits || 0) + coinReward);
         player.coins = Math.max(0, Number(player.coins || 0) + coinReward);
     }
 
     if(typeof playerResources === 'object' && playerResources){
-        playerResources.coins = Math.max(0, Number(playerResources.coins || 0) + coinReward);
+        playerResources.coins = Math.max(0, Number(playerResources.coins || player?.credits || 0) + coinReward);
     }
 
     try{ showBattleFloatingReward(expReward, coinReward, worldPosition || playerShip?.position || null); }catch(_){}
     try{ inventory?.syncFromPlayerResources?.(); }catch(_){}
-    try{ updateHUD?.(); updateUI?.(); updatePremiumBar?.(); updateBattlePlayerHud?.(); updateBattleScoreboard?.(); }catch(_){}
+    try{ updateHUD?.(); updateUI?.(); updatePremiumAccountInfo?.(); updateBattlePlayerHud?.(); updateBattleScoreboard?.(); updateProfileUI?.(); }catch(_){}
     try{ saveGame?.(); }catch(_){}
-    try{ savePlayerData?.(); }catch(_){}
-    try{ savePlayerProfile?.(); }catch(_){}
 }
 function awardSoloMissionWinReward(){
     if(isEndlessSoloBattle()) return;
@@ -3450,6 +3447,7 @@ async function saveRemoteProgress(){
         const { error: playerUpdateError } = await window.supabaseClient.from('players').update({
             nickname: player.nickname,
             level: toSafeWholeNumber(player.level, 1),
+            experience: toSafeWholeNumber(player.experience || 0, 0),
             credits: toSafeWholeNumber(playerResources.coins || player.credits || 0, 0),
             mercury_ore: toSafeWholeNumber(playerResources.mercury_ore || 0, 0),
             venus_gas: toSafeWholeNumber(playerResources.venus_gas || 0, 0),
@@ -9070,6 +9068,27 @@ function getEndlessSoloDesiredBotCount(){
     return Math.min(ENDLESS_SOLO_MAX_BOTS, ENDLESS_SOLO_BASE_BOTS + extra);
 }
 
+
+function getEndlessSoloBotSlotId(slot = 1){
+    const safeSlot = Math.max(1, Math.min(ENDLESS_SOLO_MAX_BOTS, Number(slot || 1) || 1));
+    return `UFO-${String(safeSlot).padStart(2,'0')}`;
+}
+
+function getEndlessSoloBotSlotName(slot = 1){
+    const safeSlot = Math.max(1, Math.min(ENDLESS_SOLO_MAX_BOTS, Number(slot || 1) || 1));
+    return `UFO Raider ${safeSlot}`;
+}
+
+function getNextEndlessSoloBotSlot(){
+    const desired = Math.max(1, Number(getEndlessSoloDesiredBotCount?.() || 1) || 1);
+    const activeIds = new Set(getActiveSoloBots().map(bot => String(bot?.userData?.id || '').trim()).filter(Boolean));
+    for(let i = 1; i <= desired; i++){
+        const id = getEndlessSoloBotSlotId(i);
+        if(!activeIds.has(id)) return i;
+    }
+    return Math.min(desired, ENDLESS_SOLO_MAX_BOTS);
+}
+
 function showEndlessSoloStageBanner(stage = 1){
     try{
         let banner = document.getElementById('solo-stage-banner');
@@ -9166,12 +9185,12 @@ function createEnemyBot(options = {}){
     botGroup.rotation.order = 'YXZ';
     const playerLevel = Math.max(1, Number(player?.level || 1) || 1);
     const missionPower = Math.max(1, Number(activeSoloMission?.minLevel || currentRoom?.minLevel || 1) || 1);
-    const botIndex = endlessMode ? (soloBotScoreRows.size + 1) : 1;
+    const botIndex = endlessMode ? getNextEndlessSoloBotSlot() : 1;
     const endlessStage = endlessMode ? getEndlessSoloStage() : 1;
     const weaponType = endlessMode ? getEndlessBotWeaponType(botIndex + endlessStage - 2) : 'pulse';
     const botMaxHp = Math.max(endlessMode ? 185 : 135, Math.round((playerMaxHp || 100) * (endlessMode ? (1.65 + endlessStage * 0.10) : 1.45) + missionPower * 3 + botIndex * 12 + endlessStage * 18));
-    const botId = endlessMode ? `UFO-${String(botIndex).padStart(2,'0')}` : 'UFO-01';
-    const botName = endlessMode ? `UFO Raider ${botIndex}` : (activeSoloMission?.botName || 'UFO Raider');
+    const botId = endlessMode ? getEndlessSoloBotSlotId(botIndex) : 'UFO-01';
+    const botName = endlessMode ? getEndlessSoloBotSlotName(botIndex) : (activeSoloMission?.botName || 'UFO Raider');
     botGroup.userData = {
         id: botId,
         name: botName,
@@ -9192,15 +9211,27 @@ function createEnemyBot(options = {}){
         botMoveVelocity: new THREE.Vector3(),
         hpBarOffsetY: endlessMode ? 9.2 : 5.2
     };
-    soloBotScoreRows.set(botId, {
-        id: botId,
-        nickname: botName,
-        kills: 0,
-        deaths: 0,
-        weaponType,
-        level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
-        team: 'red'
-    });
+    if(!(soloBotScoreRows instanceof Map)) soloBotScoreRows = new Map();
+    const existingBotRow = soloBotScoreRows.get(botId);
+    if(existingBotRow){
+        existingBotRow.id = botId;
+        existingBotRow.nickname = existingBotRow.nickname || botName;
+        existingBotRow.weaponType = existingBotRow.weaponType || weaponType;
+        existingBotRow.level = Math.max(1, Number(existingBotRow.level || activeSoloMission?.minLevel || player?.level || 1) || 1);
+        existingBotRow.team = 'red';
+        botGroup.userData.scoreKills = Number(existingBotRow.kills || 0) || 0;
+        botGroup.userData.scoreDeaths = Number(existingBotRow.deaths || 0) || 0;
+    }else{
+        soloBotScoreRows.set(botId, {
+            id: botId,
+            nickname: botName,
+            kills: 0,
+            deaths: 0,
+            weaponType,
+            level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
+            team: 'red'
+        });
+    }
 
     const placeholderMat = new THREE.MeshStandardMaterial({ color:0x76eaff, emissive:0x124a66, roughness:0.45, metalness:0.35 });
     const placeholder = new THREE.Mesh(new THREE.SphereGeometry(2.4, 24, 12), placeholderMat);
@@ -9433,12 +9464,12 @@ function updateBattleScoreboard(){
         if(!(soloBotScoreRows instanceof Map)) soloBotScoreRows = new Map();
 
         activeBots.forEach((bot, idx) => {
-            const id = String(bot?.userData?.id || `BOT-${idx+1}`);
+            const id = String(bot?.userData?.id || getEndlessSoloBotSlotId(idx + 1));
             let row = soloBotScoreRows.get(id);
             if(!row){
                 row = {
                     id,
-                    nickname: bot?.userData?.name || 'UFO Raider',
+                    nickname: bot?.userData?.name || id || 'UFO Raider',
                     kills: Number(bot?.userData?.scoreKills || 0) || 0,
                     deaths: Number(bot?.userData?.scoreDeaths || 0) || 0,
                     level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
@@ -9446,21 +9477,39 @@ function updateBattleScoreboard(){
                 };
                 soloBotScoreRows.set(id, row);
             }else{
-                row.id = row.id || id;
-                row.nickname = row.nickname || bot?.userData?.name || 'UFO Raider';
-                row.level = Number(row.level || activeSoloMission?.minLevel || player?.level || 1) || 1;
+                row.id = id;
+                row.nickname = row.nickname || bot?.userData?.name || id || 'UFO Raider';
+                row.level = Math.max(1, Number(row.level || activeSoloMission?.minLevel || player?.level || 1) || 1);
                 bot.userData.scoreKills = Number(row.kills || 0) || 0;
                 bot.userData.scoreDeaths = Number(row.deaths || 0) || 0;
             }
         });
 
+        const desiredBotRows = isEndlessSoloBattle()
+            ? getEndlessSoloDesiredBotCount()
+            : Math.max(1, activeBots.length || soloBotScoreRows.size || 1);
+
         const pushedBotIds = new Set();
-        soloBotScoreRows.forEach((row, key) => {
-            const id = String(row?.id || key || 'BOT');
-            if(pushedBotIds.has(id)) return;
+        for(let slot = 1; slot <= desiredBotRows; slot++){
+            const id = isEndlessSoloBattle() ? getEndlessSoloBotSlotId(slot) : 'UFO-01';
+            let row = soloBotScoreRows.get(id);
+            const activeBot = activeBots.find(bot => String(bot?.userData?.id || '') === id);
+            if(!row && activeBot){
+                row = {
+                    id,
+                    nickname: activeBot?.userData?.name || (isEndlessSoloBattle() ? getEndlessSoloBotSlotName(slot) : 'UFO Raider'),
+                    kills: Number(activeBot?.userData?.scoreKills || 0) || 0,
+                    deaths: Number(activeBot?.userData?.scoreDeaths || 0) || 0,
+                    level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
+                    team: 'red'
+                };
+                soloBotScoreRows.set(id, row);
+            }
+            if(!row) continue;
+            if(pushedBotIds.has(id)) continue;
             pushedBotIds.add(id);
             rows.push({
-                nickname: row.nickname || 'UFO Raider',
+                nickname: row.nickname || (isEndlessSoloBattle() ? getEndlessSoloBotSlotName(slot) : 'UFO Raider'),
                 clan: '',
                 level: Number(row.level || 1) || 1,
                 kills: Number(row.kills || 0) || 0,
@@ -9470,7 +9519,7 @@ function updateBattleScoreboard(){
                 deadUntil: 0,
                 team: 'red'
             });
-        });
+        }
     }
     roomPlayers.forEach((entry) => {
         const entryId = String(entry?.public_id || entry?.player_public_id || entry?.player_id || entry?.id || '').trim();
