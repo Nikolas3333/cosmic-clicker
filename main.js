@@ -91,6 +91,11 @@ const gameSettings = {
 };
 
 let enemyBot = null;
+let soloEnemyBots = [];
+let soloBotScoreRows = new Map();
+let lastEndlessBotSpawnAt = 0;
+const ENDLESS_SOLO_MAX_BOTS = 7;
+const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 6800;
 let enemyLasers = [];
 let battleObjects = [];
 let battleMapPlanet = null;
@@ -1623,6 +1628,12 @@ function clearBattleScene(){
         scene.remove(enemyBot);
         enemyBot = null;
     }
+    if(Array.isArray(soloEnemyBots)){
+        soloEnemyBots.forEach(bot => { try{ if(bot) scene.remove(bot); }catch(_){} });
+        soloEnemyBots = [];
+    }
+    try{ soloBotScoreRows = new Map(); }catch(_){}
+    lastEndlessBotSpawnAt = 0;
 
     if(Array.isArray(activeLasers)){
         activeLasers.forEach(laser => {
@@ -3736,28 +3747,44 @@ if (gameState === "BATTLE" && playerShip) {
         laser.mesh.position.add(laser.velocity);
         laser.life -= 1;
 
-        if (enemyBot && laser.mesh.position.distanceTo(enemyBot.position) < (Number(enemyBot.userData?.hitRadius || 0) || 3.4)) {
-            const armor = Math.max(0, Math.min(0.65, Number(enemyBot.userData?.armor || 0) || 0));
+        const hitBots = isSoloBattleActive() ? getActiveSoloBots() : (enemyBot ? [enemyBot] : []);
+        let hitEnemyBot = null;
+        for(const bot of hitBots){
+            if(bot && bot.userData?.alive !== false && laser.mesh.position.distanceTo(bot.position) < (Number(bot.userData?.hitRadius || 0) || 3.4)){
+                hitEnemyBot = bot;
+                break;
+            }
+        }
+        if (hitEnemyBot) {
+            const armor = Math.max(0, Math.min(0.65, Number(hitEnemyBot.userData?.armor || 0) || 0));
             const dealtDamage = Math.max(1, Math.round((Number(laser.damage || 0) || 1) * (1 - armor)));
-            enemyBot.userData.hp -= dealtDamage;
+            hitEnemyBot.userData.hp -= dealtDamage;
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
+            enemyBot = hitEnemyBot;
             updateEnemyHud();
-            if (enemyBot.userData.hp <= 0) {
-                const defeatedName = enemyBot?.userData?.name || 'UFO Raider';
-                const defeatedPos = enemyBot.position.clone();
+            if (hitEnemyBot.userData.hp <= 0) {
+                const defeatedName = hitEnemyBot?.userData?.name || 'UFO Raider';
+                const defeatedId = String(hitEnemyBot?.userData?.id || 'BOT');
+                const defeatedPos = hitEnemyBot.position.clone();
                 spawnShipDebris(defeatedPos, 0xff7755);
-                scene.remove(enemyBot);
-                enemyBot = null;
+                scene.remove(hitEnemyBot);
+                soloEnemyBots = soloEnemyBots.filter(bot => bot !== hitEnemyBot);
+                if(enemyBot === hitEnemyBot) enemyBot = soloEnemyBots[0] || null;
+                hitEnemyBot.userData.alive = false;
                 battleStats.playerKills += 1;
                 battleStats.botDeaths += 1;
+                const savedRow = soloBotScoreRows.get(defeatedId) || { id:defeatedId, nickname:defeatedName, kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' };
+                savedRow.deaths = Number(savedRow.deaths || 0) + 1;
+                soloBotScoreRows.set(defeatedId, savedRow);
                 if(isSoloBattleActive()) awardSoloBotKillReward(defeatedPos);
                 if(!isSoloBattleActive()) pushKillFeed(`${player?.nickname || 'Commander'} уничтожил ${defeatedName}`, 'kill');
                 updateEnemyHud();
                 updateSoloMissionHud?.();
                 updateBattleScoreboard();
                 if(isSoloBattleActive() && !isEndlessSoloBattle() && battleStats.playerKills >= getActiveSoloMissionGoal()) completeActiveSoloMission();
-                else if(isSoloBattleActive()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, isEndlessSoloBattle() ? 5200 : 1400);
+                else if(isSoloBattleActive() && !isEndlessSoloBattle()) setTimeout(() => { if(gameState === 'BATTLE' && isSoloBattleActive() && !activeSoloMissionEnded && !enemyBot) createEnemyBot(); }, 1400);
+                else if(isEndlessSoloBattle()) lastEndlessBotSpawnAt = 0;
             }
             continue;
         }
@@ -3820,10 +3847,21 @@ if (gameState === "BATTLE" && playerShip) {
         }
 
         if (playerShip && laser.mesh.position.distanceTo(playerShip.position) < 2.1) {
+            if(laser.pullStrength && laser.shooter){
+                const pullDir = laser.shooter.position.clone().sub(playerShip.position).normalize();
+                shipVelocity.add(pullDir.multiplyScalar(Number(laser.pullStrength || 0)));
+            }
             playerHp = Math.max(0, playerHp - laser.damage);
             if(playerHp <= 0 && !isBattleRespawning() && !activeSoloMissionEnded){
                 battleStats.botKills += 1;
                 battleStats.playerDeaths += 1;
+                const killerBot = laser.shooter || enemyBot;
+                const killerId = String(killerBot?.userData?.id || 'BOT');
+                if(killerId){
+                    const row = soloBotScoreRows.get(killerId) || { id:killerId, nickname:killerBot?.userData?.name || 'UFO Raider', kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' };
+                    row.kills = Number(row.kills || 0) + 1;
+                    soloBotScoreRows.set(killerId, row);
+                }
                 if(!isSoloBattleActive()) pushKillFeed(`${enemyBot?.userData?.name || 'Drone_x1'} уничтожил ${player?.nickname || 'Commander'}`);
                 updateSoloMissionHud?.();
                 updateBattleScoreboard();
@@ -3847,26 +3885,38 @@ if (gameState === "BATTLE" && playerShip) {
         }
     }
 
-    if (enemyBot && playerShip) {
-        enemyBot.userData.strafePhase += 0.025;
-        const desiredForward = playerShip.position.clone().sub(enemyBot.position).normalize();
-        const side = new THREE.Vector3(1,0,0).cross(desiredForward).normalize();
-        const botKeepDistance = isEndlessSoloBattle() ? -34 : -18;
-        const botStrafeDistance = isEndlessSoloBattle() ? 15 : 7;
-        const desiredPos = playerShip.position.clone()
-            .add(desiredForward.clone().multiplyScalar(botKeepDistance))
-            .add(side.multiplyScalar(Math.sin(enemyBot.userData.strafePhase) * botStrafeDistance));
-        desiredPos.y += Math.cos(enemyBot.userData.strafePhase * 1.7) * 2.2;
-        enemyBot.position.lerp(desiredPos, 0.045);
-        handleBattleCollisions(enemyBot);
-        enemyBot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(6)));
-        enemyBot.rotation.z += ((Math.sin(enemyBot.userData.strafePhase) * 0.45) - enemyBot.rotation.z) * 0.04;
+    const activeBots = isSoloBattleActive() ? getActiveSoloBots() : (enemyBot ? [enemyBot] : []);
+    if (playerShip && activeBots.length) {
+        activeBots.forEach((bot, botIndex) => {
+            if(!bot || bot.userData?.alive === false) return;
+            bot.userData.strafePhase += 0.014 + botIndex * 0.0018;
+            const toPlayerVector = playerShip.position.clone().sub(bot.position);
+            const distanceToPlayer = Math.max(1, toPlayerVector.length());
+            const desiredForward = toPlayerVector.clone().normalize();
+            const side = new THREE.Vector3(1,0,0).cross(desiredForward).normalize();
+            const preferredDistance = isEndlessSoloBattle() ? Number(bot.userData?.preferredDistance || 190) : 36;
+            const keepOffset = distanceToPlayer < preferredDistance ? -preferredDistance : -Math.min(preferredDistance, Math.max(42, distanceToPlayer * 0.32));
+            const botStrafeDistance = isEndlessSoloBattle() ? (42 + botIndex * 7) : 7;
+            const desiredPos = playerShip.position.clone()
+                .add(desiredForward.clone().multiplyScalar(keepOffset))
+                .add(side.multiplyScalar(Math.sin(bot.userData.strafePhase) * botStrafeDistance));
+            desiredPos.y += Math.cos(bot.userData.strafePhase * 1.7) * (isEndlessSoloBattle() ? 9.5 : 2.2);
+            const lerpSpeed = isEndlessSoloBattle() ? 0.018 : 0.045;
+            bot.position.lerp(desiredPos, lerpSpeed);
+            handleBattleCollisions(bot);
+            bot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(6)));
+            bot.rotation.z += ((Math.sin(bot.userData.strafePhase) * 0.45) - bot.rotation.z) * 0.04;
 
-        if (Date.now() - lastBotShotAt > botShotCooldown) {
-            lastBotShotAt = Date.now();
-            fireBotLaser();
-        }
+            const cooldown = isEndlessSoloBattle()
+                ? (1800 + botIndex * 260 + Math.random() * 320)
+                : botShotCooldown;
+            if (Date.now() - Number(bot.userData.lastShotAt || 0) > cooldown) {
+                bot.userData.lastShotAt = Date.now();
+                fireBotLaser(bot);
+            }
+        });
     }
+    ensureEndlessSoloBotWave?.();
 
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
     const followDistance = Number(playerShip?.userData?.cameraDistance || 16) || 16;
@@ -7275,51 +7325,90 @@ function createBattleSolarSystemView(){
     }
     battleSolarSystemGroup = new THREE.Group();
     battleSolarSystemGroup.name = 'Solo Endless Battle Solar System';
+
+    const makeOrbitLine = (radius, color = 0x7feaff, opacity = 0.26) => {
+        const curve = new THREE.EllipseCurve(0, 0, radius, radius, 0, Math.PI * 2, false, 0);
+        const points = curve.getPoints(220).map(p => new THREE.Vector3(p.x, 0, p.y));
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({ color, transparent:true, opacity });
+        const line = new THREE.LineLoop(geometry, material);
+        line.name = 'Endless orbit trace';
+        return line;
+    };
+
+    const makePlanetMaterial = (key, color, emissive = 0x000000, emissiveIntensity = 0) => {
+        try{
+            if(key === 'sun' && typeof sunTexture !== 'undefined'){
+                return new THREE.MeshBasicMaterial({ map:sunTexture, color:0xffffff });
+            }
+            if(key === 'earth' && typeof earthDiffuse !== 'undefined'){
+                return new THREE.MeshStandardMaterial({ map:earthDiffuse, roughness:0.72, metalness:0.04 });
+            }
+        }catch(_){}
+        return new THREE.MeshStandardMaterial({ color, roughness:0.82, metalness:0.035, emissive, emissiveIntensity });
+    };
+
     const planetDefs = [
-        { name:'Sun', radius:28, dist:0, color:0xffcc44, emissive:0xff8a22 },
-        { name:'Mercury', radius:3.6, dist:62, color:0xb7b7b7 },
-        { name:'Venus', radius:5.2, dist:88, color:0xe4b382 },
-        { name:'Earth', radius:5.8, dist:118, color:0x3b7cff },
-        { name:'Mars', radius:4.6, dist:150, color:0xc1583a },
-        { name:'Jupiter', radius:13.5, dist:202, color:0xcda27f },
-        { name:'Saturn', radius:11.5, dist:252, color:0xd9c08a, ring:true },
-        { name:'Uranus', radius:8.5, dist:302, color:0x86d8dd },
-        { name:'Neptune', radius:8.5, dist:350, color:0x4469ff }
+        { key:'sun', name:'Sun', radius:42, dist:0, color:0xffcc44, emissive:0xff7a22, speed:0.0000 },
+        { key:'mercury', name:'Mercury', radius:5.2, dist:92, color:0xb7b7b7, speed:0.0022 },
+        { key:'venus', name:'Venus', radius:7.4, dist:128, color:0xe4b382, speed:0.00165 },
+        { key:'earth', name:'Earth', radius:8.2, dist:168, color:0x3b7cff, speed:0.0012, clouds:true },
+        { key:'mars', name:'Mars', radius:6.4, dist:210, color:0xc1583a, speed:0.00095 },
+        { key:'jupiter', name:'Jupiter', radius:18.5, dist:290, color:0xcda27f, speed:0.00062 },
+        { key:'saturn', name:'Saturn', radius:16.2, dist:370, color:0xd9c08a, speed:0.00048, ring:true },
+        { key:'uranus', name:'Uranus', radius:12.2, dist:445, color:0x86d8dd, speed:0.00038 },
+        { key:'neptune', name:'Neptune', radius:12.2, dist:520, color:0x4469ff, speed:0.00032 }
     ];
+
     planetDefs.forEach((def, index) => {
         const pivot = new THREE.Group();
-        pivot.userData.orbitSpeed = index === 0 ? 0.0018 : 0.0006 + index * 0.00008;
-        const mat = new THREE.MeshStandardMaterial({
-            color:def.color,
-            roughness:0.82,
-            metalness:0.04,
-            emissive:def.emissive || 0x000000,
-            emissiveIntensity:def.emissive ? 0.55 : 0
-        });
-        const mesh = new THREE.Mesh(new THREE.SphereGeometry(def.radius, 32, 24), mat);
+        pivot.name = `Endless orbit pivot ${def.name}`;
+        pivot.userData.orbitSpeed = def.speed || 0;
+        pivot.rotation.y = index * 0.78;
+        const mat = makePlanetMaterial(def.key, def.color, def.emissive || 0x000000, def.emissive ? 0.55 : 0);
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(def.radius, 48, 36), mat);
+        mesh.name = `Endless ${def.name}`;
         mesh.position.set(def.dist, 0, 0);
-        mesh.userData.selfRotateSpeed = 0.004 + index * 0.0007;
+        mesh.userData.selfRotateSpeed = 0.004 + index * 0.00065;
         pivot.add(mesh);
+
+        if(def.key === 'sun'){
+            const glow = new THREE.Mesh(
+                new THREE.SphereGeometry(def.radius * 1.35, 48, 32),
+                new THREE.MeshBasicMaterial({ color:0xff8a20, transparent:true, opacity:0.16, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide })
+            );
+            mesh.add(glow);
+            const sunLight = new THREE.PointLight(0xffdd88, 2.4, 2600);
+            sunLight.position.set(0, 0, 0);
+            mesh.add(sunLight);
+        }
+
+        if(def.clouds && typeof earthClouds !== 'undefined'){
+            const clouds = new THREE.Mesh(
+                new THREE.SphereGeometry(def.radius * 1.025, 36, 24),
+                new THREE.MeshStandardMaterial({ map:earthClouds, transparent:true, opacity:0.38, depthWrite:false })
+            );
+            clouds.userData.selfRotateSpeed = 0.006;
+            mesh.add(clouds);
+        }
+
         if(def.ring){
             const ring = new THREE.Mesh(
-                new THREE.RingGeometry(def.radius * 1.35, def.radius * 2.2, 64),
+                new THREE.RingGeometry(def.radius * 1.45, def.radius * 2.45, 96),
                 new THREE.MeshBasicMaterial({ color:def.color, side:THREE.DoubleSide, transparent:true, opacity:0.62 })
             );
-            ring.rotation.x = Math.PI / 2.5;
+            ring.rotation.x = Math.PI / 2.45;
             mesh.add(ring);
         }
         if(def.dist > 0){
-            const orbit = new THREE.Mesh(
-                new THREE.RingGeometry(def.dist - 0.08, def.dist + 0.08, 128),
-                new THREE.MeshBasicMaterial({ color:0x1b6d92, side:THREE.DoubleSide, transparent:true, opacity:0.18 })
-            );
-            orbit.rotation.x = Math.PI / 2;
-            battleSolarSystemGroup.add(orbit);
+            battleSolarSystemGroup.add(makeOrbitLine(def.dist, 0x7feaff, 0.20));
         }
         battleSolarSystemGroup.add(pivot);
     });
-    battleSolarSystemGroup.position.set(0, -170, -260);
-    battleSolarSystemGroup.scale.setScalar(2.25);
+
+    battleSolarSystemGroup.position.set(0, -90, -720);
+    battleSolarSystemGroup.rotation.x = 0.18;
+    battleSolarSystemGroup.scale.setScalar(1.22);
     scene.add(battleSolarSystemGroup);
 }
 
@@ -7337,12 +7426,12 @@ function updateBattleSolarSystemView(){
 
 function getSoloBotSpawnPosition(){
     if(isEndlessSoloBattle()){
-        const minDist = 240;
-        const maxDist = 620;
+        const minDist = 520;
+        const maxDist = 980;
         const angle = Math.random() * Math.PI * 2;
         const dist = minDist + Math.random() * (maxDist - minDist);
-        const y = -35 + Math.random() * 90;
-        const base = playerShip?.position?.clone?.() || new THREE.Vector3(0, 10, 0);
+        const y = -120 + Math.random() * 240;
+        const base = playerShip?.position?.clone?.() || new THREE.Vector3(0, 20, 0);
         return base.add(new THREE.Vector3(Math.cos(angle) * dist, y, Math.sin(angle) * dist));
     }
     const spawnBase = spawnPointB?.clone?.() || new THREE.Vector3(130, 10, -120);
@@ -7417,7 +7506,7 @@ function enterBattleMap(mapName){
     camera.position.set(0, 18, 70);
     camera.lookAt(0, 0, 0);
 
-    createBattleObstacles(mapKey);
+    if(!endlessSoloMap) createBattleObstacles(mapKey);
     updateBattleScoreboard();
 }
 
@@ -8831,16 +8920,87 @@ function animateRemoteBattleShips(){
     });
 }
 
-function createEnemyBot(){
-    if(isSoloBattleActive() && activeSoloMissionEnded) return;
-    if(enemyBot){ scene.remove(enemyBot); enemyBot = null; }
+function getActiveSoloBots(){
+    if(!Array.isArray(soloEnemyBots)) soloEnemyBots = [];
+    soloEnemyBots = soloEnemyBots.filter(bot => bot && bot.parent === scene && bot.userData?.alive !== false);
+    if(enemyBot && !soloEnemyBots.includes(enemyBot) && enemyBot.parent === scene && enemyBot.userData?.alive !== false){
+        soloEnemyBots.unshift(enemyBot);
+    }
+    enemyBot = soloEnemyBots[0] || null;
+    return soloEnemyBots;
+}
+
+function getEndlessBotWeaponType(index = 0){
+    const weapons = ['pulse','deathRay','spread','plasma','tractor','sniper','burst'];
+    return weapons[Math.abs(Number(index || 0)) % weapons.length] || 'pulse';
+}
+
+function ensureEndlessSoloBotWave(){
+    if(!isEndlessSoloBattle() || gameState !== 'BATTLE' || activeSoloMissionEnded) return;
+    const alive = getActiveSoloBots();
+    const now = Date.now();
+    const desired = ENDLESS_SOLO_MAX_BOTS;
+    if(alive.length >= desired) return;
+    if(alive.length === 0){
+        lastEndlessBotSpawnAt = now;
+        for(let i=0;i<Math.min(3, desired);i++) createEnemyBot({ append:true });
+        return;
+    }
+    if((now - lastEndlessBotSpawnAt) < ENDLESS_SOLO_SPAWN_COOLDOWN_MS) return;
+    lastEndlessBotSpawnAt = now;
+    createEnemyBot({ append:true });
+}
+
+function createEnemyBot(options = {}){
+    if(isSoloBattleActive() && activeSoloMissionEnded) return null;
+    const endlessMode = isEndlessSoloBattle();
+    if(!endlessMode){
+        if(enemyBot){ scene.remove(enemyBot); enemyBot = null; }
+        soloEnemyBots.forEach(bot => { try{ if(bot) scene.remove(bot); }catch(_){} });
+        soloEnemyBots = [];
+        soloBotScoreRows = new Map();
+    }else{
+        getActiveSoloBots();
+        if(soloEnemyBots.length >= ENDLESS_SOLO_MAX_BOTS) return enemyBot;
+    }
+
     const botGroup = new THREE.Group();
     botGroup.rotation.order = 'YXZ';
     const playerLevel = Math.max(1, Number(player?.level || 1) || 1);
     const missionPower = Math.max(1, Number(activeSoloMission?.minLevel || currentRoom?.minLevel || 1) || 1);
-    const endlessMode = isEndlessSoloBattle();
-    const botMaxHp = Math.max(endlessMode ? 185 : 135, Math.round((playerMaxHp || 100) * (endlessMode ? 1.9 : 1.45) + missionPower * 3));
-    botGroup.userData = { name: activeSoloMission?.botName || 'UFO Raider', hp: botMaxHp, maxHp: botMaxHp, armor: Math.min(endlessMode ? 0.48 : 0.38, (endlessMode ? 0.25 : 0.18) + playerLevel * 0.006), damageBoost: endlessMode ? 1.32 : 1.18, strafePhase: Math.random() * Math.PI * 2, alive: true, isSoloBot: true, hitRadius: endlessMode ? 6.2 : 3.4 };
+    const botIndex = endlessMode ? (soloBotScoreRows.size + 1) : 1;
+    const weaponType = endlessMode ? getEndlessBotWeaponType(botIndex - 1) : 'pulse';
+    const botMaxHp = Math.max(endlessMode ? 185 : 135, Math.round((playerMaxHp || 100) * (endlessMode ? 1.65 : 1.45) + missionPower * 3 + botIndex * 12));
+    const botId = endlessMode ? `UFO-${String(botIndex).padStart(2,'0')}` : 'UFO-01';
+    const botName = endlessMode ? `UFO Raider ${botIndex}` : (activeSoloMission?.botName || 'UFO Raider');
+    botGroup.userData = {
+        id: botId,
+        name: botName,
+        hp: botMaxHp,
+        maxHp: botMaxHp,
+        armor: Math.min(endlessMode ? 0.44 : 0.38, (endlessMode ? 0.22 : 0.18) + playerLevel * 0.006),
+        damageBoost: endlessMode ? 1.18 + Math.min(0.45, botIndex * 0.045) : 1.18,
+        strafePhase: Math.random() * Math.PI * 2,
+        alive: true,
+        isSoloBot: true,
+        hitRadius: endlessMode ? 7.2 : 3.4,
+        weaponType,
+        lastShotAt: Date.now() + Math.random() * 1800,
+        tractorReadyAt: Date.now() + 60000 + Math.random() * 90000,
+        preferredDistance: endlessMode ? (145 + Math.random() * 190) : 36,
+        scoreKills: 0,
+        scoreDeaths: 0
+    };
+    soloBotScoreRows.set(botId, {
+        id: botId,
+        nickname: botName,
+        kills: 0,
+        deaths: 0,
+        weaponType,
+        level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1),
+        team: 'red'
+    });
+
     const placeholderMat = new THREE.MeshStandardMaterial({ color:0x76eaff, emissive:0x124a66, roughness:0.45, metalness:0.35 });
     const placeholder = new THREE.Mesh(new THREE.SphereGeometry(2.4, 24, 12), placeholderMat);
     placeholder.scale.set(1.45, 0.34, 1.45);
@@ -8850,25 +9010,22 @@ function createEnemyBot(){
     botGroup.add(glow);
     botGroup.position.copy(getSoloBotSpawnPosition());
     if(playerShip) botGroup.lookAt(playerShip.position);
-    enemyBot = botGroup;
-    scene.add(enemyBot);
+    soloEnemyBots.push(botGroup);
+    enemyBot = soloEnemyBots[0] || botGroup;
+    scene.add(botGroup);
     try{
         const loader = new GLTFLoader();
         loader.load(SOLO_BOT_MODEL_PATH, (gltf) => {
-            if(!enemyBot || enemyBot !== botGroup) return;
+            if(!botGroup || botGroup.parent !== scene) return;
             const model = gltf.scene;
             model.name = 'Solo UFO Bot Visual';
-
-            // v346: GLB ships can arrive with a huge authoring scale / offset.
-            // Normalize the saucer into a small combat-sized wrapper so it cannot
-            // cover the camera or draw giant planes across the map.
             model.rotation.set(0, Math.PI, 0);
             model.updateMatrixWorld(true);
             const rawBox = new THREE.Box3().setFromObject(model);
             const rawSize = rawBox.getSize(new THREE.Vector3());
             const rawCenter = rawBox.getCenter(new THREE.Vector3());
             const maxDim = Math.max(rawSize.x || 0, rawSize.y || 0, rawSize.z || 0);
-            const targetDim = isEndlessSoloBattle() ? 13.5 : 7.2;
+            const targetDim = endlessMode ? 14.5 : 7.2;
             const safeScale = (Number.isFinite(maxDim) && maxDim > 0.001)
                 ? THREE.MathUtils.clamp(targetDim / maxDim, 0.0005, 4.5)
                 : 1;
@@ -8879,26 +9036,21 @@ function createEnemyBot(){
                     child.frustumCulled = false;
                     if(child.material){
                         const mats = Array.isArray(child.material) ? child.material : [child.material];
-                        mats.forEach(mat => {
-                            if(mat){
-                                mat.depthWrite = true;
-                                mat.depthTest = true;
-                            }
-                        });
+                        mats.forEach(mat => { if(mat){ mat.depthWrite = true; mat.depthTest = true; } });
                     }
                 }
             });
-
             while(botGroup.children.length){ botGroup.remove(botGroup.children[0]); }
             botGroup.add(model);
-            botGroup.userData.hitRadius = isEndlessSoloBattle() ? 7.2 : 4.2;
-            const modelLight = new THREE.PointLight(0x66eaff, 1.15, 28);
+            botGroup.userData.hitRadius = endlessMode ? 7.8 : 4.2;
+            const modelLight = new THREE.PointLight(weaponType === 'deathRay' ? 0xff4466 : weaponType === 'tractor' ? 0xaa66ff : 0x66eaff, 1.15, 34);
             modelLight.position.set(0, 1.1, 0);
             botGroup.add(modelLight);
         }, undefined, () => {});
     }catch(_){ }
     updateEnemyHud();
     updateBattleScoreboard();
+    return botGroup;
 }
 
 function updateEnemyHud(){
@@ -8909,6 +9061,8 @@ function updateEnemyHud(){
     const hpInlineText = document.getElementById('enemy-hp-inline-text');
     if(!hud || !name || !hpBar || !hpText) return;
 
+    const bots = getActiveSoloBots?.() || (enemyBot ? [enemyBot] : []);
+    if(!enemyBot && bots.length) enemyBot = bots[0];
     if(!enemyBot){
         hud.style.display = 'none';
         return;
@@ -8926,29 +9080,59 @@ function updateEnemyHud(){
     if(hpInlineText) hpInlineText.textContent = hp + ' / ' + maxHp;
 }
 
-function fireBotLaser(){
-    if(!enemyBot || !playerShip) return;
-    const toPlayer = playerShip.position.clone().sub(enemyBot.position).normalize();
+function fireBotLaser(bot = enemyBot){
+    if(!bot || !playerShip || bot.userData?.alive === false) return;
+    const toPlayer = playerShip.position.clone().sub(bot.position).normalize();
+    const weaponType = String(bot.userData?.weaponType || 'pulse');
+    const now = Date.now();
 
-    [-0.7, 0.7].forEach(offsetX => {
-        const laserMesh = createProjectileVisual('pulse', {
-            color: '#55d7ff',
-            coreColor: '#ffffff',
-            width: 0.13,
-            length: 1.9,
-            scale: 1.05
+    if(weaponType === 'tractor' && now >= Number(bot.userData?.tractorReadyAt || 0)){
+        bot.userData.tractorReadyAt = now + 120000 + Math.random() * 90000;
+        const beamMesh = createProjectileVisual('beam', {
+            color:'#b05cff', coreColor:'#ffffff', width:0.32, length:4.8, scale:1.35
         });
-        const localOffset = new THREE.Vector3(offsetX, 0, -1.8).applyQuaternion(enemyBot.quaternion);
-        laserMesh.position.copy(enemyBot.position.clone().add(localOffset));
-        laserMesh.lookAt(enemyBot.position.clone().add(toPlayer));
+        beamMesh.position.copy(bot.position.clone().add(new THREE.Vector3(0, 0, -2.6).applyQuaternion(bot.quaternion)));
+        beamMesh.lookAt(bot.position.clone().add(toPlayer));
+        scene.add(beamMesh);
+        enemyLasers.push({ mesh:beamMesh, velocity:toPlayer.clone().multiplyScalar(1.35), life:150, maxLife:150, damage:7, weaponType:'tractor', pullStrength:0.038, shooter:bot });
+        return;
+    }
+
+    const patterns = {
+        deathRay: { offsets:[0], color:'#ff2d2d', core:'#ffffff', width:0.26, length:5.2, speed:2.45, damage:18, life:120, type:'deathRay' },
+        spread: { offsets:[-1.15,0,1.15], color:'#ff8844', core:'#fff6d0', width:0.12, length:1.8, speed:1.75, damage:7, life:105, type:'pulse' },
+        plasma: { offsets:[-0.55,0.55], color:'#38ff94', core:'#ffffff', width:0.18, length:2.2, speed:1.62, damage:12, life:120, type:'plasma' },
+        sniper: { offsets:[0], color:'#55d7ff', core:'#ffffff', width:0.10, length:3.4, speed:3.1, damage:15, life:95, type:'sniper' },
+        burst: { offsets:[-0.75,0.75], color:'#ffd84d', core:'#ffffff', width:0.12, length:1.7, speed:2.15, damage:9, life:100, type:'pulse' },
+        pulse: { offsets:[-0.7,0.7], color:'#55d7ff', core:'#ffffff', width:0.13, length:1.9, speed:1.9, damage:8, life:100, type:'pulse' },
+        tractor: { offsets:[-0.7,0.7], color:'#aa66ff', core:'#ffffff', width:0.13, length:1.9, speed:1.75, damage:8, life:110, type:'pulse' }
+    };
+    const pattern = patterns[weaponType] || patterns.pulse;
+
+    pattern.offsets.forEach((offsetX, index) => {
+        const laserMesh = createProjectileVisual(pattern.type, {
+            color: pattern.color,
+            coreColor: pattern.core,
+            width: pattern.width,
+            length: pattern.length,
+            scale: weaponType === 'deathRay' ? 1.45 : 1.05
+        });
+        const localOffset = new THREE.Vector3(offsetX, 0, -1.8).applyQuaternion(bot.quaternion);
+        const aim = toPlayer.clone();
+        if(weaponType === 'spread'){
+            aim.applyAxisAngle(new THREE.Vector3(0,1,0), (index - 1) * 0.09).normalize();
+        }
+        laserMesh.position.copy(bot.position.clone().add(localOffset));
+        laserMesh.lookAt(bot.position.clone().add(aim));
         scene.add(laserMesh);
         enemyLasers.push({
             mesh: laserMesh,
-            velocity: toPlayer.clone().multiplyScalar(1.9),
-            life: 100,
-            maxLife: 100,
-            damage: Math.round(8 * (Number(enemyBot?.userData?.damageBoost || 1) || 1)),
-            weaponType: 'pulse'
+            velocity: aim.clone().multiplyScalar(pattern.speed),
+            life: pattern.life,
+            maxLife: pattern.life,
+            damage: Math.round(pattern.damage * (Number(bot?.userData?.damageBoost || 1) || 1)),
+            weaponType: pattern.type,
+            shooter: bot
         });
     });
 }
@@ -8977,8 +9161,17 @@ function updateBattleScoreboard(){
 
     const rows = [];
     if(selfRow) rows.push(selfRow);
-    if(isSoloBattleActive() && enemyBot){
-        rows.push({ nickname: enemyBot.userData?.name || 'UFO Raider', clan: '', level: Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), kills: Number(battleStats.botKills || 0) || 0, deaths: Number(battleStats.botDeaths || 0) || 0, id: 'BOT', ping: 0, deadUntil: 0, team: 'red' });
+    if(isSoloBattleActive()){
+        const botRows = new Map(soloBotScoreRows instanceof Map ? soloBotScoreRows : []);
+        getActiveSoloBots().forEach((bot, idx) => {
+            const id = String(bot?.userData?.id || `BOT-${idx+1}`);
+            if(!botRows.has(id)){
+                botRows.set(id, { id, nickname: bot?.userData?.name || 'UFO Raider', kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' });
+            }
+        });
+        botRows.forEach((row) => {
+            rows.push({ nickname: row.nickname || 'UFO Raider', clan: '', level: Number(row.level || 1) || 1, kills: Number(row.kills || 0) || 0, deaths: Number(row.deaths || 0) || 0, id: row.id || 'BOT', ping: 0, deadUntil: 0, team: 'red' });
+        });
     }
 
     roomPlayers.forEach((entry) => {
@@ -14311,8 +14504,13 @@ function limitBattleArea(){
         battleObjects.push(ambient, point);
         scene.add(ambient, point);
 
-        const planetGeometry = new THREE.SphereGeometry(config.size, 64, 64);
+        const endlessSoloMap = isEndlessSoloBattle();
         const isSunMap = mapKey === 'sun';
+        if(endlessSoloMap){
+            createBattleSolarSystemView?.();
+            battleMapPlanet = null;
+        }else{
+        const planetGeometry = new THREE.SphereGeometry(config.size, 64, 64);
         const planetMaterial = isSunMap
         ? new THREE.MeshBasicMaterial({ side: THREE.DoubleSide,
             map: sunTexture,
@@ -14365,26 +14563,29 @@ function limitBattleArea(){
             }
         }
 
-        if(mapKey === 'saturn'){
+        if(!endlessSoloMap && mapKey === 'saturn'){
             const ringGeo = new THREE.RingGeometry(config.size * 1.42, config.size * 2.2, 128);
             const ringMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color: 0xd9c08a, side: THREE.DoubleSide, transparent:true, opacity:0.66 });
             const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.rotation.x = Math.PI / 2.38;
             battleMapPlanet.add(ring);
         }
+        }
 
-        spawnPointA = new THREE.Vector3(-320, 12, 260);
-        spawnPointB = new THREE.Vector3(320, -16, -260);
-        observerCameraTarget.copy(battleMapPlanet.position);
+        spawnPointA = endlessSoloMap ? new THREE.Vector3(0, 0, 240) : new THREE.Vector3(-320, 12, 260);
+        spawnPointB = endlessSoloMap ? new THREE.Vector3(520, 90, -520) : new THREE.Vector3(320, -16, -260);
+        if(battleMapPlanet) observerCameraTarget.copy(battleMapPlanet.position);
+        else observerCameraTarget.set(0, -90, -720);
         battlePlanetVisualScale = 1;
         camera.position.set(0, 30, 150);
         camera.lookAt(0, 0, 0);
-        createBattleObstacles(mapKey);
+        if(!endlessSoloMap) createBattleObstacles(mapKey);
         updateBattleScoreboard();
     };
 
     createBattleObstacles = function(mapKey){
         clearBattleObstacles();
+        if(isEndlessSoloBattle()) return;
         const obstaclePalette = {
             mercury:0x7f8287, venus:0x946f52, earth:0x5c6575, mars:0x8f523f,
             jupiter:0x8e7563, saturn:0x9b8a69, uranus:0x5d7984, neptune:0x50658c, sun:0x7c4f2e
