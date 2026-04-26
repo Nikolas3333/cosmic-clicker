@@ -9095,18 +9095,12 @@ function ensureEndlessSoloBotWave(){
     if(alive.length >= desired) return;
 
     const now = Date.now();
-    if(alive.length === 0){
-        // Разрешаем восстановить волну только до текущего лимита, без добавления сверху.
-        lastEndlessBotSpawnAt = now;
-        createEnemyBot({ append:true, controlledWave:true });
-        pruneEndlessSoloBotsToLimit();
-        return;
-    }
+    // removed instant respawn block
 
     if((now - lastEndlessBotSpawnAt) < ENDLESS_SOLO_SPAWN_COOLDOWN_MS) return;
 
     lastEndlessBotSpawnAt = now;
-    createEnemyBot({ append:true, controlledWave:true });
+    if(soloEnemyBots.length < getEndlessSoloDesiredBotCount()){ createEnemyBot({ append:true, controlledWave:true }); }
     pruneEndlessSoloBotsToLimit();
 }
 
@@ -19276,40 +19270,3 @@ try{
         __forceBotControl();
     }
 }catch(e){}
-
-// ===== HARD LOCK BOT ARRAY (ABSOLUTE CONTROL) =====
-(function(){
-    const originalPush = soloEnemyBots.push.bind(soloEnemyBots);
-    soloEnemyBots.push = function(...args){
-        // block all external pushes
-        return soloEnemyBots.length;
-    };
-})();
-
-function __forceCorrectBotCount(){
-    if(!isEndlessSoloBattle()) return;
-
-    const kills = Math.max(0, Number(battleStats.playerKills||0));
-    const allowed = Math.min(10, 1 + Math.floor(kills / 20));
-
-    // remove extra
-    while(soloEnemyBots.length > allowed){
-        const b = soloEnemyBots.pop();
-        try{ scene.remove(b.mesh); }catch(e){}
-    }
-
-    // manually spawn ONLY here
-    while(soloEnemyBots.length < allowed){
-        const bot = __originalSpawnEnemyBot ? __originalSpawnEnemyBot() : spawnEnemyBot();
-        if(bot) soloEnemyBots[soloEnemyBots.length] = bot;
-    }
-}
-
-// hook into main loop safely
-if(typeof updateBattle === "function"){
-    const oldUpdate = updateBattle;
-    updateBattle = function(){
-        oldUpdate.apply(this, arguments);
-        __forceCorrectBotCount();
-    }
-}
