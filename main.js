@@ -588,65 +588,111 @@ function clearBattleKillFeed(){
     }catch(_){}
 }
 
+
+// ===== V375 MULTI BOT NAME LABELS =====
+let battleBotNameLabels = new Map();
+
+function clearBattleBotNameLabels(){
+    try{
+        if(!(battleBotNameLabels instanceof Map)) battleBotNameLabels = new Map();
+        battleBotNameLabels.forEach(label => { try{ label.remove(); }catch(_){} });
+        battleBotNameLabels.clear();
+        const oldSingle = document.getElementById('battle-bot-name-label');
+        if(oldSingle) oldSingle.style.display = 'none';
+    }catch(_){}
+}
+
+function getBotLabelId(bot, index = 0){
+    return String(bot?.userData?.id || bot?.uuid || `bot-${index+1}`);
+}
+
+function ensureBotNameLabel(id){
+    if(!(battleBotNameLabels instanceof Map)) battleBotNameLabels = new Map();
+    let label = battleBotNameLabels.get(id);
+    if(!label){
+        label = document.createElement('div');
+        label.className = 'battle-bot-name-label';
+        label.dataset.botId = id;
+        document.body.appendChild(label);
+        battleBotNameLabels.set(id, label);
+    }
+    return label;
+}
+
 function updateBattleBotNameLabel(){
     try{
-        let label = document.getElementById('battle-bot-name-label');
-        if(!label){
-            label = document.createElement('div');
-            label.id = 'battle-bot-name-label';
-            document.body.appendChild(label);
-        }
+        const oldSingle = document.getElementById('battle-bot-name-label');
+        if(oldSingle) oldSingle.style.display = 'none';
 
         if(gameState !== 'BATTLE' || !isSoloBattleActive() || !camera || !renderer){
-            label.style.display = 'none';
+            clearBattleBotNameLabels();
             return;
         }
 
-        const bots = getActiveSoloBots();
-        const bot = enemyBot?.userData?.alive !== false ? enemyBot : (bots[0] || null);
-        const name = String(bot?.userData?.name || '').trim();
+        const bots = getActiveSoloBots().filter(bot => bot && bot.userData?.alive !== false);
+        const activeIds = new Set();
 
-        if(!bot || !name){
-            label.style.display = 'none';
-            return;
+        bots.forEach((bot, index) => {
+            const name = String(bot?.userData?.name || bot?.userData?.botName || '').trim();
+            if(!name) return;
+
+            const id = getBotLabelId(bot, index);
+            activeIds.add(id);
+
+            const worldPos = new THREE.Vector3();
+            try{ bot.getWorldPosition(worldPos); }catch(_){ worldPos.copy(bot.position || new THREE.Vector3()); }
+
+            const screenPos = worldPos.clone();
+            const radius = Math.max(
+                7,
+                Number(bot?.userData?.hitRadius || 0) || 0,
+                Number(bot?.userData?.radius || 0) || 0
+            );
+            screenPos.y += radius + 8;
+            screenPos.project(camera);
+
+            const label = ensureBotNameLabel(id);
+            label.textContent = name;
+
+            if(screenPos.z < -1 || screenPos.z > 1){
+                label.style.display = 'none';
+                return;
+            }
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            const x = rect.left + (screenPos.x * 0.5 + 0.5) * rect.width;
+            const y = rect.top + (-screenPos.y * 0.5 + 0.5) * rect.height;
+
+            if(x < -80 || x > window.innerWidth + 80 || y < -80 || y > window.innerHeight + 80){
+                label.style.display = 'none';
+                return;
+            }
+
+            label.style.left = `${x}px`;
+            label.style.top = `${y}px`;
+            label.style.display = 'block';
+        });
+
+        for(const [id, label] of Array.from(battleBotNameLabels.entries())){
+            if(!activeIds.has(id)){
+                try{ label.remove(); }catch(_){}
+                battleBotNameLabels.delete(id);
+            }
         }
-
-        const botPos = new THREE.Vector3();
-        try{ bot.getWorldPosition(botPos); }catch(_){ botPos.copy(bot.position || new THREE.Vector3()); }
-
-        const distance = camera.position.distanceTo(botPos);
-        if(!Number.isFinite(distance) || distance > 900){
-            label.style.display = 'none';
-            return;
-        }
-
-        const screenPos = botPos.clone();
-        screenPos.y += Number(bot?.userData?.hpLabelYOffset || bot?.userData?.hitRadius || 8) + 4;
-        screenPos.project(camera);
-
-        if(screenPos.z < -1 || screenPos.z > 1){
-            label.style.display = 'none';
-            return;
-        }
-
-        const canvas = renderer.domElement;
-        const rect = canvas.getBoundingClientRect();
-        const x = rect.left + (screenPos.x * 0.5 + 0.5) * rect.width;
-        const y = rect.top + (-screenPos.y * 0.5 + 0.5) * rect.height;
-
-        label.textContent = name;
-        label.style.left = `${x}px`;
-        label.style.top = `${y - 12}px`;
-        label.style.bottom = 'auto';
-        label.style.transform = 'translate(-50%, -100%)';
-        label.style.display = 'block';
-    }catch(_){
-        try{
-            const label = document.getElementById('battle-bot-name-label');
-            if(label) label.style.display = 'none';
-        }catch(__){}
-    }
+    }catch(_){}
 }
+
+function startV375BotNameLoop(){
+    if(window.__v375BotNameLoopStarted) return;
+    window.__v375BotNameLoopStarted = true;
+    const tick = () => {
+        try{ updateBattleBotNameLabel?.(); }catch(_){}
+        requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+}
+try{ startV375BotNameLoop(); }catch(_){}
+
 
 function updateSoloMissionHud(){
     const hud = document.getElementById('solo-mission-hud');
@@ -699,6 +745,7 @@ function finishSoloMission(victory = true){
         try{
             if(gameState === 'BATTLE' && isSoloBattleActive()){
                 clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
     switchState('LOBBY');
                 setTimeout(() => { try{ renderLobbyListV27?.('solo'); }catch(_){} }, 80);
             }
@@ -2525,6 +2572,7 @@ function initSettingsUI(){
             if(gameState === 'BATTLE' || gameState === 'OBSERVE'){
                 settingsWindow.classList.add("hidden");
                 await clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
     switchState('LOBBY');
                 if(typeof renderRoomsInLobby === 'function'){
                     await renderRoomsInLobby(true);
@@ -14601,6 +14649,7 @@ function openGameAsGuest(){
     resetPlayerProgress();
     updatePremiumAccountInfo();
     clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
     switchState('LOBBY');
 }
 function registerLocalAccount(){
@@ -14729,6 +14778,7 @@ function loginLocalAccount(){
             updatePremiumAccountInfo();
             renderProfileStats?.();
             clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
     switchState('LOBBY');
             saveGame();
         }catch(err){
@@ -15888,6 +15938,7 @@ function setShopMode(open){
 
 function openShopView(){
     if(gameState !== 'LOBBY') clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
     switchState('LOBBY');
     shopState.view = 'ships';
     shopState.selectedId = getCurrentShopShips()[0]?.id || '';
@@ -15912,6 +15963,7 @@ function closeShopView(){
             battleTab.onclick = () => {
                 closeShopView();
                 if(gameState !== 'LOBBY') clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
     switchState('LOBBY');
                 renderLobbyList('battle');
             };
@@ -15925,6 +15977,7 @@ function closeShopView(){
                 }
                 closeShopView();
                 if(gameState !== 'LOBBY') clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
     switchState('LOBBY');
                 renderLobbyList('solo');
             };
@@ -19501,8 +19554,10 @@ try{
             try{
                 if(nextState !== 'BATTLE'){
                     clearBattleKillFeed?.();
+                    clearBattleBotNameLabels?.();
                     const label = document.getElementById('battle-bot-name-label');
                     if(label) label.style.display = 'none';
+                    clearBattleBotNameLabels?.();
                 }
             }catch(_){}
             return result;
