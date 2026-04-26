@@ -19277,8 +19277,16 @@ try{
     }
 }catch(e){}
 
-// ===== TRUE FINAL SPAWN SYSTEM =====
-function updateEndlessBotsByKills(){
+// ===== HARD LOCK BOT ARRAY (ABSOLUTE CONTROL) =====
+(function(){
+    const originalPush = soloEnemyBots.push.bind(soloEnemyBots);
+    soloEnemyBots.push = function(...args){
+        // block all external pushes
+        return soloEnemyBots.length;
+    };
+})();
+
+function __forceCorrectBotCount(){
     if(!isEndlessSoloBattle()) return;
 
     const kills = Math.max(0, Number(battleStats.playerKills||0));
@@ -19290,8 +19298,18 @@ function updateEndlessBotsByKills(){
         try{ scene.remove(b.mesh); }catch(e){}
     }
 
-    // add missing
+    // manually spawn ONLY here
     while(soloEnemyBots.length < allowed){
-        spawnEnemyBot();
+        const bot = __originalSpawnEnemyBot ? __originalSpawnEnemyBot() : spawnEnemyBot();
+        if(bot) soloEnemyBots[soloEnemyBots.length] = bot;
+    }
+}
+
+// hook into main loop safely
+if(typeof updateBattle === "function"){
+    const oldUpdate = updateBattle;
+    updateBattle = function(){
+        oldUpdate.apply(this, arguments);
+        __forceCorrectBotCount();
     }
 }
