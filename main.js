@@ -95,8 +95,8 @@ let soloEnemyBots = [];
 let soloBotScoreRows = new Map();
 let lastEndlessBotSpawnAt = 0;
 const ENDLESS_SOLO_MAX_BOTS = 10;
-const ENDLESS_SOLO_BASE_BOTS = 3;
-const ENDLESS_SOLO_KILLS_PER_EXTRA_BOT = 20;
+const ENDLESS_SOLO_BASE_BOTS = 1;
+const ENDLESS_SOLO_KILLS_PER_EXTRA_BOT = 20; // controlled spawn
 const ENDLESS_SOLO_SPAWN_COOLDOWN_MS = 5200;
 let enemyLasers = [];
 let battleObjects = [];
@@ -19162,3 +19162,13 @@ setInterval(() => {
     setTimeout(() => { try{ restoreOpenPmState(); renderChatTabs?.(); if(String(currentChat || '').startsWith('pm:')) renderLobbyMessages?.(); }catch(_){ } }, 1800);
   });
 })();
+
+
+// === BOT SPAWN CONTROL FIX ===
+function trySpawnNewBot(){
+    if(soloEnemyBots.length >= ENDLESS_SOLO_MAX_BOTS) return;
+    const kills = battleStats.playerKills || 0;
+    const allowed = 1 + Math.floor(kills / ENDLESS_SOLO_KILLS_PER_EXTRA_BOT);
+    if(soloEnemyBots.length >= allowed) return;
+    spawnEnemyBot();
+}
