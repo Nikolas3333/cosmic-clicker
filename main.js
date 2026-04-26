@@ -473,8 +473,8 @@ let activeSoloMissionCompleted = false;
 let activeSoloMissionEnded = false;
 let battleSolarSystemGroup = null;
 const SOLO_DEFAULT_PLAYER_LIVES = 5;
-const SOLO_KILL_EXP_REWARD = 2;
-const SOLO_KILL_COIN_REWARD = 2;
+const SOLO_KILL_EXP_REWARD = 1;
+const SOLO_KILL_COIN_REWARD = 1;
 const SOLO_WIN_CRYSTAL_REWARD = 3;
 function isEndlessSoloBattle(){ return !!(isSoloBattleActive() && (activeSoloMission?.endless || currentRoom?.endless)); }
 function addPlayerBattleCurrency(kind = 'coins', amount = 0){
@@ -548,6 +548,9 @@ function getSoloLivesLeft(){ return Math.max(0, getActiveSoloMissionLives() - (N
 // ===== V372 SOLO KILLFEED / BOT LABEL / TEAM SCOREBOARD HELPERS =====
 function pushBattleKillFeedLine(text = ''){
     try{
+        if(gameState !== 'BATTLE') return;
+        const battleScreen = document.getElementById('battle-screen');
+        if(battleScreen && battleScreen.style.display === 'none') return;
         const safeText = String(text || '').trim();
         if(!safeText) return;
         let feed = document.getElementById('battle-kill-feed');
@@ -556,6 +559,7 @@ function pushBattleKillFeedLine(text = ''){
             feed.id = 'battle-kill-feed';
             document.body.appendChild(feed);
         }
+        feed.style.display = 'flex';
         const item = document.createElement('div');
         item.className = 'battle-kill-feed-item';
         item.textContent = safeText;
@@ -563,10 +567,24 @@ function pushBattleKillFeedLine(text = ''){
         while(feed.children.length > 5) feed.removeChild(feed.lastElementChild);
         setTimeout(() => {
             try{
+                if(gameState !== 'BATTLE'){
+                    item.remove();
+                    return;
+                }
                 item.style.opacity = '0';
                 setTimeout(() => item.remove(), 350);
             }catch(_){}
         }, 5200);
+    }catch(_){}
+}
+
+function clearBattleKillFeed(){
+    try{
+        const feed = document.getElementById('battle-kill-feed');
+        if(feed){
+            feed.innerHTML = '';
+            feed.style.display = 'none';
+        }
     }catch(_){}
 }
 
@@ -590,6 +608,28 @@ function updateBattleBotNameLabel(){
             return;
         }
         label.textContent = name;
+
+        const hpCandidates = [
+            document.getElementById('battle-hp-bar'),
+            document.getElementById('battle-hp-fill'),
+            document.getElementById('battle-player-hp-bar'),
+            document.querySelector('.battle-hp-bar'),
+            document.querySelector('#battle-hud .hp-bar')
+        ].filter(Boolean);
+
+        const hpEl = hpCandidates[0];
+        if(hpEl){
+            const rect = hpEl.getBoundingClientRect();
+            label.style.left = `${rect.left + rect.width / 2}px`;
+            label.style.top = `${Math.max(8, rect.top - 28)}px`;
+            label.style.bottom = 'auto';
+            label.style.transform = 'translateX(-50%)';
+        }else{
+            label.style.left = '50%';
+            label.style.top = 'auto';
+            label.style.bottom = '112px';
+            label.style.transform = 'translateX(-50%)';
+        }
         label.style.display = 'block';
     }catch(_){}
 }
@@ -644,7 +684,8 @@ function finishSoloMission(victory = true){
     setTimeout(() => {
         try{
             if(gameState === 'BATTLE' && isSoloBattleActive()){
-                switchState('LOBBY');
+                clearBattleKillFeed?.();
+    switchState('LOBBY');
                 setTimeout(() => { try{ renderLobbyListV27?.('solo'); }catch(_){} }, 80);
             }
         }catch(_){ }
@@ -2469,7 +2510,8 @@ function initSettingsUI(){
         closeSettings.addEventListener("click", async () => {
             if(gameState === 'BATTLE' || gameState === 'OBSERVE'){
                 settingsWindow.classList.add("hidden");
-                await switchState('LOBBY');
+                await clearBattleKillFeed?.();
+    switchState('LOBBY');
                 if(typeof renderRoomsInLobby === 'function'){
                     await renderRoomsInLobby(true);
                 }
@@ -14544,6 +14586,7 @@ function openGameAsGuest(){
     player.nickname='Guest Pilot';
     resetPlayerProgress();
     updatePremiumAccountInfo();
+    clearBattleKillFeed?.();
     switchState('LOBBY');
 }
 function registerLocalAccount(){
@@ -14671,7 +14714,8 @@ function loginLocalAccount(){
             updateNicknameSettingsState();
             updatePremiumAccountInfo();
             renderProfileStats?.();
-            switchState('LOBBY');
+            clearBattleKillFeed?.();
+    switchState('LOBBY');
             saveGame();
         }catch(err){
             showAuthMessage('Ошибка входа: ' + (err?.message || err));
@@ -15829,7 +15873,8 @@ function setShopMode(open){
 }
 
 function openShopView(){
-    if(gameState !== 'LOBBY') switchState('LOBBY');
+    if(gameState !== 'LOBBY') clearBattleKillFeed?.();
+    switchState('LOBBY');
     shopState.view = 'ships';
     shopState.selectedId = getCurrentShopShips()[0]?.id || '';
     setTimeout(() => {
@@ -15852,7 +15897,8 @@ function closeShopView(){
             battleTab.dataset.v26Bound = '1';
             battleTab.onclick = () => {
                 closeShopView();
-                if(gameState !== 'LOBBY') switchState('LOBBY');
+                if(gameState !== 'LOBBY') clearBattleKillFeed?.();
+    switchState('LOBBY');
                 renderLobbyList('battle');
             };
         }
@@ -15864,7 +15910,8 @@ function closeShopView(){
                     return;
                 }
                 closeShopView();
-                if(gameState !== 'LOBBY') switchState('LOBBY');
+                if(gameState !== 'LOBBY') clearBattleKillFeed?.();
+    switchState('LOBBY');
                 renderLobbyList('solo');
             };
         }
@@ -19431,3 +19478,32 @@ try{
         updateBattle.__v372BotLabelHooked = true;
     }
 }catch(_){}
+
+try{
+    if(typeof switchState === 'function' && !switchState.__v373KillFeedClearHooked){
+        const __oldSwitchStateV373 = switchState;
+        switchState = function(nextState){
+            const result = __oldSwitchStateV373.apply(this, arguments);
+            try{
+                if(nextState !== 'BATTLE'){
+                    clearBattleKillFeed?.();
+                    const label = document.getElementById('battle-bot-name-label');
+                    if(label) label.style.display = 'none';
+                }
+            }catch(_){}
+            return result;
+        };
+        switchState.__v373KillFeedClearHooked = true;
+    }
+}catch(_){}
+
+let __v373BotNameRaf = 0;
+function startV373BotNameLoop(){
+    if(__v373BotNameRaf) return;
+    const tick = () => {
+        try{ updateBattleBotNameLabel?.(); }catch(_){}
+        __v373BotNameRaf = requestAnimationFrame(tick);
+    };
+    __v373BotNameRaf = requestAnimationFrame(tick);
+}
+try{ startV373BotNameLoop(); }catch(_){}
