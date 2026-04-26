@@ -3762,6 +3762,7 @@ if (gameState === "BATTLE" && playerShip) {
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
             enemyBot = hitEnemyBot;
+            updateSoloBotHpBar(hitEnemyBot);
             updateEnemyHud();
             if (hitEnemyBot.userData.hp <= 0) {
                 const defeatedName = hitEnemyBot?.userData?.name || 'UFO Raider';
@@ -3890,7 +3891,7 @@ if (gameState === "BATTLE" && playerShip) {
         activeBots.forEach((bot, botIndex) => {
             if(!bot || bot.userData?.alive === false) return;
             const endlessMode = isEndlessSoloBattle();
-            bot.userData.strafePhase += (endlessMode ? 0.009 : 0.014) + botIndex * 0.0014;
+            bot.userData.strafePhase += (endlessMode ? 0.0045 : 0.010) + botIndex * 0.00045;
             const toPlayerVector = playerShip.position.clone().sub(bot.position);
             const distanceToPlayer = Math.max(1, toPlayerVector.length());
             const desiredForward = toPlayerVector.clone().normalize();
@@ -3900,7 +3901,7 @@ if (gameState === "BATTLE" && playerShip) {
             let desiredPos;
             if(endlessMode){
                 const playerForward = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
-                const slotAngle = (botIndex / Math.max(1, activeBots.length)) * Math.PI * 2 + Number(bot.userData.strafePhase || 0) * 0.34;
+                const slotAngle = (botIndex / Math.max(1, activeBots.length)) * Math.PI * 2 + Number(bot.userData.strafePhase || 0) * 0.13;
                 const attackDistance = THREE.MathUtils.clamp(Number(bot.userData?.preferredDistance || 120) || 120, 90, 175);
                 const ringOffset = side.clone().multiplyScalar(Math.sin(slotAngle) * (48 + botIndex * 5));
                 const verticalOffset = new THREE.Vector3(0, Math.cos(slotAngle * 1.37) * 28, 0);
@@ -3931,12 +3932,24 @@ if (gameState === "BATTLE" && playerShip) {
                 desiredPos.y += Math.cos(bot.userData.strafePhase * 1.7) * 2.2;
             }
 
-            const lerpSpeed = endlessMode ? (distanceToPlayer > 430 ? 0.052 : 0.034) : 0.045;
-            bot.position.lerp(desiredPos, lerpSpeed);
+            if(!bot.userData.botMoveVelocity || typeof bot.userData.botMoveVelocity.add !== 'function') bot.userData.botMoveVelocity = new THREE.Vector3();
+            const toDesired = desiredPos.clone().sub(bot.position);
+            const desiredDistance = toDesired.length();
+            const botMaxStep = endlessMode ? 1.05 : 0.82;
+            const botAccel = endlessMode ? 0.030 : 0.036;
+            const botDamping = endlessMode ? 0.945 : 0.935;
+            if(desiredDistance > 0.001){
+                const acceleration = toDesired.normalize().multiplyScalar(Math.min(botAccel * desiredDistance, botMaxStep * 0.16));
+                bot.userData.botMoveVelocity.add(acceleration);
+            }
+            bot.userData.botMoveVelocity.clampLength(0, botMaxStep);
+            bot.position.add(bot.userData.botMoveVelocity);
+            bot.userData.botMoveVelocity.multiplyScalar(botDamping);
             clampEndlessBotToCombatZone(bot);
             handleBattleCollisions(bot);
-            bot.lookAt(playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(endlessMode ? 2.2 : 6)));
-            bot.rotation.z += ((Math.sin(bot.userData.strafePhase) * (endlessMode ? 0.24 : 0.45)) - bot.rotation.z) * 0.04;
+            const aimTarget = playerShip.position.clone().add(shipVelocity.clone().multiplyScalar(endlessMode ? 1.4 : 4.5));
+            bot.lookAt(aimTarget);
+            bot.rotation.z += ((Math.sin(bot.userData.strafePhase) * (endlessMode ? 0.16 : 0.34)) - bot.rotation.z) * 0.08;
 
             const cooldown = endlessMode
                 ? (2300 + botIndex * 310 + Math.random() * 520)
@@ -3948,6 +3961,7 @@ if (gameState === "BATTLE" && playerShip) {
         });
     }
     ensureEndlessSoloBotWave?.();
+    updateSoloBotHpBars?.();
 
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
     const followDistance = Number(playerShip?.userData?.cameraDistance || 16) || 16;
@@ -9045,7 +9059,9 @@ function createEnemyBot(options = {}){
         tractorReadyAt: Date.now() + 60000 + Math.random() * 90000,
         preferredDistance: endlessMode ? (105 + Math.random() * 58) : 36,
         scoreKills: 0,
-        scoreDeaths: 0
+        scoreDeaths: 0,
+        botMoveVelocity: new THREE.Vector3(),
+        hpBarOffsetY: endlessMode ? 9.2 : 5.2
     };
     soloBotScoreRows.set(botId, {
         id: botId,
@@ -9069,6 +9085,7 @@ function createEnemyBot(options = {}){
     soloEnemyBots.push(botGroup);
     enemyBot = soloEnemyBots[0] || botGroup;
     scene.add(botGroup);
+    ensureSoloBotHpBar(botGroup);
     try{
         const loader = new GLTFLoader();
         loader.load(SOLO_BOT_MODEL_PATH, (gltf) => {
@@ -9102,11 +9119,72 @@ function createEnemyBot(options = {}){
             const modelLight = new THREE.PointLight(weaponType === 'deathRay' ? 0xff4466 : weaponType === 'tractor' ? 0xaa66ff : 0x66eaff, 1.15, 34);
             modelLight.position.set(0, 1.1, 0);
             botGroup.add(modelLight);
+            ensureSoloBotHpBar(botGroup);
         }, undefined, () => {});
     }catch(_){ }
     updateEnemyHud();
     updateBattleScoreboard();
     return botGroup;
+}
+
+
+function ensureSoloBotHpBar(bot){
+    if(!bot || bot.userData?.alive === false) return null;
+    if(bot.userData.hpBarSprite && bot.userData.hpBarSprite.parent === bot) return bot.userData.hpBarSprite;
+    try{
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 18;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.needsUpdate = true;
+        const material = new THREE.SpriteMaterial({ map:texture, transparent:true, depthTest:false, depthWrite:false });
+        const sprite = new THREE.Sprite(material);
+        sprite.name = 'solo-bot-hp-thin-bar';
+        sprite.renderOrder = 9998;
+        sprite.position.set(0, Number(bot.userData?.hpBarOffsetY || (isEndlessSoloBattle() ? 8.8 : 5.0)) || 5, 0);
+        sprite.scale.set(isEndlessSoloBattle() ? 10.5 : 7.2, 0.72, 1);
+        sprite.userData = { canvas, texture };
+        bot.userData.hpBarSprite = sprite;
+        bot.add(sprite);
+        updateSoloBotHpBar(bot);
+        return sprite;
+    }catch(_){ return null; }
+}
+
+function updateSoloBotHpBar(bot){
+    if(!bot || bot.userData?.alive === false) return;
+    const sprite = ensureSoloBotHpBar(bot);
+    if(!sprite) return;
+    const data = sprite.userData || {};
+    const canvas = data.canvas;
+    const texture = data.texture;
+    const ctx = canvas?.getContext?.('2d');
+    if(!ctx || !texture) return;
+    const hp = Math.max(0, Number(bot.userData?.hp || 0) || 0);
+    const maxHp = Math.max(1, Number(bot.userData?.maxHp || 1) || 1);
+    const ratio = THREE.MathUtils.clamp(hp / maxHp, 0, 1);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = 'rgba(0,0,0,0.62)';
+    ctx.fillRect(0, 4, canvas.width, 10);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 4.5, canvas.width - 1, 9);
+    ctx.fillStyle = ratio > 0.55 ? '#47ff7a' : (ratio > 0.25 ? '#ffd24a' : '#ff4545');
+    ctx.fillRect(2, 6, Math.max(0, (canvas.width - 4) * ratio), 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(2, 6, Math.max(0, (canvas.width - 4) * ratio), 1);
+    texture.needsUpdate = true;
+    sprite.visible = !!(gameState === 'BATTLE' && isSoloBattleActive() && hp > 0);
+    sprite.position.set(0, Number(bot.userData?.hpBarOffsetY || (isEndlessSoloBattle() ? 8.8 : 5.0)) || 5, 0);
+}
+
+function updateSoloBotHpBars(){
+    try{
+        const bots = getActiveSoloBots?.() || [];
+        bots.forEach(bot => updateSoloBotHpBar(bot));
+    }catch(_){ }
 }
 
 function updateEnemyHud(){
