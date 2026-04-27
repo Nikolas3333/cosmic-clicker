@@ -726,9 +726,9 @@ function updateBattleBotNameLabel(){
             sprite.position.set(0, hpOffset + 0.55, 0);
             // Реально меньше старого DOM-ника: ширина около половины HP-бара.
             if(isEndlessSoloBattle()){
-                sprite.scale.set(5.2, 1.15, 1);
+                sprite.scale.set(18.0, 4.0, 1);
             }else{
-                sprite.scale.set(4.2, 0.95, 1);
+                sprite.scale.set(18.0, 4.0, 1);
             }
         });
     }catch(_){}
@@ -2959,7 +2959,7 @@ transparent: true
 
 const sprite = new THREE.Sprite(material);
 
-sprite.scale.set(12,3,1);
+sprite.scale.set(18.0, 4.0, 1);
 this.mesh.add(sprite);
 
 this.resourceCanvas = canvas;
@@ -8027,7 +8027,7 @@ function createRemotePilotLabel(name, team = 'blue'){
     });
 
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(9.2, 1.7, 1);
+    sprite.scale.set(18.0, 4.0, 1);
     sprite.position.set(0, 3.4, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
@@ -9519,7 +9519,7 @@ function ensureSoloBotHpBar(bot){
         sprite.name = 'solo-bot-hp-thin-bar';
         sprite.renderOrder = 9998;
         sprite.position.set(0, Number(bot.userData?.hpBarOffsetY || (isEndlessSoloBattle() ? 8.8 : 5.0)) || 5, 0);
-        sprite.scale.set(isEndlessSoloBattle() ? 14.0 : 10.0, 2.2, 1);
+        sprite.scale.set(isEndlessSoloBattle() ? 10.5 : 7.2, 0.72, 1);
         sprite.userData = { canvas, texture };
         bot.userData.hpBarSprite = sprite;
         bot.add(sprite);
