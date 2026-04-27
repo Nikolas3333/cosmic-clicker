@@ -643,12 +643,14 @@ function updateBattleBotNameLabel(){
             try{ bot.getWorldPosition(worldPos); }catch(_){ worldPos.copy(bot.position || new THREE.Vector3()); }
 
             const screenPos = worldPos.clone();
-            // V376: nameplate is tied to the bot HP bar, not to the hit radius.
-            const hpOffsetY = Math.max(
-                4.5,
-                Number(bot?.userData?.hpBarOffsetY || (isEndlessSoloBattle() ? 8.8 : 5.0)) || 5.0
+            // V377: safe v375 position restored so the bot name cannot disappear.
+            // Visual size is controlled only by CSS, not by moving the label too low.
+            const radius = Math.max(
+                7,
+                Number(bot?.userData?.hitRadius || 0) || 0,
+                Number(bot?.userData?.radius || 0) || 0
             );
-            screenPos.y += hpOffsetY + 2.4;
+            screenPos.y += radius + 7;
             screenPos.project(camera);
 
             const label = ensureBotNameLabel(id);
