@@ -726,9 +726,9 @@ function updateBattleBotNameLabel(){
             sprite.position.set(0, hpOffset + 0.55, 0);
             // Реально меньше старого DOM-ника: ширина около половины HP-бара.
             if(isEndlessSoloBattle()){
-                sprite.scale.set(5.2, 1.15, 1);
+                sprite.scale.set(8.0, 1.8, 1);
             }else{
-                sprite.scale.set(4.2, 0.95, 1);
+                sprite.scale.set(7.0, 1.6, 1);
             }
         });
     }catch(_){}
