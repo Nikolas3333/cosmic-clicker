@@ -589,17 +589,11 @@ function clearBattleKillFeed(){
 }
 
 
-// ===== V375 MULTI BOT NAME LABELS =====
+// ===== V379 SOLO BOT NAME SPRITES (REAL FIX) =====
+// ВАЖНО: старые DOM-ники (.battle-bot-name-label) больше не используются.
+// Имя теперь рисуется как THREE.Sprite прямо над HP-баром бота.
+// Поэтому размер реально меняется в бою и не зависит от CSS/HTML-слоёв.
 let battleBotNameLabels = new Map();
-
-// ===== V378 BOT NAMEPLATE HARD STYLE =====
-function applyV378BotNameLabelStyle(label){
-    try{
-        if(!label || !label.style) return;
-        const rules = { position:"fixed", left:"0px", top:"0px", bottom:"auto", transform:"translate(-50%, -112%)", transformOrigin:"center bottom", padding:"1px 4px", minWidth:"0", maxWidth:"78px", borderRadius:"4px", background:"rgba(0,8,18,0.34)", border:"1px solid rgba(130,230,255,0.18)", color:"#c9f6ff", fontSize:"7px", lineHeight:"1", fontWeight:"700", letterSpacing:"0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", textAlign:"center", textShadow:"0 0 2px #000, 0 0 3px rgba(0,210,255,0.28)", boxShadow:"none", filter:"none", zIndex:"24500", pointerEvents:"none", userSelect:"none" };
-        Object.entries(rules).forEach(([key, value]) => label.style.setProperty(key.replace(/[A-Z]/g, m => "-" + m.toLowerCase()), value, "important"));
-    }catch(_){}
-}
 
 function clearBattleBotNameLabels(){
     try{
@@ -608,6 +602,18 @@ function clearBattleBotNameLabels(){
         battleBotNameLabels.clear();
         const oldSingle = document.getElementById('battle-bot-name-label');
         if(oldSingle) oldSingle.style.display = 'none';
+        document.querySelectorAll?.('.battle-bot-name-label')?.forEach(el => { try{ el.remove(); }catch(_){} });
+        const bots = getActiveSoloBots?.() || [];
+        bots.forEach(bot => {
+            try{
+                if(bot?.userData?.nameSprite){
+                    bot.remove(bot.userData.nameSprite);
+                    bot.userData.nameSprite.material?.map?.dispose?.();
+                    bot.userData.nameSprite.material?.dispose?.();
+                    bot.userData.nameSprite = null;
+                }
+            }catch(_){}
+        });
     }catch(_){}
 }
 
@@ -615,83 +621,116 @@ function getBotLabelId(bot, index = 0){
     return String(bot?.userData?.id || bot?.uuid || `bot-${index+1}`);
 }
 
-function ensureBotNameLabel(id){
-    if(!(battleBotNameLabels instanceof Map)) battleBotNameLabels = new Map();
-    let label = battleBotNameLabels.get(id);
-    if(!label){
-        label = document.createElement('div');
-        label.className = 'battle-bot-name-label';
-        label.dataset.botId = id;
-        applyV378BotNameLabelStyle(label);
-        document.body.appendChild(label);
-        battleBotNameLabels.set(id, label);
+function makeSoloBotNameTexture(name = ''){
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 56;
+    const ctx = canvas.getContext('2d');
+    const safeName = String(name || '').trim() || 'UFO';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const boxW = 196;
+    const boxH = 28;
+    const x = (canvas.width - boxW) / 2;
+    const y = 16;
+    const r = 9;
+
+    ctx.fillStyle = 'rgba(0, 8, 18, 0.46)';
+    ctx.strokeStyle = 'rgba(120, 230, 255, 0.28)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + boxW - r, y);
+    ctx.quadraticCurveTo(x + boxW, y, x + boxW, y + r);
+    ctx.lineTo(x + boxW, y + boxH - r);
+    ctx.quadraticCurveTo(x + boxW, y + boxH, x + boxW - r, y + boxH);
+    ctx.lineTo(x + r, y + boxH);
+    ctx.quadraticCurveTo(x, y + boxH, x, y + boxH - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = '700 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#c9f6ff';
+    ctx.shadowColor = 'rgba(0,0,0,0.95)';
+    ctx.shadowBlur = 3;
+    const shortName = safeName.length > 15 ? safeName.slice(0, 14) + '…' : safeName;
+    ctx.fillText(shortName, canvas.width / 2, y + boxH / 2 + 1);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return { canvas, texture };
+}
+
+function ensureSoloBotNameSprite(bot){
+    if(!bot || bot.userData?.alive === false) return null;
+    const name = String(bot?.userData?.name || bot?.userData?.botName || '').trim();
+    if(!name) return null;
+
+    let sprite = bot.userData?.nameSprite || null;
+    if(sprite && sprite.parent === bot && sprite.userData?.nameText === name) return sprite;
+
+    try{
+        if(sprite){
+            bot.remove(sprite);
+            sprite.material?.map?.dispose?.();
+            sprite.material?.dispose?.();
+            bot.userData.nameSprite = null;
+        }
+    }catch(_){}
+
+    try{
+        const data = makeSoloBotNameTexture(name);
+        const material = new THREE.SpriteMaterial({
+            map: data.texture,
+            transparent: true,
+            depthTest: false,
+            depthWrite: false
+        });
+        sprite = new THREE.Sprite(material);
+        sprite.name = 'solo-bot-name-small-sprite';
+        sprite.renderOrder = 9999;
+        sprite.center.set(0.5, 0.0);
+        sprite.userData = { nameText: name, canvas: data.canvas, texture: data.texture };
+        bot.userData.nameSprite = sprite;
+        bot.add(sprite);
+        return sprite;
+    }catch(_){
+        return null;
     }
-    return label;
 }
 
 function updateBattleBotNameLabel(){
     try{
         const oldSingle = document.getElementById('battle-bot-name-label');
         if(oldSingle) oldSingle.style.display = 'none';
+        document.querySelectorAll?.('.battle-bot-name-label')?.forEach(el => { try{ el.remove(); }catch(_){} });
 
-        if(gameState !== 'BATTLE' || !isSoloBattleActive() || !camera || !renderer){
+        if(gameState !== 'BATTLE' || !isSoloBattleActive()){
             clearBattleBotNameLabels();
             return;
         }
 
-        const bots = getActiveSoloBots().filter(bot => bot && bot.userData?.alive !== false);
-        const activeIds = new Set();
-
-        bots.forEach((bot, index) => {
-            const name = String(bot?.userData?.name || bot?.userData?.botName || '').trim();
-            if(!name) return;
-
-            const id = getBotLabelId(bot, index);
-            activeIds.add(id);
-
-            const worldPos = new THREE.Vector3();
-            try{ bot.getWorldPosition(worldPos); }catch(_){ worldPos.copy(bot.position || new THREE.Vector3()); }
-
-            const screenPos = worldPos.clone();
-            // V378: safe v375 position restored so the bot name cannot disappear.
-            // Visual size is controlled only by CSS, not by moving the label too low.
-            const radius = Math.max(
-                7,
-                Number(bot?.userData?.hitRadius || 0) || 0,
-                Number(bot?.userData?.radius || 0) || 0
-            );
-            screenPos.y += radius + 7;
-            screenPos.project(camera);
-
-            const label = ensureBotNameLabel(id);
-            applyV378BotNameLabelStyle(label);
-            label.textContent = name;
-
-            if(screenPos.z < -1 || screenPos.z > 1){
-                label.style.display = 'none';
-                return;
+        const bots = getActiveSoloBots?.().filter(bot => bot && bot.userData?.alive !== false) || [];
+        bots.forEach(bot => {
+            const sprite = ensureSoloBotNameSprite(bot);
+            if(!sprite) return;
+            const hpOffset = Number(bot?.userData?.hpBarOffsetY || (isEndlessSoloBattle() ? 8.8 : 5.0)) || 5;
+            sprite.visible = true;
+            sprite.position.set(0, hpOffset + 0.55, 0);
+            // Реально меньше старого DOM-ника: ширина около половины HP-бара.
+            if(isEndlessSoloBattle()){
+                sprite.scale.set(5.2, 1.15, 1);
+            }else{
+                sprite.scale.set(4.2, 0.95, 1);
             }
-
-            const rect = renderer.domElement.getBoundingClientRect();
-            const x = rect.left + (screenPos.x * 0.5 + 0.5) * rect.width;
-            const y = rect.top + (-screenPos.y * 0.5 + 0.5) * rect.height;
-
-            if(x < -80 || x > window.innerWidth + 80 || y < -80 || y > window.innerHeight + 80){
-                label.style.display = 'none';
-                return;
-            }
-
-            label.style.left = `${x}px`;
-            label.style.top = `${y}px`;
-            label.style.display = 'block';
         });
-
-        for(const [id, label] of Array.from(battleBotNameLabels.entries())){
-            if(!activeIds.has(id)){
-                try{ label.remove(); }catch(_){}
-                battleBotNameLabels.delete(id);
-            }
-        }
     }catch(_){}
 }
 
