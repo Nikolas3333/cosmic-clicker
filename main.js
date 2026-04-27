@@ -16268,9 +16268,32 @@ function closeShopView(){
         event.preventDefault();
     }, { passive:false });
 
+    // ===== V383 STRICT LOBBY MODE FILTER =====
+    function isSoloLobbyEntryV383(entry = {}){
+        try{
+            const modeText = String(entry?.mode || entry?.state || '').toLowerCase();
+            const titleText = String(entry?.title || '').toLowerCase();
+            const hasSoloText = modeText.includes('solo') || titleText.includes('бесконечный бой');
+            return !!(
+                entry?.solo === true ||
+                entry?.private === true ||
+                entry?.endless === true ||
+                entry?.mission ||
+                modeText === 'solo' ||
+                hasSoloText
+            );
+        }catch(_){
+            return false;
+        }
+    }
+
+    function isPublicBattleLobbyEntryV383(entry = {}){
+        return !!entry && !isSoloLobbyEntryV383(entry);
+    }
+
     function getBattleMaps(){
         const liveRooms = Array.isArray(supabaseBattleRoomsCache)
-            ? supabaseBattleRoomsCache.filter(room => room && room.id && !isPublicBattleRoom(room.rawRoom || room))
+            ? supabaseBattleRoomsCache.filter(room => room && room.id && !isPublicBattleRoom(room.rawRoom || room) && isPublicBattleLobbyEntryV383(room))
             : [];
 
         const sortedLiveRooms = liveRooms
@@ -16282,21 +16305,25 @@ function closeShopView(){
             });
 
         const baseMaps = (typeof LOBBY_MAP_DATA !== 'undefined' && Array.isArray(LOBBY_MAP_DATA))
-            ? LOBBY_MAP_DATA.map(item => ({
-                ...item,
-                id: null,
-                roomId: null,
-                isBaseMap: true,
-                title: item.title,
-                players: getBattleMapOccupants(item.real),
-                currentPlayers: getBattleMapOccupants(item.real),
-                maxPlayers: Number(item.maxPlayers || item.playerCount || 8),
-                map: item.real,
-                rawRoom: null
-            }))
+            ? LOBBY_MAP_DATA
+                .filter(item => isPublicBattleLobbyEntryV383(item))
+                .map(item => ({
+                    ...item,
+                    solo: false,
+                    private: false,
+                    id: null,
+                    roomId: null,
+                    isBaseMap: true,
+                    title: item.title,
+                    players: getBattleMapOccupants(item.real),
+                    currentPlayers: getBattleMapOccupants(item.real),
+                    maxPlayers: Number(item.maxPlayers || item.playerCount || 8),
+                    map: item.real,
+                    rawRoom: null
+                }))
             : [];
 
-        return [...sortedLiveRooms, ...baseMaps];
+        return [...sortedLiveRooms, ...baseMaps].filter(isPublicBattleLobbyEntryV383);
     }
 
     function getTournamentMaps(){
@@ -16304,9 +16331,9 @@ function closeShopView(){
     }
 
     function getCurrentDataset(){
-        if(lobbyModeV27 === 'solo') return SOLO_DATA;
-        if(lobbyModeV27 === 'tournament') return getTournamentMaps();
-        return getBattleMaps();
+        if(lobbyModeV27 === 'solo') return SOLO_DATA.map(entry => ({ ...entry, solo:true, private:true, state:'solo' }));
+        if(lobbyModeV27 === 'tournament') return getTournamentMaps().filter(entry => !isSoloLobbyEntryV383(entry));
+        return getBattleMaps().filter(isPublicBattleLobbyEntryV383);
     }
 
     function setModeTabUI(){
@@ -16442,6 +16469,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
     }
 
     function renderLobbyListV27(mode = getLobbyModeSafe()){
+        mode = (mode === 'solo' || mode === 'tournament' || mode === 'battle') ? mode : 'battle';
         lobbyModeV27 = mode;
         window.setLobbyModeV27?.(mode);
         const list = document.getElementById('match-list');
@@ -16451,7 +16479,9 @@ window.renderPlayersOnPlanet = function(entry = {}){
         if(!list) return;
         setModeTabUI();
         list.innerHTML = '';
-        const dataset = getCurrentDataset();
+        let dataset = getCurrentDataset();
+        if(mode === 'battle') dataset = dataset.filter(isPublicBattleLobbyEntryV383);
+        if(mode === 'solo') dataset = dataset.filter(isSoloLobbyEntryV383);
         if(!dataset.length){
             const empty = document.createElement('div');
             empty.className = 'match-item';
@@ -16546,6 +16576,10 @@ window.renderPlayersOnPlanet = function(entry = {}){
         if(battleTab && !battleTab.dataset.v27Bound){
             battleTab.dataset.v27Bound = '1';
             battleTab.onclick = async () => {
+                lobbyModeV27 = 'battle';
+                window.setLobbyModeV27?.('battle');
+                selectedLobbyMap = null;
+                currentRoom = null;
                 if(typeof renderRoomsInLobby === 'function'){
                     await renderRoomsInLobby(true);
                 }else{
@@ -17444,7 +17478,13 @@ async function loadRoomsFromSupabase() {
 
   rebuildBattleMapOccupants(allRooms, presenceRows);
 
-  const visibleRooms = allRooms.filter(room => room?.id && Array.isArray(room.room_players) && room.room_players.length > 0);
+  const visibleRooms = allRooms.filter(room => {
+    if(!room?.id || !Array.isArray(room.room_players) || room.room_players.length <= 0) return false;
+    const rawMode = String(room?.mode || room?.state || room?.room_type || room?.type || '').toLowerCase();
+    const rawName = String(room?.room_name || '').toLowerCase();
+    if(rawMode.includes('solo') || rawName.includes('solo') || rawName.includes('одиноч')) return false;
+    return true;
+  });
   supabaseBattleRoomsCache = visibleRooms.map(room => {
     const mapped = mapSupabaseRoomToLobbyEntry(room, presenceRows);
     const myName = getDisplayPlayerTag?.() || '';
