@@ -592,6 +592,15 @@ function clearBattleKillFeed(){
 // ===== V375 MULTI BOT NAME LABELS =====
 let battleBotNameLabels = new Map();
 
+// ===== V378 BOT NAMEPLATE HARD STYLE =====
+function applyV378BotNameLabelStyle(label){
+    try{
+        if(!label || !label.style) return;
+        const rules = { position:"fixed", left:"0px", top:"0px", bottom:"auto", transform:"translate(-50%, -112%)", transformOrigin:"center bottom", padding:"1px 4px", minWidth:"0", maxWidth:"78px", borderRadius:"4px", background:"rgba(0,8,18,0.34)", border:"1px solid rgba(130,230,255,0.18)", color:"#c9f6ff", fontSize:"7px", lineHeight:"1", fontWeight:"700", letterSpacing:"0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", textAlign:"center", textShadow:"0 0 2px #000, 0 0 3px rgba(0,210,255,0.28)", boxShadow:"none", filter:"none", zIndex:"24500", pointerEvents:"none", userSelect:"none" };
+        Object.entries(rules).forEach(([key, value]) => label.style.setProperty(key.replace(/[A-Z]/g, m => "-" + m.toLowerCase()), value, "important"));
+    }catch(_){}
+}
+
 function clearBattleBotNameLabels(){
     try{
         if(!(battleBotNameLabels instanceof Map)) battleBotNameLabels = new Map();
@@ -613,6 +622,7 @@ function ensureBotNameLabel(id){
         label = document.createElement('div');
         label.className = 'battle-bot-name-label';
         label.dataset.botId = id;
+        applyV378BotNameLabelStyle(label);
         document.body.appendChild(label);
         battleBotNameLabels.set(id, label);
     }
@@ -643,7 +653,7 @@ function updateBattleBotNameLabel(){
             try{ bot.getWorldPosition(worldPos); }catch(_){ worldPos.copy(bot.position || new THREE.Vector3()); }
 
             const screenPos = worldPos.clone();
-            // V377: safe v375 position restored so the bot name cannot disappear.
+            // V378: safe v375 position restored so the bot name cannot disappear.
             // Visual size is controlled only by CSS, not by moving the label too low.
             const radius = Math.max(
                 7,
@@ -654,6 +664,7 @@ function updateBattleBotNameLabel(){
             screenPos.project(camera);
 
             const label = ensureBotNameLabel(id);
+            applyV378BotNameLabelStyle(label);
             label.textContent = name;
 
             if(screenPos.z < -1 || screenPos.z > 1){
