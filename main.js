@@ -14705,27 +14705,111 @@ function openGameAsGuest(){
     switchState('LOBBY');
 }
 function registerLocalAccount(){
-    const email = document.getElementById('register-email')?.value?.trim() || '';
+    const nickname = document.getElementById('register-nickname')?.value?.trim() || '';
+    const email = document.getElementById('register-email')?.value?.trim().toLowerCase() || '';
     const password = document.getElementById('register-password')?.value || '';
+    const country = document.getElementById('register-country')?.value || '';
+    const day = document.getElementById('register-birth-day')?.value || '';
+    const month = document.getElementById('register-birth-month')?.value || '';
+    const year = document.getElementById('register-birth-year')?.value || '';
+    const registerMessage = document.getElementById('register-message');
+
+    const setRegisterMessage = (text = '') => {
+        if(registerMessage) registerMessage.textContent = text;
+        showAuthMessage(text);
+    };
+
+    if(!nickname || nickname.length < 3){
+        setRegisterMessage('Введите ник минимум 3 символа.');
+        return;
+    }
     if(!email || !password){
-        showAuthMessage('Введите email и пароль для регистрации.');
+        setRegisterMessage('Введите email и пароль.');
+        return;
+    }
+    if(password.length < 6){
+        setRegisterMessage('Пароль должен быть минимум 6 символов.');
+        return;
+    }
+    if(!country){
+        setRegisterMessage('Выберите страну.');
+        return;
+    }
+    if(!day || !month || !year){
+        setRegisterMessage('Укажите дату рождения.');
         return;
     }
 
+    const birthDate = `${year}-${month}-${day}`;
+
     (async () => {
         try{
-            const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
+            setRegisterMessage('Проверка почты...');
+
+            if(window.supabaseClient){
+                try{
+                    const existingPlayer = await window.supabaseClient
+                        .from('players')
+                        .select('email')
+                        .eq('email', email)
+                        .maybeSingle();
+
+                    if(existingPlayer?.data?.email){
+                        setRegisterMessage('Эта почта уже зарегистрирована.');
+                        return;
+                    }
+                }catch(checkErr){
+                    console.warn('Проверка email через players не удалась:', checkErr?.message || checkErr);
+                }
+            }
+
+            const { data, error } = await window.supabaseClient.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        nickname: nickname.slice(0, 20),
+                        country,
+                        birth_date: birthDate
+                    }
+                }
+            });
+
             if(error){
-                showAuthMessage('Ошибка: ' + error.message);
+                const msg = String(error.message || '').toLowerCase();
+                if(msg.includes('already') || msg.includes('registered') || msg.includes('exists')){
+                    setRegisterMessage('Эта почта уже зарегистрирована.');
+                }else{
+                    setRegisterMessage('Ошибка регистрации: ' + error.message);
+                }
                 return;
             }
+
+            const identities = data?.user?.identities;
+            if(Array.isArray(identities) && identities.length === 0){
+                setRegisterMessage('Эта почта уже зарегистрирована.');
+                return;
+            }
+
+            try{
+                localStorage.setItem(`cosmicPendingProfile:${email}`, JSON.stringify({
+                    nickname: nickname.slice(0, 20),
+                    country,
+                    birth_date: birthDate
+                }));
+            }catch(_){}
+
             const loginEmail = document.getElementById('login-email');
             const loginPassword = document.getElementById('login-password');
             if(loginEmail) loginEmail.value = email;
             if(loginPassword) loginPassword.value = password;
+
+            const registerModal = document.getElementById('register-modal');
+            if(registerModal) registerModal.classList.add('hidden');
+
             showAuthMessage('Регистрация успешна. Теперь войди в аккаунт.');
         }catch(err){
-            showAuthMessage('Ошибка: ' + (err?.message || err));
+            setRegisterMessage('Ошибка регистрации: ' + (err?.message || err));
         }
     })();
 }
@@ -14759,7 +14843,12 @@ function loginLocalAccount(){
             authState.pendingVerificationEmail = '';
             authState.pendingVerificationCode = '';
 
-            const nickname = email.split('@')[0] || 'Pilot';
+            let nickname = String(user?.user_metadata?.nickname || '').trim() || email.split('@')[0] || 'Pilot';
+            let pendingProfile = {};
+            try{
+                pendingProfile = JSON.parse(localStorage.getItem(`cosmicPendingProfile:${email}`) || '{}') || {};
+                if(pendingProfile.nickname) nickname = String(pendingProfile.nickname || '').trim().slice(0, 20) || nickname;
+            }catch(_){}
             let playerRow = null;
 
             const existingRes = await window.supabaseClient
@@ -14833,6 +14922,7 @@ function loginLocalAccount(){
                     clearBattleBotNameLabels?.();
     switchState('LOBBY');
             saveGame();
+            try{ localStorage.removeItem(`cosmicPendingProfile:${email}`); }catch(_){}
         }catch(err){
             showAuthMessage('Ошибка входа: ' + (err?.message || err));
         }
@@ -14848,14 +14938,34 @@ function initAuthScreen(){
     applyAuthUIState('');
     const loginBtn = document.getElementById('login-btn');
     const registerBtn = document.getElementById('register-btn');
-    const guestBtn = document.getElementById('guest-login-btn');
-    const forgotBtn = document.getElementById('forgot-password-btn');
+        const forgotBtn = document.getElementById('forgot-password-btn');
     const verifyBtn = document.getElementById('verify-email-btn');
     const openRegisterBtn = document.getElementById('open-register');
     const registerModal = document.getElementById('register-modal');
     const closeRegisterBtn = document.getElementById('close-register-modal');
     const serverCurrent = document.getElementById('auth-server-current');
     const serverList = document.getElementById('auth-server-list');
+    const birthDay = document.getElementById('register-birth-day');
+    const birthYear = document.getElementById('register-birth-year');
+    if(birthDay && !birthDay.dataset.filled){
+        birthDay.dataset.filled = '1';
+        for(let d = 1; d <= 31; d++){
+            const opt = document.createElement('option');
+            opt.value = String(d).padStart(2, '0');
+            opt.textContent = String(d);
+            birthDay.appendChild(opt);
+        }
+    }
+    if(birthYear && !birthYear.dataset.filled){
+        birthYear.dataset.filled = '1';
+        const nowYear = new Date().getFullYear();
+        for(let y = nowYear - 7; y >= nowYear - 100; y--){
+            const opt = document.createElement('option');
+            opt.value = String(y);
+            opt.textContent = String(y);
+            birthYear.appendChild(opt);
+        }
+    }
     if(openRegisterBtn && !openRegisterBtn.dataset.bound){
         openRegisterBtn.dataset.bound='1';
         openRegisterBtn.addEventListener('click', () => { if(registerModal) registerModal.classList.remove('hidden'); });
@@ -14895,10 +15005,11 @@ function initAuthScreen(){
     const loginPassword = document.getElementById('login-password');
     const registerEmail = document.getElementById('register-email');
     const registerPassword = document.getElementById('register-password');
+    const registerNickname = document.getElementById('register-nickname');
+    const registerCountry = document.getElementById('register-country');
     const verifyCode = document.getElementById('verify-code');
     if(loginBtn && !loginBtn.dataset.bound){ loginBtn.dataset.bound='1'; loginBtn.addEventListener('click', loginLocalAccount); }
     if(registerBtn && !registerBtn.dataset.bound){ registerBtn.dataset.bound='1'; registerBtn.addEventListener('click', registerLocalAccount); }
-    if(guestBtn && !guestBtn.dataset.bound){ guestBtn.dataset.bound='1'; guestBtn.addEventListener('click', openGameAsGuest); }
     if(forgotBtn && !forgotBtn.dataset.bound){ forgotBtn.dataset.bound='1'; forgotBtn.addEventListener('click', showForgotPassword); }
     if(verifyBtn && !verifyBtn.dataset.bound){ verifyBtn.dataset.bound='1'; verifyBtn.addEventListener('click', confirmEmailCode); }
     [loginEmail, loginPassword].forEach((el) => {
@@ -14907,7 +15018,7 @@ function initAuthScreen(){
             el.addEventListener('keydown', (e) => { if(e.key === 'Enter') loginLocalAccount(); });
         }
     });
-    [registerEmail, registerPassword].forEach((el) => {
+    [registerNickname, registerEmail, registerPassword, registerCountry, birthDay, birthYear].forEach((el) => {
         if(el && !el.dataset.enterBound){
             el.dataset.enterBound='1';
             el.addEventListener('keydown', (e) => { if(e.key === 'Enter') registerLocalAccount(); });
