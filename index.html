@@ -6911,6 +6911,27 @@ body:not(.cosmic-auth-passed) #premium-bar{
 }
 </style>
 
+
+<style id="v400-battle-visibility-fix">
+body.cosmic-auth-passed.cosmic-in-battle #lobby-screen,
+body.cosmic-auth-passed.cosmic-in-battle #top-nav,
+body.cosmic-auth-passed.cosmic-in-battle #premium-bar{
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+body.cosmic-auth-passed.cosmic-in-battle canvas,
+body.cosmic-auth-passed.cosmic-in-battle #battle-screen{
+  display:block !important;
+  visibility:visible !important;
+}
+body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
+  display:flex !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+}
+</style>
+
 </head>
 
 <body>
