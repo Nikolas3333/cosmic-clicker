@@ -4925,6 +4925,20 @@ function tryPremiumDrop() {
 
 
 
+
+// ===== V398 LOGOUT BUTTON FALLBACK =====
+document.addEventListener('click', (event) => {
+    try{
+        const logoutBtn = event.target?.closest?.('#premium-logout-btn');
+        if(!logoutBtn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        logoutToAuth('Выход выполнен. Теперь можно сменить аккаунт или сервер.');
+    }catch(err){
+        console.warn('logout fallback warning:', err?.message || err);
+    }
+}, true);
+
 window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
 initSettingsUI();
@@ -14723,9 +14737,11 @@ function updateNicknameSettingsState(message=''){
 }
 function logoutToAuth(message='Возврат в меню входа.'){
     try{ resetPrivateChatState?.(); }catch(_e){}
-    stopRemotePlayerSync?.();
+    try{ stopRemotePlayerSync?.(); }catch(_e){}
+    try{ window.supabaseClient?.auth?.signOut?.(); }catch(_e){}
     window.playerMuted = false;
     player.isMuted = false;
+
     authState.mode = 'guest';
     authState.email = '';
     authState.password = '';
@@ -14735,10 +14751,34 @@ function logoutToAuth(message='Возврат в меню входа.'){
     authState.pendingVerificationEmail = '';
     authState.pendingVerificationCode = '';
     window.currentRoomId = null;
-    try{ saveGame(); }catch(_e){}
-    resetBattleInputState();
-    applyAuthUIState(message);
-    switchState('AUTH');
+
+    try{ document.body.classList.remove('cosmic-auth-passed'); }catch(_e){}
+    try{ resetBattleInputState?.(); }catch(_e){}
+    try{ applyAuthUIState(message); }catch(_e){}
+
+    try{ switchState('AUTH'); }catch(_e){}
+
+    const authScreen = document.getElementById('auth-screen');
+    const lobby = document.getElementById('lobby-screen');
+    const topNav = document.getElementById('top-nav');
+    const premiumBar = document.getElementById('premium-bar');
+    const battleScreen = document.getElementById('battle-screen');
+    const canvas = document.querySelector('canvas');
+
+    if(authScreen){
+        authScreen.classList.remove('hidden');
+        authScreen.style.setProperty('display', 'flex', 'important');
+        authScreen.style.setProperty('visibility', 'visible', 'important');
+        authScreen.style.setProperty('pointer-events', 'auto', 'important');
+    }
+    if(lobby) lobby.style.setProperty('display', 'none', 'important');
+    if(topNav) topNav.style.setProperty('display', 'none', 'important');
+    if(premiumBar) premiumBar.style.setProperty('display', 'none', 'important');
+    if(battleScreen) battleScreen.style.setProperty('display', 'none', 'important');
+    if(canvas) canvas.style.setProperty('display', 'none', 'important');
+
+    try{ window.gameState = 'AUTH'; }catch(_e){}
+    gameState = 'AUTH';
 }
 function saveNicknameFromSettings(){
     const nicknameInput = document.getElementById('nickname-input');
