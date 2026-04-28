@@ -4840,6 +4840,26 @@ function tryPremiumDrop() {
     }
 }
 
+
+// ===== V388 AUTH CLICK FALLBACK =====
+document.addEventListener('click', (event) => {
+    try{
+        const loginBtn = event.target?.closest?.('#login-btn');
+        if(loginBtn){
+            event.preventDefault();
+            loginLocalAccount();
+            return;
+        }
+        const serverBox = event.target?.closest?.('.auth-server-box');
+        const serverList = document.getElementById('auth-server-list');
+        const serverCurrent = document.getElementById('auth-server-current');
+        if(!serverBox && serverList && !serverList.classList.contains('hidden')){
+            serverList.classList.add('hidden');
+            serverCurrent?.setAttribute?.('aria-expanded', 'false');
+        }
+    }catch(_){}
+}, true);
+
 window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
 initSettingsUI();
@@ -14819,29 +14839,37 @@ function confirmEmailCode(){
     showAuthMessage('Код подтверждения больше не используется. Просто войди в аккаунт.');
 }
 function loginLocalAccount(){
-    const email = document.getElementById('login-email')?.value?.trim() || '';
+    const email = document.getElementById('login-email')?.value?.trim().toLowerCase() || '';
     const password = document.getElementById('login-password')?.value || '';
     const remember = document.getElementById('remember-password');
+    const loginBtn = document.getElementById('login-btn');
 
     if(!email || !password){
         showAuthMessage('Введите email и пароль.');
         return;
     }
 
+    if(loginBtn){
+        loginBtn.disabled = true;
+        loginBtn.dataset.oldText = loginBtn.textContent || 'Войти';
+        loginBtn.textContent = 'Вход...';
+    }
     showAuthMessage('Вход...');
+
     (async () => {
         try{
             if(!window.supabaseClient){
                 showAuthMessage('Ошибка входа: сервер авторизации не готов.');
                 return;
             }
+
             const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
             if(error){
                 showAuthMessage('Ошибка входа: ' + error.message);
                 return;
             }
 
-            const user = data?.user;
+            const user = data?.user || null;
             authState.mode = 'account';
             authState.email = email;
             authState.password = password;
@@ -14856,18 +14884,24 @@ function loginLocalAccount(){
                 pendingProfile = JSON.parse(localStorage.getItem(`cosmicPendingProfile:${email}`) || '{}') || {};
                 if(pendingProfile.nickname) nickname = String(pendingProfile.nickname || '').trim().slice(0, 20) || nickname;
             }catch(_){}
+
             let playerRow = null;
 
-            const existingRes = await window.supabaseClient
-                .from('players')
-                .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
-                .eq('auth_id', user?.id || '')
-                .maybeSingle();
+            try{
+                const existingRes = await window.supabaseClient
+                    .from('players')
+                    .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                    .eq('auth_id', user?.id || '')
+                    .maybeSingle();
 
-            if(existingRes.error){
-                console.warn('Ошибка чтения players:', existingRes.error.message);
+                if(existingRes?.error){
+                    console.warn('Ошибка чтения players по auth_id:', existingRes.error.message);
+                }else{
+                    playerRow = existingRes?.data || null;
+                }
+            }catch(readAuthErr){
+                console.warn('players auth_id read warning:', readAuthErr?.message || readAuthErr);
             }
-            playerRow = existingRes.data || null;
 
             if(!playerRow){
                 try{
@@ -14876,54 +14910,64 @@ function loginLocalAccount(){
                         .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
                         .eq('email', email)
                         .maybeSingle();
-                    if(!emailRes.error && emailRes.data){
+
+                    if(emailRes?.error){
+                        console.warn('Ошибка чтения players по email:', emailRes.error.message);
+                    }else if(emailRes?.data){
                         playerRow = emailRes.data;
                         if(!playerRow.auth_id && user?.id){
                             try{ await window.supabaseClient.from('players').update({ auth_id: user.id }).eq('public_id', playerRow.public_id); }catch(_){}
                         }
                     }
-                }catch(_){}
+                }catch(readEmailErr){
+                    console.warn('players email read warning:', readEmailErr?.message || readEmailErr);
+                }
             }
 
             if(!playerRow){
-                const insertRes = await window.supabaseClient
-                    .from('players')
-                    .insert({
-                        auth_id: user?.id,
-                        email,
-                        nickname,
-                        level: player.level || 1,
-                        experience: Number(player.experience || 0),
-                        credits: Number(playerResources.coins || player.credits || 500),
-                        mercury_ore: Number(playerResources.mercury_ore || 0),
-                        venus_gas: Number(playerResources.venus_gas || 0),
-                        earth_water: Number(playerResources.earth_water || 0),
-                        mars_crystal: Number(playerResources.mars_crystal || 0),
-                        jupiter_hydrogen: Number(playerResources.jupiter_hydrogen || 0),
-                        saturn_ice: Number(playerResources.saturn_ice || 0),
-                        uranus_ammonia: Number(playerResources.uranus_ammonia || 0),
-                        neptune_methane: Number(playerResources.neptune_methane || 0),
-                        solar_energy: Number(playerResources.solar_energy || 0),
-                        crystals: Number(playerResources.crystals || 0),
-                        created_at: new Date().toISOString()
-                    })
-                    .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
-                    .single();
+                try{
+                    const insertRes = await window.supabaseClient
+                        .from('players')
+                        .insert({
+                            auth_id: user?.id,
+                            email,
+                            nickname,
+                            level: player.level || 1,
+                            experience: Number(player.experience || 0),
+                            credits: Number(playerResources?.coins || player.credits || 500),
+                            mercury_ore: Number(playerResources?.mercury_ore || 0),
+                            venus_gas: Number(playerResources?.venus_gas || 0),
+                            earth_water: Number(playerResources?.earth_water || 0),
+                            mars_crystal: Number(playerResources?.mars_crystal || 0),
+                            jupiter_hydrogen: Number(playerResources?.jupiter_hydrogen || 0),
+                            saturn_ice: Number(playerResources?.saturn_ice || 0),
+                            uranus_ammonia: Number(playerResources?.uranus_ammonia || 0),
+                            neptune_methane: Number(playerResources?.neptune_methane || 0),
+                            solar_energy: Number(playerResources?.solar_energy || 0),
+                            crystals: Number(playerResources?.crystals || 0),
+                            created_at: new Date().toISOString()
+                        })
+                        .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                        .single();
 
-                if(insertRes.error){
-                    console.warn('Ошибка создания players при входе:', insertRes.error.message);
-                }else{
-                    playerRow = insertRes.data;
+                    if(insertRes?.error){
+                        console.warn('Ошибка создания players при входе:', insertRes.error.message);
+                    }else{
+                        playerRow = insertRes?.data || null;
+                    }
+                }catch(insertErr){
+                    console.warn('players insert warning:', insertErr?.message || insertErr);
                 }
             }
 
             authState.playerId = Number(playerRow?.public_id) || 0;
-            player.id = authState.playerId || user?.id || 'local_player';
+            player.id = authState.playerId || user?.id || email || 'local_player';
             player.nickname = playerRow?.nickname || nickname;
             player.level = Number(playerRow?.level || player.level || 1);
             player.experience = Number(playerRow?.experience || player.experience || 0);
             player.credits = Number(playerRow?.credits || player.credits || 500);
-            applyPlayerIdentityRow(playerRow || { public_id: authState.playerId, staff_role: 'player' });
+
+            try{ applyPlayerIdentityRow(playerRow || { public_id: authState.playerId, staff_role: 'player' }); }catch(identityErr){ console.warn('identity warning:', identityErr?.message || identityErr); }
 
             if(remember?.checked){
                 localStorage.setItem('cosmicRememberedEmail', email);
@@ -14933,21 +14977,30 @@ function loginLocalAccount(){
                 localStorage.removeItem('cosmicRememberedPassword');
             }
 
-            resetPlayerProgress();
+            try{ resetPlayerProgress(); }catch(resetErr){ console.warn('reset warning:', resetErr?.message || resetErr); }
             try{ await loadGame(); }catch(loadErr){ console.warn('loadGame auth warning:', loadErr?.message || loadErr); }
             try{ await loadPlayerResourcesFromSupabase(); }catch(resErr){ console.warn('loadPlayerResources auth warning:', resErr?.message || resErr); }
             try{ startRemotePlayerSync(); }catch(syncErr){ console.warn('remote sync auth warning:', syncErr?.message || syncErr); }
+
             window.currentRoomId = null;
-            updateNicknameSettingsState();
-            updatePremiumAccountInfo();
-            renderProfileStats?.();
-            clearBattleKillFeed?.();
-                    clearBattleBotNameLabels?.();
-    switchState('LOBBY');
-            saveGame();
+            try{ updateNicknameSettingsState(); }catch(_){}
+            try{ updatePremiumAccountInfo(); }catch(_){}
+            try{ renderProfileStats?.(); }catch(_){}
+            try{ clearBattleKillFeed?.(); }catch(_){}
+            try{ clearBattleBotNameLabels?.(); }catch(_){}
+
+            switchState('LOBBY');
+
+            try{ saveGame(); }catch(saveErr){ console.warn('save warning:', saveErr?.message || saveErr); }
             try{ localStorage.removeItem(`cosmicPendingProfile:${email}`); }catch(_){}
+            showAuthMessage('');
         }catch(err){
             showAuthMessage('Ошибка входа: ' + (err?.message || err));
+        }finally{
+            if(loginBtn){
+                loginBtn.disabled = false;
+                loginBtn.textContent = loginBtn.dataset.oldText || 'Войти';
+            }
         }
     })();
 }
@@ -15005,7 +15058,12 @@ function initAuthScreen(){
     }
     if(serverCurrent && serverList && !serverCurrent.dataset.bound){
         serverCurrent.dataset.bound='1';
-        serverCurrent.addEventListener('click', () => serverList.classList.toggle('hidden'));
+        serverCurrent.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            serverList.classList.toggle('hidden');
+            serverCurrent.setAttribute('aria-expanded', serverList.classList.contains('hidden') ? 'false' : 'true');
+        });
         serverList.querySelectorAll('.auth-server-option').forEach(btn => {
             btn.addEventListener('click', () => {
                 serverList.querySelectorAll('.auth-server-option').forEach(b => b.classList.remove('active'));
@@ -15022,6 +15080,7 @@ function initAuthScreen(){
                 arrow.textContent = '⌄';
                 serverCurrent.appendChild(arrow);
                 serverList.classList.add('hidden');
+                serverCurrent.setAttribute('aria-expanded', 'false');
             });
         });
     }
@@ -15035,9 +15094,14 @@ function initAuthScreen(){
     const verifyCode = document.getElementById('verify-code');
     if(loginBtn && !loginBtn.dataset.bound){
         loginBtn.dataset.bound='1';
-        loginBtn.addEventListener('click', (e) => { e.preventDefault(); loginLocalAccount(); });
-        loginBtn.addEventListener('pointerup', (e) => { if(e.pointerType !== 'mouse') return; e.preventDefault(); loginLocalAccount(); });
-        loginBtn.onclick = (e) => { e.preventDefault(); loginLocalAccount(); };
+        loginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginLocalAccount();
+        });
+        loginBtn.onclick = (e) => {
+            e.preventDefault();
+            loginLocalAccount();
+        };
     }
     if(registerBtn && !registerBtn.dataset.bound){ registerBtn.dataset.bound='1'; registerBtn.addEventListener('click', registerLocalAccount); }
     if(forgotBtn && !forgotBtn.dataset.bound){ forgotBtn.dataset.bound='1'; forgotBtn.addEventListener('click', showForgotPassword); }
