@@ -454,6 +454,33 @@ function showAuthMessage(text){
     if(authMessage) authMessage.textContent = text || '';
 }
 
+function forceOpenLobbyAfterAuth(email = ''){
+    try{
+        authState.mode = 'account';
+        authState.email = String(email || authState.email || '').trim().toLowerCase();
+        authState.isAuthenticated = true;
+        authState.emailVerified = true;
+        authState.playerId = authState.playerId || player?.id || 0;
+        const mailNick = authState.email ? authState.email.split('@')[0] : '';
+        if(!player.nickname || player.nickname === 'Commander' || player.nickname === 'Guest Pilot'){
+            player.nickname = mailNick || 'Pilot';
+        }
+        window.currentRoomId = null;
+        try{ clearBattleKillFeed?.(); }catch(_){}
+        try{ clearBattleBotNameLabels?.(); }catch(_){}
+        try{ updateNicknameSettingsState?.(); }catch(_){}
+        try{ updatePremiumAccountInfo?.(); }catch(_){}
+        try{ renderProfileStats?.(); }catch(_){}
+        try{ saveGame?.(); }catch(_){}
+        switchState('LOBBY');
+        return true;
+    }catch(err){
+        console.error('forceOpenLobbyAfterAuth failed:', err);
+        return false;
+    }
+}
+
+
 const battleWeapon = {
     clipSize: 50,
     ammoInClip: 50,
@@ -14870,6 +14897,15 @@ function loginLocalAccount(){
             }
 
             const user = data?.user || null;
+            // V389: авторизация уже прошла успешно — сразу пускаем в лобби.
+            // Дальнейшая загрузка профиля/ресурсов больше не должна блокировать вход.
+            forceOpenLobbyAfterAuth(email);
+            try{
+                if(loginBtn){
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = loginBtn.dataset.oldText || 'Войти';
+                }
+            }catch(_){}
             authState.mode = 'account';
             authState.email = email;
             authState.password = password;
