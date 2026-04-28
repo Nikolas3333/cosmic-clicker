@@ -6799,6 +6799,41 @@ html body #battle-bot-name-label{ display:none !important; }
 }
 </style>
 
+
+<style id="v388-auth-dropdown-overlay-fix">
+#auth-screen .auth-server-box.auth-server-inline{
+  position:relative !important;
+  z-index:500 !important;
+  overflow:visible !important;
+}
+#auth-screen .auth-login-form,
+#auth-screen .cosmic-login-card,
+#auth-screen .auth-card{
+  overflow:visible !important;
+}
+#auth-screen #auth-server-list{
+  position:absolute !important;
+  left:0 !important;
+  right:0 !important;
+  top:calc(100% + 4px) !important;
+  z-index:999999 !important;
+  max-height:none !important;
+  overflow:visible !important;
+  pointer-events:auto !important;
+}
+#auth-screen #auth-server-list:not(.hidden){
+  display:block !important;
+}
+#auth-screen .auth-server-option{
+  position:relative !important;
+  z-index:999999 !important;
+}
+#auth-screen #login-btn{
+  position:relative !important;
+  z-index:1 !important;
+}
+</style>
+
 </head>
 
 <body>
@@ -6851,7 +6886,7 @@ html body #battle-bot-name-label{ display:none !important; }
         <button class="auth-server-option" type="button" data-server="RU"><span class="server-dot ru"></span>5. RU (23 / 1000)</button>
       </div>
     </div>
-        <button id="login-btn" class="auth-btn primary auth-main-login" type="button" onclick="window.cosmicLoginNow && window.cosmicLoginNow()">Войти</button>
+        <button id="login-btn" class="auth-btn primary auth-main-login" type="button">Войти</button>
         <div class="auth-divider"><span></span><b>или</b><span></span></div>
         <button id="open-register" class="auth-btn auth-create-btn" type="button">Создать аккаунт</button>
         <div id="auth-message" class="auth-message"></div>
