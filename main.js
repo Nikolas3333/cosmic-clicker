@@ -1158,7 +1158,7 @@ function initBattleHudControls(){
         fsBtn.addEventListener('click', async () => {
             try{
                 if(document.fullscreenElement){
-                    Promise.resolve().then(()=>document.exitFullscreen();
+                    await document.exitFullscreen();
                 }else{
                     await document.documentElement.requestFullscreen?.();
                 }
@@ -10339,7 +10339,7 @@ function initBattleUI(){
     const scoreboard = document.getElementById('battle-scoreboard');
 
     const leaveMap = async () => {
-        Promise.resolve().then(()=>forceLeaveBattleToLobby();
+        forceLeaveBattleToLobby();
         if(typeof renderRoomsInLobby === 'function'){
             await renderRoomsInLobby(true);
         }
@@ -16878,7 +16878,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
                 selectedLobbyMap = null;
                 currentRoom = null;
                 if(typeof renderRoomsInLobby === 'function'){
-                    Promise.resolve().then(()=>renderRoomsInLobby(true);
+                    renderRoomsInLobby(true);
                 }else{
                     renderLobbyListV27('battle');
                 }
@@ -17670,7 +17670,7 @@ function startLiveRoomsRefresh(){
   liveRoomsRefreshTimer = setInterval(async () => {
     if(gameState !== 'LOBBY') return;
     try{
-      Promise.resolve().then(()=>loadRoomsFromSupabase();
+      loadRoomsFromSupabase();
       if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
         const selectedId = selectedLobbyMap?.id || currentRoom?.id || null;
         renderLobbyListV27('battle');
