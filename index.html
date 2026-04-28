@@ -6558,6 +6558,205 @@ html body #battle-bot-name-label{ display:none !important; }
 @media (max-width:1100px){.auth-server-box{right:20px; top:20px;}.cosmic-login-card{margin-top:50px;}}
 
 </style>
+
+<style id="v386-auth-final-override">
+#auth-screen{
+  position:fixed !important;
+  inset:0 !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0,180,255,0.10), transparent 26%),
+    radial-gradient(circle at 85% 68%, rgba(0,110,255,0.13), transparent 32%),
+    linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.72)),
+    url("images/lobby_space_1.png") center/cover no-repeat !important;
+  z-index:25000 !important;
+  overflow:hidden !important;
+}
+#auth-screen::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.18);
+  backdrop-filter:blur(1.5px);
+  pointer-events:none;
+}
+.auth-stage{
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap:36px;
+  width:min(980px,96vw);
+}
+.cosmic-login-card{
+  position:relative !important;
+  width:355px !important;
+  max-width:92vw !important;
+  padding:30px 32px 32px !important;
+  border-radius:2px !important;
+  background:rgba(8,10,14,0.72) !important;
+  border:1px solid rgba(0,180,255,0.32) !important;
+  box-shadow:0 0 22px rgba(0,170,255,0.26), inset 0 0 34px rgba(0,0,0,0.55) !important;
+  text-align:left !important;
+}
+.cosmic-login-logo{
+  text-align:center;
+  font-size:42px;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:8px;
+  color:#f5f8ff;
+  text-shadow:0 2px 0 #777, 0 0 16px rgba(0,220,255,0.45);
+}
+.cosmic-login-sublogo{
+  text-align:center;
+  margin:8px 0 18px;
+  color:#00d8ff;
+  letter-spacing:12px;
+  font-size:17px;
+  text-shadow:0 0 12px rgba(0,210,255,0.75);
+}
+.cosmic-login-card .auth-subtitle{
+  margin:0 0 26px !important;
+  text-align:center !important;
+  color:#cfd8e8 !important;
+  font-size:16px !important;
+  line-height:1.35 !important;
+  opacity:.92 !important;
+}
+.auth-login-form{display:flex; flex-direction:column; gap:12px;}
+.auth-input-wrap{
+  height:42px;
+  display:flex;
+  align-items:center;
+  background:rgba(5,8,14,0.78);
+  border:1px solid rgba(96,125,160,0.55);
+  box-shadow:inset 0 0 18px rgba(0,0,0,0.55);
+}
+.auth-input-icon{
+  width:44px;
+  text-align:center;
+  color:#9aaac5;
+  font-size:20px;
+  opacity:.95;
+  flex:0 0 44px;
+}
+.auth-input-wrap input,
+.auth-input-wrap select{
+  flex:1;
+  height:100%;
+  min-width:0;
+  padding:0 12px 0 0 !important;
+  border:0 !important;
+  outline:none !important;
+  background:transparent !important;
+  color:#fff !important;
+  font-size:16px !important;
+  font-weight:700;
+}
+.auth-input-wrap select option,
+.register-birthday-row select option{background:#06101d; color:#fff;}
+.auth-row{display:flex; align-items:center; justify-content:space-between; margin:4px 0;}
+.auth-check{color:#d6d6d6 !important; font-size:14px !important;}
+.auth-check input{accent-color:#1aa9ff;}
+.auth-link-btn{background:transparent; border:0; color:#00cfff; cursor:pointer; font-size:14px; padding:0;}
+.auth-link-btn:hover{text-decoration:underline;}
+.auth-btn{border-radius:0 !important; min-height:44px !important; font-size:16px !important; font-weight:700 !important;}
+.auth-main-login{
+  background:linear-gradient(180deg,#20d2ff,#087aa8) !important;
+  border:1px solid #27dbff !important;
+  box-shadow:0 0 14px rgba(0,204,255,0.36), inset 0 1px rgba(255,255,255,0.25) !important;
+}
+.auth-create-btn{
+  background:rgba(0,0,0,0.52) !important;
+  border:1px solid #00d8ff !important;
+  color:#00d8ff !important;
+  box-shadow:0 0 12px rgba(0,210,255,0.18) !important;
+}
+.auth-divider{display:flex !important; align-items:center; gap:12px; margin:12px 0 4px !important; color:#b9c5d7 !important; font-size:14px;}
+.auth-divider span{height:1px; flex:1; background:rgba(160,180,210,0.32);}
+.auth-message{min-height:18px !important; margin-top:8px !important; color:#ffdf8a !important; text-align:center !important; font-size:13px !important;}
+.auth-server-box{
+  position:relative !important;
+  z-index:3 !important;
+  right:auto !important;
+  top:auto !important;
+  width:238px !important;
+  margin-top:44px !important;
+  color:#d7e6ff !important;
+}
+.auth-server-label{display:block; margin:0 0 6px; color:#ddd; font-size:15px;}
+.auth-server-current,.auth-server-option{
+  width:100%;
+  height:42px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:0 12px;
+  background:rgba(0,0,0,0.72);
+  border:1px solid rgba(0,180,255,0.42);
+  color:#d7e6ff;
+  font-size:16px;
+  cursor:pointer;
+  text-align:left;
+  box-shadow:inset 0 0 16px rgba(0,0,0,0.55);
+}
+.auth-server-current{justify-content:flex-start;}
+.server-arrow{margin-left:auto; color:#ffae00; font-size:28px; line-height:1;}
+.auth-server-list{margin-top:4px; background:rgba(0,0,0,0.86); border:1px solid rgba(0,180,255,0.34); box-shadow:0 0 18px rgba(0,0,0,0.6);}
+.auth-server-list.hidden{display:none !important;}
+.auth-server-option{border:0; border-bottom:1px solid rgba(255,255,255,0.08);}
+.auth-server-option.active{color:#00cfff; background:rgba(0,140,220,0.24);}
+.server-dot{width:13px; height:13px; border-radius:50%; display:inline-block; box-shadow:0 0 8px currentColor; flex:0 0 13px;}
+.server-dot.eu{background:#ffb000; color:#ffb000;}
+.server-dot.na{background:#2dff9d; color:#2dff9d;}
+.server-dot.asia{background:#b064ff; color:#b064ff;}
+.server-dot.sa{background:#ff7777; color:#ff7777;}
+.server-dot.ru{background:#44a7ff; color:#44a7ff;}
+.register-modal{
+  position:absolute;
+  z-index:5;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.58);
+}
+.register-modal.hidden{display:none !important;}
+.register-modal-box{
+  width:380px;
+  max-width:calc(100vw - 24px);
+  position:relative;
+  padding:24px;
+  background:rgba(8,10,14,0.94);
+  border:1px solid rgba(0,210,255,0.45);
+  box-shadow:0 0 28px rgba(0,180,255,0.28);
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.register-modal-box h2{margin:0 0 8px; color:#9fe8ff; text-align:center;}
+.register-close{position:absolute; right:8px; top:8px; background:transparent; border:0; color:#ddd; cursor:pointer; font-size:18px;}
+.register-birthday-row{display:grid; grid-template-columns:1fr 1.25fr 1fr; gap:8px;}
+.register-birthday-row select{
+  height:42px;
+  background:rgba(5,8,14,0.78);
+  border:1px solid rgba(96,125,160,0.55);
+  color:#fff;
+  padding:0 8px;
+  font-size:14px;
+  font-weight:700;
+  outline:none;
+}
+@media (max-width:900px){
+  .auth-stage{flex-direction:column; align-items:center; gap:16px;}
+  .auth-server-box{margin-top:0 !important; width:355px !important; max-width:92vw !important;}
+}
+</style>
+
 </head>
 
 <body>
@@ -6575,36 +6774,47 @@ html body #battle-bot-name-label{ display:none !important; }
 </div>
 
 <div id="auth-screen">
-  <div class="auth-server-box">
-    <label class="auth-server-label">Сервера:</label>
-    <button id="auth-server-current" class="auth-server-current" type="button">
-      <span class="server-dot eu"></span><span>1. EU (29 / 1000)</span><span class="server-arrow">⌄</span>
-    </button>
-    <div id="auth-server-list" class="auth-server-list hidden">
-      <button class="auth-server-option active" type="button" data-server="EU"><span class="server-dot eu"></span>1. EU (29 / 1000)</button>
-      <button class="auth-server-option" type="button" data-server="NA"><span class="server-dot na"></span>2. NA (18 / 1000)</button>
-      <button class="auth-server-option" type="button" data-server="ASIA"><span class="server-dot asia"></span>3. ASIA (11 / 1000)</button>
-      <button class="auth-server-option" type="button" data-server="SA"><span class="server-dot sa"></span>4. SA (7 / 1000)</button>
-      <button class="auth-server-option" type="button" data-server="RU"><span class="server-dot ru"></span>5. RU (23 / 1000)</button>
-    </div>
-  </div>
+  <div class="auth-stage">
+    <div class="auth-card cosmic-login-card">
+      <div class="cosmic-login-logo">COSMIC</div>
+      <div class="cosmic-login-sublogo">CLICKER</div>
+      <div class="auth-subtitle">Войдите в свой аккаунт, чтобы продолжить путешествие по галактике</div>
 
-  <div class="auth-card cosmic-login-card">
-    <div class="cosmic-login-logo">COSMIC</div>
-    <div class="cosmic-login-sublogo">CLICKER</div>
-    <div class="auth-subtitle">Войдите в свой аккаунт, чтобы продолжить путешествие по галактике</div>
-
-    <div class="auth-login-form">
-      <div class="auth-input-wrap"><span class="auth-input-icon">✉</span><input id="login-email" type="email" placeholder="E-mail"></div>
-      <div class="auth-input-wrap"><span class="auth-input-icon">🔒</span><input id="login-password" type="password" placeholder="Пароль"></div>
-      <div class="auth-row">
-        <label class="auth-check"><input id="remember-password" type="checkbox"> <span>Запомнить меня</span></label>
-        <button id="forgot-password-btn" class="auth-link-btn" type="button">Забыли пароль?</button>
+      <div class="auth-login-form">
+        <div class="auth-input-wrap">
+          <span class="auth-input-icon">✉</span>
+          <input id="login-email" name="cosmic-login-email" autocomplete="email" type="email" placeholder="E-mail">
+        </div>
+        <div class="auth-input-wrap">
+          <span class="auth-input-icon">🔒</span>
+          <input id="login-password" name="cosmic-login-password" autocomplete="current-password" type="password" placeholder="Пароль">
+        </div>
+        <div class="auth-row">
+          <label class="auth-check">
+            <input id="remember-password" type="checkbox">
+            <span>Запомнить меня</span>
+          </label>
+          <button id="forgot-password-btn" class="auth-link-btn" type="button">Забыли пароль?</button>
+        </div>
+        <button id="login-btn" class="auth-btn primary auth-main-login" type="button">Войти</button>
+        <div class="auth-divider"><span></span><b>или</b><span></span></div>
+        <button id="open-register" class="auth-btn auth-create-btn" type="button">Создать аккаунт</button>
+        <div id="auth-message" class="auth-message"></div>
       </div>
-      <button id="login-btn" class="auth-btn primary auth-main-login" type="button">Войти</button>
-      <div class="auth-divider"><span></span><b>или</b><span></span></div>
-      <button id="open-register" class="auth-btn auth-create-btn" type="button">Создать аккаунт</button>
-      <div id="auth-message" class="auth-message"></div>
+    </div>
+
+    <div class="auth-server-box">
+      <label class="auth-server-label">Сервера:</label>
+      <button id="auth-server-current" class="auth-server-current" type="button" aria-haspopup="listbox" aria-expanded="false">
+        <span class="server-dot eu"></span><span>1. EU (29 / 1000)</span><span class="server-arrow">⌄</span>
+      </button>
+      <div id="auth-server-list" class="auth-server-list hidden" role="listbox">
+        <button class="auth-server-option active" type="button" data-server="EU"><span class="server-dot eu"></span>1. EU (29 / 1000)</button>
+        <button class="auth-server-option" type="button" data-server="NA"><span class="server-dot na"></span>2. NA (18 / 1000)</button>
+        <button class="auth-server-option" type="button" data-server="ASIA"><span class="server-dot asia"></span>3. ASIA (11 / 1000)</button>
+        <button class="auth-server-option" type="button" data-server="SA"><span class="server-dot sa"></span>4. SA (7 / 1000)</button>
+        <button class="auth-server-option" type="button" data-server="RU"><span class="server-dot ru"></span>5. RU (23 / 1000)</button>
+      </div>
     </div>
   </div>
 
@@ -6612,25 +6822,62 @@ html body #battle-bot-name-label{ display:none !important; }
     <div class="register-modal-box">
       <button id="close-register-modal" class="register-close" type="button">✕</button>
       <h2>Регистрация</h2>
-      <div class="auth-input-wrap"><span class="auth-input-icon">✉</span><input id="register-email" type="email" placeholder="E-mail"></div>
-      <div class="auth-input-wrap"><span class="auth-input-icon">🔒</span><input id="register-password" type="password" placeholder="Пароль"></div>
-      <button id="register-btn" class="auth-btn primary auth-main-login" type="button">Зарегистрироваться</button>
-      <div class="auth-note">После регистрации выполни вход через E-mail и пароль.</div>
-    </div>
-  </div>
-</div>
-<div class="auth-panel">
-        <h2>Регистрация</h2>
-        <input id="register-email" type="email" placeholder="Email">
-        <input id="register-password" type="password" placeholder="Пароль">
-        <button id="register-btn" class="auth-btn primary">Зарегистрироваться</button>
-        <div class="auth-note">После регистрации выполни обычный вход через Email и пароль.</div>
-        <div class="auth-divider">или</div>
-        <button id="guest-login-btn" class="auth-btn guest"></button>
-        <div class="auth-note">У гостя прогресс не сохраняется.</div>
+
+      <div class="auth-input-wrap">
+        <span class="auth-input-icon">👤</span>
+        <input id="register-nickname" name="cosmic-register-nickname" autocomplete="nickname" type="text" maxlength="20" placeholder="Ник">
       </div>
+
+      <div class="auth-input-wrap">
+        <span class="auth-input-icon">✉</span>
+        <input id="register-email" name="cosmic-register-email" autocomplete="email" type="email" placeholder="E-mail">
+      </div>
+
+      <div class="auth-input-wrap">
+        <span class="auth-input-icon">🔒</span>
+        <input id="register-password" name="cosmic-register-password" autocomplete="new-password" type="password" placeholder="Пароль">
+      </div>
+
+      <div class="auth-input-wrap">
+        <span class="auth-input-icon">🌍</span>
+        <select id="register-country" name="cosmic-register-country">
+          <option value="">Страна</option>
+          <option value="Moldova">Молдова</option>
+          <option value="Romania">Румыния</option>
+          <option value="Ukraine">Украина</option>
+          <option value="Russia">Россия</option>
+          <option value="Belarus">Беларусь</option>
+          <option value="Other">Другая</option>
+        </select>
+      </div>
+
+      <div class="register-birthday-row">
+        <select id="register-birth-day" name="cosmic-register-birth-day">
+          <option value="">День</option>
+        </select>
+        <select id="register-birth-month" name="cosmic-register-birth-month">
+          <option value="">Месяц</option>
+          <option value="01">Январь</option>
+          <option value="02">Февраль</option>
+          <option value="03">Март</option>
+          <option value="04">Апрель</option>
+          <option value="05">Май</option>
+          <option value="06">Июнь</option>
+          <option value="07">Июль</option>
+          <option value="08">Август</option>
+          <option value="09">Сентябрь</option>
+          <option value="10">Октябрь</option>
+          <option value="11">Ноябрь</option>
+          <option value="12">Декабрь</option>
+        </select>
+        <select id="register-birth-year" name="cosmic-register-birth-year">
+          <option value="">Год</option>
+        </select>
+      </div>
+
+      <button id="register-btn" class="auth-btn primary auth-main-login" type="button">Зарегистрироваться</button>
+      <div id="register-message" class="auth-message"></div>
     </div>
-    <div id="auth-message" class="auth-message"></div>
   </div>
 </div>
 
