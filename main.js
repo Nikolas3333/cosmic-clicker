@@ -14841,16 +14841,56 @@ function loginLocalAccount(){
 function showForgotPassword(){
     const email = document.getElementById('login-email')?.value?.trim() || '';
     if(!email){ showAuthMessage('Сначала введи email, затем нажми «Забыли пароль?»'); return; }
-    showAuthMessage(`Для ${email} используй восстановление пароля через Supabase Dashboard или настрой SMTP позже.`);
+    showAuthMessage(`Восстановление пароля для ${email} будет доступно позже.`);
 }
 function initAuthScreen(){
     ensureDeveloperAccount();
-    applyAuthUIState('Вход и регистрация работают через Supabase.');
+    applyAuthUIState('');
     const loginBtn = document.getElementById('login-btn');
     const registerBtn = document.getElementById('register-btn');
     const guestBtn = document.getElementById('guest-login-btn');
     const forgotBtn = document.getElementById('forgot-password-btn');
     const verifyBtn = document.getElementById('verify-email-btn');
+    const openRegisterBtn = document.getElementById('open-register');
+    const registerModal = document.getElementById('register-modal');
+    const closeRegisterBtn = document.getElementById('close-register-modal');
+    const serverCurrent = document.getElementById('auth-server-current');
+    const serverList = document.getElementById('auth-server-list');
+    if(openRegisterBtn && !openRegisterBtn.dataset.bound){
+        openRegisterBtn.dataset.bound='1';
+        openRegisterBtn.addEventListener('click', () => { if(registerModal) registerModal.classList.remove('hidden'); });
+    }
+    if(closeRegisterBtn && !closeRegisterBtn.dataset.bound){
+        closeRegisterBtn.dataset.bound='1';
+        closeRegisterBtn.addEventListener('click', () => { if(registerModal) registerModal.classList.add('hidden'); });
+    }
+    if(registerModal && !registerModal.dataset.bound){
+        registerModal.dataset.bound='1';
+        registerModal.addEventListener('click', (e) => { if(e.target === registerModal) registerModal.classList.add('hidden'); });
+    }
+    if(serverCurrent && serverList && !serverCurrent.dataset.bound){
+        serverCurrent.dataset.bound='1';
+        serverCurrent.addEventListener('click', () => serverList.classList.toggle('hidden'));
+        serverList.querySelectorAll('.auth-server-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                serverList.querySelectorAll('.auth-server-option').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const dot = btn.querySelector('.server-dot')?.cloneNode(true);
+                const text = btn.textContent.trim();
+                serverCurrent.innerHTML = '';
+                if(dot) serverCurrent.appendChild(dot);
+                const span = document.createElement('span');
+                span.textContent = text;
+                serverCurrent.appendChild(span);
+                const arrow = document.createElement('span');
+                arrow.className = 'server-arrow';
+                arrow.textContent = '⌄';
+                serverCurrent.appendChild(arrow);
+                serverList.classList.add('hidden');
+            });
+        });
+    }
+
     const loginEmail = document.getElementById('login-email');
     const loginPassword = document.getElementById('login-password');
     const registerEmail = document.getElementById('register-email');
