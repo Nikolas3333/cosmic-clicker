@@ -9,7 +9,7 @@ import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders
 // ===============================
 
 let player = {
-  id: "local_player",
+  id: 0,
   nickname: "Commander",
   level: 1,
   experience: 0,
@@ -460,11 +460,12 @@ function forceOpenLobbyAfterAuth(email = ''){
         authState.email = String(email || authState.email || '').trim().toLowerCase();
         authState.isAuthenticated = true;
         authState.emailVerified = true;
-        authState.playerId = authState.playerId || player?.id || 0;
+        authState.playerId = getSafePlayerPublicId();
         const mailNick = authState.email ? authState.email.split('@')[0] : '';
         if(!player.nickname || player.nickname === 'Commander' || player.nickname === 'Guest Pilot'){
             player.nickname = mailNick || 'Pilot';
         }
+        player.id = getSafePlayerPublicId() || 0;
         window.currentRoomId = null;
         try{ clearBattleKillFeed?.(); }catch(_){}
         try{ clearBattleBotNameLabels?.(); }catch(_){}
@@ -3613,13 +3614,22 @@ function applySaveData(save){
     updateUI?.();
 }
 
-async function loadRemoteSaveFromSupabase(){
-    if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return null;
+async 
+function getSafePlayerPublicId(){
+    const raw = authState?.playerId;
+    const num = Number(raw);
+    if(Number.isFinite(num) && num > 0) return Math.floor(num);
+    return 0;
+}
+
+function loadRemoteSaveFromSupabase(){
+    const safePublicId = getSafePlayerPublicId();
+    if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !safePublicId) return null;
     try{
         const { data, error } = await window.supabaseClient
             .from('player_saves')
             .select('save_data')
-            .eq('player_public_id', authState.playerId)
+            .eq('player_public_id', safePublicId)
             .maybeSingle();
         if(error){
             console.warn('Не удалось загрузить remote save:', error.message);
@@ -3685,11 +3695,12 @@ function buildSavePayload(){
 }
 
 async function saveRemoteProgress(){
-    if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !authState.playerId) return;
+    const safePublicId = getSafePlayerPublicId();
+    if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !safePublicId) return;
     markLocalResourceDirty(6000);
     const payload = buildSavePayload();
     try{
-        const safePublicId = toSafeWholeNumber(authState.playerId, 0);
+        /* safePublicId already prepared */
         const { error: playerUpdateError } = await window.supabaseClient.from('players').update({
             nickname: player.nickname,
             level: toSafeWholeNumber(player.level, 1),
@@ -3712,7 +3723,7 @@ async function saveRemoteProgress(){
         }
 
         const { error } = await window.supabaseClient.from('player_saves').upsert({
-            player_public_id: toSafeWholeNumber(authState.playerId, 0),
+            player_public_id: safePublicId,
             save_data: payload,
             updated_at: new Date().toISOString()
         }, { onConflict: 'player_public_id' });
@@ -4881,24 +4892,6 @@ function tryPremiumDrop() {
 }
 
 
-// ===== V388 AUTH CLICK FALLBACK =====
-document.addEventListener('click', (event) => {
-    try{
-        const loginBtn = event.target?.closest?.('#login-btn');
-        if(loginBtn){
-            event.preventDefault();
-            loginLocalAccount();
-            return;
-        }
-        const serverBox = event.target?.closest?.('.auth-server-box');
-        const serverList = document.getElementById('auth-server-list');
-        const serverCurrent = document.getElementById('auth-server-current');
-        if(!serverBox && serverList && !serverList.classList.contains('hidden')){
-            serverList.classList.add('hidden');
-            serverCurrent?.setAttribute?.('aria-expanded', 'false');
-        }
-    }catch(_){}
-}, true);
 
 window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
@@ -14879,12 +14872,15 @@ function confirmEmailCode(){
     showAuthMessage('Код подтверждения больше не используется. Просто войди в аккаунт.');
 }
 function loginLocalAccount(){
+    if(window.__cosmicLoginInProgress) return;
+    window.__cosmicLoginInProgress = true;
     const email = document.getElementById('login-email')?.value?.trim().toLowerCase() || '';
     const password = document.getElementById('login-password')?.value || '';
     const remember = document.getElementById('remember-password');
     const loginBtn = document.getElementById('login-btn');
 
     if(!email || !password){
+        window.__cosmicLoginInProgress = false;
         showAuthMessage('Введите email и пароль.');
         return;
     }
@@ -15020,7 +15016,7 @@ function loginLocalAccount(){
             }
 
             authState.playerId = Number(playerRow?.public_id) || 0;
-            player.id = authState.playerId || user?.id || email || 'local_player';
+            player.id = authState.playerId || 0;
             player.nickname = playerRow?.nickname || nickname;
             player.level = Number(playerRow?.level || player.level || 1);
             player.experience = Number(playerRow?.experience || player.experience || 0);
@@ -15056,6 +15052,7 @@ function loginLocalAccount(){
         }catch(err){
             console.warn('Фоновая авторизация завершилась предупреждением:', err?.message || err);
         }finally{
+            window.__cosmicLoginInProgress = false;
             if(loginBtn){
                 loginBtn.disabled = false;
                 loginBtn.textContent = loginBtn.dataset.oldText || 'Войти';
@@ -15157,10 +15154,6 @@ function initAuthScreen(){
             e.preventDefault();
             loginLocalAccount();
         });
-        loginBtn.onclick = (e) => {
-            e.preventDefault();
-            loginLocalAccount();
-        };
     }
     if(registerBtn && !registerBtn.dataset.bound){ registerBtn.dataset.bound='1'; registerBtn.addEventListener('click', registerLocalAccount); }
     if(forgotBtn && !forgotBtn.dataset.bound){ forgotBtn.dataset.bound='1'; forgotBtn.addEventListener('click', showForgotPassword); }
