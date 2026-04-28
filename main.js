@@ -471,7 +471,7 @@ function forceOpenLobbyAfterAuth(email = ''){
         player.id = safeId || 0;
         window.currentRoomId = null;
 
-        try{ document.body.classList.add('cosmic-auth-passed'); }catch(_){}
+        try{ document.body.classList.add('cosmic-auth-passed'); document.body.classList.add('cosmic-in-lobby'); document.body.classList.remove('cosmic-in-battle','cosmic-in-auth'); }catch(_){}
         try{ clearBattleKillFeed?.(); }catch(_){}
         try{ clearBattleBotNameLabels?.(); }catch(_){}
         try{ updateNicknameSettingsState?.(); }catch(_){}
@@ -2121,6 +2121,11 @@ async function switchState(newState){
 
     gameState = newState;
     try{ window.gameState = newState; }catch(_){ }
+    try{
+        document.body.classList.toggle('cosmic-in-battle', newState === 'BATTLE' || newState === 'OBSERVE');
+        document.body.classList.toggle('cosmic-in-lobby', newState === 'LOBBY');
+        document.body.classList.toggle('cosmic-in-auth', newState === 'AUTH');
+    }catch(_){ }
     if(newState === "BATTLE" || newState === "OBSERVE") battleLeavingInProgress = false;
     if(newState !== "BATTLE") { try{ updateSoloMissionHud?.(); hideSoloMissionResult?.(); }catch(_){} }
 
@@ -2134,15 +2139,15 @@ async function switchState(newState){
     const premiumBar = document.getElementById("premium-bar");
     const authScreen = document.getElementById("auth-screen");
 
-    if(canvas) canvas.style.display = "none";
-    if(lobby) lobby.style.display = "none";
-    if(authScreen) authScreen.style.display = "none";
-    if(orbitExit) orbitExit.style.display = "none";
-    if(topNav) topNav.style.display = "none";
-    if(battleScreen) battleScreen.style.display = "none";
-    if(resourceBar) resourceBar.style.display = "none";
-    if(ui) ui.style.display = "none";
-    if(premiumBar) premiumBar.style.display = "none";
+    if(canvas) canvas.style.setProperty('display', 'none', 'important');
+    if(lobby) lobby.style.setProperty('display', 'none', 'important');
+    if(authScreen) authScreen.style.setProperty('display', 'none', 'important');
+    if(orbitExit) orbitExit.style.setProperty('display', 'none', 'important');
+    if(topNav) topNav.style.setProperty('display', 'none', 'important');
+    if(battleScreen) battleScreen.style.setProperty('display', 'none', 'important');
+    if(resourceBar) resourceBar.style.setProperty('display', 'none', 'important');
+    if(ui) ui.style.setProperty('display', 'none', 'important');
+    if(premiumBar) premiumBar.style.setProperty('display', 'none', 'important');
     setHangarChatMode(false, false);
         __restoreHangarChatPanel();
 
@@ -2166,24 +2171,24 @@ async function switchState(newState){
 
     if(gameState === "AUTH"){
         if(!document.body.classList.contains('cosmic-auth-passed')){
-            if(authScreen) authScreen.style.display = "flex";
+            if(authScreen) authScreen.style.setProperty('display', 'flex', 'important');
         }
     }
 
     if(gameState === "LOBBY"){
-        if(lobby) lobby.style.display = "flex";
-        if(topNav) topNav.style.display = "flex";
+        if(lobby) lobby.style.setProperty('display', 'flex', 'important');
+        if(topNav) topNav.style.setProperty('display', 'flex', 'important');
         updatePremiumAccountInfo();
-        if(premiumBar) premiumBar.style.display = "flex";
+        if(premiumBar) premiumBar.style.setProperty('display', 'flex', 'important');
         if(typeof renderRoomsInLobby === 'function'){
             renderRoomsInLobby();
         }
     }
 
     if(gameState === "ORBIT"){
-        if(canvas) canvas.style.display = "block";
-        if(orbitExit) orbitExit.style.display = "block";
-        if(resourceBar) resourceBar.style.display = "flex";
+        if(canvas) canvas.style.setProperty('display', 'block', 'important');
+        if(orbitExit) orbitExit.style.setProperty('display', 'block', 'important');
+        if(resourceBar) resourceBar.style.setProperty('display', 'flex', 'important');
         if(ui) ui.style.display = "none";
 
         if(typeof scene !== "undefined" && typeof solarSystem !== "undefined" && !scene.children.includes(solarSystem)){
@@ -2199,13 +2204,13 @@ async function switchState(newState){
 }
 
 if(gameState === "BATTLE"){
-    if(battleScreen) battleScreen.style.display = "block";
+    if(battleScreen) battleScreen.style.setProperty('display', 'block', 'important');
     updateBattlePlayerHud();
     startBattleHudLoops();
     initBattleHudControls();
 
     if(canvas){
-        canvas.style.display = "block";
+        canvas.style.setProperty('display', 'block', 'important');
 
         setTimeout(() => {
             safeRequestPointerLock(canvas);
@@ -10398,7 +10403,7 @@ async function forceLeaveBattleToLobby(){
     try{ resetBattleSessionCounters(); }catch(_){ }
 
     gameState = 'LOBBY';
-    try{ window.gameState = 'LOBBY'; }catch(_){ }
+    try{ window.gameState = 'LOBBY'; document.body.classList.add('cosmic-in-lobby'); document.body.classList.remove('cosmic-in-battle','cosmic-in-auth'); }catch(_){ }
 
     const canvas = document.querySelector('canvas');
     const lobby = document.getElementById('lobby-screen');
@@ -10412,12 +10417,12 @@ async function forceLeaveBattleToLobby(){
     const settingsWindow = document.getElementById('settings-window');
     const pauseMenu = document.getElementById('battle-pause-menu');
 
-    if(canvas) canvas.style.display = 'none';
-    if(authScreen) authScreen.style.display = 'none';
-    if(orbitExit) orbitExit.style.display = 'none';
-    if(battleScreen) battleScreen.style.display = 'none';
-    if(resourceBar) resourceBar.style.display = 'none';
-    if(ui) ui.style.display = 'none';
+    if(canvas) canvas.style.setProperty('display', 'none', 'important');
+    if(authScreen) authScreen.style.setProperty('display', 'none', 'important');
+    if(orbitExit) orbitExit.style.setProperty('display', 'none', 'important');
+    if(battleScreen) battleScreen.style.setProperty('display', 'none', 'important');
+    if(resourceBar) resourceBar.style.setProperty('display', 'none', 'important');
+    if(ui) ui.style.setProperty('display', 'none', 'important');
     if(settingsWindow) settingsWindow.classList.add('hidden');
     if(pauseMenu) pauseMenu.classList.add('hidden');
 
@@ -10427,10 +10432,10 @@ async function forceLeaveBattleToLobby(){
     try{ stopBattleHudLoops(); }catch(_){ }
     try{ updateNicknameSettingsState?.(); }catch(_){ }
 
-    if(lobby) lobby.style.display = 'flex';
-    if(topNav) topNav.style.display = 'flex';
+    if(lobby) lobby.style.setProperty('display', 'flex', 'important');
+    if(topNav) topNav.style.setProperty('display', 'flex', 'important');
     updatePremiumAccountInfo?.();
-    if(premiumBar) premiumBar.style.display = 'flex';
+    if(premiumBar) premiumBar.style.setProperty('display', 'flex', 'important');
 
     currentRoom = null;
     try{ window.currentRoomId = null; }catch(_){ }
@@ -14824,7 +14829,7 @@ function logoutToAuth(message='Возврат в меню входа.'){
     authState.pendingVerificationCode = '';
     window.currentRoomId = null;
 
-    try{ document.body.classList.remove('cosmic-auth-passed'); }catch(_e){}
+    try{ document.body.classList.remove('cosmic-auth-passed','cosmic-in-lobby','cosmic-in-battle'); document.body.classList.add('cosmic-in-auth'); }catch(_e){}
     try{ resetBattleInputState?.(); }catch(_e){}
     try{ applyAuthUIState(message); }catch(_e){}
 
