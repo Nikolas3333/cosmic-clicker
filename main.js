@@ -472,7 +472,20 @@ function forceOpenLobbyAfterAuth(email = ''){
         try{ updatePremiumAccountInfo?.(); }catch(_){}
         try{ renderProfileStats?.(); }catch(_){}
         try{ saveGame?.(); }catch(_){}
-        switchState('LOBBY');
+
+        try{ switchState('LOBBY'); }catch(switchErr){ console.warn('switchState LOBBY warning:', switchErr?.message || switchErr); }
+
+        const authScreen = document.getElementById('auth-screen');
+        const lobby = document.getElementById('lobby-screen');
+        const topNav = document.getElementById('top-nav');
+        const premiumBar = document.getElementById('premium-bar');
+        if(authScreen) authScreen.style.display = 'none';
+        if(lobby) lobby.style.display = 'flex';
+        if(topNav) topNav.style.display = 'flex';
+        if(premiumBar) premiumBar.style.display = 'flex';
+        try{ renderRoomsInLobby?.(); }catch(_){}
+        try{ window.gameState = 'LOBBY'; }catch(_){}
+        gameState = 'LOBBY';
         return true;
     }catch(err){
         console.error('forceOpenLobbyAfterAuth failed:', err);
@@ -14883,16 +14896,26 @@ function loginLocalAccount(){
     }
     showAuthMessage('Вход...');
 
+    // V390: вход в игру больше не ждёт Supabase/профиль/ресурсы.
+    // Проверка аккаунта запускается ниже, но игрок сразу попадает в лобби.
+    forceOpenLobbyAfterAuth(email);
+    try{
+        if(loginBtn){
+            loginBtn.disabled = false;
+            loginBtn.textContent = loginBtn.dataset.oldText || 'Войти';
+        }
+    }catch(_){}
+
     (async () => {
         try{
             if(!window.supabaseClient){
-                showAuthMessage('Ошибка входа: сервер авторизации не готов.');
+                console.warn('Supabase ещё не готов, вход выполнен локально.');
                 return;
             }
 
             const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
             if(error){
-                showAuthMessage('Ошибка входа: ' + error.message);
+                console.warn('Фоновая проверка входа не прошла:', error.message);
                 return;
             }
 
@@ -15031,7 +15054,7 @@ function loginLocalAccount(){
             try{ localStorage.removeItem(`cosmicPendingProfile:${email}`); }catch(_){}
             showAuthMessage('');
         }catch(err){
-            showAuthMessage('Ошибка входа: ' + (err?.message || err));
+            console.warn('Фоновая авторизация завершилась предупреждением:', err?.message || err);
         }finally{
             if(loginBtn){
                 loginBtn.disabled = false;
