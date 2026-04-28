@@ -1389,12 +1389,9 @@ function getThrottledPresencePing(now = Date.now()){
 
 function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
     const nowIso = base.updated_at || new Date().toISOString();
-    return {
-        id: base.id || ((globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
-            ? globalThis.crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    const payload = {
         room_id: roomId,
-        player_id: playerId,
+        player_id: String(playerId || '').trim(),
         nickname: base.nickname || player?.nickname || 'Commander',
         joined_at: base.joined_at || nowIso,
         updated_at: nowIso,
@@ -1404,24 +1401,99 @@ function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
         ...(base.position ? { position: base.position } : {}),
         ...(base.rotation ? { rotation: base.rotation } : {})
     };
+
+    // Важно: id не генерируем сами.
+    // В таблице room_players id должен оставаться серверным/существующим,
+    // иначе Supabase может ловить 409/Conflict при upsert.
+    if(base.id) payload.id = base.id;
+    return payload;
 }
+
 
 async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}, selectColumns = 'id'){
     const normalizedRoomId = sanitizeOnlineRoomId(roomId);
     const safePlayerId = String(playerId || '').trim();
     if(!normalizedRoomId || !safePlayerId || !window.supabaseClient) return { data:null, error:null, ok:false };
+
     const payload = buildRoomPlayerRowPayload(normalizedRoomId, safePlayerId, base);
+
+    const selectExisting = async () => {
+        try{
+            return await window.supabaseClient
+                .from('room_players')
+                .select('id,room_id,player_id,nickname')
+                .eq('room_id', normalizedRoomId)
+                .eq('player_id', safePlayerId)
+                .limit(1);
+        }catch(error){
+            return { data:null, error };
+        }
+    };
+
     try{
-        const result = await window.supabaseClient
+        const existing = await selectExisting();
+        const existingRow = Array.isArray(existing?.data) ? existing.data[0] : null;
+
+        if(existingRow?.id){
+            const updatePayload = { ...payload };
+            delete updatePayload.id;
+            delete updatePayload.room_id;
+            delete updatePayload.player_id;
+
+            const updated = await window.supabaseClient
+                .from('room_players')
+                .update(updatePayload)
+                .eq('id', existingRow.id)
+                .select(selectColumns)
+                .limit(1);
+
+            if(!updated?.error){
+                return { data: updated?.data || existing.data || null, error:null, ok:true, payload };
+            }
+        }
+
+        const inserted = await window.supabaseClient
             .from('room_players')
-            .upsert(payload, { onConflict: 'room_id,player_id' })
+            .insert(payload)
             .select(selectColumns)
             .limit(1);
-        return { data: result?.data || null, error: result?.error || null, ok: !result?.error, payload };
+
+        if(!inserted?.error){
+            return { data: inserted?.data || null, error:null, ok:true, payload };
+        }
+
+        const code = String(inserted?.error?.code || '').trim();
+
+        // 23505 = unique conflict. The row exists; update it instead of failing.
+        if(code === '23505' || String(inserted?.error?.message || '').toLowerCase().includes('duplicate')){
+            const afterConflict = await selectExisting();
+            const row = Array.isArray(afterConflict?.data) ? afterConflict.data[0] : null;
+            if(row?.id){
+                const updatePayload = { ...payload };
+                delete updatePayload.id;
+                delete updatePayload.room_id;
+                delete updatePayload.player_id;
+
+                const updated = await window.supabaseClient
+                    .from('room_players')
+                    .update(updatePayload)
+                    .eq('id', row.id)
+                    .select(selectColumns)
+                    .limit(1);
+
+                if(!updated?.error){
+                    return { data: updated?.data || afterConflict?.data || null, error:null, ok:true, payload };
+                }
+                return { data:null, error:updated?.error || inserted?.error, ok:false, payload };
+            }
+        }
+
+        return { data:null, error:inserted?.error || null, ok:false, payload };
     }catch(error){
         return { data:null, error, ok:false, payload };
     }
 }
+
 
 function getJoinedLobbyRoomId(){
     const currentId = String(currentRoom?.id || currentRoom?.roomId || '').trim();
@@ -17294,6 +17366,17 @@ async function ensureRoomPlayerRowJoined(roomId, identity){
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
   const playerId = String(identity?.playerId || '').trim();
   if(!normalizedRoomId || !playerId || !window.supabaseClient) return false;
+
+  const stamp = new Date().toISOString();
+  const basePayload = {
+      nickname: identity.displayName || player?.nickname || 'Commander',
+      joined_at: stamp,
+      updated_at: stamp,
+      team: getBattleRoomPlayerTeam(playerId),
+      level: Number(player?.level || 1) || 1,
+      ping: Number(getBattlePingValue() || 0) || 0
+  };
+
   try{
     const { data: rows, error } = await window.supabaseClient
       .from('room_players')
@@ -17302,24 +17385,13 @@ async function ensureRoomPlayerRowJoined(roomId, identity){
       .eq('player_id', playerId)
       .limit(1);
 
-    if(error){
-      return false;
-    }
-
-    if(Array.isArray(rows) && rows.length > 0){
+    if(!error && Array.isArray(rows) && rows.length > 0){
       const rowId = String(rows[0]?.id || '').trim();
       if(rowId){
         try{
           await window.supabaseClient
             .from('room_players')
-            .update({
-              nickname: identity.displayName,
-              joined_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              team: getBattleRoomPlayerTeam(playerId),
-              level: Number(player?.level || 1) || 1,
-              ping: Number(getBattlePingValue() || 0) || 0
-            })
+            .update(basePayload)
             .eq('id', rowId)
             .select('id')
             .limit(1);
@@ -17327,9 +17399,24 @@ async function ensureRoomPlayerRowJoined(roomId, identity){
       }
       return true;
     }
+
+    const inserted = await window.supabaseClient
+      .from('room_players')
+      .insert(buildRoomPlayerRowPayload(normalizedRoomId, playerId, basePayload))
+      .select('id')
+      .limit(1);
+
+    if(!inserted?.error) return true;
+
+    const code = String(inserted?.error?.code || '').trim();
+    if(code === '23505' || String(inserted?.error?.message || '').toLowerCase().includes('duplicate')){
+      return true;
+    }
   }catch(_){}
+
   return false;
 }
+
 
 
 async function waitForConfirmedRoom(roomId, maxWaitMs = 9000){
