@@ -6889,6 +6889,28 @@ body.cosmic-auth-passed #premium-bar{
 }
 </style>
 
+
+<style id="v398-logout-click-fix">
+#premium-logout-btn{
+  pointer-events:auto !important;
+  z-index:999999 !important;
+}
+#premium-bar{
+  pointer-events:auto !important;
+  z-index:999990 !important;
+}
+body:not(.cosmic-auth-passed) #auth-screen{
+  display:flex !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+}
+body:not(.cosmic-auth-passed) #lobby-screen,
+body:not(.cosmic-auth-passed) #top-nav,
+body:not(.cosmic-auth-passed) #premium-bar{
+  display:none !important;
+}
+</style>
+
 </head>
 
 <body>
