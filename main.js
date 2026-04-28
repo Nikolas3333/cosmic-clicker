@@ -3614,15 +3614,14 @@ function applySaveData(save){
     updateUI?.();
 }
 
-async 
-function getSafePlayerPublicId(){
+async function getSafePlayerPublicId(){
     const raw = authState?.playerId;
     const num = Number(raw);
     if(Number.isFinite(num) && num > 0) return Math.floor(num);
     return 0;
 }
 
-async function loadRemoteSaveFromSupabase(){
+;async function loadRemoteSaveFromSupabase(){
     const safePublicId = getSafePlayerPublicId();
     if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !safePublicId) return null;
     try{
