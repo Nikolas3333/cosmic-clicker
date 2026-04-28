@@ -460,19 +460,23 @@ function forceOpenLobbyAfterAuth(email = ''){
         authState.email = String(email || authState.email || '').trim().toLowerCase();
         authState.isAuthenticated = true;
         authState.emailVerified = true;
-        authState.playerId = getSafePlayerPublicId();
+
+        const safeId = getSafePlayerPublicId();
+        authState.playerId = safeId || 0;
+
         const mailNick = authState.email ? authState.email.split('@')[0] : '';
         if(!player.nickname || player.nickname === 'Commander' || player.nickname === 'Guest Pilot'){
             player.nickname = mailNick || 'Pilot';
         }
-        player.id = getSafePlayerPublicId() || 0;
+        player.id = safeId || 0;
         window.currentRoomId = null;
+
+        try{ document.body.classList.add('cosmic-auth-passed'); }catch(_){}
         try{ clearBattleKillFeed?.(); }catch(_){}
         try{ clearBattleBotNameLabels?.(); }catch(_){}
         try{ updateNicknameSettingsState?.(); }catch(_){}
         try{ updatePremiumAccountInfo?.(); }catch(_){}
         try{ renderProfileStats?.(); }catch(_){}
-        try{ saveGame?.(); }catch(_){}
 
         try{ switchState('LOBBY'); }catch(switchErr){ console.warn('switchState LOBBY warning:', switchErr?.message || switchErr); }
 
@@ -480,13 +484,39 @@ function forceOpenLobbyAfterAuth(email = ''){
         const lobby = document.getElementById('lobby-screen');
         const topNav = document.getElementById('top-nav');
         const premiumBar = document.getElementById('premium-bar');
-        if(authScreen) authScreen.style.display = 'none';
-        if(lobby) lobby.style.display = 'flex';
-        if(topNav) topNav.style.display = 'flex';
-        if(premiumBar) premiumBar.style.display = 'flex';
+        const battleScreen = document.getElementById('battle-screen');
+        const canvas = document.querySelector('canvas');
+
+        if(authScreen){
+            authScreen.classList.add('hidden');
+            authScreen.style.setProperty('display', 'none', 'important');
+            authScreen.style.setProperty('visibility', 'hidden', 'important');
+            authScreen.style.setProperty('pointer-events', 'none', 'important');
+        }
+        if(lobby){
+            lobby.classList.remove('hidden');
+            lobby.style.setProperty('display', 'flex', 'important');
+            lobby.style.setProperty('visibility', 'visible', 'important');
+        }
+        if(topNav){
+            topNav.style.setProperty('display', 'flex', 'important');
+        }
+        if(premiumBar){
+            premiumBar.style.setProperty('display', 'flex', 'important');
+        }
+        if(battleScreen){
+            battleScreen.style.setProperty('display', 'none', 'important');
+        }
+        if(canvas){
+            canvas.style.setProperty('display', 'none', 'important');
+        }
+
         try{ renderRoomsInLobby?.(); }catch(_){}
         try{ window.gameState = 'LOBBY'; }catch(_){}
         gameState = 'LOBBY';
+
+        // Do not save remotely before a real numeric Supabase public_id exists.
+        try{ if(getSafePlayerPublicId()) saveGame?.(); }catch(_){}
         return true;
     }catch(err){
         console.error('forceOpenLobbyAfterAuth failed:', err);
@@ -2063,7 +2093,9 @@ async function switchState(newState){
     updateNicknameSettingsState?.();
 
     if(gameState === "AUTH"){
-        if(authScreen) authScreen.style.display = "flex";
+        if(!document.body.classList.contains('cosmic-auth-passed')){
+            if(authScreen) authScreen.style.display = "flex";
+        }
     }
 
     if(gameState === "LOBBY"){
@@ -14895,6 +14927,7 @@ function loginLocalAccount(){
     // V390: вход в игру больше не ждёт Supabase/профиль/ресурсы.
     // Проверка аккаунта запускается ниже, но игрок сразу попадает в лобби.
     forceOpenLobbyAfterAuth(email);
+    window.__cosmicLoginInProgress = false;
     try{
         if(loginBtn){
             loginBtn.disabled = false;
