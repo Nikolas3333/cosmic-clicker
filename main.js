@@ -3622,7 +3622,7 @@ function getSafePlayerPublicId(){
     return 0;
 }
 
-function loadRemoteSaveFromSupabase(){
+async function loadRemoteSaveFromSupabase(){
     const safePublicId = getSafePlayerPublicId();
     if(!window.supabaseReady || !window.supabaseClient || authState.mode !== 'account' || !safePublicId) return null;
     try{
