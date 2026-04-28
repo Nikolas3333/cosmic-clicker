@@ -4840,6 +4840,8 @@ function tryPremiumDrop() {
     }
 }
 
+window.cosmicLoginNow = loginLocalAccount;
+window.cosmicRegisterNow = registerLocalAccount;
 initSettingsUI();
 initLobbyBackground();
 initAuthScreen();
@@ -14826,8 +14828,13 @@ function loginLocalAccount(){
         return;
     }
 
+    showAuthMessage('Вход...');
     (async () => {
         try{
+            if(!window.supabaseClient){
+                showAuthMessage('Ошибка входа: сервер авторизации не готов.');
+                return;
+            }
             const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
             if(error){
                 showAuthMessage('Ошибка входа: ' + error.message);
@@ -14861,6 +14868,22 @@ function loginLocalAccount(){
                 console.warn('Ошибка чтения players:', existingRes.error.message);
             }
             playerRow = existingRes.data || null;
+
+            if(!playerRow){
+                try{
+                    const emailRes = await window.supabaseClient
+                        .from('players')
+                        .select('public_id,nickname,email,auth_id,level,experience,credits,created_at,staff_role,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,crystals')
+                        .eq('email', email)
+                        .maybeSingle();
+                    if(!emailRes.error && emailRes.data){
+                        playerRow = emailRes.data;
+                        if(!playerRow.auth_id && user?.id){
+                            try{ await window.supabaseClient.from('players').update({ auth_id: user.id }).eq('public_id', playerRow.public_id); }catch(_){}
+                        }
+                    }
+                }catch(_){}
+            }
 
             if(!playerRow){
                 const insertRes = await window.supabaseClient
@@ -14911,9 +14934,9 @@ function loginLocalAccount(){
             }
 
             resetPlayerProgress();
-            await loadGame();
-            await loadPlayerResourcesFromSupabase();
-            startRemotePlayerSync();
+            try{ await loadGame(); }catch(loadErr){ console.warn('loadGame auth warning:', loadErr?.message || loadErr); }
+            try{ await loadPlayerResourcesFromSupabase(); }catch(resErr){ console.warn('loadPlayerResources auth warning:', resErr?.message || resErr); }
+            try{ startRemotePlayerSync(); }catch(syncErr){ console.warn('remote sync auth warning:', syncErr?.message || syncErr); }
             window.currentRoomId = null;
             updateNicknameSettingsState();
             updatePremiumAccountInfo();
@@ -14935,6 +14958,8 @@ function showForgotPassword(){
 }
 function initAuthScreen(){
     ensureDeveloperAccount();
+    window.cosmicLoginNow = loginLocalAccount;
+    window.cosmicRegisterNow = registerLocalAccount;
     applyAuthUIState('');
     const loginBtn = document.getElementById('login-btn');
     const registerBtn = document.getElementById('register-btn');
@@ -15008,7 +15033,12 @@ function initAuthScreen(){
     const registerNickname = document.getElementById('register-nickname');
     const registerCountry = document.getElementById('register-country');
     const verifyCode = document.getElementById('verify-code');
-    if(loginBtn && !loginBtn.dataset.bound){ loginBtn.dataset.bound='1'; loginBtn.addEventListener('click', loginLocalAccount); }
+    if(loginBtn && !loginBtn.dataset.bound){
+        loginBtn.dataset.bound='1';
+        loginBtn.addEventListener('click', (e) => { e.preventDefault(); loginLocalAccount(); });
+        loginBtn.addEventListener('pointerup', (e) => { if(e.pointerType !== 'mouse') return; e.preventDefault(); loginLocalAccount(); });
+        loginBtn.onclick = (e) => { e.preventDefault(); loginLocalAccount(); };
+    }
     if(registerBtn && !registerBtn.dataset.bound){ registerBtn.dataset.bound='1'; registerBtn.addEventListener('click', registerLocalAccount); }
     if(forgotBtn && !forgotBtn.dataset.bound){ forgotBtn.dataset.bound='1'; forgotBtn.addEventListener('click', showForgotPassword); }
     if(verifyBtn && !verifyBtn.dataset.bound){ verifyBtn.dataset.bound='1'; verifyBtn.addEventListener('click', confirmEmailCode); }
