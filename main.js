@@ -2049,10 +2049,7 @@ function clearBattleScene(){
         battleMapPlanet = null;
     }
 
-    if(battleSolarSystemGroup){
-        try{ scene.remove(battleSolarSystemGroup); }catch(_){}
-        battleSolarSystemGroup = null;
-    }
+    try{ removeBattleSolarSystemView?.(); }catch(_){}
 
     shipVelocity.set(0, 0, 0);
     shipRotationVelocity.set(0, 0, 0);
@@ -4399,8 +4396,12 @@ updateDebrisPieces();
 if((gameState === "BATTLE" || gameState === "OBSERVE") && battleObserverMode){
     updateObserverBattle();
 }
-if(isEndlessSoloBattle() && !battleSolarSystemGroup){ try{ createBattleSolarSystemView?.(); }catch(_){} }
-updateBattleSolarSystemView?.();
+if(gameState === "BATTLE" && isEndlessSoloBattle()){
+    if(!battleSolarSystemGroup){ try{ createBattleSolarSystemView?.(); }catch(_){} }
+    updateBattleSolarSystemView?.();
+}else{
+    try{ removeBattleSolarSystemView?.(); }catch(_){}
+}
 limitBattleArea();
 updateBattlePlayerHud();
 renderer.render(scene,camera);
@@ -5575,6 +5576,42 @@ function isStaffRole(role = "player") {
 
 function canWriteInObserverChat() {
     return isStaffRole(getOwnStaffRole());
+}
+
+function updateAuthServerVisibility(){
+    try{
+        const serverCurrent = document.getElementById('auth-server-current');
+        const serverList = document.getElementById('auth-server-list');
+        if(!serverList) return;
+        const isStaff = isStaffRole(getOwnStaffRole());
+        const realOption = serverList.querySelector('[data-real-server="true"]') || serverList.querySelector('[data-server="EU"]');
+        const devOption = serverList.querySelector('[data-dev-server="true"]');
+
+        if(devOption){
+            devOption.classList.toggle('hidden', !isStaff);
+            devOption.style.display = isStaff ? '' : 'none';
+            devOption.disabled = !isStaff;
+        }
+
+        if(!isStaff && devOption?.classList.contains('active')){
+            devOption.classList.remove('active');
+            realOption?.classList.add('active');
+        }
+
+        if(serverCurrent && realOption && (!isStaff || !devOption?.classList.contains('active'))){
+            const dot = realOption.querySelector('.server-dot')?.cloneNode(true);
+            const text = realOption.textContent.trim();
+            serverCurrent.innerHTML = '';
+            if(dot) serverCurrent.appendChild(dot);
+            const span = document.createElement('span');
+            span.textContent = text;
+            serverCurrent.appendChild(span);
+            const arrow = document.createElement('span');
+            arrow.className = 'server-arrow';
+            arrow.textContent = '⌄';
+            serverCurrent.appendChild(arrow);
+        }
+    }catch(_){}
 }
 
 function canWriteBattleAnnouncementChat() {
@@ -7804,11 +7841,32 @@ function resetBattleSessionCounters(){
 }
 
 
+function removeBattleSolarSystemView(){
+    try{
+        if(!battleSolarSystemGroup) return;
+        const oldGroup = battleSolarSystemGroup;
+        scene?.remove?.(oldGroup);
+        oldGroup.traverse?.((obj) => {
+            try{
+                if(obj.geometry) obj.geometry.dispose?.();
+                if(obj.material){
+                    if(Array.isArray(obj.material)){
+                        obj.material.forEach(mat => {
+                            try{ mat.map?.dispose?.(); mat.dispose?.(); }catch(_){}
+                        });
+                    }else{
+                        obj.material.map?.dispose?.();
+                        obj.material.dispose?.();
+                    }
+                }
+            }catch(_){}
+        });
+    }catch(_){}
+    battleSolarSystemGroup = null;
+}
+
 function createBattleSolarSystemView(){
-    if(battleSolarSystemGroup){
-        try{ scene.remove(battleSolarSystemGroup); }catch(_){}
-        battleSolarSystemGroup = null;
-    }
+    removeBattleSolarSystemView();
     battleSolarSystemGroup = new THREE.Group();
     battleSolarSystemGroup.name = 'Solo Endless Battle Solar System';
 
@@ -15172,7 +15230,7 @@ function loginLocalAccount(){
             player.experience = Number(playerRow?.experience || player.experience || 0);
             player.credits = Number(playerRow?.credits || player.credits || 500);
 
-            try{ applyPlayerIdentityRow(playerRow || { public_id: authState.playerId, staff_role: 'player' }); }catch(identityErr){ console.warn('identity warning:', identityErr?.message || identityErr); }
+            try{ applyPlayerIdentityRow(playerRow || { public_id: authState.playerId, staff_role: 'player' }); updateAuthServerVisibility?.(); }catch(identityErr){ console.warn('identity warning:', identityErr?.message || identityErr); }
 
             if(remember?.checked){
                 localStorage.setItem('cosmicRememberedEmail', email);
@@ -15229,6 +15287,7 @@ function initAuthScreen(){
     const closeRegisterBtn = document.getElementById('close-register-modal');
     const serverCurrent = document.getElementById('auth-server-current');
     const serverList = document.getElementById('auth-server-list');
+    try{ updateAuthServerVisibility(); }catch(_){}
     const birthDay = document.getElementById('register-birth-day');
     const birthYear = document.getElementById('register-birth-year');
     if(birthDay && !birthDay.dataset.filled){
@@ -15272,6 +15331,7 @@ function initAuthScreen(){
         });
         serverList.querySelectorAll('.auth-server-option').forEach(btn => {
             btn.addEventListener('click', () => {
+                if(btn.disabled || btn.classList.contains('hidden') || btn.style.display === 'none') return;
                 serverList.querySelectorAll('.auth-server-option').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 const dot = btn.querySelector('.server-dot')?.cloneNode(true);
