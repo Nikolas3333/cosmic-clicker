@@ -6932,6 +6932,30 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 }
 </style>
 
+
+
+<!-- V403 ORBIT EXIT UI RESTORE + STABLE DEV SERVER VISIBILITY -->
+<style>
+  body:not(.state-orbit) #premium-bar,
+  body:not(.state-orbit) #premium-account-info,
+  body:not(.state-orbit) #premium-currency-box{
+    visibility:visible;
+    pointer-events:auto;
+  }
+  body.state-lobby #premium-bar{
+    display:flex !important;
+    visibility:visible !important;
+    pointer-events:auto !important;
+  }
+  body.state-lobby #resource-bar{
+    display:none !important;
+  }
+  .auth-server-option[data-dev-server="true"][aria-disabled="true"]{
+    display:none !important;
+    pointer-events:none !important;
+  }
+</style>
+
 </head>
 
 <body>
