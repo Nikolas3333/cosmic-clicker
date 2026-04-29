@@ -20201,3 +20201,181 @@ function startV374BotNameLoop(){
     __v374BotNameLoop = requestAnimationFrame(tick);
 }
 try{ startV374BotNameLoop(); }catch(_){}
+
+
+/* ================= V402 DEV SERVER ACCESS + ORBIT UI PATCH ================= */
+(function(){
+    const REAL_SERVER_ID = 'EU';
+    const DEV_SERVER_ID = 'DEV';
+
+    function isStaffNow(){
+        try{
+            const role = String((typeof getOwnStaffRole === 'function' ? getOwnStaffRole() : player?.staff_role) || 'player').trim().toLowerCase();
+            return role === 'mod' || role === 'adm' || role === 'owr';
+        }catch(_){ return false; }
+    }
+
+    function getServerList(){ return document.getElementById('auth-server-list'); }
+    function getServerCurrent(){ return document.getElementById('auth-server-current'); }
+    function getRealOption(){
+        const list = getServerList();
+        return list?.querySelector('[data-real-server="true"]') || list?.querySelector('[data-server="EU"]') || null;
+    }
+    function getDevOption(){
+        const list = getServerList();
+        return list?.querySelector('[data-dev-server="true"]') || list?.querySelector('[data-server="DEV"]') || null;
+    }
+
+    function setCurrentServerButtonFromOption(option){
+        const current = getServerCurrent();
+        if(!current || !option) return;
+        const dot = option.querySelector('.server-dot')?.cloneNode(true);
+        const text = String(option.textContent || '').trim();
+        current.innerHTML = '';
+        if(dot) current.appendChild(dot);
+        const span = document.createElement('span');
+        span.textContent = text;
+        current.appendChild(span);
+        const arrow = document.createElement('span');
+        arrow.className = 'server-arrow';
+        arrow.textContent = '⌄';
+        current.appendChild(arrow);
+    }
+
+    function selectRealServer(){
+        const list = getServerList();
+        const real = getRealOption();
+        if(!list || !real) return;
+        list.querySelectorAll('.auth-server-option').forEach(btn => btn.classList.remove('active'));
+        real.classList.add('active');
+        setCurrentServerButtonFromOption(real);
+        try{ localStorage.setItem('cosmicSelectedServer', REAL_SERVER_ID); }catch(_){}
+    }
+
+    function getSelectedCosmicServer(){
+        const list = getServerList();
+        const active = list?.querySelector('.auth-server-option.active');
+        const id = String(active?.dataset?.server || REAL_SERVER_ID).trim().toUpperCase();
+        return id === DEV_SERVER_ID ? DEV_SERVER_ID : REAL_SERVER_ID;
+    }
+
+    function enforceDevServerAccess(showMessage){
+        const staff = isStaffNow();
+        const dev = getDevOption();
+        const real = getRealOption();
+        if(dev){
+            dev.classList.toggle('hidden', !staff);
+            dev.style.display = staff ? '' : 'none';
+            dev.disabled = !staff;
+            dev.setAttribute('aria-disabled', staff ? 'false' : 'true');
+        }
+        if(!staff && getSelectedCosmicServer() === DEV_SERVER_ID){
+            selectRealServer();
+            if(showMessage && typeof showAuthMessage === 'function'){
+                showAuthMessage('DEV Test Server доступен только staff. Ты переключён на Europe / Frankfurt.');
+            }
+        }else if(real && getSelectedCosmicServer() === REAL_SERVER_ID){
+            setCurrentServerButtonFromOption(real);
+        }
+    }
+
+    const previousUpdateAuthServerVisibility = typeof updateAuthServerVisibility === 'function' ? updateAuthServerVisibility : null;
+    updateAuthServerVisibility = function(){
+        try{ previousUpdateAuthServerVisibility?.(); }catch(_){}
+        enforceDevServerAccess(false);
+    };
+    window.updateAuthServerVisibility = updateAuthServerVisibility;
+    window.getSelectedCosmicServer = getSelectedCosmicServer;
+
+    document.addEventListener('click', function(event){
+        const devOption = event.target?.closest?.('[data-dev-server="true"], [data-server="DEV"]');
+        if(!devOption) return;
+        if(!isStaffNow()){
+            event.preventDefault();
+            event.stopPropagation();
+            selectRealServer();
+            if(typeof showAuthMessage === 'function'){
+                showAuthMessage('DEV Test Server доступен только staff.');
+            }
+        }
+    }, true);
+
+    const previousLoginLocalAccount = typeof loginLocalAccount === 'function' ? loginLocalAccount : null;
+    if(previousLoginLocalAccount){
+        loginLocalAccount = function(...args){
+            if(getSelectedCosmicServer() === DEV_SERVER_ID && !isStaffNow()){
+                selectRealServer();
+            }
+            const result = previousLoginLocalAccount.apply(this, args);
+            setTimeout(() => enforceDevServerAccess(true), 500);
+            setTimeout(() => enforceDevServerAccess(true), 1500);
+            return result;
+        };
+        window.cosmicLoginNow = loginLocalAccount;
+    }
+
+    const previousSetPlayerOnlineStatus = typeof setPlayerOnlineStatus === 'function' ? setPlayerOnlineStatus : null;
+    if(previousSetPlayerOnlineStatus){
+        setPlayerOnlineStatus = async function(status = 'lobby', roomId = null){
+            if(getSelectedCosmicServer() === DEV_SERVER_ID){
+                try{ await removePlayerFromOnline?.(); }catch(_){}
+                return;
+            }
+            return previousSetPlayerOnlineStatus.call(this, status, roomId);
+        };
+        window.setPlayerOnlineStatus = setPlayerOnlineStatus;
+    }
+
+    function enforceOrbitTopUi(){
+        try{
+            const state = String(gameState || '').toUpperCase();
+            const isOrbit = state === 'ORBIT';
+            if(document.body){
+                document.body.classList.toggle('state-orbit', isOrbit);
+                if(isOrbit){
+                    document.body.classList.remove('state-lobby','state-auth','state-battle','state-observe');
+                }
+            }
+            const premiumBar = document.getElementById('premium-bar');
+            const accountInfo = document.getElementById('premium-account-info');
+            const currencyBox = document.getElementById('premium-currency-box');
+            const battleHud = document.getElementById('battle-player-hud');
+            const resourceBar = document.getElementById('resource-bar');
+            if(isOrbit){
+                [premiumBar, accountInfo, currencyBox, battleHud].forEach(el => {
+                    if(el) el.style.setProperty('display', 'none', 'important');
+                });
+                if(resourceBar) resourceBar.style.setProperty('display', 'flex', 'important');
+            }
+        }catch(_){}
+    }
+
+    const previousSwitchStateV402 = typeof switchState === 'function' ? switchState : null;
+    if(previousSwitchStateV402){
+        switchState = async function(...args){
+            const result = await previousSwitchStateV402.apply(this, args);
+            enforceDevServerAccess(false);
+            enforceOrbitTopUi();
+            return result;
+        };
+        window.switchState = switchState;
+    }
+
+    const previousUpdateHUDV402 = typeof updateHUD === 'function' ? updateHUD : null;
+    if(previousUpdateHUDV402){
+        updateHUD = function(...args){
+            const result = previousUpdateHUDV402.apply(this, args);
+            enforceOrbitTopUi();
+            return result;
+        };
+        window.updateHUD = updateHUD;
+    }
+
+    setInterval(() => {
+        enforceDevServerAccess(false);
+        enforceOrbitTopUi();
+    }, 800);
+
+    setTimeout(() => { enforceDevServerAccess(false); enforceOrbitTopUi(); }, 100);
+    setTimeout(() => { enforceDevServerAccess(false); enforceOrbitTopUi(); }, 1000);
+})();
