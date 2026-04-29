@@ -6934,7 +6934,7 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 
 
 
-<!-- V403 ORBIT EXIT UI RESTORE + STABLE DEV SERVER VISIBILITY -->
+<!-- V405 ORBIT EXIT UI RESTORE -->
 <style>
   body:not(.state-orbit) #premium-bar,
   body:not(.state-orbit) #premium-account-info,
@@ -6950,7 +6950,6 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
   body.state-lobby #resource-bar{
     display:none !important;
   }
-  .auth-server-option[data-dev-server="true"][aria-disabled="true"]{
     display:none !important;
     pointer-events:none !important;
   }
@@ -7002,7 +7001,6 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
       </button>
       <div id="auth-server-list" class="auth-server-list hidden" role="listbox">
         <button class="auth-server-option active" type="button" data-server="EU" data-real-server="true"><span class="server-dot eu"></span>1. Europe / Frankfurt (real)</button>
-        <button class="auth-server-option dev-only hidden" type="button" data-server="DEV" data-dev-server="true"><span class="server-dot eu"></span>DEV Test Server (staff only)</button>
       </div>
     </div>
         <button id="login-btn" class="auth-btn primary auth-main-login" type="button">Войти</button>
@@ -9062,7 +9060,7 @@ body.hangar-chat-mode #chat-wrapper.hangar-pm-neon {
 
 </style>
 
-<!-- V402 DEV SERVER + ORBIT UI SAFETY PATCH -->
+<!-- V405 ORBIT UI SAFETY PATCH -->
 <style>
   body.state-orbit #premium-bar,
   body.state-orbit #premium-account-info,
@@ -9081,8 +9079,6 @@ body.hangar-chat-mode #chat-wrapper.hangar-pm-neon {
     max-width:calc(100vw - 40px) !important;
     z-index:21020 !important;
   }
-  .auth-server-option.dev-only.hidden,
-  .auth-server-option[data-dev-server="true"].hidden{
     display:none !important;
     pointer-events:none !important;
   }
