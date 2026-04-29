@@ -6974,14 +6974,11 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
         <div class="auth-server-box auth-server-inline">
       <label class="auth-server-label">Сервера:</label>
       <button id="auth-server-current" class="auth-server-current" type="button" aria-haspopup="listbox" aria-expanded="false">
-        <span class="server-dot eu"></span><span>1. EU (29 / 1000)</span><span class="server-arrow">⌄</span>
+        <span class="server-dot eu"></span><span>1. Europe / Frankfurt (real)</span><span class="server-arrow">⌄</span>
       </button>
       <div id="auth-server-list" class="auth-server-list hidden" role="listbox">
-        <button class="auth-server-option active" type="button" data-server="EU"><span class="server-dot eu"></span>1. EU (29 / 1000)</button>
-        <button class="auth-server-option" type="button" data-server="NA"><span class="server-dot na"></span>2. NA (18 / 1000)</button>
-        <button class="auth-server-option" type="button" data-server="ASIA"><span class="server-dot asia"></span>3. ASIA (11 / 1000)</button>
-        <button class="auth-server-option" type="button" data-server="SA"><span class="server-dot sa"></span>4. SA (7 / 1000)</button>
-        <button class="auth-server-option" type="button" data-server="RU"><span class="server-dot ru"></span>5. RU (23 / 1000)</button>
+        <button class="auth-server-option active" type="button" data-server="EU" data-real-server="true"><span class="server-dot eu"></span>1. Europe / Frankfurt (real)</button>
+        <button class="auth-server-option dev-only hidden" type="button" data-server="DEV" data-dev-server="true"><span class="server-dot eu"></span>DEV Test Server (staff only)</button>
       </div>
     </div>
         <button id="login-btn" class="auth-btn primary auth-main-login" type="button">Войти</button>
