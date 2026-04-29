@@ -20686,3 +20686,432 @@ try{ startV374BotNameLoop(); }catch(_){}
     setTimeout(() => { refreshOwnStaffRoleV403(true).then(() => enforceDevServerVisibilityV403(false)); restoreTopUiAfterOrbitV403(); }, 150);
     setTimeout(() => { refreshOwnStaffRoleV403(true).then(() => enforceDevServerVisibilityV403(false)); restoreTopUiAfterOrbitV403(); }, 1600);
 })();
+/* ================= V404 SERVER PRESENCE ISOLATION + ORBIT UI HARD RESTORE ================= */
+(function(){
+    const REAL_SERVER_ID = 'EU';
+    const DEV_SERVER_ID = 'DEV';
+    const STAFF_EMAIL_CACHE_PREFIX = 'cosmicStaffRoleByEmail:';
+    let v404EmailRoleTimer = null;
+    let v404RoleLookupInFlight = false;
+
+    function normRole(role){
+        return String(role || 'player').trim().toLowerCase();
+    }
+
+    function isStaffRole(role){
+        const value = normRole(role);
+        return ['staff','admin','owner','moderator','mod','developer','dev','tester','support'].includes(value);
+    }
+
+    function currentEmail(){
+        return String(document.getElementById('login-email')?.value || authState?.email || player?.email || '').trim().toLowerCase();
+    }
+
+    function cacheEmailRole(email, role){
+        const safeEmail = String(email || '').trim().toLowerCase();
+        if(!safeEmail) return;
+        try{ localStorage.setItem(STAFF_EMAIL_CACHE_PREFIX + safeEmail, normRole(role)); }catch(_){ }
+    }
+
+    function cachedEmailRole(email = currentEmail()){
+        const safeEmail = String(email || '').trim().toLowerCase();
+        if(!safeEmail) return '';
+        try{ return normRole(localStorage.getItem(STAFF_EMAIL_CACHE_PREFIX + safeEmail) || ''); }catch(_){ return ''; }
+    }
+
+    function cachedPublicRole(){
+        try{
+            const pid = String(authState?.playerId || player?.id || '').trim();
+            if(pid && typeof getCachedStaffRole === 'function') return normRole(getCachedStaffRole(pid));
+        }catch(_){ }
+        return '';
+    }
+
+    function ownRole(){
+        const direct = normRole(player?.staff_role || '');
+        if(direct && direct !== 'player') return direct;
+        const byPublic = cachedPublicRole();
+        if(byPublic && byPublic !== 'player') return byPublic;
+        const byEmail = cachedEmailRole();
+        if(byEmail) return byEmail;
+        return direct || byPublic || 'player';
+    }
+
+    function isStaffNow(){
+        return isStaffRole(ownRole());
+    }
+
+    function serverList(){ return document.getElementById('auth-server-list'); }
+    function serverCurrent(){ return document.getElementById('auth-server-current'); }
+    function realOption(){ return serverList()?.querySelector('[data-real-server="true"], [data-server="EU"]'); }
+    function devOption(){ return serverList()?.querySelector('[data-dev-server="true"], [data-server="DEV"]'); }
+
+    function optionServerId(option){
+        const id = String(option?.dataset?.server || '').trim().toUpperCase();
+        return id === DEV_SERVER_ID ? DEV_SERVER_ID : REAL_SERVER_ID;
+    }
+
+    function renderCurrentServerButton(option){
+        const current = serverCurrent();
+        if(!current || !option) return;
+        const dot = option.querySelector('.server-dot')?.cloneNode(true);
+        const text = String(option.textContent || '').replace(/\s+/g, ' ').trim();
+        current.innerHTML = '';
+        if(dot) current.appendChild(dot);
+        const label = document.createElement('span');
+        label.textContent = text;
+        current.appendChild(label);
+        const arrow = document.createElement('span');
+        arrow.className = 'server-arrow';
+        arrow.textContent = '⌄';
+        current.appendChild(arrow);
+    }
+
+    function selectServer(id){
+        const list = serverList();
+        if(!list) return;
+        const targetId = String(id || REAL_SERVER_ID).trim().toUpperCase() === DEV_SERVER_ID ? DEV_SERVER_ID : REAL_SERVER_ID;
+        const option = targetId === DEV_SERVER_ID ? devOption() : realOption();
+        if(!option) return;
+        list.querySelectorAll('.auth-server-option').forEach(btn => btn.classList.remove('active'));
+        option.classList.add('active');
+        renderCurrentServerButton(option);
+        try{ localStorage.setItem('cosmicSelectedServer', optionServerId(option)); }catch(_){ }
+    }
+
+    function selectedServer(){
+        const active = serverList()?.querySelector('.auth-server-option.active');
+        const activeId = optionServerId(active);
+        if(activeId === DEV_SERVER_ID && isStaffNow()) return DEV_SERVER_ID;
+        return REAL_SERVER_ID;
+    }
+
+    function wantedSavedServer(){
+        try{
+            const saved = String(localStorage.getItem('cosmicSelectedServer') || REAL_SERVER_ID).trim().toUpperCase();
+            return saved === DEV_SERVER_ID ? DEV_SERVER_ID : REAL_SERVER_ID;
+        }catch(_){ return REAL_SERVER_ID; }
+    }
+
+    function enforceServerUi(showMessage = false){
+        const list = serverList();
+        const real = realOption();
+        const dev = devOption();
+        const staff = isStaffNow();
+        if(!list) return;
+
+        if(dev){
+            dev.dataset.devServer = 'true';
+            dev.classList.toggle('hidden', !staff);
+            dev.style.setProperty('display', staff ? 'block' : 'none', staff ? '' : 'important');
+            dev.disabled = !staff;
+            dev.setAttribute('aria-disabled', staff ? 'false' : 'true');
+        }
+
+        if(!staff){
+            if(optionServerId(list.querySelector('.auth-server-option.active')) === DEV_SERVER_ID){
+                selectServer(REAL_SERVER_ID);
+                if(showMessage && typeof showAuthMessage === 'function') showAuthMessage('DEV Test Server доступен только staff. Переключено на Europe / Frankfurt.');
+            }else if(real){
+                if(!list.querySelector('.auth-server-option.active')) selectServer(REAL_SERVER_ID);
+                renderCurrentServerButton(real);
+            }
+            return;
+        }
+
+        const active = list.querySelector('.auth-server-option.active');
+        if(!active){
+            selectServer(wantedSavedServer());
+        }else{
+            renderCurrentServerButton(active);
+        }
+    }
+
+    async function refreshRoleByEmail(force = false){
+        const email = currentEmail();
+        if(!email || !window.supabaseClient || v404RoleLookupInFlight) return;
+        const cached = cachedEmailRole(email);
+        if(!force && cached) { enforceServerUi(false); return; }
+        v404RoleLookupInFlight = true;
+        try{
+            const { data, error } = await window.supabaseClient
+                .from('players')
+                .select('public_id,staff_role,email')
+                .eq('email', email)
+                .maybeSingle();
+            if(!error && data){
+                cacheEmailRole(email, data.staff_role || 'player');
+                if(data.public_id && typeof setCachedStaffRole === 'function') setCachedStaffRole(String(data.public_id), data.staff_role || 'player');
+                if(String(authState?.email || '').trim().toLowerCase() === email || String(player?.email || '').trim().toLowerCase() === email){
+                    player.staff_role = normRole(data.staff_role || player.staff_role || 'player');
+                }
+            }else if(!error){
+                cacheEmailRole(email, 'player');
+            }
+        }catch(_){
+        }finally{
+            v404RoleLookupInFlight = false;
+            enforceServerUi(false);
+        }
+    }
+
+    function bindEmailRoleLookup(){
+        const input = document.getElementById('login-email');
+        if(!input || input.dataset.v404StaffLookupBound) return;
+        input.dataset.v404StaffLookupBound = '1';
+        const schedule = () => {
+            clearTimeout(v404EmailRoleTimer);
+            v404EmailRoleTimer = setTimeout(() => refreshRoleByEmail(false), 450);
+        };
+        input.addEventListener('input', schedule);
+        input.addEventListener('change', () => refreshRoleByEmail(true));
+        input.addEventListener('blur', () => refreshRoleByEmail(false));
+        schedule();
+    }
+
+    function mappedServerStatus(status = 'lobby'){
+        const base = String(status || 'lobby').trim().toLowerCase();
+        if(selectedServer() === DEV_SERVER_ID){
+            return base === 'lobby' ? 'dev-lobby' : 'dev-in-game';
+        }
+        return base === 'dev-lobby' || base === 'dev-in-game' ? 'lobby' : base;
+    }
+
+    function filterPlayersBySelectedServer(players = []){
+        const dev = selectedServer() === DEV_SERVER_ID;
+        return (Array.isArray(players) ? players : []).filter(row => {
+            const status = String(row?.status || '').toLowerCase();
+            const isDevPresence = status === 'dev-lobby' || status === 'dev-in-game' || String(row?.room_id || '').startsWith('dev:');
+            return dev ? isDevPresence : !isDevPresence;
+        });
+    }
+
+    const baseSetPlayerOnlineStatusV404 = typeof setPlayerOnlineStatus === 'function' ? setPlayerOnlineStatus : null;
+    setPlayerOnlineStatus = async function(status = 'lobby', roomId = null){
+        if(!window.supabaseClient) return;
+        const playerId = authState?.playerId ? String(authState.playerId) : (player?.id ? String(player.id) : '');
+        if(!playerId || playerId === '0') return;
+        const nickname = String(player?.nickname || 'Commander').trim() || 'Commander';
+        const server = selectedServer();
+        const storedStatus = mappedServerStatus(status);
+        const safeRoomId = typeof sanitizeOnlineRoomId === 'function' ? sanitizeOnlineRoomId(roomId) : (roomId ? String(roomId) : null);
+        const storedRoomId = server === DEV_SERVER_ID
+            ? (safeRoomId ? `dev:${safeRoomId}` : 'dev:lobby')
+            : safeRoomId;
+        const { error } = await window.supabaseClient
+            .from('online_players')
+            .upsert({
+                player_id: playerId,
+                nickname,
+                room_id: storedRoomId,
+                status: storedStatus,
+                updated_at: new Date().toISOString()
+            });
+        if(error && baseSetPlayerOnlineStatusV404){
+            console.warn('V404 online write warning:', error.message || error);
+        }
+    };
+    window.setPlayerOnlineStatus = setPlayerOnlineStatus;
+
+    const baseLoadOnlinePlayersV404 = typeof loadOnlinePlayersFromSupabase === 'function' ? loadOnlinePlayersFromSupabase : null;
+    loadOnlinePlayersFromSupabase = async function(){
+        if(!window.supabaseClient) return [];
+        try{
+            const cutoffIso = typeof getOnlineFreshCutoffIso === 'function'
+                ? getOnlineFreshCutoffIso()
+                : new Date(Date.now() - 45000).toISOString();
+            const { data, error } = await window.supabaseClient
+                .from('online_players')
+                .select('*')
+                .gte('updated_at', cutoffIso)
+                .order('updated_at', { ascending: false });
+            if(error){
+                console.error('Ошибка загрузки online_players:', error);
+                return [];
+            }
+            return filterPlayersBySelectedServer(data || []);
+        }catch(_){
+            try{ return filterPlayersBySelectedServer(await baseLoadOnlinePlayersV404?.() || []); }catch(__){ return []; }
+        }
+    };
+    window.loadOnlinePlayersFromSupabase = loadOnlinePlayersFromSupabase;
+
+    renderOnlinePlayers = async function(){
+        const list = document.getElementById('online-list');
+        if(!list) return;
+        const players = await loadOnlinePlayersFromSupabase();
+        const myId = authState?.playerId ? String(authState.playerId) : null;
+        try{ refreshPmOnlineState?.(players); }catch(_){ }
+        list.innerHTML = '';
+        const lobbyStatus = selectedServer() === DEV_SERVER_ID ? 'dev-lobby' : 'lobby';
+        const lobbyPlayers = players.filter(item => String(item?.status || '').toLowerCase() === lobbyStatus);
+        const appendPlayerRow = (p) => {
+            const row = document.createElement('div');
+            row.className = 'online-player';
+            const targetId = p?.player_id ? String(p.player_id) : '';
+            const canPmTarget = typeof isAccountPublicId === 'function' ? isAccountPublicId(targetId) : !!targetId;
+            const isMe = !!(targetId && myId && targetId === myId);
+            row.textContent = `${p.nickname || 'Player'}${!canPmTarget ? ' (guest)' : ''}`;
+            row.title = isMe ? 'Это вы' : 'Нажмите, чтобы открыть профиль';
+            row.dataset.playerId = targetId;
+            row.dataset.nickname = p.nickname || '';
+            if(!canPmTarget) row.style.opacity = '0.7';
+            list.appendChild(row);
+            if(targetId){
+                row.addEventListener('click', async () => {
+                    try{ await openPlayerProfile?.(targetId, p.nickname || `ID ${targetId}`); }catch(_){ }
+                });
+            }
+        };
+        if(lobbyPlayers.length){
+            lobbyPlayers.forEach(appendPlayerRow);
+        }else{
+            const empty = document.createElement('div');
+            empty.className = 'online-player';
+            empty.style.opacity = '0.7';
+            empty.textContent = selectedServer() === DEV_SERVER_ID ? 'На DEV сервере пока никого нет' : 'Игроков онлайн пока нет';
+            list.appendChild(empty);
+        }
+    };
+    window.renderOnlinePlayers = renderOnlinePlayers;
+
+    function hardRestoreTopUi(){
+        try{
+            const state = String(gameState || window.gameState || '').toUpperCase();
+            const isOrbit = state === 'ORBIT';
+            const isLobby = state === 'LOBBY';
+            const isAuth = state === 'AUTH';
+            const premiumBar = document.getElementById('premium-bar');
+            const accountInfo = document.getElementById('premium-account-info');
+            const currencyBox = document.getElementById('premium-currency-box');
+            const battleHud = document.getElementById('battle-player-hud');
+            const resourceBar = document.getElementById('resource-bar');
+            const topNav = document.getElementById('top-nav');
+
+            if(document.body){
+                document.body.classList.toggle('state-orbit', isOrbit);
+                if(!isOrbit) document.body.classList.remove('state-orbit');
+            }
+
+            [premiumBar, accountInfo, currencyBox, battleHud, resourceBar, topNav].forEach(el => {
+                if(!el) return;
+                el.style.removeProperty('visibility');
+                el.style.removeProperty('pointer-events');
+            });
+
+            if(isOrbit){
+                [premiumBar, accountInfo, currencyBox, battleHud, topNav].forEach(el => {
+                    if(!el) return;
+                    el.style.setProperty('display', 'none', 'important');
+                    el.style.setProperty('visibility', 'hidden', 'important');
+                    el.style.setProperty('pointer-events', 'none', 'important');
+                });
+                if(resourceBar){
+                    resourceBar.style.setProperty('display', 'flex', 'important');
+                    resourceBar.style.setProperty('visibility', 'visible', 'important');
+                    resourceBar.style.setProperty('pointer-events', 'none', 'important');
+                }
+                return;
+            }
+
+            if(resourceBar) resourceBar.style.setProperty('display', 'none', 'important');
+            if(isLobby){
+                if(premiumBar) premiumBar.style.setProperty('display', 'flex', 'important');
+                if(accountInfo) accountInfo.style.setProperty('display', 'flex', 'important');
+                if(currencyBox) currencyBox.style.setProperty('display', 'flex', 'important');
+                if(topNav) topNav.style.setProperty('display', 'flex', 'important');
+                if(battleHud) battleHud.style.setProperty('display', 'none', 'important');
+            }else if(isAuth){
+                if(premiumBar) premiumBar.style.setProperty('display', 'none', 'important');
+                if(accountInfo) accountInfo.style.removeProperty('display');
+                if(currencyBox) currencyBox.style.removeProperty('display');
+                if(battleHud) battleHud.style.setProperty('display', 'none', 'important');
+            }else if(state === 'BATTLE' || state === 'OBSERVE'){
+                if(premiumBar) premiumBar.style.setProperty('display', 'none', 'important');
+                if(battleHud) battleHud.style.removeProperty('display');
+            }
+        }catch(_){ }
+    }
+
+    const baseSwitchStateV404 = typeof switchState === 'function' ? switchState : null;
+    if(baseSwitchStateV404){
+        switchState = async function(...args){
+            const result = await baseSwitchStateV404.apply(this, args);
+            enforceServerUi(false);
+            hardRestoreTopUi();
+            try{ syncCurrentOnlinePresence?.(); }catch(_){ }
+            setTimeout(() => { enforceServerUi(false); hardRestoreTopUi(); try{ syncCurrentOnlinePresence?.(); renderOnlinePlayers?.(); }catch(_){} }, 120);
+            setTimeout(() => { hardRestoreTopUi(); try{ renderOnlinePlayers?.(); }catch(_){} }, 600);
+            return result;
+        };
+        window.switchState = switchState;
+    }
+
+    const baseUpdateHUDV404 = typeof updateHUD === 'function' ? updateHUD : null;
+    if(baseUpdateHUDV404){
+        updateHUD = function(...args){
+            const result = baseUpdateHUDV404.apply(this, args);
+            hardRestoreTopUi();
+            return result;
+        };
+        window.updateHUD = updateHUD;
+    }
+
+    const baseApplyIdentityV404 = typeof applyPlayerIdentityRow === 'function' ? applyPlayerIdentityRow : null;
+    if(baseApplyIdentityV404){
+        applyPlayerIdentityRow = function(row = {}){
+            const result = baseApplyIdentityV404.apply(this, arguments);
+            if(row?.email && row?.staff_role) cacheEmailRole(row.email, row.staff_role);
+            if(row?.staff_role) player.staff_role = normRole(row.staff_role);
+            enforceServerUi(false);
+            setTimeout(() => { enforceServerUi(false); try{ syncCurrentOnlinePresence?.(); renderOnlinePlayers?.(); }catch(_){} }, 100);
+            return result;
+        };
+        window.applyPlayerIdentityRow = applyPlayerIdentityRow;
+    }
+
+    const baseUpdateAuthServerVisibilityV404 = typeof updateAuthServerVisibility === 'function' ? updateAuthServerVisibility : null;
+    updateAuthServerVisibility = function(){
+        try{ baseUpdateAuthServerVisibilityV404?.(); }catch(_){ }
+        enforceServerUi(false);
+        bindEmailRoleLookup();
+        setTimeout(() => enforceServerUi(false), 120);
+    };
+    window.updateAuthServerVisibility = updateAuthServerVisibility;
+    window.getSelectedCosmicServer = selectedServer;
+
+    document.addEventListener('click', function(event){
+        const option = event.target?.closest?.('.auth-server-option');
+        if(!option) return;
+        const targetId = optionServerId(option);
+        if(targetId === DEV_SERVER_ID && !isStaffNow()){
+            event.preventDefault();
+            event.stopPropagation();
+            selectServer(REAL_SERVER_ID);
+            if(typeof showAuthMessage === 'function') showAuthMessage('DEV Test Server доступен только staff. Введите staff email и дождитесь проверки роли.');
+            refreshRoleByEmail(true);
+            return;
+        }
+        setTimeout(() => {
+            selectServer(targetId);
+            enforceServerUi(false);
+            try{ syncCurrentOnlinePresence?.(); renderOnlinePlayers?.(); }catch(_){ }
+        }, 0);
+    }, true);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        bindEmailRoleLookup();
+        enforceServerUi(false);
+        hardRestoreTopUi();
+    });
+
+    setInterval(() => {
+        bindEmailRoleLookup();
+        enforceServerUi(false);
+        hardRestoreTopUi();
+    }, 1000);
+
+    setTimeout(() => { bindEmailRoleLookup(); refreshRoleByEmail(false); enforceServerUi(false); hardRestoreTopUi(); }, 250);
+    setTimeout(() => { refreshRoleByEmail(false); enforceServerUi(false); hardRestoreTopUi(); }, 1600);
+    setTimeout(() => { refreshRoleByEmail(false); enforceServerUi(false); hardRestoreTopUi(); }, 3200);
+})();
