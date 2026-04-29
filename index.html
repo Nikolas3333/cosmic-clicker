@@ -9037,3 +9037,29 @@ body.hangar-chat-mode #chat-wrapper.hangar-pm-neon {
 @media (max-width:1100px){.auth-server-box{right:20px; top:20px;}.cosmic-login-card{margin-top:50px;}}
 
 </style>
+
+<!-- V402 DEV SERVER + ORBIT UI SAFETY PATCH -->
+<style>
+  body.state-orbit #premium-bar,
+  body.state-orbit #premium-account-info,
+  body.state-orbit #premium-currency-box,
+  body.state-orbit #battle-player-hud{
+    display:none !important;
+    visibility:hidden !important;
+    pointer-events:none !important;
+  }
+  body.state-orbit #resource-bar{
+    display:flex !important;
+    left:50% !important;
+    right:auto !important;
+    transform:translateX(-50%) !important;
+    top:15px !important;
+    max-width:calc(100vw - 40px) !important;
+    z-index:21020 !important;
+  }
+  .auth-server-option.dev-only.hidden,
+  .auth-server-option[data-dev-server="true"].hidden{
+    display:none !important;
+    pointer-events:none !important;
+  }
+</style>
