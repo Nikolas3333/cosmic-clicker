@@ -277,7 +277,7 @@ async function renderHangarPresencePanel(){
         const item = document.createElement('div');
         item.style.cssText = 'display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,0.055);border:1px solid rgba(255,255,255,0.06);';
         const role = pid === ownerId ? 'хозяин' : 'гость';
-        const me = pid && myId && pid === myId ? ' • вы' : '';
+        const me = pid && myId && pid === myId ? '' : '';
         item.textContent = `${pid === ownerId ? '👑' : '👁'} ${p?.nickname || 'Player'} — ${role}${me}`;
         if(pid && pid !== myId){
             item.style.cursor = 'pointer';
