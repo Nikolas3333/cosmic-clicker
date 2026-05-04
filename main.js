@@ -7539,7 +7539,6 @@ function updateProfileUI() {
     <p>Ник: ${player.nickname}</p>
     <p>Уровень: ${player.level}</p>
     <p>Опыт: ${player.experience}</p>
-    <p>Кредиты: ${player.credits}</p>
     <p>Кораблей: ${player.ships.length}</p>
   `;
 }
@@ -10580,17 +10579,13 @@ initBattleChat();
 function renderProfileStats(){
     const profileInfo = document.getElementById('profile-info');
     if(!profileInfo) return;
-    const totalResources = Object.values(playerResources || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
     profileInfo.innerHTML = `
       <h2 class="profile-title">Пилот ${player.nickname}</h2>
       <div class="profile-grid">
-        <div class="stat-card"><div class="cosmic-badge">Игровой ID</div><div>${authState.playerId || 0}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Email</div><div>${authState.email || 'Гость'}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${player.level}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Кредиты</div><div>${player.credits}</div></div>
+        <div class="stat-card"><div class="cosmic-badge">Опыт</div><div>${player.experience || 0}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Фраги</div><div>${battleStats.playerKills}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Смерти</div><div>${battleStats.playerDeaths}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${player.ships.length}</div></div>
       </div>`;
 }
@@ -18331,13 +18326,9 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
     profileInfoEl.innerHTML = `
       <h2 class="profile-title">Пилот ${escapeChatHtml(displayName)}</h2>
       <div class="profile-grid">
-        <div class="stat-card"><div class="cosmic-badge">Игровой ID</div><div>${escapeChatHtml(normalizedId || '—')}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Статус</div><div>${isAccountPublicId(normalizedId) ? 'Аккаунт' : 'Гость'}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Роль</div><div>${roleMeta.short || 'PLAYER'}</div></div>
         <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${Number(data?.level) || 1}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Кредиты</div><div>${Number(data?.credits) || 0}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Кристаллы</div><div>${Number(data?.crystals) || 0}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
       </div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
         ${canPm ? '<button id="profile-pm-btn" type="button" style="padding:10px 14px;border-radius:10px;border:1px solid rgba(0,255,255,0.35);background:rgba(0,180,255,0.18);color:#fff;cursor:pointer;">✉️ Написать в ЛС</button>' : ''}
