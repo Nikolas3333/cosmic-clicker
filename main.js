@@ -163,6 +163,146 @@ let hangarViewMode = 'self';
 let hangarGuestOwner = null;
 let hangarSelfSnapshot = null;
 
+// ===== V411 HANGAR PRESENCE (real online visibility, no DB schema changes) =====
+// Используем online_players.status = "hangar:<ownerPublicId>".
+// Так не нужен новый столбец в Supabase и не трогаем room_id/rooms.
+let currentHangarPresenceOwnerId = '';
+let hangarPresenceRenderTimer = null;
+
+function getOwnPublicIdForPresence(){
+    const value = (typeof authState !== 'undefined' && authState?.playerId)
+        ? String(authState.playerId)
+        : (typeof player !== 'undefined' && player?.id ? String(player.id) : '');
+    return String(value || '').trim();
+}
+
+function getHangarPresenceStatus(ownerId){
+    const safeOwnerId = String(ownerId || '').trim();
+    return safeOwnerId ? `hangar:${safeOwnerId}` : 'hangar';
+}
+
+function getHangarOwnerIdForPresence(){
+    if(typeof isHangarGuestView === 'function' && isHangarGuestView() && hangarGuestOwner?.public_id){
+        return String(hangarGuestOwner.public_id || '').trim();
+    }
+    return getOwnPublicIdForPresence();
+}
+
+function isHangarWindowOpenNow(){
+    const win = document.getElementById('hangar-window');
+    return !!(win && !win.classList.contains('hidden') && win.style.display !== 'none');
+}
+
+async function enterHangarPresence(ownerId = ''){
+    const safeOwnerId = String(ownerId || getHangarOwnerIdForPresence() || '').trim();
+    if(!safeOwnerId) return;
+    currentHangarPresenceOwnerId = safeOwnerId;
+    try{ await setPlayerOnlineStatus?.(getHangarPresenceStatus(safeOwnerId), null); }catch(error){ console.warn('hangar presence enter warning:', error?.message || error); }
+    try{ startHangarPresenceLoop?.(); }catch(_){}
+    try{ renderHangarPresencePanel?.(); }catch(_){}
+}
+
+async function enterOwnHangarPresence(){
+    await enterHangarPresence(getOwnPublicIdForPresence());
+}
+
+async function leaveHangarPresence(){
+    const wasInHangar = !!currentHangarPresenceOwnerId || (typeof isHangarGuestView === 'function' && isHangarGuestView());
+    currentHangarPresenceOwnerId = '';
+    try{ stopHangarPresenceLoop?.(); }catch(_){}
+    try{ clearHangarPresencePanel?.(); }catch(_){}
+    if(wasInHangar){
+        try{ await setPlayerOnlineStatus?.('lobby', null); }catch(error){ console.warn('hangar presence leave warning:', error?.message || error); }
+    }
+}
+
+function ensureHangarPresencePanel(){
+    const win = document.getElementById('hangar-window');
+    if(!win) return null;
+    let panel = document.getElementById('hangar-presence-panel');
+    if(panel) return panel;
+    panel = document.createElement('div');
+    panel.id = 'hangar-presence-panel';
+    panel.style.cssText = 'position:absolute;top:58px;right:22px;min-width:220px;max-width:300px;max-height:240px;overflow:auto;padding:12px 14px;border-radius:14px;background:rgba(4,10,22,0.84);border:1px solid rgba(112,234,255,0.28);box-shadow:0 0 22px rgba(0,210,255,0.18);color:#dffaff;font-size:13px;z-index:30;pointer-events:auto;';
+    panel.innerHTML = '<div style="font-weight:800;color:#8ff5ff;margin-bottom:8px;">👥 В ангаре</div><div id="hangar-presence-list" style="display:flex;flex-direction:column;gap:6px;"></div>';
+    win.appendChild(panel);
+    return panel;
+}
+
+function clearHangarPresencePanel(){
+    const list = document.getElementById('hangar-presence-list');
+    if(list) list.innerHTML = '';
+}
+
+async function renderHangarPresencePanel(){
+    if(!isHangarWindowOpenNow()) return;
+    const ownerId = String(currentHangarPresenceOwnerId || getHangarOwnerIdForPresence() || '').trim();
+    if(!ownerId) return;
+    const panel = ensureHangarPresencePanel();
+    const list = document.getElementById('hangar-presence-list');
+    if(!panel || !list) return;
+
+    const myId = getOwnPublicIdForPresence();
+    let players = [];
+    try{
+        players = await loadOnlinePlayersFromSupabase?.() || [];
+    }catch(error){
+        console.warn('hangar presence load warning:', error?.message || error);
+        players = [];
+    }
+
+    const neededStatus = getHangarPresenceStatus(ownerId).toLowerCase();
+    const rows = (players || []).filter(p => String(p?.status || '').toLowerCase() === neededStatus);
+
+    // На всякий случай добавляем хозяина сверху, если он уже в списке присутствующих.
+    rows.sort((a,b) => {
+        const aid = String(a?.player_id || '');
+        const bid = String(b?.player_id || '');
+        if(aid === ownerId && bid !== ownerId) return -1;
+        if(bid === ownerId && aid !== ownerId) return 1;
+        return String(a?.nickname || '').localeCompare(String(b?.nickname || ''));
+    });
+
+    list.innerHTML = '';
+    if(!rows.length){
+        const empty = document.createElement('div');
+        empty.style.opacity = '0.68';
+        empty.textContent = 'Пока никого нет';
+        list.appendChild(empty);
+        return;
+    }
+
+    rows.forEach(p => {
+        const pid = String(p?.player_id || '').trim();
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,0.055);border:1px solid rgba(255,255,255,0.06);';
+        const role = pid === ownerId ? 'хозяин' : 'гость';
+        const me = pid && myId && pid === myId ? ' • вы' : '';
+        item.textContent = `${pid === ownerId ? '👑' : '👁'} ${p?.nickname || 'Player'} — ${role}${me}`;
+        if(pid && pid !== myId){
+            item.style.cursor = 'pointer';
+            item.title = 'Открыть профиль';
+            item.addEventListener('click', () => { try{ openPlayerProfile?.(pid, p?.nickname || `ID ${pid}`); }catch(_){} });
+        }
+        list.appendChild(item);
+    });
+}
+
+function startHangarPresenceLoop(){
+    if(hangarPresenceRenderTimer) clearInterval(hangarPresenceRenderTimer);
+    hangarPresenceRenderTimer = setInterval(() => {
+        try{
+            if(!isHangarWindowOpenNow()){ stopHangarPresenceLoop(); return; }
+            renderHangarPresencePanel();
+        }catch(_){}
+    }, 2200);
+}
+
+function stopHangarPresenceLoop(){
+    if(hangarPresenceRenderTimer) clearInterval(hangarPresenceRenderTimer);
+    hangarPresenceRenderTimer = null;
+}
+
 function isHangarGuestView(){
     return String(hangarViewMode || 'self') === 'guest';
 }
@@ -7570,10 +7710,11 @@ function updateHangarUI() {
 if(hangarBtn && hangarWindow){
   hangarBtn.addEventListener("click", () => {
     try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
+    try{ enterOwnHangarPresence?.(); }catch(_){}
     updateHangarUI();
     hangarWindow.classList.remove("hidden");
     hangarWindow.style.cssText = "position:fixed;inset:0;top:0;left:0;width:100vw;height:100vh;display:flex;justify-content:center;align-items:center;z-index:21000;background:rgba(0,0,0,0.82);";
-    requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){} });
+    requestAnimationFrame(() => { try{ ensureHangarRenderer?.(); }catch(_){} try{ renderHangarPresencePanel?.(); }catch(_){} });
   });
 }
 
@@ -7581,6 +7722,7 @@ if(closeHangar && hangarWindow){
   closeHangar.addEventListener("click", () => {
     hangarWindow.classList.add("hidden");
     hangarWindow.style.display='none';
+    try{ leaveHangarPresence?.(); }catch(_){}
     try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
   });
 }
@@ -14463,6 +14605,17 @@ function renderHangarCosmic(forceSyncToSelected = true){
         guestBanner.style.display = isHangarGuestView?.() ? 'block' : 'none';
         guestBanner.textContent = `👁 Просмотр ангара: ${hangarGuestOwner?.nickname || 'игрок'}`;
     }
+    try{
+        if(isHangarWindowOpenNow?.()){
+            const ownerId = getHangarOwnerIdForPresence?.();
+            if(ownerId){
+                currentHangarPresenceOwnerId = String(ownerId);
+                ensureHangarPresencePanel?.();
+                renderHangarPresencePanel?.();
+                startHangarPresenceLoop?.();
+            }
+        }
+    }catch(_){}
     bindHangarControls();
     bindHangarRuntimeUI();
     updateHangarFilterButtons?.();
@@ -14512,7 +14665,7 @@ function initExtraLobbyWindows(){
         tab.dataset.boundExtra = '1';
         tab.addEventListener('click', () => {
           closeAll();
-          if(winId === 'hangar-window') try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
+          if(winId === 'hangar-window') { try{ restoreOwnHangarAfterGuest?.(); }catch(_){} try{ enterOwnHangarPresence?.(); }catch(_){} }
           win.classList.remove('hidden');
           if(winId === 'hangar-window'){
             requestAnimationFrame(() => {
@@ -14536,6 +14689,7 @@ function initExtraLobbyWindows(){
           win.classList.add('hidden');
           if(winId === 'hangar-window'){
             try{ disposeHangarRenderer?.(); }catch(_){}
+            try{ leaveHangarPresence?.(); }catch(_){}
             try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
             __restoreHangarChatPanel();
           }
@@ -18424,6 +18578,7 @@ async function openPlayerHangarAsGuest(targetId, fallbackNickname = 'Player', ca
         hangarSelfSnapshot = null;
         document.getElementById('profile-window')?.classList.add('hidden');
         document.getElementById('hangar-window')?.classList.remove('hidden');
+        try{ await enterOwnHangarPresence?.(); }catch(_){}
         renderHangarCosmic?.(true);
         return;
     }
@@ -18431,8 +18586,10 @@ async function openPlayerHangarAsGuest(targetId, fallbackNickname = 'Player', ca
     const profileData = cachedProfileData || await fetchPlayerProfileData(normalizedId) || { public_id: normalizedId, nickname: fallbackNickname };
     const saveData = await fetchPlayerHangarSaveData(normalizedId);
     applyGuestHangarPayload(profileData, saveData, fallbackNickname);
+    currentHangarPresenceOwnerId = String(normalizedId);
     document.getElementById('profile-window')?.classList.add('hidden');
     document.getElementById('hangar-window')?.classList.remove('hidden');
+    try{ await enterHangarPresence?.(normalizedId); }catch(_){}
     requestAnimationFrame(() => {
         try{ renderHangarCosmic?.(true); }catch(error){ console.warn('open guest hangar render warning:', error?.message || error); }
     });
@@ -18658,6 +18815,15 @@ function getOnlinePresenceStateForGameState(state = gameState){
 }
 
 function syncCurrentOnlinePresence(){
+    if(typeof isHangarWindowOpenNow === 'function' && isHangarWindowOpenNow()){
+        const ownerId = String(currentHangarPresenceOwnerId || getHangarOwnerIdForPresence?.() || '').trim();
+        if(ownerId){
+            currentHangarPresenceOwnerId = ownerId;
+            setPlayerOnlineStatus(getHangarPresenceStatus(ownerId), null);
+            return;
+        }
+    }
+
     const status = getOnlinePresenceStateForGameState(gameState);
     if(status === 'offline'){
         removePlayerFromOnline();
