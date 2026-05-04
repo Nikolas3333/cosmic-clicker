@@ -332,7 +332,7 @@ async function renderHangarPresencePanel(){
         return String(a?.nickname || '').localeCompare(String(b?.nickname || ''));
     });
 
-    try{ /*disabled*/removed_renderHangarPresenceAvatars(rows, ownerId); }catch(_){}
+    try{ /*disabled*/ }catch(_){}
 
     list.innerHTML = '';
     if(!rows.length){
@@ -20989,28 +20989,40 @@ setInterval(function(){
  }catch(e){}
 },1500);
 
-// v420 safe astronaut visible
+
+
+// v421 HARD CLEAN UI (FINAL)
+setInterval(function(){
+  try{
+    var els = document.querySelectorAll('[id*="hangar-presence-avatars"],[id*="removed-hangar-presence-avatars"]');
+    for(var i=0;i<els.length;i++){
+      if(els[i] && els[i].parentNode){
+        els[i].parentNode.removeChild(els[i]);
+      }
+    }
+  }catch(e){}
+},500);
+
+// v421 SIMPLE STATIC ASTRONAUT (VISIBLE)
 setTimeout(function(){
  try{
-   if(window.THREE && window.scene && window.camera && !window.__astro_v420){
+   if(window.THREE && window.scene && !window.__astro_final){
      var g = new THREE.Group();
      var m = new THREE.MeshBasicMaterial({color:0xffffff});
-     var body = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.4), m);
-     body.position.y = 0.6;
-     var head = new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8), m);
-     head.position.y = 1.4;
-     g.add(body); g.add(head);
-     scene.add(g);
-     window.__astro_v420 = g;
 
-     setInterval(function(){
-       try{
-         var dir = new THREE.Vector3();
-         camera.getWorldDirection(dir);
-         var pos = camera.position.clone().add(dir.multiplyScalar(3));
-         g.position.copy(pos);
-       }catch(e){}
-     },100);
+     var body = new THREE.Mesh(new THREE.BoxGeometry(1,2,0.6), m);
+     body.position.y = 1;
+
+     var head = new THREE.Mesh(new THREE.SphereGeometry(0.5,8,8), m);
+     head.position.y = 2.5;
+
+     g.add(body);
+     g.add(head);
+
+     g.position.set(0,0,0); // центр сцены
+
+     scene.add(g);
+     window.__astro_final = g;
    }
  }catch(e){}
 },2000);
