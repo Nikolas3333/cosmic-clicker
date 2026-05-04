@@ -238,14 +238,12 @@ function clearHangarPresencePanel(){
 }
 
 function ensureHangarPresenceAvatars(){
-    const win = document.getElementById('hangar-window');
-    if(!win) return null;
     let wrap = document.getElementById('hangar-presence-avatars');
     if(wrap) return wrap;
     wrap = document.createElement('div');
     wrap.id = 'hangar-presence-avatars';
-    wrap.style.cssText = 'position:fixed;left:50%;bottom:92px;transform:translateX(-50%);display:flex;gap:14px;align-items:flex-end;justify-content:center;z-index:70000;pointer-events:auto;';
-    win.appendChild(wrap);
+    wrap.style.cssText = 'position:fixed;left:50%;bottom:92px;transform:translateX(-50%);display:flex;gap:14px;align-items:flex-end;justify-content:center;z-index:999999;pointer-events:auto;';
+    document.body.appendChild(wrap);
     return wrap;
 }
 
@@ -20761,3 +20759,12 @@ setInterval(() => {
     }
   }catch(_){}
 }, 1800);
+
+
+// v416 force avatars visible
+setInterval(()=>{
+ try{
+   const el = document.getElementById('hangar-presence-avatars');
+   if(el) el.style.display='flex';
+ }catch(_){ }
+},1000);
