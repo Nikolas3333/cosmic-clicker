@@ -233,13 +233,41 @@ function ensureHangarPresencePanel(){
 function clearHangarPresencePanel(){
     const list = document.getElementById('hangar-presence-list');
     if(list) list.innerHTML = '';
-    const avatars = document.getElementById('hangar-presence-avatars');
+    const avatars = document.getElementById('removed-hangar-presence-avatars');
     if(avatars){ avatars.innerHTML = ''; avatars.remove(); }
 }
 
+function /*disabled*/removed_ensureHangarPresenceAvatars(){
+    let wrap = document.getElementById('removed-hangar-presence-avatars');
+    if(wrap) return wrap;
+    wrap = document.createElement('div');
+    wrap.id = 'removed-hangar-presence-avatars';
+    wrap.style.cssText = 'position:fixed;left:50%;bottom:92px;transform:translateX(-50%);display:flex;gap:14px;align-items:flex-end;justify-content:center;z-index:999999;pointer-events:auto;';
+    document.body.appendChild(wrap);
+    return wrap;
+}
 
-
-`); }catch(_){} });
+function /*disabled*/removed_renderHangarPresenceAvatars(rows = [], ownerId = ''){
+    const wrap = /*disabled*/removed_ensureHangarPresenceAvatars();
+    if(!wrap) return;
+    wrap.innerHTML = '';
+    const visibleRows = (rows || []).slice(0, 6);
+    visibleRows.forEach((p, index) => {
+        const pid = String(p?.player_id || '').trim();
+        const isOwner = pid && String(ownerId || '').trim() === pid;
+        const card = document.createElement('div');
+        card.style.cssText = 'min-width:66px;max-width:96px;padding:9px 10px;border-radius:16px;background:rgba(4,12,24,0.92);border:1px solid rgba(130,240,255,0.55);box-shadow:0 0 24px rgba(0,220,255,0.32);text-align:center;color:#e9fbff;font-size:12px;backdrop-filter:blur(6px);';
+        const icon = document.createElement('div');
+        icon.textContent = isOwner ? '👑🧑‍🚀' : '👁🧑‍🚀';
+        icon.style.cssText = 'font-size:28px;line-height:1.1;margin-bottom:4px;filter:drop-shadow(0 0 8px rgba(0,255,255,0.45));';
+        const name = document.createElement('div');
+        name.textContent = String(p?.nickname || 'Player').slice(0, 12);
+        name.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0.92;';
+        card.appendChild(icon);
+        card.appendChild(name);
+        if(pid){
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', () => { try{ openPlayerProfile?.(pid, p?.nickname || `ID ${pid}`); }catch(_){} });
         }
         wrap.appendChild(card);
     });
@@ -304,7 +332,7 @@ async function renderHangarPresencePanel(){
         return String(a?.nickname || '').localeCompare(String(b?.nickname || ''));
     });
 
-    try{  }catch(_){}
+    try{ /*disabled*/removed_renderHangarPresenceAvatars(rows, ownerId); }catch(_){}
 
     list.innerHTML = '';
     if(!rows.length){
@@ -20953,35 +20981,36 @@ setTimeout(()=>{
  }catch(e){}
 },1500);
 
-// v419 remove old avatar UI completely
-setInterval(()=>{
-  try{
-    const el = document.getElementById('hangar-presence-avatars');
-    if(el) el.remove();
-  }catch(e){}
-},1000);
-
-// v419 HARD astronaut always visible near camera
-setInterval(()=>{
+// v420 cleanup old UI safely
+setInterval(function(){
  try{
-   if(window.THREE && window.scene && window.camera){
-     if(!window.__astro_fix){
-       const g = new THREE.Group();
-       const m = new THREE.MeshBasicMaterial({color:0xffffff});
-       const body = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.4), m);
-       body.position.y = 0.6;
-       const head = new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8), m);
-       head.position.y = 1.4;
-       g.add(body); g.add(head);
-       scene.add(g);
-       window.__astro_fix = g;
-     }
+   var el = document.getElementById('removed-hangar-presence-avatars');
+   if(el){ el.parentNode && el.parentNode.removeChild(el); }
+ }catch(e){}
+},1500);
 
-     // always keep in front of camera
-     const dir = new THREE.Vector3();
-     camera.getWorldDirection(dir);
-     const pos = camera.position.clone().add(dir.multiplyScalar(3));
-     window.__astro_fix.position.copy(pos);
+// v420 safe astronaut visible
+setTimeout(function(){
+ try{
+   if(window.THREE && window.scene && window.camera && !window.__astro_v420){
+     var g = new THREE.Group();
+     var m = new THREE.MeshBasicMaterial({color:0xffffff});
+     var body = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.4), m);
+     body.position.y = 0.6;
+     var head = new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8), m);
+     head.position.y = 1.4;
+     g.add(body); g.add(head);
+     scene.add(g);
+     window.__astro_v420 = g;
+
+     setInterval(function(){
+       try{
+         var dir = new THREE.Vector3();
+         camera.getWorldDirection(dir);
+         var pos = camera.position.clone().add(dir.multiplyScalar(3));
+         g.position.copy(pos);
+       }catch(e){}
+     },100);
    }
  }catch(e){}
-},100);
+},2000);
