@@ -20653,3 +20653,14 @@ try{ startV374BotNameLoop(); }catch(_){}
 
 
 // v410: hangar presence system placeholder (safe, non-breaking)
+
+// v413 AUTO ENTER HANGAR PRESENCE FIX
+setInterval(() => {
+  try{
+    if(typeof isHangarWindowOpenNow === 'function' && isHangarWindowOpenNow()){
+      if(!currentHangarPresenceOwnerId){
+        enterOwnHangarPresence?.();
+      }
+    }
+  }catch(_){}
+},1500);
