@@ -20761,10 +20761,203 @@ setInterval(() => {
 }, 1800);
 
 
-// v416 force avatars visible
-setInterval(()=>{
- try{
-   const el = document.getElementById('hangar-presence-avatars');
-   if(el) el.style.display='flex';
- }catch(_){ }
-},1000);
+
+
+// ===== V417 HARD HANGAR ASTRONAUT OVERLAY (independent visual layer) =====
+// This is intentionally independent from the older hangar-presence panel.
+// It creates a visible body-level astronaut strip whenever the hangar is open.
+let __cosmicHangarAstronautOverlayTimer = null;
+
+function cosmicIsHangarActuallyOpenV417(){
+    try{
+        const win = document.getElementById('hangar-window');
+        if(!win) return false;
+        if(win.classList.contains('hidden')) return false;
+        const cs = window.getComputedStyle ? getComputedStyle(win) : null;
+        if(cs && (cs.display === 'none' || cs.visibility === 'hidden')) return false;
+        return true;
+    }catch(_){
+        return false;
+    }
+}
+
+function cosmicGetHangarPresenceRowsV417(){
+    const rows = [];
+    const addRow = (entry) => {
+        try{
+            const pid = String(entry?.player_id || '').trim();
+            if(!pid) return;
+            if(rows.some(r => String(r?.player_id || '').trim() === pid)) return;
+            rows.push(entry);
+        }catch(_){}
+    };
+
+    try{
+        const ownerId = String(
+            (typeof currentHangarPresenceOwnerId !== 'undefined' && currentHangarPresenceOwnerId) ||
+            (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') ||
+            (authState?.playerId || player?.id || '')
+        ).trim();
+
+        const myId = String(
+            (typeof getOwnPublicIdForPresence === 'function' ? getOwnPublicIdForPresence() : '') ||
+            authState?.playerId ||
+            player?.id ||
+            ''
+        ).trim();
+
+        const ownerName =
+            String(hangarGuestOwner?.nickname || '').trim() ||
+            String(hangarGuestOwner?.name || '').trim() ||
+            String(player?.nickname || '').trim() ||
+            'Player';
+
+        if(ownerId){
+            addRow({
+                player_id: ownerId,
+                nickname: ownerName,
+                __owner: true
+            });
+        }
+
+        if(myId){
+            addRow({
+                player_id: myId,
+                nickname: String(player?.nickname || 'Player').trim() || 'Player',
+                __owner: ownerId && ownerId === myId
+            });
+        }
+
+        try{
+            const listItems = Array.from(document.querySelectorAll('#hangar-presence-list > div'));
+            listItems.forEach((el, index) => {
+                const txt = String(el?.textContent || '').trim();
+                if(!txt || txt.includes('Пока никого')) return;
+                const isOwner = txt.startsWith('👑');
+                const clean = txt.replace(/^👑\s*/,'').replace(/^👁\s*/,'').trim();
+                addRow({
+                    player_id: `dom-${index}-${clean}`,
+                    nickname: clean || 'Player',
+                    __owner: isOwner
+                });
+            });
+        }catch(_){}
+    }catch(_){}
+
+    if(!rows.length){
+        rows.push({
+            player_id: 'local-preview',
+            nickname: String(player?.nickname || 'Player').trim() || 'Player',
+            __owner: true
+        });
+    }
+
+    return rows.slice(0, 6);
+}
+
+function cosmicEnsureHangarAstronautOverlayV417(){
+    let overlay = document.getElementById('cosmic-hangar-astronaut-overlay-v417');
+    if(overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'cosmic-hangar-astronaut-overlay-v417';
+    overlay.style.cssText = [
+        'position:fixed',
+        'left:50%',
+        'bottom:28px',
+        'transform:translateX(-50%)',
+        'display:flex',
+        'gap:18px',
+        'align-items:flex-end',
+        'justify-content:center',
+        'z-index:2147483647',
+        'pointer-events:auto',
+        'padding:10px 14px',
+        'border-radius:22px',
+        'background:rgba(0,8,18,0.76)',
+        'border:1px solid rgba(120,240,255,0.42)',
+        'box-shadow:0 0 32px rgba(0,220,255,0.32)',
+        'backdrop-filter:blur(7px)'
+    ].join(';');
+
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function cosmicRenderHangarAstronautOverlayV417(){
+    try{
+        const overlay = cosmicEnsureHangarAstronautOverlayV417();
+
+        if(!cosmicIsHangarActuallyOpenV417()){
+            overlay.style.display = 'none';
+            return;
+        }
+
+        const ownerId = String(
+            (typeof currentHangarPresenceOwnerId !== 'undefined' && currentHangarPresenceOwnerId) ||
+            (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') ||
+            (authState?.playerId || player?.id || '')
+        ).trim();
+
+        const rows = cosmicGetHangarPresenceRowsV417();
+        overlay.innerHTML = '';
+        overlay.style.display = 'flex';
+
+        rows.forEach((p) => {
+            const pid = String(p?.player_id || '').trim();
+            const isOwner = !!p?.__owner || (!!ownerId && pid === ownerId);
+            const box = document.createElement('div');
+            box.style.cssText = [
+                'width:82px',
+                'min-height:92px',
+                'display:flex',
+                'flex-direction:column',
+                'align-items:center',
+                'justify-content:center',
+                'gap:5px',
+                'border-radius:18px',
+                'background:linear-gradient(180deg, rgba(8,24,42,0.96), rgba(2,8,18,0.94))',
+                'border:1px solid rgba(140,245,255,0.58)',
+                'box-shadow:0 0 22px rgba(0,230,255,0.28), inset 0 0 18px rgba(120,240,255,0.08)',
+                'color:#eaffff',
+                'font-family:Arial,sans-serif',
+                'text-align:center'
+            ].join(';');
+
+            const badge = document.createElement('div');
+            badge.textContent = isOwner ? '👑' : '👁';
+            badge.style.cssText = 'font-size:20px;line-height:1;';
+
+            const astro = document.createElement('div');
+            astro.textContent = '🧑‍🚀';
+            astro.style.cssText = 'font-size:42px;line-height:1;filter:drop-shadow(0 0 12px rgba(0,255,255,0.85));';
+
+            const name = document.createElement('div');
+            name.textContent = String(p?.nickname || 'Player').slice(0, 12);
+            name.style.cssText = 'max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#dffbff;opacity:0.96;';
+
+            box.appendChild(badge);
+            box.appendChild(astro);
+            box.appendChild(name);
+
+            if(pid && !String(pid).startsWith('local-preview') && !String(pid).startsWith('dom-')){
+                box.style.cursor = 'pointer';
+                box.addEventListener('click', () => {
+                    try{ openPlayerProfile?.(pid, p?.nickname || `ID ${pid}`); }catch(_){}
+                });
+            }
+
+            overlay.appendChild(box);
+        });
+    }catch(_){}
+}
+
+function cosmicStartHangarAstronautOverlayV417(){
+    if(__cosmicHangarAstronautOverlayTimer) return;
+    __cosmicHangarAstronautOverlayTimer = setInterval(() => {
+        try{ cosmicRenderHangarAstronautOverlayV417(); }catch(_){}
+    }, 700);
+    try{ cosmicRenderHangarAstronautOverlayV417(); }catch(_){}
+}
+
+try{ cosmicStartHangarAstronautOverlayV417(); }catch(_){}
