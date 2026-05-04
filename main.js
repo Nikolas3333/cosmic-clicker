@@ -233,6 +233,7 @@ function ensureHangarPresencePanel(){
 function clearHangarPresencePanel(){
     const list = document.getElementById('hangar-presence-list');
     if(list) list.innerHTML = '';
+    try{ updateHangarAstronauts(rows); }catch(e){}
     const avatars = document.getElementById('removed-hangar-presence-avatars');
     if(avatars){ avatars.innerHTML = ''; avatars.remove(); }
 }
@@ -335,6 +336,7 @@ async function renderHangarPresencePanel(){
     try{ /*disabled*/ }catch(_){}
 
     list.innerHTML = '';
+    try{ updateHangarAstronauts(rows); }catch(e){}
     if(!rows.length){
         const empty = document.createElement('div');
         empty.style.opacity = '0.68';
@@ -17275,6 +17277,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
         if(!list) return;
         setModeTabUI();
         list.innerHTML = '';
+    try{ updateHangarAstronauts(rows); }catch(e){}
         let dataset = getCurrentDataset();
         if(mode === 'battle') dataset = dataset.filter(isPublicBattleLobbyEntryV383);
         if(mode === 'solo') dataset = dataset.filter(isSoloLobbyEntryV383);
@@ -18844,6 +18847,7 @@ async function renderOnlinePlayers(){
     const myId = (typeof authState !== 'undefined' && authState?.playerId) ? String(authState.playerId) : null;
     refreshPmOnlineState(players);
     list.innerHTML = '';
+    try{ updateHangarAstronauts(rows); }catch(e){}
 
     const lobbyPlayers = players.filter(item => String(item?.status || '').toLowerCase() === 'lobby');
 
@@ -20726,249 +20730,7 @@ try{ startV374BotNameLoop(); }catch(_){}
 
 
 
-// v410: hangar presence system placeholder (safe, non-breaking)
-
-
-
-// v414 HANGAR PRESENCE OWNER-AWARE SAFETY LOOP
-setInterval(() => {
-  try{
-    if(typeof isHangarWindowOpenNow === 'function' && isHangarWindowOpenNow()){
-      const ownerId = String(currentHangarPresenceOwnerId || (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') || '').trim();
-      if(ownerId){
-        currentHangarPresenceOwnerId = ownerId;
-        setPlayerOnlineStatus?.(getHangarPresenceStatus(ownerId), null);
-        renderHangarPresencePanel?.();
-      }
-    }
-  }catch(_){}
-}, 2200);
-
-
-
-// v415 HARD HANGAR PRESENCE KEEPALIVE
-setInterval(() => {
-  try{
-    if(typeof isHangarWindowOpenNow === 'function' && isHangarWindowOpenNow()){
-      const ownerId = (typeof getHangarOwnerIdForPresence === 'function') ? getHangarOwnerIdForPresence() : '';
-      if(ownerId){
-        currentHangarPresenceOwnerId = String(ownerId || '').trim();
-        setPlayerOnlineStatus?.(getHangarPresenceStatus(ownerId), null);
-        renderHangarPresencePanel?.();
-      }
-    }
-  }catch(_){}
-}, 1800);
-
-
-
-
-// ===== V417 HARD HANGAR ASTRONAUT OVERLAY (independent visual layer) =====
-// This is intentionally independent from the older hangar-presence panel.
-// It creates a visible body-level astronaut strip whenever the hangar is open.
-let __cosmicHangarAstronautOverlayTimer = null;
-
-function cosmicIsHangarActuallyOpenV417(){
-    try{
-        const win = document.getElementById('hangar-window');
-        if(!win) return false;
-        if(win.classList.contains('hidden')) return false;
-        const cs = window.getComputedStyle ? getComputedStyle(win) : null;
-        if(cs && (cs.display === 'none' || cs.visibility === 'hidden')) return false;
-        return true;
-    }catch(_){
-        return false;
-    }
-}
-
-function cosmicGetHangarPresenceRowsV417(){
-    const rows = [];
-    const addRow = (entry) => {
-        try{
-            const pid = String(entry?.player_id || '').trim();
-            if(!pid) return;
-            if(rows.some(r => String(r?.player_id || '').trim() === pid)) return;
-            rows.push(entry);
-        }catch(_){}
-    };
-
-    try{
-        const ownerId = String(
-            (typeof currentHangarPresenceOwnerId !== 'undefined' && currentHangarPresenceOwnerId) ||
-            (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') ||
-            (authState?.playerId || player?.id || '')
-        ).trim();
-
-        const myId = String(
-            (typeof getOwnPublicIdForPresence === 'function' ? getOwnPublicIdForPresence() : '') ||
-            authState?.playerId ||
-            player?.id ||
-            ''
-        ).trim();
-
-        const ownerName =
-            String(hangarGuestOwner?.nickname || '').trim() ||
-            String(hangarGuestOwner?.name || '').trim() ||
-            String(player?.nickname || '').trim() ||
-            'Player';
-
-        if(ownerId){
-            addRow({
-                player_id: ownerId,
-                nickname: ownerName,
-                __owner: true
-            });
-        }
-
-        if(myId){
-            addRow({
-                player_id: myId,
-                nickname: String(player?.nickname || 'Player').trim() || 'Player',
-                __owner: ownerId && ownerId === myId
-            });
-        }
-
-        try{
-            const listItems = Array.from(document.querySelectorAll('#hangar-presence-list > div'));
-            listItems.forEach((el, index) => {
-                const txt = String(el?.textContent || '').trim();
-                if(!txt || txt.includes('Пока никого')) return;
-                const isOwner = txt.startsWith('👑');
-                const clean = txt.replace(/^👑\s*/,'').replace(/^👁\s*/,'').trim();
-                addRow({
-                    player_id: `dom-${index}-${clean}`,
-                    nickname: clean || 'Player',
-                    __owner: isOwner
-                });
-            });
-        }catch(_){}
-    }catch(_){}
-
-    if(!rows.length){
-        rows.push({
-            player_id: 'local-preview',
-            nickname: String(player?.nickname || 'Player').trim() || 'Player',
-            __owner: true
-        });
-    }
-
-    return rows.slice(0, 6);
-}
-
-function cosmicEnsureHangarAstronautOverlayV417(){
-    let overlay = document.getElementById('cosmic-hangar-astronaut-overlay-v417');
-    if(overlay) return overlay;
-
-    overlay = document.createElement('div');
-    overlay.id = 'cosmic-hangar-astronaut-overlay-v417';
-    overlay.style.cssText = [
-        'position:fixed',
-        'left:50%',
-        'bottom:28px',
-        'transform:translateX(-50%)',
-        'display:flex',
-        'gap:18px',
-        'align-items:flex-end',
-        'justify-content:center',
-        'z-index:2147483647',
-        'pointer-events:auto',
-        'padding:10px 14px',
-        'border-radius:22px',
-        'background:rgba(0,8,18,0.76)',
-        'border:1px solid rgba(120,240,255,0.42)',
-        'box-shadow:0 0 32px rgba(0,220,255,0.32)',
-        'backdrop-filter:blur(7px)'
-    ].join(';');
-
-    document.body.appendChild(overlay);
-    return overlay;
-}
-
-function cosmicRenderHangarAstronautOverlayV417(){
-    try{
-        const overlay = cosmicEnsureHangarAstronautOverlayV417();
-
-        if(!cosmicIsHangarActuallyOpenV417()){
-            overlay.style.display = 'none';
-            return;
-        }
-
-        const ownerId = String(
-            (typeof currentHangarPresenceOwnerId !== 'undefined' && currentHangarPresenceOwnerId) ||
-            (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') ||
-            (authState?.playerId || player?.id || '')
-        ).trim();
-
-        const rows = cosmicGetHangarPresenceRowsV417();
-        overlay.innerHTML = '';
-        overlay.style.display = 'flex';
-
-        rows.forEach((p) => {
-            const pid = String(p?.player_id || '').trim();
-            const isOwner = !!p?.__owner || (!!ownerId && pid === ownerId);
-            const box = document.createElement('div');
-            box.style.cssText = [
-                'width:82px',
-                'min-height:92px',
-                'display:flex',
-                'flex-direction:column',
-                'align-items:center',
-                'justify-content:center',
-                'gap:5px',
-                'border-radius:18px',
-                'background:linear-gradient(180deg, rgba(8,24,42,0.96), rgba(2,8,18,0.94))',
-                'border:1px solid rgba(140,245,255,0.58)',
-                'box-shadow:0 0 22px rgba(0,230,255,0.28), inset 0 0 18px rgba(120,240,255,0.08)',
-                'color:#eaffff',
-                'font-family:Arial,sans-serif',
-                'text-align:center'
-            ].join(';');
-
-            const badge = document.createElement('div');
-            badge.textContent = isOwner ? '👑' : '👁';
-            badge.style.cssText = 'font-size:20px;line-height:1;';
-
-            const astro = document.createElement('div');
-            astro.textContent = '🧑‍🚀';
-            astro.style.cssText = 'font-size:42px;line-height:1;filter:drop-shadow(0 0 12px rgba(0,255,255,0.85));';
-
-            const name = document.createElement('div');
-            name.textContent = String(p?.nickname || 'Player').slice(0, 12);
-            name.style.cssText = 'max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#dffbff;opacity:0.96;';
-
-            box.appendChild(badge);
-            box.appendChild(astro);
-            box.appendChild(name);
-
-            if(pid && !String(pid).startsWith('local-preview') && !String(pid).startsWith('dom-')){
-                box.style.cursor = 'pointer';
-                box.addEventListener('click', () => {
-                    try{ openPlayerProfile?.(pid, p?.nickname || `ID ${pid}`); }catch(_){}
-                });
-            }
-
-            overlay.appendChild(box);
-        });
-    }catch(_){}
-}
-
-function cosmicStartHangarAstronautOverlayV417(){
-    if(__cosmicHangarAstronautOverlayTimer) return;
-    __cosmicHangarAstronautOverlayTimer = setInterval(() => {
-        try{ cosmicRenderHangarAstronautOverlayV417(); }catch(_){}
-    }, 700);
-    try{ cosmicRenderHangarAstronautOverlayV417(); }catch(_){}
-}
-
-try{ /*disabled overlay*/ }catch(_){}
-
-
-// v418 SAFE astronaut (no syntax break)
-setTimeout(()=>{
- try{
-   if(window.THREE && window.scene && !window.__astro_fix){
-     const g = new THREE.Group();
-     const m = new THREE.MeshBasicMaterial({color:0xffffff});
+);
      const body = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.4), m);
      body.position.y = 0.6;
      const head = new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8), m);
@@ -20981,34 +20743,7 @@ setTimeout(()=>{
  }catch(e){}
 },1500);
 
-// v420 cleanup old UI safely
-setInterval(function(){
- try{
-   var el = document.getElementById('removed-hangar-presence-avatars');
-   if(el){ el.parentNode && el.parentNode.removeChild(el); }
- }catch(e){}
-},1500);
-
-
-
-// v421 HARD CLEAN UI (FINAL)
-setInterval(function(){
-  try{
-    var els = document.querySelectorAll('[id*="hangar-presence-avatars"],[id*="removed-hangar-presence-avatars"]');
-    for(var i=0;i<els.length;i++){
-      if(els[i] && els[i].parentNode){
-        els[i].parentNode.removeChild(els[i]);
-      }
-    }
-  }catch(e){}
-},500);
-
-// v421 SIMPLE STATIC ASTRONAUT (VISIBLE)
-setTimeout(function(){
- try{
-   if(window.THREE && window.scene && !window.__astro_final){
-     var g = new THREE.Group();
-     var m = new THREE.MeshBasicMaterial({color:0xffffff});
+);
 
      var body = new THREE.Mesh(new THREE.BoxGeometry(1,2,0.6), m);
      body.position.y = 1;
@@ -21026,3 +20761,57 @@ setTimeout(function(){
    }
  }catch(e){}
 },2000);
+
+
+// ===== v422 REAL HANGAR ASTRONAUTS (SYNCED VIA online_players) =====
+let hangarAstronauts = {};
+
+function updateHangarAstronauts(rows){
+  try{
+    if(!window.THREE || !window.scene) return;
+
+    const existingIds = new Set(Object.keys(hangarAstronauts));
+
+    rows.forEach((p, i)=>{
+      const id = String(p?.player_id || '').trim();
+      if(!id) return;
+
+      if(!hangarAstronauts[id]){
+        const g = new THREE.Group();
+        const m = new THREE.MeshBasicMaterial({color:0xffffff});
+
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.4), m);
+        body.position.y = 0.6;
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8), m);
+        head.position.y = 1.4;
+
+        g.add(body);
+        g.add(head);
+
+        scene.add(g);
+        hangarAstronauts[id] = g;
+      }
+
+      // position around center
+      const angle = i * 1.2;
+      const radius = 4;
+      hangarAstronauts[id].position.set(
+        Math.cos(angle)*radius,
+        0,
+        Math.sin(angle)*radius
+      );
+
+      existingIds.delete(id);
+    });
+
+    // remove old
+    existingIds.forEach(id=>{
+      try{
+        scene.remove(hangarAstronauts[id]);
+        delete hangarAstronauts[id];
+      }catch(e){}
+    });
+
+  }catch(e){}
+}
