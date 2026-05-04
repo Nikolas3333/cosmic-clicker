@@ -190,7 +190,8 @@ function getHangarOwnerIdForPresence(){
 
 function isHangarWindowOpenNow(){
     const win = document.getElementById('hangar-window');
-    return !!(win && !win.classList.contains('hidden') && win.style.display !== 'none');
+    if(!win) return false;
+    return !win.classList.contains('hidden');
 }
 
 async function enterHangarPresence(ownerId = ''){
@@ -232,6 +233,46 @@ function ensureHangarPresencePanel(){
 function clearHangarPresencePanel(){
     const list = document.getElementById('hangar-presence-list');
     if(list) list.innerHTML = '';
+    const avatars = document.getElementById('hangar-presence-avatars');
+    if(avatars) avatars.innerHTML = '';
+}
+
+function ensureHangarPresenceAvatars(){
+    const win = document.getElementById('hangar-window');
+    if(!win) return null;
+    let wrap = document.getElementById('hangar-presence-avatars');
+    if(wrap) return wrap;
+    wrap = document.createElement('div');
+    wrap.id = 'hangar-presence-avatars';
+    wrap.style.cssText = 'position:absolute;left:50%;bottom:72px;transform:translateX(-50%);display:flex;gap:14px;align-items:flex-end;justify-content:center;z-index:32;pointer-events:auto;';
+    win.appendChild(wrap);
+    return wrap;
+}
+
+function renderHangarPresenceAvatars(rows = [], ownerId = ''){
+    const wrap = ensureHangarPresenceAvatars();
+    if(!wrap) return;
+    wrap.innerHTML = '';
+    const visibleRows = (rows || []).slice(0, 6);
+    visibleRows.forEach((p, index) => {
+        const pid = String(p?.player_id || '').trim();
+        const isOwner = pid && String(ownerId || '').trim() === pid;
+        const card = document.createElement('div');
+        card.style.cssText = 'min-width:62px;max-width:92px;padding:8px 9px;border-radius:16px;background:rgba(4,12,24,0.72);border:1px solid rgba(130,240,255,0.30);box-shadow:0 0 18px rgba(0,220,255,0.16);text-align:center;color:#e9fbff;font-size:12px;backdrop-filter:blur(6px);';
+        const icon = document.createElement('div');
+        icon.textContent = isOwner ? '👑🧑‍🚀' : '👁🧑‍🚀';
+        icon.style.cssText = 'font-size:28px;line-height:1.1;margin-bottom:4px;filter:drop-shadow(0 0 8px rgba(0,255,255,0.45));';
+        const name = document.createElement('div');
+        name.textContent = String(p?.nickname || 'Player').slice(0, 12);
+        name.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0.92;';
+        card.appendChild(icon);
+        card.appendChild(name);
+        if(pid){
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', () => { try{ openPlayerProfile?.(pid, p?.nickname || `ID ${pid}`); }catch(_){} });
+        }
+        wrap.appendChild(card);
+    });
 }
 
 async function renderHangarPresencePanel(){
@@ -263,6 +304,8 @@ async function renderHangarPresencePanel(){
         return String(a?.nickname || '').localeCompare(String(b?.nickname || ''));
     });
 
+    try{ renderHangarPresenceAvatars(rows, ownerId); }catch(_){}
+
     list.innerHTML = '';
     if(!rows.length){
         const empty = document.createElement('div');
@@ -276,9 +319,7 @@ async function renderHangarPresencePanel(){
         const pid = String(p?.player_id || '').trim();
         const item = document.createElement('div');
         item.style.cssText = 'display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,0.055);border:1px solid rgba(255,255,255,0.06);';
-        const role = pid === ownerId ? 'хозяин' : 'гость';
-        const me = pid && myId && pid === myId ? '' : '';
-        item.textContent = `${pid === ownerId ? '👑' : '👁'} ${p?.nickname || 'Player'} — ${role}${me}`;
+        item.textContent = `${pid === ownerId ? '👑' : '👁'} ${p?.nickname || 'Player'}`;
         if(pid && pid !== myId){
             item.style.cursor = 'pointer';
             item.title = 'Открыть профиль';
@@ -14667,6 +14708,7 @@ function initExtraLobbyWindows(){
           closeAll();
           if(winId === 'hangar-window') { try{ restoreOwnHangarAfterGuest?.(); }catch(_){} try{ enterOwnHangarPresence?.(); }catch(_){} }
           win.classList.remove('hidden');
+          if(winId === 'hangar-window') win.style.display = 'flex';
           if(winId === 'hangar-window'){
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
@@ -18577,7 +18619,9 @@ async function openPlayerHangarAsGuest(targetId, fallbackNickname = 'Player', ca
         hangarGuestOwner = null;
         hangarSelfSnapshot = null;
         document.getElementById('profile-window')?.classList.add('hidden');
-        document.getElementById('hangar-window')?.classList.remove('hidden');
+        const selfHangarWin = document.getElementById('hangar-window');
+        selfHangarWin?.classList.remove('hidden');
+        if(selfHangarWin) selfHangarWin.style.display = 'flex';
         try{ await enterOwnHangarPresence?.(); }catch(_){}
         renderHangarCosmic?.(true);
         return;
@@ -18588,7 +18632,9 @@ async function openPlayerHangarAsGuest(targetId, fallbackNickname = 'Player', ca
     applyGuestHangarPayload(profileData, saveData, fallbackNickname);
     currentHangarPresenceOwnerId = String(normalizedId);
     document.getElementById('profile-window')?.classList.add('hidden');
-    document.getElementById('hangar-window')?.classList.remove('hidden');
+    const guestHangarWin = document.getElementById('hangar-window');
+    guestHangarWin?.classList.remove('hidden');
+    if(guestHangarWin) guestHangarWin.style.display = 'flex';
     try{ await enterHangarPresence?.(normalizedId); }catch(_){}
     requestAnimationFrame(() => {
         try{ renderHangarCosmic?.(true); }catch(error){ console.warn('open guest hangar render warning:', error?.message || error); }
@@ -20654,13 +20700,18 @@ try{ startV374BotNameLoop(); }catch(_){}
 
 // v410: hangar presence system placeholder (safe, non-breaking)
 
-// v413 AUTO ENTER HANGAR PRESENCE FIX
+
+
+// v414 HANGAR PRESENCE OWNER-AWARE SAFETY LOOP
 setInterval(() => {
   try{
     if(typeof isHangarWindowOpenNow === 'function' && isHangarWindowOpenNow()){
-      if(!currentHangarPresenceOwnerId){
-        enterOwnHangarPresence?.();
+      const ownerId = String(currentHangarPresenceOwnerId || (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') || '').trim();
+      if(ownerId){
+        currentHangarPresenceOwnerId = ownerId;
+        setPlayerOnlineStatus?.(getHangarPresenceStatus(ownerId), null);
+        renderHangarPresencePanel?.();
       }
     }
   }catch(_){}
-},1500);
+}, 2200);
