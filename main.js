@@ -158,6 +158,57 @@ const authState = {
     pendingVerificationCode: ''
 };
 
+// ===== GUEST HANGAR VIEW (read-only) =====
+let hangarViewMode = 'self';
+let hangarGuestOwner = null;
+let hangarSelfSnapshot = null;
+
+function isHangarGuestView(){
+    return String(hangarViewMode || 'self') === 'guest';
+}
+
+function makeHangarPlayerSnapshot(){
+    try{
+        return {
+            player: JSON.parse(JSON.stringify(player || {})),
+            playerResources: JSON.parse(JSON.stringify(playerResources || {})),
+            currentLevel: typeof currentLevel !== 'undefined' ? currentLevel : 1,
+            damage: typeof damage !== 'undefined' ? damage : 1
+        };
+    }catch(_){
+        return null;
+    }
+}
+
+function restoreOwnHangarAfterGuest(){
+    try{
+        if(!isHangarGuestView()) return;
+        if(hangarSelfSnapshot?.player){
+            Object.keys(player || {}).forEach(key => { try{ delete player[key]; }catch(_){} });
+            Object.assign(player, JSON.parse(JSON.stringify(hangarSelfSnapshot.player)));
+        }
+        if(hangarSelfSnapshot?.playerResources && typeof playerResources === 'object'){
+            Object.keys(playerResources).forEach(key => { try{ delete playerResources[key]; }catch(_){} });
+            Object.assign(playerResources, JSON.parse(JSON.stringify(hangarSelfSnapshot.playerResources)));
+        }
+        if(typeof currentLevel !== 'undefined' && Number.isFinite(Number(hangarSelfSnapshot?.currentLevel))){
+            currentLevel = Number(hangarSelfSnapshot.currentLevel);
+        }
+        if(typeof damage !== 'undefined' && Number.isFinite(Number(hangarSelfSnapshot?.damage))){
+            damage = Number(hangarSelfSnapshot.damage);
+        }
+    }catch(error){
+        console.warn('restoreOwnHangarAfterGuest warning:', error?.message || error);
+    }finally{
+        hangarViewMode = 'self';
+        hangarGuestOwner = null;
+        hangarSelfSnapshot = null;
+        try{ refreshOwnedShipsInventory?.(); }catch(_){}
+        try{ currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || ''); }catch(_){}
+        try{ updatePremiumAccountInfo?.(); updateHUD?.(); updateUI?.(); }catch(_){}
+    }
+}
+
 function getDisplayPlayerTag(){
     const safeNickname = (player?.nickname || 'Commander').trim() || 'Commander';
     return safeNickname;
@@ -3841,6 +3892,7 @@ async function saveRemoteProgress(){
 }
 
 function saveGame(){
+    if(isHangarGuestView?.()) return;
     const saveKey = getActiveSaveKey();
     const payload = buildSavePayload();
     if(saveKey){
@@ -7514,6 +7566,7 @@ function updateHangarUI() {
 
 if(hangarBtn && hangarWindow){
   hangarBtn.addEventListener("click", () => {
+    try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
     updateHangarUI();
     hangarWindow.classList.remove("hidden");
     hangarWindow.style.cssText = "position:fixed;inset:0;top:0;left:0;width:100vw;height:100vh;display:flex;justify-content:center;align-items:center;z-index:21000;background:rgba(0,0,0,0.82);";
@@ -7525,6 +7578,7 @@ if(closeHangar && hangarWindow){
   closeHangar.addEventListener("click", () => {
     hangarWindow.classList.add("hidden");
     hangarWindow.style.display='none';
+    try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
   });
 }
 
@@ -10808,6 +10862,7 @@ function getEquippedModuleTypesForShip(shipId){
 }
 
 function sellHullFromHangar(hullId){
+    if(isHangarGuestView?.()) return false;
     const safeId = String(hullId || '').trim();
     if(!canSellHull(safeId)) return false;
 
@@ -10874,6 +10929,7 @@ function removeModuleFromAllShips(moduleId){
 }
 
 function sellModuleFromHangar(moduleId){
+    if(isHangarGuestView?.()) return false;
     const safeId = String(moduleId || '').trim();
     if(!canSellModule(safeId)) return false;
     const sellPrice = getModuleSellPrice(safeId);
@@ -11398,6 +11454,7 @@ function createHangarTransferMesh(ship){
 }
 
 function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = -1){
+    if(isHangarGuestView?.()) return;
     const safePrev = String(previousShipId || '').trim();
     const safeNext = String(nextShipId || '').trim();
     if(!hangarState?.scene) return;
@@ -11508,6 +11565,7 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
 }
 
 function selectCurrentHangarShip(){
+    if(isHangarGuestView?.()) return false;
     if(hangarState.shipTransfer) return false;
     const ships = getOwnedHangarShips();
     const currentShip = ships[hangarState.shipIndex] || null;
@@ -14048,7 +14106,7 @@ function bindHangarStageInteraction(){
         }
         hangarState.hoverDockIndex = hoverIndex;
         updateHangarPlatformPrompt();
-        if(activateClick && terminalShipId && !hangarState.shipTransfer && canSellHull(terminalShipId) && isHangarDockWithinUseDistance(hoverIndex)){
+        if(!isHangarGuestView?.() && activateClick && terminalShipId && !hangarState.shipTransfer && canSellHull(terminalShipId) && isHangarDockWithinUseDistance(hoverIndex)){
             sellHullFromHangar?.(terminalShipId);
             hangarState.hoverDockIndex = -1;
             hangarState.selectedDockIndex = -1;
@@ -14057,7 +14115,7 @@ function bindHangarStageInteraction(){
             rebuildHangarSceneObjects();
             return;
         }
-        if(activateClick && hoverIndex >= 0 && !hangarState.shipTransfer && isHangarDockWithinUseDistance(hoverIndex)){
+        if(!isHangarGuestView?.() && activateClick && hoverIndex >= 0 && !hangarState.shipTransfer && isHangarDockWithinUseDistance(hoverIndex)){
             hangarState.selectedDockIndex = hoverIndex;
             updateHangarPlatformPrompt();
             const nextShip = getHangarDockShipByIndex(hoverIndex);
@@ -14224,6 +14282,7 @@ function bindHangarRuntimeUI(){
     if(moduleBtn && !moduleBtn.dataset.boundHangarRuntime){
         moduleBtn.dataset.boundHangarRuntime = '1';
         moduleBtn.addEventListener('click', () => {
+            if(isHangarGuestView?.()) return;
             const ship = getForcedHangarDisplayShip();
             const modules = getOwnedHangarModules();
             const module = modules[hangarState.moduleIndex] || null;
@@ -14242,6 +14301,7 @@ function bindHangarRuntimeUI(){
     if(moduleSellBtn && !moduleSellBtn.dataset.boundHangarRuntime){
         moduleSellBtn.dataset.boundHangarRuntime = '1';
         moduleSellBtn.addEventListener('click', () => {
+            if(isHangarGuestView?.()) return;
             const modules = getOwnedHangarModules();
             const module = modules[hangarState.moduleIndex] || null;
             if(!module) return;
@@ -14253,12 +14313,14 @@ function bindHangarRuntimeUI(){
     if(shipActionBtn && !shipActionBtn.dataset.boundHangarRuntime){
         shipActionBtn.dataset.boundHangarRuntime = '1';
         shipActionBtn.addEventListener('click', () => {
+            if(isHangarGuestView?.()) return;
             selectCurrentHangarShip?.();
         });
     }
     if(shipSellBtn && !shipSellBtn.dataset.boundHangarRuntime){
         shipSellBtn.dataset.boundHangarRuntime = '1';
         shipSellBtn.addEventListener('click', () => {
+            if(isHangarGuestView?.()) return;
             const ship = getForcedHangarDisplayShip();
             if(!ship) return;
             sellHullFromHangar?.(ship.id);
@@ -14269,6 +14331,7 @@ function bindHangarRuntimeUI(){
     if(floatingShipSellBtn && !floatingShipSellBtn.dataset.boundHangarRuntime){
         floatingShipSellBtn.dataset.boundHangarRuntime = '1';
         floatingShipSellBtn.addEventListener('click', () => {
+            if(isHangarGuestView?.()) return;
             const shipId = String(floatingShipSellBtn.dataset.shipId || '').trim();
             if(!shipId) return;
             sellHullFromHangar?.(shipId);
@@ -14326,6 +14389,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
     const win = document.getElementById('hangar-window');
     if(!win) return;
     win.classList.remove('hidden');
+    win.classList.toggle('guest-hangar-view', !!isHangarGuestView?.());
 
     if(forceSyncToSelected !== false){
         try{ syncHangarSelectionState?.({ forceClass:true }); }catch(_){ }
@@ -14336,6 +14400,7 @@ function renderHangarCosmic(forceSyncToSelected = true){
     if(shell){
         shell.innerHTML = `
           <button id="close-hangar" class="hangar-close-btn" type="button">✖</button>
+          <div id="hangar-guest-banner" class="hangar-guest-banner" style="display:none;">👁 Просмотр ангара игрока</div>
           <div class="hangar-layout">
             <aside class="hangar-module-side">
               <div class="hangar-side-title">Модули улучшения</div>
@@ -14390,6 +14455,11 @@ function renderHangarCosmic(forceSyncToSelected = true){
         `;
     }
 
+    const guestBanner = document.getElementById('hangar-guest-banner');
+    if(guestBanner){
+        guestBanner.style.display = isHangarGuestView?.() ? 'block' : 'none';
+        guestBanner.textContent = `👁 Просмотр ангара: ${hangarGuestOwner?.nickname || 'игрок'}`;
+    }
     bindHangarControls();
     bindHangarRuntimeUI();
     updateHangarFilterButtons?.();
@@ -14439,6 +14509,7 @@ function initExtraLobbyWindows(){
         tab.dataset.boundExtra = '1';
         tab.addEventListener('click', () => {
           closeAll();
+          if(winId === 'hangar-window') try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
           win.classList.remove('hidden');
           if(winId === 'hangar-window'){
             requestAnimationFrame(() => {
@@ -14462,6 +14533,7 @@ function initExtraLobbyWindows(){
           win.classList.add('hidden');
           if(winId === 'hangar-window'){
             try{ disposeHangarRenderer?.(); }catch(_){}
+            try{ restoreOwnHangarAfterGuest?.(); }catch(_){}
             __restoreHangarChatPanel();
           }
         });
@@ -18286,6 +18358,90 @@ async function fetchPlayerProfileData(targetId){
     return data || null;
 }
 
+
+async function fetchPlayerHangarSaveData(targetId){
+    const safeId = Number(String(targetId || '').trim());
+    if(!window.supabaseReady || !window.supabaseClient || !Number.isFinite(safeId) || safeId <= 0) return null;
+    try{
+        const { data, error } = await window.supabaseClient
+            .from('player_saves')
+            .select('save_data')
+            .eq('player_public_id', Math.floor(safeId))
+            .maybeSingle();
+        if(error){
+            console.warn('Не удалось загрузить ангар игрока:', error.message || error);
+            return null;
+        }
+        return data?.save_data || null;
+    }catch(error){
+        console.warn('fetchPlayerHangarSaveData error:', error?.message || error);
+        return null;
+    }
+}
+
+function applyGuestHangarPayload(profileData = {}, saveData = null, fallbackNickname = 'Player'){
+    if(!hangarSelfSnapshot) hangarSelfSnapshot = makeHangarPlayerSnapshot();
+    hangarViewMode = 'guest';
+    hangarGuestOwner = {
+        public_id: profileData?.public_id || '',
+        nickname: profileData?.nickname || fallbackNickname || 'Player'
+    };
+
+    const payload = saveData && typeof saveData === 'object' ? saveData : {};
+    const guestNickname = payload.nickname || profileData?.nickname || fallbackNickname || 'Player';
+    const guestOwnedShips = Array.isArray(payload.ownedShipIds) && payload.ownedShipIds.length
+        ? payload.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
+        : ['scout_1'];
+
+    player.nickname = guestNickname;
+    player.id = Number(profileData?.public_id || 0) || 0;
+    player.level = Number(payload.playerLevel || profileData?.level || 1) || 1;
+    player.experience = Number(payload.playerExperience || profileData?.experience || 0) || 0;
+    player.credits = Number(payload.credits || profileData?.credits || 0) || 0;
+    player.ownedShipIds = Array.from(new Set(guestOwnedShips.length ? guestOwnedShips : ['scout_1']));
+    player.selectedShipId = String(payload.selectedShipId || player.ownedShipIds[0] || 'scout_1').trim() || 'scout_1';
+    player.ownedModuleIds = Array.isArray(payload.ownedModuleIds) ? Array.from(new Set(payload.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean))) : ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'];
+    player.activeModulesByShip = payload.activeModulesByShip && typeof payload.activeModulesByShip === 'object'
+        ? JSON.parse(JSON.stringify(payload.activeModulesByShip))
+        : { [player.selectedShipId]: { weapon:'weapon_laser_s1', shield:'shield_micro_s1', booster:'booster_ion_s1' } };
+    player.hangarDockAssignments = payload.hangarDockAssignments && typeof payload.hangarDockAssignments === 'object'
+        ? JSON.parse(JSON.stringify(payload.hangarDockAssignments))
+        : {};
+
+    if(payload.playerResources && typeof payload.playerResources === 'object' && typeof playerResources === 'object'){
+        Object.keys(playerResources).forEach(key => { try{ delete playerResources[key]; }catch(_){} });
+        Object.assign(playerResources, JSON.parse(JSON.stringify(payload.playerResources)));
+    }
+
+    try{ refreshOwnedShipsInventory?.(); }catch(_){}
+    try{ ensureHangarDockAssignments?.(); }catch(_){}
+    try{ currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || ''); }catch(_){}
+}
+
+async function openPlayerHangarAsGuest(targetId, fallbackNickname = 'Player', cachedProfileData = null){
+    const normalizedId = String(targetId || '').trim();
+    const myId = authState?.playerId ? String(authState.playerId) : '';
+    if(!normalizedId) return;
+    if(myId && normalizedId === myId){
+        hangarViewMode = 'self';
+        hangarGuestOwner = null;
+        hangarSelfSnapshot = null;
+        document.getElementById('profile-window')?.classList.add('hidden');
+        document.getElementById('hangar-window')?.classList.remove('hidden');
+        renderHangarCosmic?.(true);
+        return;
+    }
+
+    const profileData = cachedProfileData || await fetchPlayerProfileData(normalizedId) || { public_id: normalizedId, nickname: fallbackNickname };
+    const saveData = await fetchPlayerHangarSaveData(normalizedId);
+    applyGuestHangarPayload(profileData, saveData, fallbackNickname);
+    document.getElementById('profile-window')?.classList.add('hidden');
+    document.getElementById('hangar-window')?.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        try{ renderHangarCosmic?.(true); }catch(error){ console.warn('open guest hangar render warning:', error?.message || error); }
+    });
+}
+
 async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
     const profileWindowEl = document.getElementById('profile-window');
     const profileInfoEl = document.getElementById('profile-info');
@@ -18332,12 +18488,16 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
       </div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
         ${canPm ? '<button id="profile-pm-btn" type="button" style="padding:10px 14px;border-radius:10px;border:1px solid rgba(0,255,255,0.35);background:rgba(0,180,255,0.18);color:#fff;cursor:pointer;">✉️ Написать в ЛС</button>' : ''}
+        ${isAccountPublicId(normalizedId) ? '<button id="profile-view-hangar-btn" type="button" style="padding:10px 14px;border-radius:10px;border:1px solid rgba(120,255,210,0.35);background:rgba(0,255,190,0.14);color:#fff;cursor:pointer;">🚀 Посмотреть ангар</button>' : ''}
       </div>
       ${!data ? '<div class="auth-note" style="margin-top:12px;">Профиль загружен частично. Полных данных по игроку пока нет.</div>' : ''}
     `;
 
     document.getElementById('profile-pm-btn')?.addEventListener('click', () => {
         openPrivateChat(String(normalizedId), displayName);
+    });
+    document.getElementById('profile-view-hangar-btn')?.addEventListener('click', async () => {
+        await openPlayerHangarAsGuest(String(normalizedId), displayName, data || null);
     });
 }
 
