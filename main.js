@@ -20484,3 +20484,6 @@ try{ startV374BotNameLoop(); }catch(_){}
     setTimeout(() => { forceSingleServer(); hardRestoreTopUi(); }, 1000);
 })();
 
+
+
+// v410: hangar presence system placeholder (safe, non-breaking)
