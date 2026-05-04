@@ -210,7 +210,10 @@ function restoreOwnHangarAfterGuest(){
 }
 
 function getDisplayPlayerTag(){
-    const safeNickname = (player?.nickname || 'Commander').trim() || 'Commander';
+    const sourcePlayer = (typeof isHangarGuestView === 'function' && isHangarGuestView() && hangarSelfSnapshot?.player)
+        ? hangarSelfSnapshot.player
+        : player;
+    const safeNickname = (sourcePlayer?.nickname || 'Commander').trim() || 'Commander';
     return safeNickname;
 }
 
@@ -18388,16 +18391,13 @@ function applyGuestHangarPayload(profileData = {}, saveData = null, fallbackNick
     };
 
     const payload = saveData && typeof saveData === 'object' ? saveData : {};
-    const guestNickname = payload.nickname || profileData?.nickname || fallbackNickname || 'Player';
     const guestOwnedShips = Array.isArray(payload.ownedShipIds) && payload.ownedShipIds.length
         ? payload.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)
         : ['scout_1'];
 
-    player.nickname = guestNickname;
-    player.id = Number(profileData?.public_id || 0) || 0;
-    player.level = Number(payload.playerLevel || profileData?.level || 1) || 1;
-    player.experience = Number(payload.playerExperience || profileData?.experience || 0) || 0;
-    player.credits = Number(payload.credits || profileData?.credits || 0) || 0;
+    // V409: гостевой ангар не должен подменять личность текущего игрока.
+    // Поэтому не меняем player.nickname / player.id / level / experience / credits / playerResources.
+    // Временно подменяется только витрина ангара: корабли, модули и расстановка.
     player.ownedShipIds = Array.from(new Set(guestOwnedShips.length ? guestOwnedShips : ['scout_1']));
     player.selectedShipId = String(payload.selectedShipId || player.ownedShipIds[0] || 'scout_1').trim() || 'scout_1';
     player.ownedModuleIds = Array.isArray(payload.ownedModuleIds) ? Array.from(new Set(payload.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean))) : ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'];
@@ -18408,14 +18408,10 @@ function applyGuestHangarPayload(profileData = {}, saveData = null, fallbackNick
         ? JSON.parse(JSON.stringify(payload.hangarDockAssignments))
         : {};
 
-    if(payload.playerResources && typeof payload.playerResources === 'object' && typeof playerResources === 'object'){
-        Object.keys(playerResources).forEach(key => { try{ delete playerResources[key]; }catch(_){} });
-        Object.assign(playerResources, JSON.parse(JSON.stringify(payload.playerResources)));
-    }
-
     try{ refreshOwnedShipsInventory?.(); }catch(_){}
     try{ ensureHangarDockAssignments?.(); }catch(_){}
     try{ currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || ''); }catch(_){}
+    try{ updatePremiumAccountInfo?.(); updateHUD?.(); updateUI?.(); }catch(_){}
 }
 
 async function openPlayerHangarAsGuest(targetId, fallbackNickname = 'Player', cachedProfileData = null){
