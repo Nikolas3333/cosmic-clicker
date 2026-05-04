@@ -2330,6 +2330,7 @@ body.state-observe #battle-player-world-hp{ display:none !important; }
 #premium-player-level,
 #premium-player-id,
 #premium-player-name,
+#premium-coins,
 #premium-crystals{
   position:relative;
   top:0;
@@ -6964,6 +6965,7 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
     <span id="premium-player-id">ID: 0</span>
     <span id="premium-player-level">⭐ 1</span>
     <span id="premium-player-exp">EXP 0 / 100</span>
+    <span class='premium-item' id="premium-coins">🟡 0</span>
     <span class='premium-item' id="premium-crystals">💎 0</span>
   </div>
   <button id="premium-logout-btn" type="button" title="Сменить аккаунт / сервер">✕</button>
@@ -6979,6 +6981,7 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
       <div class="auth-login-form">
         <div class="auth-input-wrap">
           <span class="auth-input-icon">✉</span>
+          <input id="login-email" name="cosmic-login-email" autocomplete="email" type="email" placeholder="E-mail">
         </div>
         <div class="auth-input-wrap">
           <span class="auth-input-icon">🔒</span>
@@ -7022,6 +7025,7 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 
       <div class="auth-input-wrap">
         <span class="auth-input-icon">✉</span>
+        <input id="register-email" name="cosmic-register-email" autocomplete="email" type="email" placeholder="E-mail">
       </div>
 
       <div class="auth-input-wrap">
@@ -7230,7 +7234,6 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 <!-- ===== PROFILE WINDOW ===== -->
 <div id="profile-window" class="hidden">
   <div class="profile-content">
-    <h2>Профиль</h2>
     <div id="profile-info"></div>
     <br>
     <button id="close-profile">Закрыть</button>
@@ -7333,6 +7336,7 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
     </select>
 
     <label>Ставка монетами:</label>
+    <select id="tournament-stake-coins">
       <option value="0">Без ставки монетами</option>
       <option value="50">50 монет</option>
       <option value="100">100 монет</option>
@@ -7527,10 +7531,17 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 </div>
 
 <script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+const SUPABASE_URL = 'https://htflrhpqrbwqvlyxgbpu.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_SWbPj79rY6fTYjaoHODtDg_0KNOSRLb';
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+window.supabaseClient = supabase;
+window.supabaseReady = true;
 
+console.log('🔥 Supabase подключен и готов к работе');
 </script>
 
 <script type="importmap">
