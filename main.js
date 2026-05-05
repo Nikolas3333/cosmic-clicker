@@ -1,4 +1,4 @@
-// COSMIC CLICKER v425 - FIX REAL 3D HANGAR ASTRONAUTS
+// COSMIC CLICKER v426 - SYNC HANGAR ASTRONAUT POSITIONS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -199,7 +199,7 @@ async function enterHangarPresence(ownerId = ''){
     const safeOwnerId = String(ownerId || getHangarOwnerIdForPresence() || '').trim();
     if(!safeOwnerId) return;
     currentHangarPresenceOwnerId = safeOwnerId;
-    try{ await setPlayerOnlineStatus?.(getHangarPresenceStatus(safeOwnerId), null); }catch(error){ console.warn('hangar presence enter warning:', error?.message || error); }
+    try{ await setPlayerOnlineStatus?.(getHangarPresenceStatusWithPositionV426?.(safeOwnerId) || getHangarPresenceStatus(safeOwnerId), null); }catch(error){ console.warn('hangar presence enter warning:', error?.message || error); }
     try{ startHangarPresenceLoop?.(); }catch(_){}
     try{ renderHangarPresencePanel?.(); }catch(_){}
 }
@@ -292,7 +292,7 @@ async function renderHangarPresencePanel(){
     }
 
     const neededStatus = getHangarPresenceStatus(ownerId).toLowerCase();
-    const rawRows = (players || []).filter(p => String(p?.status || '').toLowerCase() === neededStatus);
+    const rawRows = (players || []).filter(p => String(p?.status || '').toLowerCase().startsWith(neededStatus));
     const rows = Array.isArray(rawRows) ? rawRows.slice() : [];
 
     rows.sort((a,b) => {
@@ -9689,7 +9689,7 @@ async function startLiveBattleSync(){
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
         if(onlineRoomId !== getBattleRoomIdSafe()) return;
         sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
-    }, 1200);
+    }, 550);
     setTimeout(() => {
         if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
         if(onlineRoomId !== getBattleRoomIdSafe()) return;
@@ -21058,7 +21058,50 @@ function getCosmicHangarPresenceSceneV425(){
   return null;
 }
 
-function getCosmicHangarPresencePositionV425(index, total, isOwner){
+function parseCosmicHangarPresenceStatusV426(status){
+  try{
+    var parts = String(status || '').split(':');
+    if(parts.length < 5 || parts[0] !== 'hangar') return null;
+    var x = Number(parts[2]);
+    var z = Number(parts[3]);
+    var yaw = Number(parts[4]);
+    if(!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    return { x:x, z:z, yaw:Number.isFinite(yaw) ? yaw : Math.PI };
+  }catch(_){ return null; }
+}
+
+function clampCosmicHangarPresenceNumberV426(value, min, max){
+  var n = Number(value);
+  if(!Number.isFinite(n)) return 0;
+  return Math.max(min, Math.min(max, n));
+}
+
+function getCosmicHangarLocalPositionPayloadV426(){
+  try{
+    var pivot = (typeof hangarState !== 'undefined' && hangarState && hangarState.astronautPivot) ? hangarState.astronautPivot : null;
+    var x = pivot ? pivot.position.x : 0;
+    var z = pivot ? pivot.position.z : 20.8;
+    var yaw = pivot ? pivot.rotation.y : Math.PI;
+    x = clampCosmicHangarPresenceNumberV426(x, -24, 24);
+    z = clampCosmicHangarPresenceNumberV426(z, -8, 32);
+    yaw = Number.isFinite(Number(yaw)) ? Number(yaw) : Math.PI;
+    return {
+      x: Math.round(x * 10) / 10,
+      z: Math.round(z * 10) / 10,
+      yaw: Math.round(yaw * 100) / 100
+    };
+  }catch(_){
+    return { x:0, z:20.8, yaw:Math.PI };
+  }
+}
+
+function getHangarPresenceStatusWithPositionV426(ownerId){
+  var base = (typeof getHangarPresenceStatus === 'function') ? getHangarPresenceStatus(ownerId) : ('hangar:' + String(ownerId || '').trim());
+  var pos = getCosmicHangarLocalPositionPayloadV426();
+  return base + ':' + pos.x + ':' + pos.z + ':' + pos.yaw;
+}
+
+function getCosmicStableSlotPositionV426(playerId, index, isOwner){
   var positions = [
     { x:-3.2, z:20.8 },
     { x: 3.2, z:20.8 },
@@ -21067,8 +21110,21 @@ function getCosmicHangarPresencePositionV425(index, total, isOwner){
     { x: 0.0, z:18.4 },
     { x: 0.0, z:26.4 }
   ];
-  var pos = positions[index % positions.length] || positions[0];
-  return new THREE.Vector3(pos.x, hangarState && Number.isFinite(hangarState.astronautGroundY) ? hangarState.astronautGroundY : -1.72, pos.z);
+  if(isOwner) return positions[0];
+  var id = String(playerId || '');
+  var hash = 0;
+  for(var i=0;i<id.length;i++) hash = ((hash * 31) + id.charCodeAt(i)) >>> 0;
+  return positions[(hash || index || 1) % positions.length] || positions[0];
+}
+
+function getCosmicHangarPresencePositionV425(index, total, isOwner, row){
+  var parsed = parseCosmicHangarPresenceStatusV426(row && row.status);
+  var groundY = hangarState && Number.isFinite(hangarState.astronautGroundY) ? hangarState.astronautGroundY : -1.72;
+  if(parsed){
+    return new THREE.Vector3(parsed.x, groundY, parsed.z);
+  }
+  var pos = getCosmicStableSlotPositionV426(row && row.player_id, index, isOwner);
+  return new THREE.Vector3(pos.x, groundY, pos.z);
 }
 
 window.updateHangarAstronautsSafe = function(rows){
@@ -21118,14 +21174,14 @@ window.updateHangarAstronautsSafe = function(rows){
       obj.userData.nickname = String(p.nickname || 'Player');
       obj.userData.isOwner = isOwner;
 
-      var target = getCosmicHangarPresencePositionV425(visibleIndex, list.length, isOwner);
-      obj.position.copy(target);
-      obj.rotation.y = isOwner ? Math.PI * 0.92 : Math.PI * 1.08;
-
-      try{
-        var bob = Math.sin(performance.now() * 0.002 + visibleIndex) * 0.035;
-        obj.position.y += bob;
-      }catch(_){ }
+      var target = getCosmicHangarPresencePositionV425(visibleIndex, list.length, isOwner, p);
+      var parsed = parseCosmicHangarPresenceStatusV426(p && p.status);
+      if(!obj.userData.hasPresencePosition){
+        obj.position.copy(target);
+        obj.userData.hasPresencePosition = true;
+      }
+      obj.userData.targetPosition = target.clone();
+      obj.userData.targetYaw = parsed ? parsed.yaw : (isOwner ? Math.PI * 0.92 : Math.PI * 1.08);
 
       visibleIndex++;
     }
@@ -21141,6 +21197,54 @@ window.updateHangarAstronautsSafe = function(rows){
     try{ console.warn('hangar astronauts v425 warning:', e && e.message ? e.message : e); }catch(_){ }
   }
 };
+
+
+var __cosmicHangarPresenceLastSyncV426 = { at:0, status:'' };
+async function syncCosmicHangarLocalPresencePositionV426(force){
+  try{
+    if(typeof isHangarWindowOpenNow === 'function' && !isHangarWindowOpenNow()) return;
+    var ownerId = String(
+      (typeof currentHangarPresenceOwnerId !== 'undefined' && currentHangarPresenceOwnerId) ||
+      (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') ||
+      ''
+    ).trim();
+    if(!ownerId || typeof setPlayerOnlineStatus !== 'function') return;
+    var status = getHangarPresenceStatusWithPositionV426(ownerId);
+    var now = Date.now();
+    if(!force && status === __cosmicHangarPresenceLastSyncV426.status && now - __cosmicHangarPresenceLastSyncV426.at < 900) return;
+    if(!force && now - __cosmicHangarPresenceLastSyncV426.at < 420) return;
+    __cosmicHangarPresenceLastSyncV426 = { at:now, status:status };
+    await setPlayerOnlineStatus(status, null);
+  }catch(_){ }
+}
+
+function animateCosmicHangarPresenceAstronautsV426(){
+  try{
+    if(window.hangarAstronauts){
+      var now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      for(var k in window.hangarAstronauts){
+        var obj = window.hangarAstronauts[k];
+        if(!obj) continue;
+        var target = obj.userData && obj.userData.targetPosition;
+        if(target && obj.position){
+          obj.position.x += (target.x - obj.position.x) * 0.24;
+          obj.position.z += (target.z - obj.position.z) * 0.24;
+          var bob = Math.sin(now * 0.004 + String(k).length) * 0.035;
+          obj.position.y += ((target.y + bob) - obj.position.y) * 0.28;
+        }
+        if(obj.userData && Number.isFinite(Number(obj.userData.targetYaw))){
+          var diff = Number(obj.userData.targetYaw) - obj.rotation.y;
+          while(diff > Math.PI) diff -= Math.PI * 2;
+          while(diff < -Math.PI) diff += Math.PI * 2;
+          obj.rotation.y += diff * 0.18;
+        }
+      }
+    }
+  }catch(_){ }
+  requestAnimationFrame(animateCosmicHangarPresenceAstronautsV426);
+}
+try{ requestAnimationFrame(animateCosmicHangarPresenceAstronautsV426); }catch(_){ }
+setInterval(function(){ try{ syncCosmicHangarLocalPresencePositionV426(false); }catch(_){ } }, 450);
 
 setInterval(function(){
   try{
