@@ -1,4 +1,4 @@
-// COSMIC CLICKER v426 - SYNC HANGAR ASTRONAUT POSITIONS
+// COSMIC CLICKER v427 - FIX HANGAR ASTRONAUT PATROL LOOP
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -18866,7 +18866,7 @@ function syncCurrentOnlinePresence(){
         const ownerId = String(currentHangarPresenceOwnerId || getHangarOwnerIdForPresence?.() || '').trim();
         if(ownerId){
             currentHangarPresenceOwnerId = ownerId;
-            setPlayerOnlineStatus(getHangarPresenceStatus(ownerId), null);
+            setPlayerOnlineStatus((typeof getHangarPresenceStatusWithPositionV426 === 'function' ? getHangarPresenceStatusWithPositionV426(ownerId) : getHangarPresenceStatus(ownerId)), null);
             return;
         }
     }
@@ -20710,7 +20710,7 @@ setInterval(() => {
       const ownerId = String(currentHangarPresenceOwnerId || (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') || '').trim();
       if(ownerId){
         currentHangarPresenceOwnerId = ownerId;
-        setPlayerOnlineStatus?.(getHangarPresenceStatus(ownerId), null);
+        setPlayerOnlineStatus?.((typeof getHangarPresenceStatusWithPositionV426 === 'function' ? getHangarPresenceStatusWithPositionV426(ownerId) : getHangarPresenceStatus(ownerId)), null);
         renderHangarPresencePanel?.();
       }
     }
@@ -20726,7 +20726,7 @@ setInterval(() => {
       const ownerId = (typeof getHangarOwnerIdForPresence === 'function') ? getHangarOwnerIdForPresence() : '';
       if(ownerId){
         currentHangarPresenceOwnerId = String(ownerId || '').trim();
-        setPlayerOnlineStatus?.(getHangarPresenceStatus(ownerId), null);
+        setPlayerOnlineStatus?.((typeof getHangarPresenceStatusWithPositionV426 === 'function' ? getHangarPresenceStatusWithPositionV426(ownerId) : getHangarPresenceStatus(ownerId)), null);
         renderHangarPresencePanel?.();
       }
     }
@@ -21174,14 +21174,18 @@ window.updateHangarAstronautsSafe = function(rows){
       obj.userData.nickname = String(p.nickname || 'Player');
       obj.userData.isOwner = isOwner;
 
-      var target = getCosmicHangarPresencePositionV425(visibleIndex, list.length, isOwner, p);
       var parsed = parseCosmicHangarPresenceStatusV426(p && p.status);
+      var target = getCosmicHangarPresencePositionV425(visibleIndex, list.length, isOwner, p);
+      if(!parsed && obj.userData && obj.userData.targetPosition){
+        // v427: if an old heartbeat briefly writes plain "hangar:<owner>", keep the last real position.
+        target = obj.userData.targetPosition.clone ? obj.userData.targetPosition.clone() : target;
+      }
       if(!obj.userData.hasPresencePosition){
         obj.position.copy(target);
         obj.userData.hasPresencePosition = true;
       }
-      obj.userData.targetPosition = target.clone();
-      obj.userData.targetYaw = parsed ? parsed.yaw : (isOwner ? Math.PI * 0.92 : Math.PI * 1.08);
+      obj.userData.targetPosition = target.clone ? target.clone() : target;
+      obj.userData.targetYaw = parsed ? parsed.yaw : (Number.isFinite(Number(obj.userData.targetYaw)) ? Number(obj.userData.targetYaw) : (isOwner ? Math.PI * 0.92 : Math.PI * 1.08));
 
       visibleIndex++;
     }
@@ -21199,6 +21203,7 @@ window.updateHangarAstronautsSafe = function(rows){
 };
 
 
+// v427: prevent old hangar keepalive loops from stripping position and causing back-and-forth patrol
 var __cosmicHangarPresenceLastSyncV426 = { at:0, status:'' };
 async function syncCosmicHangarLocalPresencePositionV426(force){
   try{
@@ -21212,7 +21217,7 @@ async function syncCosmicHangarLocalPresencePositionV426(force){
     var status = getHangarPresenceStatusWithPositionV426(ownerId);
     var now = Date.now();
     if(!force && status === __cosmicHangarPresenceLastSyncV426.status && now - __cosmicHangarPresenceLastSyncV426.at < 900) return;
-    if(!force && now - __cosmicHangarPresenceLastSyncV426.at < 420) return;
+    if(!force && now - __cosmicHangarPresenceLastSyncV426.at < 900) return;
     __cosmicHangarPresenceLastSyncV426 = { at:now, status:status };
     await setPlayerOnlineStatus(status, null);
   }catch(_){ }
@@ -21244,7 +21249,7 @@ function animateCosmicHangarPresenceAstronautsV426(){
   requestAnimationFrame(animateCosmicHangarPresenceAstronautsV426);
 }
 try{ requestAnimationFrame(animateCosmicHangarPresenceAstronautsV426); }catch(_){ }
-setInterval(function(){ try{ syncCosmicHangarLocalPresencePositionV426(false); }catch(_){ } }, 450);
+setInterval(function(){ try{ syncCosmicHangarLocalPresencePositionV426(false); }catch(_){ } }, 1000);
 
 setInterval(function(){
   try{
