@@ -1,4 +1,4 @@
-// COSMIC CLICKER v424 - FIX HANGAR PRESENCE LIST
+// COSMIC CLICKER v425 - FIX REAL 3D HANGAR ASTRONAUTS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -20936,125 +20936,222 @@ function cosmicStartHangarAstronautOverlayV417(){
 try{ /*disabled overlay*/ }catch(_){}
 
 
-// v418 SAFE astronaut (no syntax break)
-setTimeout(()=>{
- try{
-   if(window.THREE && window.scene && !window.__astro_fix){
-     const g = new THREE.Group();
-     const m = new THREE.MeshBasicMaterial({color:0xffffff});
-     const body = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.4), m);
-     body.position.y = 0.6;
-     const head = new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8), m);
-     head.position.y = 1.4;
-     g.add(body); g.add(head);
-     g.position.set(0,0,4);
-     scene.add(g);
-     window.__astro_fix = g;
-   }
- }catch(e){}
-},1500);
 
-// v420 cleanup old UI safely
-setInterval(function(){
- try{
-   var el = document.getElementById('removed-hangar-presence-avatars');
-   if(el){ el.parentNode && el.parentNode.removeChild(el); }
- }catch(e){}
-},1500);
-
-
-
-// v421 HARD CLEAN UI (FINAL)
-setInterval(function(){
-  try{
-    var els = document.querySelectorAll('[id*="hangar-presence-avatars"],[id*="removed-hangar-presence-avatars"]');
-    for(var i=0;i<els.length;i++){
-      if(els[i] && els[i].parentNode){
-        els[i].parentNode.removeChild(els[i]);
-      }
-    }
-  }catch(e){}
-},500);
-
-// v421 SIMPLE STATIC ASTRONAUT (VISIBLE)
-setTimeout(function(){
- try{
-   if(window.THREE && window.scene && !window.__astro_final){
-     var g = new THREE.Group();
-     var m = new THREE.MeshBasicMaterial({color:0xffffff});
-
-     var body = new THREE.Mesh(new THREE.BoxGeometry(1,2,0.6), m);
-     body.position.y = 1;
-
-     var head = new THREE.Mesh(new THREE.SphereGeometry(0.5,8,8), m);
-     head.position.y = 2.5;
-
-     g.add(body);
-     g.add(head);
-
-     g.position.set(0,0,0); // центр сцены
-
-     scene.add(g);
-     window.__astro_final = g;
-   }
- }catch(e){}
-},2000);
-
-
-// ===== v423 SAFE HANGAR ASTRONAUTS (NO SYNTAX RISK) =====
+// ===== v425 REAL HANGAR ASTRONAUTS IN HANGAR SCENE =====
+// Настоящие 3D-космонавты теперь добавляются в hangarState.scene,
+// а не в window.scene. Источник данных — только реальные rows из presence.
 if(typeof window.hangarAstronauts === 'undefined'){
   window.hangarAstronauts = {};
 }
 
+function createCosmicHangarPresenceNameSpriteV425(name, isOwner){
+  try{
+    var canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    var ctx = canvas.getContext('2d');
+    if(ctx){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = 'rgba(2,10,22,0.72)';
+      ctx.strokeStyle = isOwner ? 'rgba(255,220,90,0.9)' : 'rgba(110,235,255,0.9)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.roundRect(18, 22, canvas.width - 36, 74, 22);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = isOwner ? '#ffe27a' : '#dffbff';
+      ctx.font = '700 34px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label = (isOwner ? '👑 ' : '👁 ') + String(name || 'Player').slice(0, 18);
+      ctx.fillText(label, canvas.width / 2, 59);
+    }
+    var texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    var material = new THREE.SpriteMaterial({ map:texture, transparent:true, depthTest:false, depthWrite:false });
+    var sprite = new THREE.Sprite(material);
+    sprite.name = 'hangar-presence-name-v425';
+    sprite.renderOrder = 99999;
+    sprite.scale.set(3.2, 0.8, 1);
+    sprite.position.set(0, 2.75, 0);
+    sprite.userData.texture = texture;
+    return sprite;
+  }catch(_){
+    return null;
+  }
+}
+
+function createCosmicHangarPresenceAstronautV425(row, ownerId){
+  var pid = String(row && row.player_id || '').trim();
+  var isOwner = !!(pid && String(ownerId || '').trim() === pid);
+  var root = new THREE.Group();
+  root.name = 'hangar-presence-astronaut-v425';
+  root.userData.playerId = pid;
+  root.userData.nickname = String(row && row.nickname || 'Player');
+  root.userData.isOwner = isOwner;
+
+  var body = null;
+  try{
+    body = createHangarAstronautFallback();
+  }catch(_){
+    body = new THREE.Group();
+    var suit = new THREE.MeshStandardMaterial({ color:0xeaf3ff, metalness:0.35, roughness:0.55 });
+    var trim = new THREE.MeshStandardMaterial({ color:isOwner ? 0xffd861 : 0x57dfff, emissive:isOwner ? 0x5a3c00 : 0x004b66, emissiveIntensity:0.35 });
+    var torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.05, 0.42), suit);
+    torso.position.y = 1.45;
+    var helmet = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 18), suit);
+    helmet.position.y = 2.24;
+    var visor = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), trim);
+    visor.position.set(0,2.22,0.2);
+    visor.scale.set(1,0.72,0.32);
+    body.add(torso, helmet, visor);
+  }
+
+  root.add(body);
+
+  var ringColor = isOwner ? 0xffd861 : 0x5eeaff;
+  var ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.72, 0.026, 8, 36),
+    new THREE.MeshBasicMaterial({ color:ringColor, transparent:true, opacity:0.72 })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.04;
+  root.add(ring);
+
+  var glow = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.72, 0.72, 0.025, 36),
+    new THREE.MeshBasicMaterial({ color:ringColor, transparent:true, opacity:0.18, depthWrite:false })
+  );
+  glow.position.y = 0.035;
+  root.add(glow);
+
+  var label = createCosmicHangarPresenceNameSpriteV425(row && row.nickname || 'Player', isOwner);
+  if(label) root.add(label);
+
+  root.scale.setScalar(1.05);
+  root.rotation.y = Math.PI;
+  return root;
+}
+
+function disposeCosmicHangarPresenceObjectV425(obj){
+  try{
+    if(!obj) return;
+    obj.traverse(function(child){
+      try{ child.geometry && child.geometry.dispose && child.geometry.dispose(); }catch(_){ }
+      try{
+        var mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.filter(Boolean).forEach(function(mat){
+          try{ mat.map && mat.map.dispose && mat.map.dispose(); }catch(_){ }
+          try{ mat.dispose && mat.dispose(); }catch(_){ }
+        });
+      }catch(_){ }
+      try{ child.userData && child.userData.texture && child.userData.texture.dispose && child.userData.texture.dispose(); }catch(_){ }
+    });
+  }catch(_){ }
+}
+
+function getCosmicHangarPresenceSceneV425(){
+  try{
+    if(typeof hangarState !== 'undefined' && hangarState && hangarState.scene) return hangarState.scene;
+  }catch(_){ }
+  return null;
+}
+
+function getCosmicHangarPresencePositionV425(index, total, isOwner){
+  var positions = [
+    { x:-3.2, z:20.8 },
+    { x: 3.2, z:20.8 },
+    { x:-5.4, z:24.4 },
+    { x: 5.4, z:24.4 },
+    { x: 0.0, z:18.4 },
+    { x: 0.0, z:26.4 }
+  ];
+  var pos = positions[index % positions.length] || positions[0];
+  return new THREE.Vector3(pos.x, hangarState && Number.isFinite(hangarState.astronautGroundY) ? hangarState.astronautGroundY : -1.72, pos.z);
+}
+
 window.updateHangarAstronautsSafe = function(rows){
   try{
-    if(!window.THREE || !window.scene) return;
+    var scene = getCosmicHangarPresenceSceneV425();
+    if(!scene || typeof THREE === 'undefined') return;
 
+    var ownerId = String(
+      (typeof currentHangarPresenceOwnerId !== 'undefined' && currentHangarPresenceOwnerId) ||
+      (typeof getHangarOwnerIdForPresence === 'function' ? getHangarOwnerIdForPresence() : '') ||
+      ''
+    ).trim();
+
+    var myId = String(
+      (typeof getOwnPublicIdForPresence === 'function' ? getOwnPublicIdForPresence() : '') ||
+      (authState && authState.playerId) ||
+      (player && player.id) ||
+      ''
+    ).trim();
+
+    var list = Array.isArray(rows) ? rows.slice(0, 6) : [];
     var used = {};
+    var visibleIndex = 0;
 
-    for(var i=0;i<rows.length;i++){
-      var p = rows[i];
-      var id = String(p && p.player_id || '').trim();
+    for(var i=0;i<list.length;i++){
+      var p = list[i] || {};
+      var id = String(p.player_id || '').trim();
       if(!id) continue;
 
+      // Свой локальный космонавт уже управляется hangarState.astronautPivot.
+      // Дубликат себе не создаём, но других игроков создаём обязательно.
+      if(myId && id === myId) continue;
+
       used[id] = true;
+      var isOwner = !!(ownerId && id === ownerId);
+      var obj = window.hangarAstronauts[id] || null;
 
-      if(!window.hangarAstronauts[id]){
-        var g = new THREE.Group();
-        var m = new THREE.MeshBasicMaterial({color:0xffffff});
-
-        var body = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,0.4), m);
-        body.position.y = 0.6;
-
-        var head = new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8), m);
-        head.position.y = 1.4;
-
-        g.add(body);
-        g.add(head);
-
-        scene.add(g);
-        window.hangarAstronauts[id] = g;
+      if(!obj || obj.parent !== scene || obj.userData.isOwner !== isOwner){
+        try{ if(obj && obj.parent) obj.parent.remove(obj); }catch(_){ }
+        disposeCosmicHangarPresenceObjectV425(obj);
+        obj = createCosmicHangarPresenceAstronautV425(p, ownerId);
+        scene.add(obj);
+        window.hangarAstronauts[id] = obj;
       }
 
-      var angle = i * 1.2;
-      var r = 4;
+      obj.visible = true;
+      obj.userData.nickname = String(p.nickname || 'Player');
+      obj.userData.isOwner = isOwner;
 
-      window.hangarAstronauts[id].position.set(
-        Math.cos(angle)*r,
-        0,
-        Math.sin(angle)*r
-      );
+      var target = getCosmicHangarPresencePositionV425(visibleIndex, list.length, isOwner);
+      obj.position.copy(target);
+      obj.rotation.y = isOwner ? Math.PI * 0.92 : Math.PI * 1.08;
+
+      try{
+        var bob = Math.sin(performance.now() * 0.002 + visibleIndex) * 0.035;
+        obj.position.y += bob;
+      }catch(_){ }
+
+      visibleIndex++;
     }
 
-    // cleanup
     for(var k in window.hangarAstronauts){
       if(!used[k]){
-        try{
-          scene.remove(window.hangarAstronauts[k]);
-        }catch(e){}
+        try{ window.hangarAstronauts[k].parent && window.hangarAstronauts[k].parent.remove(window.hangarAstronauts[k]); }catch(_){ }
+        disposeCosmicHangarPresenceObjectV425(window.hangarAstronauts[k]);
         delete window.hangarAstronauts[k];
       }
     }
-
-  }catch(e){}
+  }catch(e){
+    try{ console.warn('hangar astronauts v425 warning:', e && e.message ? e.message : e); }catch(_){ }
+  }
 };
+
+setInterval(function(){
+  try{
+    if(typeof isHangarWindowOpenNow === 'function' && isHangarWindowOpenNow()){
+      renderHangarPresencePanel && renderHangarPresencePanel();
+    }else if(window.hangarAstronauts){
+      for(var k in window.hangarAstronauts){
+        try{ window.hangarAstronauts[k].parent && window.hangarAstronauts[k].parent.remove(window.hangarAstronauts[k]); }catch(_){ }
+        disposeCosmicHangarPresenceObjectV425(window.hangarAstronauts[k]);
+        delete window.hangarAstronauts[k];
+      }
+    }
+  }catch(_){ }
+}, 1200);
