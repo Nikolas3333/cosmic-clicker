@@ -1,3 +1,4 @@
+// COSMIC CLICKER v424 - FIX HANGAR PRESENCE LIST
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -294,36 +295,6 @@ async function renderHangarPresencePanel(){
     const rawRows = (players || []).filter(p => String(p?.status || '').toLowerCase() === neededStatus);
     const rows = Array.isArray(rawRows) ? rawRows.slice() : [];
 
-    const addPresenceFallback = (entry) => {
-        try{
-            const pid = String(entry?.player_id || '').trim();
-            if(!pid) return;
-            if(rows.some(row => String(row?.player_id || '').trim() === pid)) return;
-            rows.push(entry);
-        }catch(_){}
-    };
-
-    const ownerNickname =
-        (String(hangarGuestOwner?.nickname || '').trim()) ||
-        (String(hangarGuestOwner?.name || '').trim()) ||
-        (String(hangarGuestOwner?.display_name || '').trim()) ||
-        (String(player?.nickname || '').trim()) ||
-        'Player';
-
-    addPresenceFallback({
-        player_id: ownerId,
-        nickname: ownerNickname,
-        status: neededStatus
-    });
-
-    if(myId){
-        addPresenceFallback({
-            player_id: myId,
-            nickname: String(player?.nickname || 'Player').trim() || 'Player',
-            status: neededStatus
-        });
-    }
-
     rows.sort((a,b) => {
         const aid = String(a?.player_id || '');
         const bid = String(b?.player_id || '');
@@ -336,6 +307,7 @@ async function renderHangarPresencePanel(){
 
     list.innerHTML = '';
     if(!rows.length){
+        try{ updateHangarAstronautsSafe([]); }catch(e){}
         const empty = document.createElement('div');
         empty.style.opacity = '0.68';
         empty.textContent = 'Пока никого нет';
