@@ -1,4 +1,4 @@
-// COSMIC CLICKER v427 - FIX HANGAR ASTRONAUT PATROL LOOP
+// COSMIC CLICKER v428 - PROFILE SKIN AND MODULE UPGRADE BARS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -7775,13 +7775,14 @@ const closeProfile = document.getElementById("close-profile");
 const profileInfo = document.getElementById("profile-info");
 
 function updateProfileUI() {
+  try{
+    if(typeof renderProfileStats === 'function'){
+      renderProfileStats();
+      return;
+    }
+  }catch(_){}
   if(!profileInfo) return;
-  profileInfo.innerHTML = `
-    <p>Ник: ${player.nickname}</p>
-    <p>Уровень: ${player.level}</p>
-    <p>Опыт: ${player.experience}</p>
-    <p>Кораблей: ${player.ships.length}</p>
-  `;
+  profileInfo.innerHTML = `<div class="auth-note">Профиль загружается...</div>`;
 }
 
 if(profileBtn && profileWindow){
@@ -10817,18 +10818,202 @@ initBattleUI();
 initBattleChat();
 
 
+
+// ===== V428 PROFILE SKIN + PUBLIC MODULE UPGRADES =====
+function escapeProfileHtmlV428(value){
+    try{ return escapeChatHtml(String(value ?? '')); }catch(_){
+        return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+    }
+}
+
+function getProfileSkinKeyV428(source = {}){
+    const raw = source?.skin || source?.selectedSkin || source?.selected_skin || source?.characterSkin || source?.character_skin || source?.avatarSkin || source?.avatar_skin || '';
+    return String(raw || 'astronaut_blue').trim() || 'astronaut_blue';
+}
+
+function getProfileSkinMetaV428(source = {}){
+    const key = getProfileSkinKeyV428(source);
+    const nice = key.replace(/^astronaut[_-]?/i,'').replace(/[_-]+/g,' ').trim();
+    return {
+        key,
+        title: nice ? `Скин: ${nice.charAt(0).toUpperCase()}${nice.slice(1)}` : 'Скин пилота',
+        emoji: key.toLowerCase().includes('red') ? '🧑‍🚀' : (key.toLowerCase().includes('alien') ? '👽' : '🧑‍🚀')
+    };
+}
+
+function getProfileModuleUpgradeLevelV428(moduleId = '', source = {}){
+    const safeId = String(moduleId || '').trim();
+    if(!safeId) return 0;
+    const bags = [
+        source?.moduleLevels,
+        source?.module_levels,
+        source?.moduleUpgrades,
+        source?.module_upgrades,
+        source?.moduleUpgradeLevels,
+        source?.module_upgrade_levels,
+        source?.upgradedModules,
+        source?.upgraded_modules
+    ];
+    for(const bag of bags){
+        if(!bag || typeof bag !== 'object') continue;
+        const raw = bag[safeId];
+        if(raw && typeof raw === 'object'){
+            const n = Number(raw.level ?? raw.upgrades ?? raw.count ?? raw.value ?? 0);
+            if(Number.isFinite(n) && n > 0) return Math.max(1, Math.min(10, Math.floor(n)));
+        }else{
+            const n = Number(raw);
+            if(Number.isFinite(n) && n > 0) return Math.max(1, Math.min(10, Math.floor(n)));
+        }
+    }
+    return 1;
+}
+
+function getProfileSelectedShipIdV428(source = {}){
+    return String(source?.selectedShipId || source?.selected_ship_id || player?.selectedShipId || 'scout_1').trim() || 'scout_1';
+}
+
+function getProfileEquippedModulesV428(source = {}){
+    const selectedShipId = getProfileSelectedShipIdV428(source);
+    const active = source?.activeModulesByShip && typeof source.activeModulesByShip === 'object'
+        ? source.activeModulesByShip
+        : (player?.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? player.activeModulesByShip : {});
+    const slots = active?.[selectedShipId] || active?.[String(selectedShipId)] || active?.scout_1 || {};
+    const order = ['weapon','shield','booster'];
+    const rows = [];
+    order.forEach(typeId => {
+        const moduleId = String(slots?.[typeId] || '').trim();
+        const module = moduleId && typeof getModuleById === 'function' ? getModuleById(moduleId) : null;
+        rows.push({
+            typeId,
+            moduleId,
+            module,
+            name: module?.name || (typeId === 'weapon' ? 'Оружие не выбрано' : typeId === 'shield' ? 'Щит не выбран' : 'Ускоритель не выбран'),
+            badge: module?.badge || (typeId === 'weapon' ? 'Оружие' : typeId === 'shield' ? 'Защита' : 'Двигатель'),
+            level: moduleId ? getProfileModuleUpgradeLevelV428(moduleId, source) : 0
+        });
+    });
+    return rows;
+}
+
+function renderProfileModuleBarsV428(level = 0){
+    const safeLevel = Math.max(0, Math.min(10, Math.floor(Number(level || 0) || 0)));
+    let html = '<div class="profile-module-bars" title="Прокачки модуля">';
+    for(let i = 1; i <= 10; i++){
+        html += `<span class="profile-module-bar ${i <= safeLevel ? 'filled' : ''}"></span>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fallbackName = 'Player', canPm = false, canHangar = false } = {}){
+    const source = save && typeof save === 'object' ? save : {};
+    const skin = getProfileSkinMetaV428(source);
+    const displayName = profile?.nickname || source?.nickname || fallbackName || player?.nickname || 'Player';
+    const profileRole = normalizeStaffRole?.(profile?.staff_role || (isSelf ? player?.staff_role : 'player')) || 'player';
+    const roleMeta = getStaffRoleMeta?.(profileRole) || { short:'PLAYER' };
+    const level = Number(profile?.level ?? source?.playerLevel ?? source?.level ?? player?.level ?? 1) || 1;
+    const exp = Number(profile?.experience ?? source?.playerExperience ?? source?.experience ?? player?.experience ?? 0) || 0;
+    const credits = Number(profile?.credits ?? source?.credits ?? player?.credits ?? playerResources?.coins ?? 0) || 0;
+    const ownedShips = Array.isArray(source?.ownedShipIds) ? source.ownedShipIds.length : (isSelf && Array.isArray(player?.ownedShipIds) ? player.ownedShipIds.length : (Array.isArray(player?.ships) ? player.ships.length : 0));
+    const ownedModules = Array.isArray(source?.ownedModuleIds) ? source.ownedModuleIds.length : (isSelf && Array.isArray(player?.ownedModuleIds) ? player.ownedModuleIds.length : 0);
+    const modules = getProfileEquippedModulesV428(source);
+    const resources = [
+        ['🪨 Руда', profile?.mercury_ore], ['🌫 Газ', profile?.venus_gas], ['💧 Вода', profile?.earth_water], ['💎 Кристалл', profile?.mars_crystal],
+        ['🧪 Водород', profile?.jupiter_hydrogen], ['🧊 Лёд', profile?.saturn_ice], ['☄ Аммиак', profile?.uranus_ammonia], ['🫧 Метан', profile?.neptune_methane], ['☀ Энергия', profile?.solar_energy]
+    ];
+    const totalResources = resources.reduce((sum, [, value]) => sum + (Number(value) || 0), 0);
+    const kills = isSelf ? Number(battleStats?.playerKills || 0) : Number(source?.battleStats?.playerKills || source?.playerKills || 0);
+    const deaths = isSelf ? Number(battleStats?.playerDeaths || 0) : Number(source?.battleStats?.playerDeaths || source?.playerDeaths || 0);
+
+    return `
+      <div class="profile-v428-shell">
+        <div class="profile-v428-header">
+          <h2 class="profile-title">Пилот ${escapeProfileHtmlV428(displayName)}</h2>
+          <div class="profile-v428-id">ID: ${escapeProfileHtmlV428(profile?.public_id || (isSelf ? authState?.playerId : '') || '—')} • ${escapeProfileHtmlV428(roleMeta.short || 'PLAYER')}</div>
+        </div>
+        <div class="profile-v428-main">
+          <aside class="profile-skin-card">
+            <div class="profile-skin-frame">
+              <div class="profile-skin-figure">${skin.emoji}</div>
+              <div class="profile-skin-glow"></div>
+            </div>
+            <div class="profile-skin-name">${escapeProfileHtmlV428(skin.title)}</div>
+            <div class="profile-skin-note">Место под выбранный скин персонажа</div>
+          </aside>
+          <section class="profile-v428-right">
+            <div class="profile-grid profile-grid-v428">
+              <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${level}</div></div>
+              <div class="stat-card"><div class="cosmic-badge">Опыт</div><div>${exp}</div></div>
+              <div class="stat-card"><div class="cosmic-badge">Монеты</div><div>${credits}</div></div>
+              <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
+              <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${ownedShips}</div></div>
+              <div class="stat-card"><div class="cosmic-badge">Модулей</div><div>${ownedModules}</div></div>
+              <div class="stat-card"><div class="cosmic-badge">Фраги</div><div>${kills}</div></div>
+              <div class="stat-card"><div class="cosmic-badge">Смерти</div><div>${deaths}</div></div>
+            </div>
+            <div class="profile-module-panel">
+              <div class="profile-section-title">Установленные модули</div>
+              <div class="profile-module-list">
+                ${modules.map(row => `
+                  <div class="profile-module-row">
+                    <div class="profile-module-info">
+                      <div class="profile-module-name">${escapeProfileHtmlV428(row.name)}</div>
+                      <div class="profile-module-sub">${escapeProfileHtmlV428(row.badge)} • прокачек: ${row.level}</div>
+                    </div>
+                    ${renderProfileModuleBarsV428(row.level)}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            <div class="profile-resource-panel">
+              <div class="profile-section-title">Ресурсы</div>
+              <div class="profile-resource-grid">
+                ${resources.map(([name, value]) => `<div class="profile-resource-chip"><span>${escapeProfileHtmlV428(name)}</span><b>${Number(value) || 0}</b></div>`).join('')}
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="profile-v428-actions">
+          ${canPm ? '<button id="profile-pm-btn" type="button" class="profile-action-btn">✉️ Написать в ЛС</button>' : ''}
+          ${canHangar ? '<button id="profile-view-hangar-btn" type="button" class="profile-action-btn green">🚀 Посмотреть ангар</button>' : ''}
+        </div>
+      </div>
+    `;
+}
+
 function renderProfileStats(){
     const profileInfo = document.getElementById('profile-info');
     if(!profileInfo) return;
-    profileInfo.innerHTML = `
-      <h2 class="profile-title">Пилот ${player.nickname}</h2>
-      <div class="profile-grid">
-        <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${player.level}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Опыт</div><div>${player.experience || 0}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Фраги</div><div>${battleStats.playerKills}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Смерти</div><div>${battleStats.playerDeaths}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${player.ships.length}</div></div>
-      </div>`;
+    const selfSave = (typeof buildSavePayload === 'function') ? buildSavePayload() : {
+        selectedShipId: player?.selectedShipId || 'scout_1',
+        ownedShipIds: player?.ownedShipIds || ['scout_1'],
+        ownedModuleIds: player?.ownedModuleIds || [],
+        activeModulesByShip: player?.activeModulesByShip || {}
+    };
+    profileInfo.innerHTML = renderProfilePanelV428({
+        profile: {
+            public_id: authState?.playerId || player?.id || '',
+            nickname: player?.nickname || 'Commander',
+            level: player?.level || currentLevel || 1,
+            experience: player?.experience || 0,
+            credits: playerResources?.coins || player?.credits || 0,
+            staff_role: player?.staff_role || 'player',
+            mercury_ore: playerResources?.mercury_ore || 0,
+            venus_gas: playerResources?.venus_gas || 0,
+            earth_water: playerResources?.earth_water || 0,
+            mars_crystal: playerResources?.mars_crystal || 0,
+            jupiter_hydrogen: playerResources?.jupiter_hydrogen || 0,
+            saturn_ice: playerResources?.saturn_ice || 0,
+            uranus_ammonia: playerResources?.uranus_ammonia || 0,
+            neptune_methane: playerResources?.neptune_methane || 0,
+            solar_energy: playerResources?.solar_energy || 0
+        },
+        save: selfSave,
+        isSelf: true,
+        fallbackName: player?.nickname || 'Commander',
+        canPm: false,
+        canHangar: false
+    });
 }
 
 
@@ -18546,7 +18731,7 @@ async function fetchPlayerProfileData(targetId){
 
     const { data, error } = await window.supabaseClient
         .from('players')
-        .select('public_id,nickname,level,credits,email,staff_role,crystals,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,created_at')
+        .select('public_id,nickname,level,experience,credits,email,staff_role,crystals,mercury_ore,venus_gas,earth_water,mars_crystal,jupiter_hydrogen,saturn_ice,uranus_ammonia,neptune_methane,solar_energy,created_at')
         .eq('public_id', Number(targetId))
         .maybeSingle();
 
@@ -18660,38 +18845,22 @@ async function openPlayerProfile(targetId, fallbackNickname = 'Player'){
     profileWindowEl.classList.remove('hidden');
 
     const data = normalizedId ? await fetchPlayerProfileData(normalizedId) : null;
+    const saveData = normalizedId ? await fetchPlayerHangarSaveData(normalizedId) : null;
     if (data?.public_id) {
         setCachedStaffRole(String(data.public_id), data.staff_role || 'player');
     }
     const displayName = data?.nickname || fallbackNickname || 'Player';
-    const profileRole = normalizeStaffRole(data?.staff_role || (normalizedId && normalizedId === myId ? player?.staff_role : 'player'));
-    const roleMeta = getStaffRoleMeta(profileRole);
     const canPm = canUsePrivateChat() && isAccountPublicId(normalizedId) && normalizedId !== myId;
-    const totalResources = [
-        data?.mercury_ore,
-        data?.venus_gas,
-        data?.earth_water,
-        data?.mars_crystal,
-        data?.jupiter_hydrogen,
-        data?.saturn_ice,
-        data?.uranus_ammonia,
-        data?.neptune_methane,
-        data?.solar_energy
-    ].reduce((sum, value) => sum + (Number(value) || 0), 0);
+    const canHangar = isAccountPublicId(normalizedId);
 
-    profileInfoEl.innerHTML = `
-      <h2 class="profile-title">Пилот ${escapeChatHtml(displayName)}</h2>
-      <div class="profile-grid">
-        <div class="stat-card"><div class="cosmic-badge">Статус</div><div>${isAccountPublicId(normalizedId) ? 'Аккаунт' : 'Гость'}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Роль</div><div>${roleMeta.short || 'PLAYER'}</div></div>
-        <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${Number(data?.level) || 1}</div></div>
-      </div>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
-        ${canPm ? '<button id="profile-pm-btn" type="button" style="padding:10px 14px;border-radius:10px;border:1px solid rgba(0,255,255,0.35);background:rgba(0,180,255,0.18);color:#fff;cursor:pointer;">✉️ Написать в ЛС</button>' : ''}
-        ${isAccountPublicId(normalizedId) ? '<button id="profile-view-hangar-btn" type="button" style="padding:10px 14px;border-radius:10px;border:1px solid rgba(120,255,210,0.35);background:rgba(0,255,190,0.14);color:#fff;cursor:pointer;">🚀 Посмотреть ангар</button>' : ''}
-      </div>
-      ${!data ? '<div class="auth-note" style="margin-top:12px;">Профиль загружен частично. Полных данных по игроку пока нет.</div>' : ''}
-    `;
+    profileInfoEl.innerHTML = renderProfilePanelV428({
+        profile: data || { public_id: normalizedId, nickname: displayName },
+        save: saveData || {},
+        isSelf: false,
+        fallbackName: displayName,
+        canPm,
+        canHangar
+    }) + (!data ? '<div class="auth-note" style="margin-top:12px;text-align:center;">Профиль загружен частично. Полных данных по игроку пока нет.</div>' : '');
 
     document.getElementById('profile-pm-btn')?.addEventListener('click', () => {
         openPrivateChat(String(normalizedId), displayName);
