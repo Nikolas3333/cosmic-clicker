@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v430 - PROFILE BATTLE STATS CLEANUP -->
+<!-- COSMIC CLICKER v431 - PROFILE COMPACT ONE CARD LAYOUT -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -6608,6 +6608,173 @@ shop-main-head{
   display:flex;
 }
 
+
+
+/* ===== V431 PROFILE COMPACT ONE-CARD FIX ===== */
+#profile-window{
+  align-items:flex-start;
+  justify-content:center;
+  padding-top:64px;
+  box-sizing:border-box;
+}
+#profile-window .profile-content{
+  position:relative;
+  width:min(900px, calc(100vw - 420px));
+  min-width:760px;
+  max-height:calc(100vh - 92px);
+  overflow:hidden;
+  padding:18px 20px 18px;
+}
+.profile-close-x{
+  position:absolute;
+  top:10px;
+  right:12px;
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  border:1px solid rgba(255,80,80,0.45);
+  background:rgba(100,0,0,0.55);
+  color:#ffb5b5;
+  font-size:24px;
+  line-height:26px;
+  font-weight:900;
+  cursor:pointer;
+  z-index:5;
+  box-shadow:0 0 14px rgba(255,60,60,0.22);
+}
+.profile-close-x:hover{
+  background:rgba(180,20,20,0.82);
+  color:#fff;
+}
+.profile-v428-header{
+  margin-bottom:12px;
+  padding-right:44px;
+}
+.profile-v428-header .profile-title{
+  font-size:25px;
+  margin:0;
+}
+.profile-v428-main{
+  grid-template-columns:205px minmax(0,1fr);
+  gap:14px;
+}
+.profile-skin-card{
+  min-height:0;
+  height:476px;
+  padding:14px;
+}
+.profile-skin-frame{
+  width:158px;
+  height:262px;
+}
+.profile-skin-figure{
+  font-size:74px;
+}
+.profile-skin-name{
+  margin-top:10px;
+  font-size:18px;
+}
+.profile-skin-note{
+  font-size:11px;
+}
+.profile-skin-stats{
+  margin-top:10px;
+}
+.profile-rating-bar{
+  height:17px;
+  line-height:17px;
+  font-size:12px;
+}
+.profile-mini-stats-grid{
+  gap:5px;
+}
+.profile-mini-row{
+  grid-template-columns:34px minmax(0,1fr);
+  gap:6px;
+}
+.profile-mini-row b{
+  min-height:23px;
+  padding:3px 6px;
+  font-size:12px;
+}
+.profile-mini-icon.coin-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:22px;
+  font-size:0;
+}
+.profile-mini-icon.coin-icon::before{
+  content:"";
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 32%, #fff4a0 0 18%, #ffd11a 30%, #c47a00 74%, #7a3d00 100%);
+  box-shadow:0 0 8px rgba(255,205,35,0.5), inset -2px -2px 4px rgba(80,35,0,0.35);
+}
+.profile-v428-right{
+  gap:12px;
+}
+.profile-battle-stat-grid{
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:9px;
+}
+.profile-battle-stat-card{
+  min-height:58px;
+  padding:8px 9px;
+  border-radius:12px;
+}
+.profile-battle-stat-label{
+  font-size:12px;
+  gap:5px;
+}
+.profile-battle-stat-value{
+  font-size:14px;
+}
+.profile-module-panel{
+  padding:12px;
+}
+.profile-section-title{
+  margin-bottom:8px;
+  font-size:18px;
+}
+.profile-module-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.profile-module-row{
+  min-height:58px;
+  padding:8px 10px;
+  border-radius:13px;
+  grid-template-columns:minmax(0,1fr) auto;
+}
+.profile-module-name{
+  font-size:13px;
+}
+.profile-module-sub{
+  font-size:11px;
+  margin-top:3px;
+}
+.profile-module-bars{
+  height:38px;
+  align-items:center;
+}
+.profile-module-bar{
+  width:5px;
+  height:32px;
+}
+.profile-v428-actions{
+  margin-top:10px;
+}
+.profile-v428-actions:empty{
+  display:none;
+}
+@media (max-width:1100px){
+  #profile-window .profile-content{ width:min(900px,94vw); min-width:0; }
+}
+
 </style>
 <style id="v378-bot-nameplate-hard-override">
 html body .battle-bot-name-label,
@@ -7570,9 +7737,8 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 <!-- ===== PROFILE WINDOW ===== -->
 <div id="profile-window" class="hidden">
   <div class="profile-content">
+    <button id="close-profile" class="profile-close-x" type="button" title="Закрыть">×</button>
     <div id="profile-info"></div>
-    <br>
-    <button id="close-profile">Закрыть</button>
   </div>
 </div>
 
