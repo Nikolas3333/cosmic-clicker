@@ -1,4 +1,4 @@
-// COSMIC CLICKER v428 - PROFILE SKIN AND MODULE UPGRADE BARS
+// COSMIC CLICKER v429 - PROFILE SKIN SIDE STATS AND RATING BAR
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -10905,6 +10905,37 @@ function renderProfileModuleBarsV428(level = 0){
     return html;
 }
 
+function getProfileExperienceMaxV429(level = 1){
+    const safeLevel = Math.max(1, Math.floor(Number(level || 1) || 1));
+    return Math.max(50, safeLevel * 50);
+}
+
+function renderProfileSkinStatsV429({ rating = 0, exp = 0, expMax = 50, level = 1, credits = 0, crystals = 0 } = {}){
+    const safeRating = Math.max(0, Math.floor(Number(rating || 0) || 0));
+    const safeExp = Math.max(0, Math.floor(Number(exp || 0) || 0));
+    const safeExpMax = Math.max(1, Math.floor(Number(expMax || 1) || 1));
+    const safeLevel = Math.max(1, Math.floor(Number(level || 1) || 1));
+    const safeCredits = Math.max(0, Math.floor(Number(credits || 0) || 0));
+    const safeCrystals = Math.max(0, Math.floor(Number(crystals || 0) || 0));
+    return `
+      <div class="profile-skin-stats">
+        <div class="profile-rating-bar" title="Рейтинг для будущих таблиц лидеров">
+          <span>${safeRating}</span>
+        </div>
+        <div class="profile-mini-stats-grid">
+          <div class="profile-mini-label exp">EXP</div>
+          <div class="profile-mini-value">${safeExp} / ${safeExpMax}</div>
+          <div class="profile-mini-icon">⭐</div>
+          <div class="profile-mini-value">${safeLevel}</div>
+          <div class="profile-mini-icon">🪙</div>
+          <div class="profile-mini-value">${safeCredits}</div>
+          <div class="profile-mini-icon">💎</div>
+          <div class="profile-mini-value">${safeCrystals}</div>
+        </div>
+      </div>
+    `;
+}
+
 function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fallbackName = 'Player', canPm = false, canHangar = false } = {}){
     const source = save && typeof save === 'object' ? save : {};
     const skin = getProfileSkinMetaV428(source);
@@ -10914,6 +10945,9 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
     const level = Number(profile?.level ?? source?.playerLevel ?? source?.level ?? player?.level ?? 1) || 1;
     const exp = Number(profile?.experience ?? source?.playerExperience ?? source?.experience ?? player?.experience ?? 0) || 0;
     const credits = Number(profile?.credits ?? source?.credits ?? player?.credits ?? playerResources?.coins ?? 0) || 0;
+    const crystals = Number(profile?.crystals ?? source?.crystals ?? source?.playerResources?.crystals ?? playerResources?.crystals ?? 0) || 0;
+    const rating = Number(profile?.rating ?? source?.rating ?? source?.leaderRating ?? source?.leader_rating ?? 0) || 0;
+    const expMax = Number(profile?.experience_max ?? source?.experienceMax ?? source?.experience_max ?? getProfileExperienceMaxV429(level)) || getProfileExperienceMaxV429(level);
     const ownedShips = Array.isArray(source?.ownedShipIds) ? source.ownedShipIds.length : (isSelf && Array.isArray(player?.ownedShipIds) ? player.ownedShipIds.length : (Array.isArray(player?.ships) ? player.ships.length : 0));
     const ownedModules = Array.isArray(source?.ownedModuleIds) ? source.ownedModuleIds.length : (isSelf && Array.isArray(player?.ownedModuleIds) ? player.ownedModuleIds.length : 0);
     const modules = getProfileEquippedModulesV428(source);
@@ -10933,18 +10967,18 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
         </div>
         <div class="profile-v428-main">
           <aside class="profile-skin-card">
-            <div class="profile-skin-frame">
-              <div class="profile-skin-figure">${skin.emoji}</div>
-              <div class="profile-skin-glow"></div>
+            <div class="profile-skin-top">
+              <div class="profile-skin-frame">
+                <div class="profile-skin-figure">${skin.emoji}</div>
+                <div class="profile-skin-glow"></div>
+              </div>
+              <div class="profile-skin-name">${escapeProfileHtmlV428(skin.title)}</div>
+              <div class="profile-skin-note">Место под выбранный скин персонажа</div>
             </div>
-            <div class="profile-skin-name">${escapeProfileHtmlV428(skin.title)}</div>
-            <div class="profile-skin-note">Место под выбранный скин персонажа</div>
+            ${renderProfileSkinStatsV429({ rating, exp, expMax, level, credits, crystals })}
           </aside>
           <section class="profile-v428-right">
             <div class="profile-grid profile-grid-v428">
-              <div class="stat-card"><div class="cosmic-badge">Уровень</div><div>${level}</div></div>
-              <div class="stat-card"><div class="cosmic-badge">Опыт</div><div>${exp}</div></div>
-              <div class="stat-card"><div class="cosmic-badge">Монеты</div><div>${credits}</div></div>
               <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
               <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${ownedShips}</div></div>
               <div class="stat-card"><div class="cosmic-badge">Модулей</div><div>${ownedModules}</div></div>
@@ -10997,6 +11031,7 @@ function renderProfileStats(){
             level: player?.level || currentLevel || 1,
             experience: player?.experience || 0,
             credits: playerResources?.coins || player?.credits || 0,
+            crystals: playerResources?.crystals || player?.crystals || 0,
             staff_role: player?.staff_role || 'player',
             mercury_ore: playerResources?.mercury_ore || 0,
             venus_gas: playerResources?.venus_gas || 0,
