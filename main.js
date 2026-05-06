@@ -21500,3 +21500,35 @@ setInterval(function(){
     }
   }catch(_){ }
 }, 1200);
+
+
+function makeLevelShipIcon(levelValue = 1){
+    const safeLevel = Math.max(1, Number(levelValue || 1) || 1);
+    return `
+    <svg width="28" height="22" viewBox="0 0 56 44" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="shipGlow" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#7efcff"/>
+          <stop offset="100%" stop-color="#00a2ff"/>
+        </linearGradient>
+      </defs>
+      <path d="M28 3 L48 26 L37 26 L37 39 L19 39 L19 26 L8 26 Z"
+            fill="rgba(8,18,35,0.96)"
+            stroke="url(#shipGlow)"
+            stroke-width="2.5"
+            style="filter:drop-shadow(0 0 6px rgba(0,255,255,0.55));"/>
+      <text x="28" y="26"
+            text-anchor="middle"
+            font-size="16"
+            font-weight="900"
+            fill="#dffcff"
+            font-family="Arial">${safeLevel}</text>
+    </svg>`;
+}
+
+try{
+ const __profileShipIcon = document.getElementById('profile-level-ship-icon');
+ if(__profileShipIcon){
+   __profileShipIcon.innerHTML = makeLevelShipIcon(player?.level || currentLevel || 1);
+ }
+}catch(_){}
