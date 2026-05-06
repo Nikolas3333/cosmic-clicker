@@ -1,4 +1,4 @@
-// COSMIC CLICKER v429 - PROFILE SKIN SIDE STATS AND RATING BAR
+// COSMIC CLICKER v430 - PROFILE BATTLE STATS CLEANUP
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -10923,15 +10923,39 @@ function renderProfileSkinStatsV429({ rating = 0, exp = 0, expMax = 50, level = 
           <span>${safeRating}</span>
         </div>
         <div class="profile-mini-stats-grid">
-          <div class="profile-mini-label exp">EXP</div>
-          <div class="profile-mini-value">${safeExp} / ${safeExpMax}</div>
-          <div class="profile-mini-icon">⭐</div>
-          <div class="profile-mini-value">${safeLevel}</div>
-          <div class="profile-mini-icon">🪙</div>
-          <div class="profile-mini-value">${safeCredits}</div>
-          <div class="profile-mini-icon">💎</div>
-          <div class="profile-mini-value">${safeCrystals}</div>
+          <div class="profile-mini-row exp-row"><span class="profile-mini-label exp">EXP</span><b>${safeExp} / ${safeExpMax}</b></div>
+          <div class="profile-mini-row"><span class="profile-mini-icon">⭐</span><b>${safeLevel}</b></div>
+          <div class="profile-mini-row"><span class="profile-mini-icon">🪙</span><b>${safeCredits}</b></div>
+          <div class="profile-mini-row"><span class="profile-mini-icon">💎</span><b>${safeCrystals}</b></div>
         </div>
+      </div>
+    `;
+}
+
+function getProfileStatNumberV430(...values){
+    for(const value of values){
+        const n = Number(value);
+        if(Number.isFinite(n) && n >= 0) return Math.floor(n);
+    }
+    return 0;
+}
+
+function renderProfileBattleStatsV430({ totalKills = 0, teamPoints = 0, flagsCaptured = 0, tournamentWins = 0, totalDeaths = 0 } = {}){
+    const rows = [
+        ['🟡', 'Всего убийств', totalKills],
+        ['🟡', 'Командные очки', teamPoints],
+        ['🟡', 'Флагов захвачено', flagsCaptured],
+        ['🟠', 'Турниры (победы)', tournamentWins],
+        ['🔴', 'Всего смертей', totalDeaths]
+    ];
+    return `
+      <div class="profile-battle-stat-grid">
+        ${rows.map(([icon, label, value]) => `
+          <div class="profile-battle-stat-card">
+            <div class="profile-battle-stat-label"><span>${icon}</span>${escapeProfileHtmlV428(label)}</div>
+            <div class="profile-battle-stat-value">${getProfileStatNumberV430(value)}</div>
+          </div>
+        `).join('')}
       </div>
     `;
 }
@@ -10948,16 +10972,36 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
     const crystals = Number(profile?.crystals ?? source?.crystals ?? source?.playerResources?.crystals ?? playerResources?.crystals ?? 0) || 0;
     const rating = Number(profile?.rating ?? source?.rating ?? source?.leaderRating ?? source?.leader_rating ?? 0) || 0;
     const expMax = Number(profile?.experience_max ?? source?.experienceMax ?? source?.experience_max ?? getProfileExperienceMaxV429(level)) || getProfileExperienceMaxV429(level);
-    const ownedShips = Array.isArray(source?.ownedShipIds) ? source.ownedShipIds.length : (isSelf && Array.isArray(player?.ownedShipIds) ? player.ownedShipIds.length : (Array.isArray(player?.ships) ? player.ships.length : 0));
-    const ownedModules = Array.isArray(source?.ownedModuleIds) ? source.ownedModuleIds.length : (isSelf && Array.isArray(player?.ownedModuleIds) ? player.ownedModuleIds.length : 0);
     const modules = getProfileEquippedModulesV428(source);
-    const resources = [
-        ['🪨 Руда', profile?.mercury_ore], ['🌫 Газ', profile?.venus_gas], ['💧 Вода', profile?.earth_water], ['💎 Кристалл', profile?.mars_crystal],
-        ['🧪 Водород', profile?.jupiter_hydrogen], ['🧊 Лёд', profile?.saturn_ice], ['☄ Аммиак', profile?.uranus_ammonia], ['🫧 Метан', profile?.neptune_methane], ['☀ Энергия', profile?.solar_energy]
-    ];
-    const totalResources = resources.reduce((sum, [, value]) => sum + (Number(value) || 0), 0);
-    const kills = isSelf ? Number(battleStats?.playerKills || 0) : Number(source?.battleStats?.playerKills || source?.playerKills || 0);
-    const deaths = isSelf ? Number(battleStats?.playerDeaths || 0) : Number(source?.battleStats?.playerDeaths || source?.playerDeaths || 0);
+    const localKills = isSelf ? Number(battleStats?.playerKills || 0) : 0;
+    const localDeaths = isSelf ? Number(battleStats?.playerDeaths || 0) : 0;
+    const totalKills = getProfileStatNumberV430(
+        profile?.total_kills, profile?.totalKills, profile?.kills_total,
+        source?.totalKills, source?.total_kills, source?.killsTotal,
+        source?.battleStats?.totalKills, source?.battleStats?.playerKills,
+        source?.playerKills, source?.kills, localKills
+    );
+    const teamPoints = getProfileStatNumberV430(
+        profile?.team_points, profile?.teamPoints, profile?.team_score, profile?.teamScore,
+        source?.teamPoints, source?.team_points, source?.teamScore, source?.team_score,
+        source?.battleStats?.teamPoints, source?.battleStats?.teamScore
+    );
+    const flagsCaptured = getProfileStatNumberV430(
+        profile?.flags_captured, profile?.flagsCaptured, profile?.captured_flags, profile?.capturedFlags,
+        source?.flagsCaptured, source?.flags_captured, source?.capturedFlags, source?.captured_flags,
+        source?.battleStats?.flagsCaptured
+    );
+    const tournamentWins = getProfileStatNumberV430(
+        profile?.tournament_wins, profile?.tournamentWins, profile?.tournaments_won, profile?.tournamentsWon,
+        source?.tournamentWins, source?.tournament_wins, source?.tournamentsWon, source?.tournaments_won,
+        source?.battleStats?.tournamentWins
+    );
+    const totalDeaths = getProfileStatNumberV430(
+        profile?.total_deaths, profile?.totalDeaths, profile?.deaths_total,
+        source?.totalDeaths, source?.total_deaths, source?.deathsTotal,
+        source?.battleStats?.totalDeaths, source?.battleStats?.playerDeaths,
+        source?.playerDeaths, source?.deaths, localDeaths
+    );
 
     return `
       <div class="profile-v428-shell">
@@ -10978,13 +11022,7 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
             ${renderProfileSkinStatsV429({ rating, exp, expMax, level, credits, crystals })}
           </aside>
           <section class="profile-v428-right">
-            <div class="profile-grid profile-grid-v428">
-              <div class="stat-card"><div class="cosmic-badge">Ресурсов</div><div>${totalResources}</div></div>
-              <div class="stat-card"><div class="cosmic-badge">Кораблей</div><div>${ownedShips}</div></div>
-              <div class="stat-card"><div class="cosmic-badge">Модулей</div><div>${ownedModules}</div></div>
-              <div class="stat-card"><div class="cosmic-badge">Фраги</div><div>${kills}</div></div>
-              <div class="stat-card"><div class="cosmic-badge">Смерти</div><div>${deaths}</div></div>
-            </div>
+            ${renderProfileBattleStatsV430({ totalKills, teamPoints, flagsCaptured, tournamentWins, totalDeaths })}
             <div class="profile-module-panel">
               <div class="profile-section-title">Установленные модули</div>
               <div class="profile-module-list">
@@ -10997,12 +11035,6 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
                     ${renderProfileModuleBarsV428(row.level)}
                   </div>
                 `).join('')}
-              </div>
-            </div>
-            <div class="profile-resource-panel">
-              <div class="profile-section-title">Ресурсы</div>
-              <div class="profile-resource-grid">
-                ${resources.map(([name, value]) => `<div class="profile-resource-chip"><span>${escapeProfileHtmlV428(name)}</span><b>${Number(value) || 0}</b></div>`).join('')}
               </div>
             </div>
           </section>
