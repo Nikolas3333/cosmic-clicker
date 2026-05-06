@@ -1,4 +1,4 @@
-// COSMIC CLICKER v430 - PROFILE BATTLE STATS CLEANUP
+// COSMIC CLICKER v431 - PROFILE COMPACT ONE CARD LAYOUT
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -10925,7 +10925,7 @@ function renderProfileSkinStatsV429({ rating = 0, exp = 0, expMax = 50, level = 
         <div class="profile-mini-stats-grid">
           <div class="profile-mini-row exp-row"><span class="profile-mini-label exp">EXP</span><b>${safeExp} / ${safeExpMax}</b></div>
           <div class="profile-mini-row"><span class="profile-mini-icon">⭐</span><b>${safeLevel}</b></div>
-          <div class="profile-mini-row"><span class="profile-mini-icon">🪙</span><b>${safeCredits}</b></div>
+          <div class="profile-mini-row"><span class="profile-mini-icon coin-icon" title="Монеты"></span><b>${safeCredits}</b></div>
           <div class="profile-mini-row"><span class="profile-mini-icon">💎</span><b>${safeCrystals}</b></div>
         </div>
       </div>
@@ -11039,10 +11039,10 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
             </div>
           </section>
         </div>
-        <div class="profile-v428-actions">
+        ${(canPm || canHangar) ? `<div class="profile-v428-actions">
           ${canPm ? '<button id="profile-pm-btn" type="button" class="profile-action-btn">✉️ Написать в ЛС</button>' : ''}
           ${canHangar ? '<button id="profile-view-hangar-btn" type="button" class="profile-action-btn green">🚀 Посмотреть ангар</button>' : ''}
-        </div>
+        </div>` : ''}
       </div>
     `;
 }
