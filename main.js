@@ -1,4 +1,4 @@
-// COSMIC CLICKER v431 - PROFILE COMPACT ONE CARD LAYOUT
+// COSMIC CLICKER v434 - FIX LEVEL SHIP ICON DUPLICATE
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -21534,25 +21534,6 @@ try{
 }catch(_){}
 
 
-function makeLevelShipIcon(levelValue = 1){
-    const safeLevel = Math.max(1, Number(levelValue || 1) || 1);
-    return `
-    <div style="
-        width:24px;
-        height:16px;
-        position:relative;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        color:#dffcff;
-        font-size:10px;
-        font-weight:900;
-        background:linear-gradient(180deg,#12395d,#081624);
-        border:1px solid #4de7ff;
-        clip-path:polygon(50% 0%,100% 58%,78% 58%,78% 100%,22% 100%,22% 58%,0% 58%);
-        box-shadow:0 0 8px rgba(0,255,255,0.45);
-    ">${safeLevel}</div>`;
-}
 
 function updateProfileLevelShipIcon(){
     try{
