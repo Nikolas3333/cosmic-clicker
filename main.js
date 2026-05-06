@@ -1,4 +1,4 @@
-// COSMIC CLICKER v434 - FIX LEVEL SHIP ICON DUPLICATE
+// COSMIC CLICKER v435 - PROFILE LEVEL SHIP ICON FAST FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -387,7 +387,31 @@ function restoreOwnHangarAfterGuest(){
         hangarSelfSnapshot = null;
         try{ refreshOwnedShipsInventory?.(); }catch(_){}
         try{ currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || ''); }catch(_){}
-        try{ updatePremiumAccountInfo?.(); updateHUD?.(); updateUI?.(); }catch(_){}
+        try{ updatePremiumAccountInfo?.(); try{ refreshCosmicLevelShipIcon?.(); }catch(_){} updateHUD?.(); updateUI?.(); }catch(_){}
+    }
+}
+
+
+function cosmicLevelShipIconHtml(levelValue = 1){
+    const safeLevel = Math.max(1, Math.min(120, Number(levelValue || 1) || 1));
+    return `
+        <span class="cosmic-level-ship-badge" title="Уровень ${safeLevel}">
+            <span class="cosmic-level-ship-body">
+                <span class="cosmic-level-ship-number">${safeLevel}</span>
+            </span>
+            <span class="cosmic-level-ship-flame"></span>
+        </span>
+    `;
+}
+
+function refreshCosmicLevelShipIcon(){
+    try{
+        const level = Math.max(1, Number(player?.level || currentLevel || 1) || 1);
+        document.querySelectorAll('[data-cosmic-level-ship]').forEach(node => {
+            node.innerHTML = cosmicLevelShipIconHtml(level);
+        });
+    }catch(error){
+        console.warn('cosmic level ship icon warning:', error?.message || error);
     }
 }
 
@@ -712,7 +736,7 @@ function forceOpenLobbyAfterAuth(email = ''){
         try{ clearBattleBotNameLabels?.(); }catch(_){}
         try{ updateNicknameSettingsState?.(); }catch(_){}
         try{ updatePremiumAccountInfo?.(); }catch(_){}
-        try{ renderProfileStats?.(); }catch(_){}
+        try{ renderProfileStats?.(); try{ refreshCosmicLevelShipIcon?.(); }catch(_){} }catch(_){}
 
         try{ switchState('LOBBY'); }catch(switchErr){ console.warn('switchState LOBBY warning:', switchErr?.message || switchErr); }
 
@@ -832,7 +856,7 @@ function awardSoloBotKillReward(worldPosition = null){
 
     try{ showBattleFloatingReward(expReward, coinReward, worldPosition || playerShip?.position || null); }catch(_){}
     try{ inventory?.syncFromPlayerResources?.(); }catch(_){}
-    try{ updateHUD?.(); updateUI?.(); updatePremiumAccountInfo?.(); updateBattlePlayerHud?.(); updateBattleScoreboard?.(); updateProfileUI?.(); }catch(_){}
+    try{ updateHUD?.(); updateUI?.(); updatePremiumAccountInfo?.(); updateBattlePlayerHud?.(); updateBattleScoreboard?.(); updateProfileUI?.(); try{ refreshCosmicLevelShipIcon?.(); }catch(_){} }catch(_){}
     try{ saveGame?.(); }catch(_){}
 }
 function awardSoloMissionWinReward(){
@@ -21502,47 +21526,4 @@ setInterval(function(){
 }, 1200);
 
 
-function makeLevelShipIcon(levelValue = 1){
-    const safeLevel = Math.max(1, Number(levelValue || 1) || 1);
-    return `
-    <svg width="28" height="22" viewBox="0 0 56 44" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="shipGlow" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#7efcff"/>
-          <stop offset="100%" stop-color="#00a2ff"/>
-        </linearGradient>
-      </defs>
-      <path d="M28 3 L48 26 L37 26 L37 39 L19 39 L19 26 L8 26 Z"
-            fill="rgba(8,18,35,0.96)"
-            stroke="url(#shipGlow)"
-            stroke-width="2.5"
-            style="filter:drop-shadow(0 0 6px rgba(0,255,255,0.55));"/>
-      <text x="28" y="26"
-            text-anchor="middle"
-            font-size="16"
-            font-weight="900"
-            fill="#dffcff"
-            font-family="Arial">${safeLevel}</text>
-    </svg>`;
-}
 
-try{
- const __profileShipIcon = document.getElementById('profile-level-ship-icon');
- if(__profileShipIcon){
-   __profileShipIcon.innerHTML = makeLevelShipIcon(player?.level || currentLevel || 1);
- }
-}catch(_){}
-
-
-
-function updateProfileLevelShipIcon(){
-    try{
-        const target = document.getElementById('profile-level-ship-icon');
-        if(!target) return;
-        target.innerHTML = makeLevelShipIcon(player?.level || currentLevel || 1);
-    }catch(error){
-        console.warn('profile ship icon warning:', error);
-    }
-}
-
-setInterval(updateProfileLevelShipIcon, 1000);
