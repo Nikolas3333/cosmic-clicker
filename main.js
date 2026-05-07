@@ -1,4 +1,4 @@
-// COSMIC CLICKER v435 - PROFILE LEVEL SHIP ICON FAST FIX
+// COSMIC CLICKER v436 - SUPABASE IO SAFE BATTLE REALTIME FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -1824,17 +1824,7 @@ function ensureSelfRoomPlayerState(){
         team,
         level: Number(player?.level || 1) || 1,
         ping: getThrottledRoomPlayerPing(now),
-        position: {
-            x: Number(playerShip.position.x || 0),
-            y: Number(playerShip.position.y || 0),
-            z: Number(playerShip.position.z || 0)
-        },
-        rotation: {
-            x: Number(playerShip.quaternion.x || 0),
-            y: Number(playerShip.quaternion.y || 0),
-            z: Number(playerShip.quaternion.z || 0),
-            w: Number(playerShip.quaternion.w || 1)
-        },
+        // v436: координаты/поворот не пишем в room_players. Они идут через pilot-state broadcast.
         updated_at: new Date(now).toISOString()
     };
 
@@ -1852,10 +1842,10 @@ function ensureSelfRoomPlayerState(){
         || previousPayload.team !== payload.team
         || Number(previousPayload.level || 0) !== Number(payload.level || 0)
         || (pingWindowPassed && Number(previousPayload.ping || 0) !== Number(payload.ping || 0));
-    const changedPosition = !previousPayload || hasMeaningfulBattleVectorDelta(previousPayload.position, payload.position, ROOM_PLAYER_POSITION_EPSILON);
-    const changedRotation = !previousPayload || hasMeaningfulBattleQuaternionDelta(previousPayload.rotation, payload.rotation, ROOM_PLAYER_ROTATION_EPSILON);
+    const changedPosition = false;
+    const changedRotation = false;
 
-    if(!needsForceSend && !changedMeta && !changedPosition && !changedRotation){
+    if(!needsForceSend && !changedMeta){
         return;
     }
 
@@ -1880,8 +1870,6 @@ function ensureSelfRoomPlayerState(){
                 team: payload.team,
                 level: payload.level,
                 ping: payload.ping,
-                position: payload.position,
-                rotation: payload.rotation,
                 updated_at: payload.updated_at
             };
 
@@ -1921,9 +1909,7 @@ function ensureSelfRoomPlayerState(){
                     updated_at: payload.updated_at,
                     team: payload.team,
                     level: payload.level,
-                    ping: payload.ping,
-                    position: payload.position,
-                    rotation: payload.rotation
+                    ping: payload.ping
                 }, 'id');
 
                 if(!isStillSameBattleSession()) return;
@@ -8371,13 +8357,13 @@ var battleClientResetSerial = 0;
 const ROOM_PLAYER_FETCH_CACHE_MS = 300;
 const ROOM_PLAYER_PING_UPDATE_MS = 9000;
 const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
-const LIVE_BATTLE_SYNC_INTERVAL_MS = 900;
-const LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS = 900;
-const LIVE_BATTLE_HIT_POLL_INTERVAL_MS = 180;
-const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 2800;
+const LIVE_BATTLE_SYNC_INTERVAL_MS = 2500; // v436: DB roster sync реже, позиции идут через broadcast
+const LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS = 160; // v436: живое PvP движение без записи в БД
+const LIVE_BATTLE_HIT_POLL_INTERVAL_MS = 60000; // v436: polling battle_hits отключён ниже
+const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 12000; // v436: room_players больше не хранит частые координаты
 const ROOM_PLAYER_POSITION_EPSILON = 0.65;
 const ROOM_PLAYER_ROTATION_EPSILON = 0.06;
-const BATTLE_PRESENCE_FORCE_INTERVAL_MS = 900;
+const BATTLE_PRESENCE_FORCE_INTERVAL_MS = 600;
 const BATTLE_PRESENCE_POSITION_EPSILON = 0.28;
 const BATTLE_PRESENCE_ROTATION_EPSILON = 0.035;
 var battleScoreState = new Map();
@@ -8599,7 +8585,8 @@ function upsertRemoteBattlePresence(payload = {}){
 
     let entry = remoteBattleShips.get(entryId);
     if(!entry){
-        return;
+        entry = createRemoteBattleShipMesh(nickname, remoteBattleShips.size, team);
+        remoteBattleShips.set(entryId, entry);
     }
 
     entry.playerId = entryId;
@@ -8833,30 +8820,35 @@ async function insertBattleHitRecord(targetPlayerId, damage, victimName = ''){
 }
 
 async function broadcastBattleHit(targetPlayerId, damage, victimName = ''){
-    return insertBattleHitRecord(targetPlayerId, damage, victimName);
+    // v436: попадания больше НЕ пишутся в таблицу battle_hits.
+    // Это временное realtime-событие боя: функционал атаки остаётся, Disk IO падает.
+    const self = getBattleSelfIdentity();
+    const targetId = String(targetPlayerId || '').trim();
+    const damageValue = Math.max(0, Number(damage || 0) || 0);
+    if(!self.playerId || !targetId || !damageValue) return false;
+    return sendBattlePresenceEvent('pilot-hit', {
+        hitId: `live:${self.playerId}:${targetId}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,
+        attackerId: self.playerId,
+        attackerName: self.nickname || 'Commander',
+        targetPlayerId: targetId,
+        targetName: String(victimName || '').trim(),
+        damage: damageValue,
+        roomId: getBattleRoomIdSafe(),
+        at: Date.now()
+    });
 }
 
 async function insertBattleKillAckRecord(targetPlayerId, victimName = ''){
-    if(!window.supabaseClient) return false;
+    // v436: kill-ack тоже уходит через realtime broadcast, а не через battle_hits.
     const self = getBattleSelfIdentity();
-    const roomId = getBattleHitsRoomId();
-    const targetId = String(targetPlayerId || '').trim();
-    if(!self.playerId || !roomId || !targetId) return false;
-
-    try{
-        const { error } = await window.supabaseClient
-            .from('battle_hits')
-            .insert({
-                room_id: roomId,
-                attacker_id: self.playerId,
-                target_id: targetId,
-                damage: BATTLE_KILL_ACK_DAMAGE
-            });
-        if(error) return false;
-        return true;
-    }catch(_){
-        return false;
-    }
+    const attackerId = String(targetPlayerId || '').trim();
+    if(!self.playerId || !attackerId) return false;
+    return broadcastBattleKill(
+        attackerId,
+        resolveBattlePlayerNameById(attackerId, 'Pilot'),
+        self.playerId,
+        String(victimName || self.nickname || player?.nickname || 'Commander').trim() || 'Commander'
+    );
 }
 
 async function broadcastBattleKill(attackerId, attackerName, victimId, victimName){
@@ -8909,98 +8901,14 @@ function applyPredictedRemoteDamageV338(victimId, entry, damageValue){
 }
 
 async function initializeBattleHitCursor(){
-    if(!window.supabaseClient) return;
-    const self = getBattleSelfIdentity();
-    const roomId = getBattleHitsRoomId();
+    // v436: legacy battle_hits cursor disabled. Hits are delivered by realtime broadcast.
+    battleHitCursorId = 0;
     battleHitSessionStartedAt = Date.now();
-    if(!self.playerId || !roomId){
-        battleHitCursorId = 0;
-        return;
-    }
-
-    try{
-        const { data, error } = await window.supabaseClient
-            .from('battle_hits')
-            .select('id,created_at')
-            .eq('room_id', roomId)
-            .eq('target_id', self.playerId)
-            .order('id', { ascending: false })
-            .limit(1);
-
-        if(!error && Array.isArray(data) && data.length){
-            battleHitCursorId = Number(data[0]?.id || 0) || 0;
-        }else{
-            battleHitCursorId = 0;
-        }
-    }catch(_){
-        battleHitCursorId = 0;
-    }
 }
 
 async function pollIncomingBattleHits(){
-    if(battleHitPollInFlight) return;
-    if(gameState !== 'BATTLE' || battleObserverMode || !playerShip || !window.supabaseClient) return;
-    const self = getBattleSelfIdentity();
-    const roomId = getBattleHitsRoomId();
-    if(!self.playerId || !roomId) return;
-
-    battleHitPollInFlight = true;
-    try{
-        let query = window.supabaseClient
-            .from('battle_hits')
-            .select('id,attacker_id,target_id,damage,created_at')
-            .eq('room_id', roomId)
-            .eq('target_id', self.playerId)
-            .order('id', { ascending: true })
-            .limit(50);
-
-        if(Number.isFinite(battleHitCursorId) && battleHitCursorId > 0){
-            query = query.gt('id', battleHitCursorId);
-        }
-
-        const { data, error } = await query;
-        if(error || !Array.isArray(data) || !data.length) return;
-
-        for(const row of data){
-            const hitRowId = Number(row?.id || 0) || 0;
-            if(hitRowId > battleHitCursorId) battleHitCursorId = hitRowId;
-
-            const createdAtMs = row?.created_at ? new Date(row.created_at).getTime() : 0;
-            if(Number.isFinite(battleHitSessionStartedAt) && battleHitSessionStartedAt > 0 && Number.isFinite(createdAtMs) && createdAtMs > 0){
-                if(createdAtMs < (battleHitSessionStartedAt - 150)){
-                    continue;
-                }
-            }
-
-            const attackerId = String(row?.attacker_id || '').trim();
-            const targetPlayerId = String(row?.target_id || '').trim();
-            const damageValue = Number(row?.damage || 0) || 0;
-            const attackerName = resolveBattlePlayerNameById(attackerId, 'Pilot');
-
-            if(damageValue <= BATTLE_KILL_ACK_DAMAGE){
-                handleIncomingBattleKill({
-                    hitId: `db:${hitRowId}`,
-                    attackerId: targetPlayerId,
-                    attackerName: resolveBattlePlayerNameById(targetPlayerId, 'Commander'),
-                    victimId: attackerId,
-                    victimName: attackerName,
-                    source: 'db-ack'
-                });
-                continue;
-            }
-
-            applyIncomingBattleHit({
-                hitId: `db:${hitRowId}`,
-                attackerId,
-                attackerName,
-                targetPlayerId,
-                damage: damageValue
-            });
-        }
-    }catch(_){
-    }finally{
-        battleHitPollInFlight = false;
-    }
+    // v436: no polling from battle_hits table. This removes constant SELECT load from Supabase Disk IO.
+    return;
 }
 
 
@@ -9720,14 +9628,11 @@ async function startLiveBattleSync(){
         if(onlineRoomId !== getBattleRoomIdSafe()) return;
         sendBattlePresenceEvent?.('pilot-join', selfJoinPayload);
     }, 2500);
-    pollIncomingBattleHits();
     liveBattleSyncTimer = setInterval(syncLiveBattlePlayers, LIVE_BATTLE_SYNC_INTERVAL_MS);
     liveBattlePresencePushTimer = setInterval(() => {
         broadcastSelfBattleState();
     }, LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS);
-    battleHitPollTimer = setInterval(() => {
-        pollIncomingBattleHits();
-    }, LIVE_BATTLE_HIT_POLL_INTERVAL_MS);
+    battleHitPollTimer = null; // v436: battle_hits polling removed
 }
 
 function animateRemoteBattleShips(){
