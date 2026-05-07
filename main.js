@@ -1,4 +1,4 @@
-// COSMIC CLICKER v436 - SUPABASE IO SAFE BATTLE REALTIME FIX
+// COSMIC CLICKER v437 - LIVE BATTLE POSITION SYNC FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -8357,7 +8357,7 @@ var battleClientResetSerial = 0;
 const ROOM_PLAYER_FETCH_CACHE_MS = 300;
 const ROOM_PLAYER_PING_UPDATE_MS = 9000;
 const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
-const LIVE_BATTLE_SYNC_INTERVAL_MS = 2500; // v436: DB roster sync реже, позиции идут через broadcast
+const LIVE_BATTLE_SYNC_INTERVAL_MS = 2500; // v437: DB roster sync only; live positions are protected from stale DB overwrite
 const LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS = 160; // v436: живое PvP движение без записи в БД
 const LIVE_BATTLE_HIT_POLL_INTERVAL_MS = 60000; // v436: polling battle_hits отключён ниже
 const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 12000; // v436: room_players больше не хранит частые координаты
@@ -8578,6 +8578,11 @@ function upsertRemoteBattlePresence(payload = {}){
     const myId = String(authState?.playerId || player?.id || '').trim();
     if(!entryId || (myId && entryId === myId)) return;
 
+    // v437: safety filter. A delayed packet from another/old room must never move ships in the current fight.
+    const packetRoomId = sanitizeOnlineRoomId(payload?.roomId || payload?.room_id || '');
+    const activeRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || '');
+    if(packetRoomId && activeRoomId && packetRoomId !== activeRoomId) return;
+
     const nickname = String(payload.nickname || payload.name || 'Pilot').trim() || 'Pilot';
     const level = Math.max(1, Number(payload.level || 1) || 1);
     const ping = Math.max(0, Number(payload.ping || 0) || 0);
@@ -8616,6 +8621,13 @@ function upsertRemoteBattlePresence(payload = {}){
     const z = Number(payload.z);
     if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
         entry.targetPosition.set(x, y, z);
+        entry.hasLiveBroadcast = true;
+        entry.lastLiveBroadcastAt = Date.now();
+        if(entry.mesh && !entry.mesh.userData.hasLiveBroadcastInitialSync){
+            entry.mesh.position.copy(entry.targetPosition);
+            entry.mesh.userData.hasLiveBroadcastInitialSync = true;
+            entry.mesh.userData.hasInitialSync = true;
+        }
     }
 
     const qx = Number(payload.qx);
@@ -8624,6 +8636,13 @@ function upsertRemoteBattlePresence(payload = {}){
     const qw = Number(payload.qw);
     if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
         entry.targetQuaternion.set(qx, qy, qz, qw);
+        entry.hasLiveBroadcast = true;
+        entry.lastLiveBroadcastAt = Date.now();
+        if(entry.mesh && !entry.mesh.userData.hasLiveBroadcastInitialQuatSync){
+            entry.mesh.quaternion.copy(entry.targetQuaternion);
+            entry.mesh.userData.hasLiveBroadcastInitialQuatSync = true;
+            entry.mesh.userData.hasInitialQuatSync = true;
+        }
     }
 
     updateBattleScoreboard?.();
@@ -9092,6 +9111,7 @@ async function broadcastSelfBattleState(){
     const now = Date.now();
     const payload = {
         playerId,
+        roomId: getBattleRoomIdSafe(),
         nickname: player?.nickname || 'Commander',
         level: Number(player?.level || 1) || 1,
         team: getBattleRoomPlayerTeam(playerId),
@@ -9380,11 +9400,16 @@ async function syncLiveBattlePlayers(){
         }
         tryApplyRemoteShipTeamVisual(remoteState);
 
+        // v437: room_players is only the roster/source-of-truth for who is in the room.
+        // Positions from this table are intentionally NOT allowed to overwrite fresh broadcast movement,
+        // otherwise every 2.5s a stale DB row can pull the remote ship back near the spawn/old place.
+        const hasFreshLiveState = !!(remoteState.hasLiveBroadcast && (Date.now() - Number(remoteState.lastLiveBroadcastAt || 0)) < 5000);
+
         const pos = entry?.position || {};
         const x = Number(pos?.x);
         const y = Number(pos?.y);
         const z = Number(pos?.z);
-        if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
+        if(!hasFreshLiveState && Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
             remoteState.targetPosition.set(x, y, z);
             if(remoteState.mesh && !remoteState.mesh.userData.hasInitialSync){
                 remoteState.mesh.position.copy(remoteState.targetPosition);
@@ -9397,7 +9422,7 @@ async function syncLiveBattlePlayers(){
         const qy = Number(rot?.y);
         const qz = Number(rot?.z);
         const qw = Number(rot?.w);
-        if(Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
+        if(!hasFreshLiveState && Number.isFinite(qx) && Number.isFinite(qy) && Number.isFinite(qz) && Number.isFinite(qw)){
             remoteState.targetQuaternion.set(qx, qy, qz, qw);
             if(remoteState.mesh && !remoteState.mesh.userData.hasInitialQuatSync){
                 remoteState.mesh.quaternion.copy(remoteState.targetQuaternion);
