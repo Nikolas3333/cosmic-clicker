@@ -8334,6 +8334,9 @@ var liveBattlePresencePushTimer = null;
 var liveBattlePresenceChannel = null;
 var liveBattlePresenceChannelName = '';
     liveBattlePresenceSubscribePromise = null;
+var liveBattleMapPresenceChannel = null;
+var liveBattleMapPresenceChannelName = '';
+var liveBattleMapPresenceSubscribePromise = null;
 var battleHitPollTimer = null;
 var battleHitCursorId = 0;
 var battleHitSessionStartedAt = 0;
@@ -8473,9 +8476,15 @@ function stopLiveBattleSync(){
     if(liveBattlePresenceChannel && window.supabaseClient){
         try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
     }
+    if(liveBattleMapPresenceChannel && window.supabaseClient){
+        try{ window.supabaseClient.removeChannel(liveBattleMapPresenceChannel); }catch(_){}
+    }
     liveBattlePresenceChannel = null;
     liveBattlePresenceChannelName = '';
     liveBattlePresenceSubscribePromise = null;
+    liveBattleMapPresenceChannel = null;
+    liveBattleMapPresenceChannelName = '';
+    liveBattleMapPresenceSubscribePromise = null;
     clearRemoteBattleShips();
 }
 
@@ -8572,16 +8581,49 @@ function getLiveBattleChannelName(){
     return `cosmic-battle-room:${roomId}`;
 }
 
+function getBattleMapKeySafe(){
+    const rawMap = String(currentRoom?.real || currentRoom?.map || selectedLobbyMap?.real || selectedLobbyMap?.map || '').trim();
+    const normalized = normalizeBattleMapName?.(rawMap) || rawMap.toLowerCase();
+    return String(normalized || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+}
+
+function getLiveBattleMapChannelName(){
+    const mapKey = getBattleMapKeySafe();
+    if(!mapKey) return '';
+    return `cosmic-battle-map:${mapKey}`;
+}
+
+function isPlayerInCurrentBattleRoster(playerId = ''){
+    const safeId = String(playerId || '').trim();
+    if(!safeId) return false;
+    const lists = [
+        ...(Array.isArray(currentRoom?.currentPlayers) ? [currentRoom.currentPlayers] : []),
+        ...(Array.isArray(currentRoom?.players) ? [currentRoom.players] : []),
+        ...(Array.isArray(cachedRoomPlayersRows) ? [cachedRoomPlayersRows] : [])
+    ];
+    return lists.some(list => list.some(row => {
+        const rowId = String(row?.public_id || row?.player_public_id || row?.player_id || row?.id || '').trim();
+        return rowId && rowId === safeId;
+    }));
+}
+
 function upsertRemoteBattlePresence(payload = {}){
     try{ cachedRoomPlayersFetchedAt = 0; }catch(_){ }
     const entryId = String(payload.playerId || payload.player_id || payload.id || '').trim();
     const myId = String(authState?.playerId || player?.id || '').trim();
     if(!entryId || (myId && entryId === myId)) return;
 
-    // v437: safety filter. A delayed packet from another/old room must never move ships in the current fight.
+    // v438: accept live movement if room matches OR map matches OR player is already in the current roster.
+    // This fixes cases where two clients joined the same battle but had different local roomId bindings,
+    // while still blocking packets from completely unrelated maps/players.
     const packetRoomId = sanitizeOnlineRoomId(payload?.roomId || payload?.room_id || '');
     const activeRoomId = sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || '');
-    if(packetRoomId && activeRoomId && packetRoomId !== activeRoomId) return;
+    const packetMapKey = String(payload?.mapKey || payload?.map || '').trim().toLowerCase();
+    const activeMapKey = getBattleMapKeySafe();
+    const roomMatches = !!(packetRoomId && activeRoomId && packetRoomId === activeRoomId);
+    const mapMatches = !!(packetMapKey && activeMapKey && packetMapKey === activeMapKey);
+    const knownRosterPlayer = isPlayerInCurrentBattleRoster(entryId);
+    if(packetRoomId && activeRoomId && packetRoomId !== activeRoomId && !mapMatches && !knownRosterPlayer) return;
 
     const nickname = String(payload.nickname || payload.name || 'Pilot').trim() || 'Pilot';
     const level = Math.max(1, Number(payload.level || 1) || 1);
@@ -8758,12 +8800,19 @@ async function sendBattlePresenceEvent(eventName, payload = {}){
     const packet = { type:'broadcast', event:eventName, payload };
 
     try{
+        const sends = [];
         if(liveBattlePresenceChannel){
-            if(typeof liveBattlePresenceChannel.httpSend === 'function'){
-                await liveBattlePresenceChannel.httpSend(packet);
-            }else{
-                await liveBattlePresenceChannel.send(packet);
-            }
+            sends.push(typeof liveBattlePresenceChannel.httpSend === 'function'
+                ? liveBattlePresenceChannel.httpSend(packet)
+                : liveBattlePresenceChannel.send(packet));
+        }
+        if(liveBattleMapPresenceChannel){
+            sends.push(typeof liveBattleMapPresenceChannel.httpSend === 'function'
+                ? liveBattleMapPresenceChannel.httpSend(packet)
+                : liveBattleMapPresenceChannel.send(packet));
+        }
+        if(sends.length){
+            await Promise.allSettled(sends);
             return true;
         }
     }catch(_){}
@@ -9045,26 +9094,9 @@ function handleIncomingBattleKill(payload = {}){
     }
 }
 
-function ensureLiveBattlePresenceChannel(){
-    if(!window.supabaseClient) return Promise.resolve(false);
-    if(!getBattleRoomIdSafe()) return Promise.resolve(false);
-    const channelName = getLiveBattleChannelName();
-    if(!channelName) return Promise.resolve(false);
-    if(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName){
-        return liveBattlePresenceSubscribePromise || Promise.resolve(true);
-    }
-
-    if(liveBattlePresenceChannel){
-        try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
-        liveBattlePresenceChannel = null;
-    }
-
-    liveBattlePresenceChannelName = channelName;
-    liveBattlePresenceChannel = window.supabaseClient.channel(channelName, {
-        config: { broadcast: { self: false, ack: false } }
-    });
-
-    liveBattlePresenceChannel
+function bindLiveBattlePresenceHandlers(channel){
+    if(!channel) return channel;
+    return channel
         .on('broadcast', { event: 'pilot-state' }, ({ payload }) => {
             upsertRemoteBattlePresence(payload || {});
         })
@@ -9080,8 +9112,11 @@ function ensureLiveBattlePresenceChannel(){
         .on('broadcast', { event: 'pilot-left' }, ({ payload }) => {
             handleIncomingBattleLeave(payload || {});
         });
+}
 
-    liveBattlePresenceSubscribePromise = new Promise((resolve) => {
+function subscribeLiveBattleChannel(channel){
+    if(!channel) return Promise.resolve(false);
+    return new Promise((resolve) => {
         let settled = false;
         const done = (ok) => {
             if(settled) return;
@@ -9089,17 +9124,58 @@ function ensureLiveBattlePresenceChannel(){
             resolve(!!ok);
         };
         try{
-            liveBattlePresenceChannel.subscribe((status) => {
+            channel.subscribe((status) => {
                 if(status === 'SUBSCRIBED') done(true);
                 if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') done(false);
             });
         }catch(_){
             done(false);
         }
-        setTimeout(() => done(true), 900);
+        setTimeout(() => done(true), 1200);
     });
+}
 
-    return liveBattlePresenceSubscribePromise;
+function ensureLiveBattlePresenceChannel(){
+    if(!window.supabaseClient) return Promise.resolve(false);
+    if(!getBattleRoomIdSafe()) return Promise.resolve(false);
+
+    const channelName = getLiveBattleChannelName();
+    const mapChannelName = getLiveBattleMapChannelName();
+    if(!channelName && !mapChannelName) return Promise.resolve(false);
+
+    const promises = [];
+
+    if(channelName){
+        if(!(liveBattlePresenceChannel && liveBattlePresenceChannelName === channelName)){
+            if(liveBattlePresenceChannel){
+                try{ window.supabaseClient.removeChannel(liveBattlePresenceChannel); }catch(_){}
+                liveBattlePresenceChannel = null;
+            }
+            liveBattlePresenceChannelName = channelName;
+            liveBattlePresenceChannel = bindLiveBattlePresenceHandlers(window.supabaseClient.channel(channelName, {
+                config: { broadcast: { self: false, ack: false } }
+            }));
+            liveBattlePresenceSubscribePromise = subscribeLiveBattleChannel(liveBattlePresenceChannel);
+        }
+        promises.push(liveBattlePresenceSubscribePromise || Promise.resolve(true));
+    }
+
+    if(mapChannelName){
+        if(!(liveBattleMapPresenceChannel && liveBattleMapPresenceChannelName === mapChannelName)){
+            if(liveBattleMapPresenceChannel){
+                try{ window.supabaseClient.removeChannel(liveBattleMapPresenceChannel); }catch(_){}
+                liveBattleMapPresenceChannel = null;
+            }
+            liveBattleMapPresenceChannelName = mapChannelName;
+            liveBattleMapPresenceChannel = bindLiveBattlePresenceHandlers(window.supabaseClient.channel(mapChannelName, {
+                config: { broadcast: { self: false, ack: false } }
+            }));
+            liveBattleMapPresenceSubscribePromise = subscribeLiveBattleChannel(liveBattleMapPresenceChannel);
+        }
+        promises.push(liveBattleMapPresenceSubscribePromise || Promise.resolve(true));
+    }
+
+    return Promise.all(promises).then(results => results.some(Boolean)).catch(() => false);
 }
 
 async function broadcastSelfBattleState(){
@@ -9112,6 +9188,7 @@ async function broadcastSelfBattleState(){
     const payload = {
         playerId,
         roomId: getBattleRoomIdSafe(),
+        mapKey: getBattleMapKeySafe(),
         nickname: player?.nickname || 'Commander',
         level: Number(player?.level || 1) || 1,
         team: getBattleRoomPlayerTeam(playerId),
@@ -9159,11 +9236,19 @@ async function broadcastSelfBattleState(){
             event: 'pilot-state',
             payload
         };
-        if(typeof liveBattlePresenceChannel.httpSend === 'function'){
-            await liveBattlePresenceChannel.httpSend(eventPayload);
-        }else{
-            await liveBattlePresenceChannel.send(eventPayload);
+        const sends = [];
+        if(liveBattlePresenceChannel){
+            sends.push(typeof liveBattlePresenceChannel.httpSend === 'function'
+                ? liveBattlePresenceChannel.httpSend(eventPayload)
+                : liveBattlePresenceChannel.send(eventPayload));
         }
+        if(liveBattleMapPresenceChannel){
+            sends.push(typeof liveBattleMapPresenceChannel.httpSend === 'function'
+                ? liveBattleMapPresenceChannel.httpSend(eventPayload)
+                : liveBattleMapPresenceChannel.send(eventPayload));
+        }
+        if(!sends.length) return;
+        await Promise.allSettled(sends);
         lastBattlePresencePayload = JSON.stringify(payload);
         lastBattlePresenceSentAt = now;
     }catch(_){ }
