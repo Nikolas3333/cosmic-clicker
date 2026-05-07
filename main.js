@@ -1,4 +1,4 @@
-// COSMIC CLICKER v437 - LIVE BATTLE POSITION SYNC FIX
+// COSMIC CLICKER v439 - STABLE ROOM SYNC RESTORE FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -1824,7 +1824,17 @@ function ensureSelfRoomPlayerState(){
         team,
         level: Number(player?.level || 1) || 1,
         ping: getThrottledRoomPlayerPing(now),
-        // v436: координаты/поворот не пишем в room_players. Они идут через pilot-state broadcast.
+        position: {
+            x: Number(playerShip.position.x || 0),
+            y: Number(playerShip.position.y || 0),
+            z: Number(playerShip.position.z || 0)
+        },
+        rotation: {
+            x: Number(playerShip.quaternion.x || 0),
+            y: Number(playerShip.quaternion.y || 0),
+            z: Number(playerShip.quaternion.z || 0),
+            w: Number(playerShip.quaternion.w || 1)
+        },
         updated_at: new Date(now).toISOString()
     };
 
@@ -1842,10 +1852,14 @@ function ensureSelfRoomPlayerState(){
         || previousPayload.team !== payload.team
         || Number(previousPayload.level || 0) !== Number(payload.level || 0)
         || (pingWindowPassed && Number(previousPayload.ping || 0) !== Number(payload.ping || 0));
-    const changedPosition = false;
-    const changedRotation = false;
+    const changedPosition = !previousPayload || hasMeaningfulBattleVectorDelta(previousPayload.position || previousPayload, payload.position, ROOM_PLAYER_POSITION_EPSILON);
+    const changedRotation = !previousPayload || hasMeaningfulBattleQuaternionDelta(
+        previousPayload.rotation || { x: previousPayload?.qx, y: previousPayload?.qy, z: previousPayload?.qz, w: previousPayload?.qw },
+        payload.rotation,
+        ROOM_PLAYER_ROTATION_EPSILON
+    );
 
-    if(!needsForceSend && !changedMeta){
+    if(!needsForceSend && !changedMeta && !changedPosition && !changedRotation){
         return;
     }
 
@@ -1870,6 +1884,8 @@ function ensureSelfRoomPlayerState(){
                 team: payload.team,
                 level: payload.level,
                 ping: payload.ping,
+                position: payload.position,
+                rotation: payload.rotation,
                 updated_at: payload.updated_at
             };
 
@@ -1909,7 +1925,9 @@ function ensureSelfRoomPlayerState(){
                     updated_at: payload.updated_at,
                     team: payload.team,
                     level: payload.level,
-                    ping: payload.ping
+                    ping: payload.ping,
+                    position: payload.position,
+                    rotation: payload.rotation
                 }, 'id');
 
                 if(!isStillSameBattleSession()) return;
@@ -8360,12 +8378,12 @@ var battleClientResetSerial = 0;
 const ROOM_PLAYER_FETCH_CACHE_MS = 300;
 const ROOM_PLAYER_PING_UPDATE_MS = 9000;
 const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
-const LIVE_BATTLE_SYNC_INTERVAL_MS = 2500; // v437: DB roster sync only; live positions are protected from stale DB overwrite
-const LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS = 160; // v436: живое PvP движение без записи в БД
+const LIVE_BATTLE_SYNC_INTERVAL_MS = 800; // v439: stable DB roster + position fallback; realtime remains helper only
+const LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS = 180; // v439: realtime helper, room channel only
 const LIVE_BATTLE_HIT_POLL_INTERVAL_MS = 60000; // v436: polling battle_hits отключён ниже
-const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 12000; // v436: room_players больше не хранит частые координаты
-const ROOM_PLAYER_POSITION_EPSILON = 0.65;
-const ROOM_PLAYER_ROTATION_EPSILON = 0.06;
+const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 800; // v439: restore position sync so PvP stays correct
+const ROOM_PLAYER_POSITION_EPSILON = 0.35;
+const ROOM_PLAYER_ROTATION_EPSILON = 0.035;
 const BATTLE_PRESENCE_FORCE_INTERVAL_MS = 600;
 const BATTLE_PRESENCE_POSITION_EPSILON = 0.28;
 const BATTLE_PRESENCE_ROTATION_EPSILON = 0.035;
@@ -8588,9 +8606,8 @@ function getBattleMapKeySafe(){
 }
 
 function getLiveBattleMapChannelName(){
-    const mapKey = getBattleMapKeySafe();
-    if(!mapKey) return '';
-    return `cosmic-battle-map:${mapKey}`;
+    // v439: map-wide channel disabled. It mixed different rooms on the same map and caused ghost/nearby ships.
+    return '';
 }
 
 function isPlayerInCurrentBattleRoster(playerId = ''){
@@ -9485,10 +9502,9 @@ async function syncLiveBattlePlayers(){
         }
         tryApplyRemoteShipTeamVisual(remoteState);
 
-        // v437: room_players is only the roster/source-of-truth for who is in the room.
-        // Positions from this table are intentionally NOT allowed to overwrite fresh broadcast movement,
-        // otherwise every 2.5s a stale DB row can pull the remote ship back near the spawn/old place.
-        const hasFreshLiveState = !!(remoteState.hasLiveBroadcast && (Date.now() - Number(remoteState.lastLiveBroadcastAt || 0)) < 5000);
+        // v439: DB position is again the stable room-only source of truth.
+        // Broadcast is only a smoothing helper; map-wide broadcast was disabled because it mixed rooms.
+        const hasFreshLiveState = false;
 
         const pos = entry?.position || {};
         const x = Number(pos?.x);
@@ -10770,18 +10786,17 @@ async function forceLeaveBattleToLobby(){
     updatePremiumAccountInfo?.();
     if(premiumBar) premiumBar.style.setProperty('display', 'flex', 'important');
 
+    try{
+        await cleanupCurrentBattleRoom(roomSnapshot);
+    }catch(_){ }
+
     currentRoom = null;
     try{ window.currentRoomId = null; }catch(_){ }
     selectedLobbyMap = null;
+    battleLeavingInProgress = false;
 
-    try{ renderRoomsInLobby?.(); }catch(_){ }
-
-    Promise.resolve()
-        .then(() => cleanupCurrentBattleRoom(roomSnapshot))
-        .catch(() => {})
-        .finally(() => {
-            try{ hardResetBattleClientState(); }catch(_){ }
-        });
+    try{ await renderRoomsInLobby?.(true); }catch(_){ }
+    try{ hardResetBattleClientState(); }catch(_){ }
 }
 
 
@@ -10795,7 +10810,7 @@ function initBattleUI(){
     const scoreboard = document.getElementById('battle-scoreboard');
 
     const leaveMap = async () => {
-        forceLeaveBattleToLobby();
+        await forceLeaveBattleToLobby();
         if(typeof renderRoomsInLobby === 'function'){
             await renderRoomsInLobby(true);
         }
@@ -18269,7 +18284,7 @@ async function leaveRoomPlayers(roomId) {
   battleLeavingInProgress = true;
 
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
-  if(!normalizedRoomId) return 0;
+  if(!normalizedRoomId){ battleLeavingInProgress = false; return 0; }
 
   const selfPlayerId = String(getSelfBattlePlayerId() || authState?.playerId || player?.id || '').trim();
   const selfNickname = String(player?.nickname || (typeof getDisplayPlayerTag === 'function' ? getDisplayPlayerTag() : '') || 'Commander').trim() || 'Commander';
@@ -18292,11 +18307,23 @@ async function leaveRoomPlayers(roomId) {
     lastSelfRoomPlayerStateSentAt = 0;
   }catch(_){}
 
-  const { error: deletePlayerError } = await window.supabaseClient
-    .from('room_players')
-    .delete()
-    .eq('room_id', normalizedRoomId)
-    .eq('player_id', selfPlayerId);
+  let deletePlayerError = null;
+  if(selfPlayerId){
+    const deleteResult = await window.supabaseClient
+      .from('room_players')
+      .delete()
+      .eq('room_id', normalizedRoomId)
+      .eq('player_id', selfPlayerId);
+    deletePlayerError = deleteResult?.error || null;
+  }
+  if(!selfPlayerId && selfNickname){
+    const deleteByName = await window.supabaseClient
+      .from('room_players')
+      .delete()
+      .eq('room_id', normalizedRoomId)
+      .eq('nickname', selfNickname);
+    deletePlayerError = deleteByName?.error || null;
+  }
 
   if (deletePlayerError) {
     console.error('Ошибка выхода из room_players:', deletePlayerError);
@@ -18339,6 +18366,7 @@ async function leaveRoomPlayers(roomId) {
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
   }
+  battleLeavingInProgress = false;
   return count || 0;
 }
 
@@ -18352,7 +18380,9 @@ async function cleanupCurrentBattleRoom(roomSnapshot = currentRoom) {
   selectedLobbyMap = null;
 
   if (shouldLeave) {
-    await leaveRoomPlayers(targetRoomId);
+    try{ await leaveRoomPlayers(targetRoomId); }finally{ battleLeavingInProgress = false; }
+  }else{
+    battleLeavingInProgress = false;
   }
 
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function'){
