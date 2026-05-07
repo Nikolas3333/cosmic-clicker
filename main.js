@@ -1,4 +1,4 @@
-// COSMIC CLICKER v439 - STABLE ROOM SYNC RESTORE FIX
+// COSMIC CLICKER v441 - REAL ROOM LIFECYCLE FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -1583,9 +1583,9 @@ function getBattleRoomPlayerTeam(entryId = ''){
     return String(key).slice(-1).charCodeAt(0) % 2 === 0 ? 'blue' : 'red';
 }
 
-const ROOM_PLAYER_STALE_MS = 12000;
-const ROOM_EMPTY_DELETE_GRACE_MS = 20000;
-const RECENTLY_LEFT_ROOM_HIDE_MS = 45000;
+const ROOM_PLAYER_STALE_MS = 90000;
+const ROOM_EMPTY_DELETE_GRACE_MS = 25000;
+const RECENTLY_LEFT_ROOM_HIDE_MS = 12000;
 const recentlyLeftBattleRooms = new Map();
 
 function rememberRecentlyLeftBattleRoom(roomId = '', playerId = '', nickname = ''){
@@ -17647,7 +17647,8 @@ window.renderPlayersOnPlanet = function(entry = {}){
                         ? { ...entry, name: entry.real, currentPlayers:getBattleMapOccupants(entry.real || entry.map || entry.name), players:getBattleMapOccupants(entry.real || entry.map || entry.name), isBaseMap:true }
                         : entry;
                     selectedLobbyMap = { ...previewEntry, name: previewEntry.real };
-                    currentRoom = entry.id ? previewEntry : null;
+                    // Простое выделение комнаты в лобби НЕ означает вход в бой.
+                    currentRoom = null;
                     syncPreview(previewEntry);
                 });
                 list.appendChild(item);
@@ -18530,7 +18531,7 @@ function cleanupBattleRoomSilently(){
         console.warn('cleanupBattleRoomSilently error:', error);
         try{
           if(window.supabaseReady && window.supabaseClient){
-            await window.supabaseClient.from('rooms').delete().eq('id', sanitizeOnlineRoomId(roomId));
+            // Не удаляем room по ошибке cleanup: иначе реальные созданные комнаты могут пропасть из лобби.
             await loadRoomsFromSupabase();
             if(typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
               renderLobbyListV27('battle');
@@ -18563,7 +18564,8 @@ function startLiveRoomsRefresh(){
           const fresh = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : []).find(room => String(room?.id || '') === String(selectedId));
           if(fresh){
             selectedLobbyMap = { ...fresh, name: fresh.real };
-            currentRoom = fresh;
+            // В лобби currentRoom должен оставаться пустым. Иначе игрок одновременно числится в лобби и на карте.
+            if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') currentRoom = null;
             syncPreview?.(fresh);
             const list = document.getElementById('match-list');
             const selectedEl = list?.querySelector(`.match-item[data-room-id="${selectedId}"]`);
@@ -18670,12 +18672,19 @@ async function loadRoomsFromSupabase() {
   rebuildBattleMapOccupants(allRooms, presenceRows);
 
   const visibleRooms = allRooms.filter(room => {
-    if(!room?.id || !Array.isArray(room.room_players) || room.room_players.length <= 0) return false;
-    const livePresenceCount = presenceRows.filter(row => String(row?.room_id || '') === String(room.id)).length;
-    if(isRecentlyLeftBattleRoom(room.id) && livePresenceCount <= 0) return false;
+    if(!room?.id) return false;
+
     const rawMode = String(room?.mode || room?.state || room?.room_type || room?.type || '').toLowerCase();
     const rawName = String(room?.room_name || '').toLowerCase();
     if(rawMode.includes('solo') || rawName.includes('solo') || rawName.includes('одиноч')) return false;
+
+    const rows = Array.isArray(room.room_players) ? room.room_players : [];
+    const livePresenceCount = presenceRows.filter(row => String(row?.room_id || '') === String(room.id)).length;
+
+    // Если игрок только что вышел и в комнате больше никого нет — не показываем ghost-комнату.
+    if(isRecentlyLeftBattleRoom(room.id) && rows.length <= 0 && livePresenceCount <= 0) return false;
+
+    // Созданная комната должна быть видна даже если row room_players ещё не успел подтвердиться.
     return true;
   });
   supabaseBattleRoomsCache = visibleRooms.map(room => {
@@ -18693,7 +18702,8 @@ async function loadRoomsFromSupabase() {
     const freshSelected = supabaseBattleRoomsCache.find(room => String(room?.id || '') === selectedId);
     if(freshSelected){
       if(selectedLobbyMap?.id) selectedLobbyMap = { ...freshSelected, name: freshSelected.real };
-      if(currentRoom?.id) currentRoom = { ...currentRoom, ...freshSelected, currentPlayers:[...(freshSelected.currentPlayers||[])], players:[...(freshSelected.players||[])] };
+      if(currentRoom?.id && (gameState === 'BATTLE' || gameState === 'OBSERVE')) currentRoom = { ...currentRoom, ...freshSelected, currentPlayers:[...(freshSelected.currentPlayers||[])], players:[...(freshSelected.players||[])] };
+      if(gameState === 'LOBBY') currentRoom = null;
     }
   } else if(selectedLobbyMap?.isBaseMap || (!selectedLobbyMap?.id && selectedLobbyMap?.real)) {
     const occupants = getBattleMapOccupants(selectedLobbyMap.real || selectedLobbyMap.map || selectedLobbyMap.name);
