@@ -1585,6 +1585,52 @@ function getBattleRoomPlayerTeam(entryId = ''){
 
 const ROOM_PLAYER_STALE_MS = 12000;
 const ROOM_EMPTY_DELETE_GRACE_MS = 20000;
+const RECENTLY_LEFT_ROOM_HIDE_MS = 45000;
+const recentlyLeftBattleRooms = new Map();
+
+function rememberRecentlyLeftBattleRoom(roomId = '', playerId = '', nickname = ''){
+    const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+    if(!normalizedRoomId) return;
+    recentlyLeftBattleRooms.set(normalizedRoomId, {
+        roomId: normalizedRoomId,
+        playerId: String(playerId || '').trim(),
+        nickname: String(nickname || '').trim().toLowerCase(),
+        at: Date.now()
+    });
+}
+
+function isRecentlyLeftBattleRoom(roomId = ''){
+    const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+    if(!normalizedRoomId) return false;
+    const entry = recentlyLeftBattleRooms.get(normalizedRoomId);
+    if(!entry) return false;
+    if((Date.now() - Number(entry.at || 0)) > RECENTLY_LEFT_ROOM_HIDE_MS){
+        recentlyLeftBattleRooms.delete(normalizedRoomId);
+        return false;
+    }
+    return true;
+}
+
+function filterRecentlyLeftRoomPlayers(room = {}){
+    const normalizedRoomId = sanitizeOnlineRoomId(room?.id || room?.roomId || '');
+    if(!normalizedRoomId || !Array.isArray(room?.room_players)) return room;
+    const entry = recentlyLeftBattleRooms.get(normalizedRoomId);
+    if(!entry) return room;
+    if((Date.now() - Number(entry.at || 0)) > RECENTLY_LEFT_ROOM_HIDE_MS){
+        recentlyLeftBattleRooms.delete(normalizedRoomId);
+        return room;
+    }
+    const leftPlayerId = String(entry.playerId || '').trim();
+    const leftNickname = String(entry.nickname || '').trim().toLowerCase();
+    room.room_players = room.room_players.filter(row => {
+        const rowPlayerId = String(row?.player_id || row?.id || '').trim();
+        const rowNickname = String(row?.nickname || '').trim().toLowerCase();
+        if(leftPlayerId && rowPlayerId === leftPlayerId) return false;
+        if(leftNickname && rowNickname === leftNickname) return false;
+        return true;
+    });
+    return room;
+}
 
 function getRoomPlayerFreshCutoffIso(){
     return new Date(Date.now() - ROOM_PLAYER_STALE_MS).toISOString();
@@ -2368,6 +2414,10 @@ async function switchState(newState){
             const leaveRoomId = sanitizeOnlineRoomId(leaveRoomSnapshot?.id || leaveRoomSnapshot?.roomId || '');
             const selfPlayerId = String(getSelfBattlePlayerId() || authState?.playerId || player?.id || '').trim();
             const selfNickname = player?.nickname || 'Commander';
+            if(leaveRoomId){
+                rememberRecentlyLeftBattleRoom(leaveRoomId, selfPlayerId, selfNickname);
+                try{ await setPlayerOnlineStatus?.('lobby', null); }catch(_){}
+            }
             if(leaveRoomId && selfPlayerId){
                 await sendBattlePresenceEvent('pilot-left', {
                     playerId: selfPlayerId,
@@ -18286,8 +18336,19 @@ async function leaveRoomPlayers(roomId) {
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
   if(!normalizedRoomId){ battleLeavingInProgress = false; return 0; }
 
-  const selfPlayerId = String(getSelfBattlePlayerId() || authState?.playerId || player?.id || '').trim();
-  const selfNickname = String(player?.nickname || (typeof getDisplayPlayerTag === 'function' ? getDisplayPlayerTag() : '') || 'Commander').trim() || 'Commander';
+  const identity = (typeof getCurrentPlayerIdentity === 'function' ? getCurrentPlayerIdentity() : {}) || {};
+  const idCandidates = Array.from(new Set([
+    getSelfBattlePlayerId?.(),
+    authState?.playerId,
+    player?.id,
+    identity?.playerId
+  ].map(value => String(value || '').trim()).filter(Boolean)));
+  const selfPlayerId = idCandidates[0] || '';
+  const selfNickname = String(player?.nickname || identity?.displayName || identity?.nickname || (typeof getDisplayPlayerTag === 'function' ? getDisplayPlayerTag() : '') || 'Commander').trim() || 'Commander';
+
+  rememberRecentlyLeftBattleRoom(normalizedRoomId, selfPlayerId, selfNickname);
+
+  try{ await setPlayerOnlineStatus?.('lobby', null); }catch(_){}
 
   if(selfPlayerId){
     try{
@@ -18308,26 +18369,33 @@ async function leaveRoomPlayers(roomId) {
   }catch(_){}
 
   let deletePlayerError = null;
-  if(selfPlayerId){
-    const deleteResult = await window.supabaseClient
-      .from('room_players')
-      .delete()
-      .eq('room_id', normalizedRoomId)
-      .eq('player_id', selfPlayerId);
-    deletePlayerError = deleteResult?.error || null;
+
+  for(const candidateId of idCandidates){
+    try{
+      const deleteResult = await window.supabaseClient
+        .from('room_players')
+        .delete()
+        .eq('room_id', normalizedRoomId)
+        .eq('player_id', candidateId);
+      if(deleteResult?.error) deletePlayerError = deleteResult.error;
+    }catch(error){ deletePlayerError = error; }
   }
-  if(!selfPlayerId && selfNickname){
-    const deleteByName = await window.supabaseClient
-      .from('room_players')
-      .delete()
-      .eq('room_id', normalizedRoomId)
-      .eq('nickname', selfNickname);
-    deletePlayerError = deleteByName?.error || null;
+
+  // Фолбэк: если player_id в старой строке отличается, удаляем свою строку по нику в этой комнате.
+  // Это нужно именно против ghost-player после выхода.
+  if(selfNickname){
+    try{
+      const deleteByName = await window.supabaseClient
+        .from('room_players')
+        .delete()
+        .eq('room_id', normalizedRoomId)
+        .eq('nickname', selfNickname);
+      if(deleteByName?.error) deletePlayerError = deleteByName.error;
+    }catch(error){ deletePlayerError = error; }
   }
 
   if (deletePlayerError) {
-    console.error('Ошибка выхода из room_players:', deletePlayerError);
-    return -1;
+    console.warn('Предупреждение выхода из room_players:', deletePlayerError);
   }
 
   const freshCutoff = getRoomPlayerFreshCutoffIso();
@@ -18340,29 +18408,33 @@ async function leaveRoomPlayers(roomId) {
       .lt('updated_at', freshCutoff);
   }catch(_){}
 
-  const { count, error: countError } = await window.supabaseClient
-    .from('room_players')
-    .select('*', { count: 'exact', head: true })
-    .eq('room_id', normalizedRoomId)
-    .gte('updated_at', freshCutoff);
-
-  if (countError) {
-    console.error('Ошибка подсчёта игроков в комнате:', countError);
-    return -1;
-  }
-
-  if ((count || 0) <= 0) {
-    const { error: roomDeleteError } = await window.supabaseClient
-      .from('rooms')
-      .delete()
-      .eq('id', normalizedRoomId);
-
-    if (roomDeleteError) {
-      console.error('Ошибка удаления пустой комнаты:', roomDeleteError);
+  let count = 0;
+  try{
+    const countResponse = await window.supabaseClient
+      .from('room_players')
+      .select('*', { count: 'exact', head: true })
+      .eq('room_id', normalizedRoomId)
+      .gte('updated_at', freshCutoff);
+    if(countResponse?.error){
+      console.warn('Ошибка подсчёта игроков в комнате:', countResponse.error);
+    }else{
+      count = Number(countResponse?.count || 0) || 0;
     }
+  }catch(error){
+    console.warn('Ошибка подсчёта игроков в комнате:', error);
   }
 
-  await loadRoomsFromSupabase();
+  if (count <= 0) {
+    try{
+      const { error: roomDeleteError } = await window.supabaseClient
+        .from('rooms')
+        .delete()
+        .eq('id', normalizedRoomId);
+      if (roomDeleteError) console.warn('Ошибка удаления пустой комнаты:', roomDeleteError);
+    }catch(error){ console.warn('Ошибка удаления пустой комнаты:', error); }
+  }
+
+  try{ await loadRoomsFromSupabase(); }catch(_){}
   if(gameState === 'LOBBY' && typeof renderLobbyListV27 === 'function' && getLobbyModeSafe() === 'battle'){
     renderLobbyListV27('battle');
   }
@@ -18399,6 +18471,11 @@ function cleanupBattleRoomSilently(){
   const identity = getCurrentPlayerIdentity?.() || {};
   const selfId = String(getSelfBattlePlayerId() || authState?.playerId || player?.id || identity?.playerId || '').trim();
   const selfNickname = player?.nickname || identity?.displayName || identity?.nickname || 'Commander';
+
+  if(shouldLeave && normalizedRoomId){
+    rememberRecentlyLeftBattleRoom(normalizedRoomId, selfId, selfNickname);
+    try{ setPlayerOnlineStatus?.('lobby', null); }catch(_){}
+  }
 
   if(shouldLeave && selfId && roomSnapshot){
     const filterList = (list) => Array.isArray(list)
@@ -18511,7 +18588,7 @@ async function loadRoomsFromSupabase() {
   const [roomsResponse, onlineResponse] = await Promise.all([
     window.supabaseClient
       .from('rooms')
-      .select('*, room_players(player_id,nickname,joined_at,updated_at,team,level,ping)')
+      .select('*, room_players(id,room_id,player_id,nickname,joined_at,updated_at,team,level,ping)')
       .order('created_at', { ascending: true }),
     window.supabaseClient
       .from('online_players')
@@ -18533,6 +18610,15 @@ async function loadRoomsFromSupabase() {
 
   const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
   let allRooms = Array.isArray(data) ? data : [];
+
+  try{
+    for(const [roomId, entry] of recentlyLeftBattleRooms.entries()){
+      if((Date.now() - Number(entry?.at || 0)) > RECENTLY_LEFT_ROOM_HIDE_MS){
+        recentlyLeftBattleRooms.delete(roomId);
+      }
+    }
+    allRooms.forEach(room => filterRecentlyLeftRoomPlayers(room));
+  }catch(_){}
 
   const staleRoomPlayers = [];
   allRooms.forEach(room => {
@@ -18585,6 +18671,8 @@ async function loadRoomsFromSupabase() {
 
   const visibleRooms = allRooms.filter(room => {
     if(!room?.id || !Array.isArray(room.room_players) || room.room_players.length <= 0) return false;
+    const livePresenceCount = presenceRows.filter(row => String(row?.room_id || '') === String(room.id)).length;
+    if(isRecentlyLeftBattleRoom(room.id) && livePresenceCount <= 0) return false;
     const rawMode = String(room?.mode || room?.state || room?.room_type || room?.type || '').toLowerCase();
     const rawName = String(room?.room_name || '').toLowerCase();
     if(rawMode.includes('solo') || rawName.includes('solo') || rawName.includes('одиноч')) return false;
