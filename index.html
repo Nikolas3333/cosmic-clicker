@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v443 - PROFILE SKILLS SHIP CLEANUP -->
+<!-- COSMIC CLICKER v444 - SAFE BATTLE ENTER AND SELECTED SHIP -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7116,6 +7116,51 @@ shop-main-head{
 @keyframes profileShipSpinV443{
   0%{ transform:perspective(520px) rotateY(0deg) rotateX(7deg); }
   100%{ transform:perspective(520px) rotateY(360deg) rotateX(7deg); }
+}
+
+
+/* ===== V444 SELECTED HANGAR SHIP PREVIEW ===== */
+#profile-window .profile-ship-preview-v443 .profile-ship-name-v443{
+  color:#9fefff !important;
+}
+#profile-window .profile-ship-model-v444{
+  position:relative !important;
+  z-index:2 !important;
+  width:74px !important;
+  height:48px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  color:#eaffff !important;
+  font-size:48px !important;
+  line-height:1 !important;
+  filter:drop-shadow(0 0 14px rgba(0,255,255,.65)) !important;
+  transform:rotate(-18deg) !important;
+}
+#profile-window .profile-ship-orbit-v443.xwing .profile-ship-model-v444{
+  font-size:42px !important;
+}
+#profile-window .profile-ship-orbit-v443.xwing .profile-ship-model-v444::before,
+#profile-window .profile-ship-orbit-v443.xwing .profile-ship-model-v444::after{
+  content:"" !important;
+  position:absolute !important;
+  left:50% !important;
+  top:50% !important;
+  width:82px !important;
+  height:8px !important;
+  border-radius:999px !important;
+  background:linear-gradient(90deg, transparent, #dffbff 18%, #ff6b6b 50%, #dffbff 82%, transparent) !important;
+  box-shadow:0 0 10px rgba(130,240,255,.6) !important;
+  transform-origin:center !important;
+}
+#profile-window .profile-ship-orbit-v443.xwing .profile-ship-model-v444::before{
+  transform:translate(-50%,-50%) rotate(32deg) !important;
+}
+#profile-window .profile-ship-orbit-v443.xwing .profile-ship-model-v444::after{
+  transform:translate(-50%,-50%) rotate(-32deg) !important;
+}
+#profile-window .profile-ship-rocket-v443{
+  display:none !important;
 }
 
 </style>
