@@ -1,4 +1,4 @@
-// COSMIC CLICKER v441 - COMPACT VERTICAL SKILLS
+// COSMIC CLICKER v442 - REAL COMPACT PROFILE SKILLS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -305,31 +305,34 @@ function renderProfileSkillBarsV440(level = 0){
 function renderProfileSkillsPanelV440(isSelf = false){
     const levels = ensureProfileSkillLevelsV440();
     const total = getProfileSkillTotalPointsV440();
-    const spent = getProfileSkillSpentPointsV440();
     const free = getProfileSkillFreePointsV440();
 
     return `
-      <div class="profile-skills-panel-v440">
-        <div class="profile-skills-head-v440">
-          <div class="profile-section-title">Навыки пилота</div>
-          <div class="profile-skill-points-v440">Очки: <b>${free}</b> / ${total}</div>
+      <div class="profile-skills-panel-v442">
+        <div class="profile-skills-head-v442">
+          <span>Навыки пилота</span>
+          <span class="profile-skill-points-v442">Очки: <b>${free}</b> / ${total}</span>
         </div>
-        <div class="profile-skills-grid-v440">
+        <div class="profile-skills-list-v442">
           ${PROFILE_SKILLS_V440.map(skill => {
               const lvl = Number(levels[skill.id] || 0) || 0;
               const canMinus = isSelf && lvl > 0;
               const canPlus = isSelf && free > 0 && lvl < PROFILE_SKILL_MAX_LEVEL_V440;
+              let bars = '';
+              for(let i = 0; i < PROFILE_SKILL_MAX_LEVEL_V440; i++){
+                  bars += `<span class="profile-skill-bar-v442 ${i < lvl ? 'filled' : ''}"></span>`;
+              }
               return `
-                <div class="profile-skill-row-v440" title="${escapeProfileHtmlV428(skill.desc)}">
-                  <div class="profile-skill-left-v440">
-                    <span class="profile-skill-icon-v440">${skill.icon}</span>
-                    <span class="profile-skill-name-v440">${escapeProfileHtmlV428(skill.name)}</span>
+                <div class="profile-skill-line-v442" title="${escapeProfileHtmlV428(skill.desc)}">
+                  <div class="profile-skill-title-v442">
+                    <span class="profile-skill-icon-v442">${skill.icon}</span>
+                    <span class="profile-skill-name-v442">${escapeProfileHtmlV428(skill.name)}</span>
                   </div>
-                  <div class="profile-skill-controls-v440">
-                    ${isSelf ? `<button type="button" class="profile-skill-btn-v440" data-skill-action="minus" data-skill-id="${skill.id}" ${canMinus ? '' : 'disabled'}>−</button>` : ''}
-                    ${renderProfileSkillBarsV440(lvl)}
-                    <span class="profile-skill-level-v440">${lvl}/${PROFILE_SKILL_MAX_LEVEL_V440}</span>
-                    ${isSelf ? `<button type="button" class="profile-skill-btn-v440 plus" data-skill-action="plus" data-skill-id="${skill.id}" ${canPlus ? '' : 'disabled'}>+</button>` : ''}
+                  <div class="profile-skill-upgrade-v442">
+                    ${isSelf ? `<button type="button" class="profile-skill-btn-v442" data-skill-action="minus" data-skill-id="${skill.id}" ${canMinus ? '' : 'disabled'}>−</button>` : ''}
+                    <div class="profile-skill-bars-v442">${bars}</div>
+                    <span class="profile-skill-num-v442">${lvl}</span>
+                    ${isSelf ? `<button type="button" class="profile-skill-btn-v442 plus" data-skill-action="plus" data-skill-id="${skill.id}" ${canPlus ? '' : 'disabled'}>+</button>` : ''}
                   </div>
                 </div>
               `;
