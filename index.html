@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v442 - REAL COMPACT PROFILE SKILLS -->
+<!-- COSMIC CLICKER v443 - PROFILE SKILLS SHIP CLEANUP -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7047,6 +7047,77 @@ shop-main-head{
   }
 }
 
+
+
+/* ===== V443 PROFILE CLEANUP / SHIP PREVIEW / NO RAW CSS ===== */
+#profile-window .profile-skill-points-v442{
+  font-size:14px !important;
+}
+#profile-window .profile-module-panel-v440{
+  position:relative !important;
+  display:flex !important;
+  flex-direction:column !important;
+}
+#profile-window .profile-module-panel-v440 .profile-module-list{
+  flex:0 0 auto !important;
+}
+#profile-window .profile-ship-preview-v443{
+  flex:1 1 auto !important;
+  min-height:115px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  justify-content:center !important;
+  margin-top:10px !important;
+  border-radius:14px !important;
+  background:
+    radial-gradient(circle at center, rgba(0,255,255,.10), transparent 55%),
+    rgba(0,0,0,.14) !important;
+  border:1px solid rgba(120,230,255,.10) !important;
+  overflow:hidden !important;
+}
+#profile-window .profile-ship-orbit-v443{
+  position:relative !important;
+  width:112px !important;
+  height:82px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  transform-style:preserve-3d !important;
+  animation: profileShipSpinV443 4.2s linear infinite !important;
+}
+#profile-window .profile-ship-rocket-v443{
+  position:relative !important;
+  z-index:2 !important;
+  font-size:54px !important;
+  line-height:1 !important;
+  filter:drop-shadow(0 0 14px rgba(0,255,255,.55)) drop-shadow(0 0 18px rgba(255,70,70,.25)) !important;
+  transform:rotate(-18deg) !important;
+}
+#profile-window .profile-ship-glow-v443{
+  position:absolute !important;
+  inset:22px 16px !important;
+  border-radius:50% !important;
+  background:radial-gradient(circle, rgba(0,255,255,.28), transparent 70%) !important;
+  filter:blur(7px) !important;
+}
+#profile-window .profile-ship-name-v443{
+  margin-top:2px !important;
+  color:#9fefff !important;
+  font-weight:800 !important;
+  font-size:12px !important;
+  text-align:center !important;
+  max-width:220px !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+  opacity:.92 !important;
+}
+@keyframes profileShipSpinV443{
+  0%{ transform:perspective(520px) rotateY(0deg) rotateX(7deg); }
+  100%{ transform:perspective(520px) rotateY(360deg) rotateX(7deg); }
+}
+
 </style>
 <style id="v378-bot-nameplate-hard-override">
 html body .battle-bot-name-label,
@@ -10817,303 +10888,3 @@ body.hangar-chat-mode #chat-wrapper.hangar-pm-neon {
 
 
 <!-- v410: hangar guest list UI placeholder -->
-
-
-/* ===== V440 PROFILE SKILLS ONE-WINDOW LAYOUT ===== */
-#profile-window .profile-content{
-  width:min(1120px, calc(100vw - 300px));
-  min-width:860px;
-  max-height:calc(100vh - 88px);
-  overflow:hidden;
-}
-.profile-v428-main{
-  grid-template-columns:200px minmax(0,1fr);
-  gap:12px;
-}
-.profile-skin-card{
-  height:500px;
-}
-.profile-skin-frame{
-  height:246px;
-}
-.profile-battle-stat-grid{
-  gap:7px;
-}
-.profile-battle-stat-card{
-  min-height:52px;
-  padding:7px 8px;
-}
-.profile-v440-lower-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1.35fr) minmax(260px,0.65fr);
-  gap:10px;
-  min-height:0;
-}
-.profile-skills-panel-v440,
-.profile-module-panel-v440{
-  border:1px solid rgba(125,216,255,0.14);
-  border-radius:16px;
-  background:rgba(255,255,255,0.04);
-  padding:10px;
-  box-sizing:border-box;
-  min-height:0;
-}
-.profile-skills-head-v440{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  margin-bottom:7px;
-}
-.profile-skill-points-v440{
-  white-space:nowrap;
-  font-size:12px;
-  color:#bff4ff;
-  opacity:0.9;
-}
-.profile-skill-points-v440 b{
-  color:#00ff88;
-  font-size:15px;
-}
-.profile-skills-grid-v440{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:6px 8px;
-}
-.profile-skill-row-v440{
-  min-width:0;
-  height:31px;
-  border-radius:10px;
-  background:rgba(0,0,0,0.20);
-  border:1px solid rgba(255,255,255,0.07);
-  padding:4px 6px;
-  box-sizing:border-box;
-  display:grid;
-  grid-template-columns:minmax(95px,1fr) auto;
-  align-items:center;
-  gap:5px;
-}
-.profile-skill-left-v440{
-  min-width:0;
-  display:flex;
-  align-items:center;
-  gap:5px;
-}
-.profile-skill-icon-v440{
-  width:18px;
-  text-align:center;
-  filter:drop-shadow(0 0 5px rgba(0,255,255,0.25));
-}
-.profile-skill-name-v440{
-  min-width:0;
-  color:#e9fbff;
-  font-weight:800;
-  font-size:11px;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.profile-skill-controls-v440{
-  display:flex;
-  align-items:center;
-  gap:4px;
-}
-.profile-skill-bars-v440{
-  display:flex;
-  align-items:center;
-  gap:2px;
-}
-.profile-skill-bar-v440{
-  width:5px;
-  height:18px;
-  border-radius:5px;
-  background:rgba(255,255,255,0.10);
-  border:1px solid rgba(255,255,255,0.08);
-  box-sizing:border-box;
-}
-.profile-skill-bar-v440.filled{
-  background:linear-gradient(180deg,#eaffaa,#7dff7d 55%,#00c853);
-  box-shadow:0 0 7px rgba(90,255,120,0.40);
-}
-.profile-skill-level-v440{
-  min-width:28px;
-  text-align:right;
-  font-size:10px;
-  font-weight:800;
-  color:#bfffd0;
-  opacity:0.95;
-}
-.profile-skill-btn-v440{
-  width:20px;
-  height:20px;
-  padding:0;
-  border-radius:6px;
-  border:1px solid rgba(150,230,255,0.20);
-  background:linear-gradient(180deg, rgba(35,55,80,0.95), rgba(5,10,18,0.95));
-  color:#eaffff;
-  font-weight:900;
-  line-height:18px;
-  cursor:pointer;
-}
-.profile-skill-btn-v440.plus{
-  color:#50ff90;
-}
-.profile-skill-btn-v440:disabled{
-  opacity:0.25;
-  cursor:not-allowed;
-}
-.profile-module-panel-v440 .profile-module-list{
-  gap:6px;
-}
-.profile-module-panel-v440 .profile-module-row{
-  min-height:50px;
-  padding:7px 8px;
-}
-.profile-module-panel-v440 .profile-module-bars{
-  height:30px;
-}
-.profile-module-panel-v440 .profile-module-bar{
-  height:25px;
-  width:4px;
-}
-@media (max-width:1180px){
-  #profile-window .profile-content{
-    width:min(980px,94vw);
-    min-width:0;
-  }
-  .profile-v440-lower-grid{
-    grid-template-columns:1fr;
-  }
-  .profile-skills-grid-v440{
-    grid-template-columns:1fr;
-  }
-}
-
-
-/* ===== V441 COMPACT VERTICAL SKILLS ===== */
-
-.profile-v440-lower-grid{
-  display:grid;
-  grid-template-columns:1fr 300px;
-  gap:8px;
-  align-items:start;
-}
-
-.profile-skills-panel-v441{
-  border:1px solid rgba(120,220,255,0.14);
-  border-radius:14px;
-  background:rgba(255,255,255,0.03);
-  padding:8px 10px;
-}
-
-.profile-skills-title-v441{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:8px;
-  color:#dff8ff;
-  font-weight:800;
-  font-size:15px;
-}
-
-.profile-skill-points-inline-v441{
-  color:#66ff99;
-  font-size:14px;
-}
-
-.profile-skills-list-v441{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-}
-
-.profile-skill-line-v441{
-  display:grid;
-  grid-template-columns:130px 1fr;
-  align-items:center;
-  gap:8px;
-  min-height:24px;
-}
-
-.profile-skill-name-wrap-v441{
-  display:flex;
-  align-items:center;
-  gap:5px;
-  min-width:0;
-}
-
-.profile-skill-icon-v441{
-  font-size:14px;
-}
-
-.profile-skill-name-v441{
-  font-size:13px;
-  font-weight:700;
-  color:#f2fbff;
-  white-space:nowrap;
-}
-
-.profile-skill-right-v441{
-  display:flex;
-  align-items:center;
-  gap:4px;
-}
-
-.profile-skill-bars-v441{
-  display:flex;
-  align-items:flex-end;
-  gap:2px;
-}
-
-.profile-skill-bar-v441{
-  width:6px;
-  height:18px;
-  border-radius:2px;
-  background:rgba(255,255,255,0.12);
-  border:1px solid rgba(255,255,255,0.05);
-}
-
-.profile-skill-bar-v441.filled{
-  background:linear-gradient(180deg,#cfffaa,#59ff7f 60%,#00bb44);
-  box-shadow:0 0 6px rgba(100,255,120,0.4);
-}
-
-.profile-skill-level-v441{
-  width:14px;
-  text-align:center;
-  font-size:11px;
-  color:#8fffaa;
-  font-weight:800;
-}
-
-.profile-skill-btn-v441{
-  width:18px;
-  height:18px;
-  padding:0;
-  border:none;
-  border-radius:4px;
-  cursor:pointer;
-  background:#101826;
-  color:white;
-  font-size:12px;
-  font-weight:900;
-}
-
-.profile-skill-btn-v441.plus{
-  color:#55ff88;
-}
-
-.profile-skill-btn-v441:disabled{
-  opacity:0.25;
-  cursor:not-allowed;
-}
-
-.profile-module-panel-v440{
-  max-height:355px;
-  overflow:hidden;
-}
-
-.profile-module-panel-v440 .profile-module-row{
-  min-height:44px;
-  padding:5px 6px;
-}
