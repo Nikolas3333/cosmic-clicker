@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v441 - COMPACT VERTICAL SKILLS -->
+<!-- COSMIC CLICKER v442 - REAL COMPACT PROFILE SKILLS -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -6829,6 +6829,222 @@ shop-main-head{
   justify-content:center;
   width:40px;
   height:30px;
+}
+
+
+
+/* ===== V442 REAL COMPACT PROFILE SKILLS OVERRIDE ===== */
+#profile-window .profile-content{
+  width: min(1120px, 94vw) !important;
+  max-height: calc(100vh - 84px) !important;
+  overflow: hidden !important;
+}
+
+#profile-window .profile-v428-main{
+  display: grid !important;
+  grid-template-columns: 210px minmax(0,1fr) !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+#profile-window .profile-skin-card{
+  height: 505px !important;
+  min-height: 0 !important;
+}
+
+#profile-window .profile-skin-frame{
+  height: 250px !important;
+}
+
+#profile-window .profile-battle-stat-grid{
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 7px !important;
+  margin-bottom: 8px !important;
+}
+
+#profile-window .profile-battle-stat-card{
+  min-height: 50px !important;
+  padding: 7px 8px !important;
+}
+
+#profile-window .profile-v440-lower-grid{
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 300px !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+  min-height: 0 !important;
+}
+
+#profile-window .profile-skills-panel-v440,
+#profile-window .profile-skills-panel-v441{
+  display: none !important;
+}
+
+#profile-window .profile-skills-panel-v442{
+  height: 350px !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(125,216,255,.16) !important;
+  border-radius: 14px !important;
+  background: rgba(255,255,255,.035) !important;
+  padding: 8px 10px !important;
+}
+
+#profile-window .profile-skills-head-v442{
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin: 0 0 6px 0 !important;
+  color: #9fefff !important;
+  font-weight: 900 !important;
+  font-size: 16px !important;
+}
+
+#profile-window .profile-skill-points-v442{
+  color: #c9f9ff !important;
+  font-size: 13px !important;
+  white-space: nowrap !important;
+}
+
+#profile-window .profile-skill-points-v442 b{
+  color: #45ff87 !important;
+}
+
+#profile-window .profile-skills-list-v442{
+  height: 304px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+#profile-window .profile-skill-line-v442{
+  height: 23px !important;
+  min-height: 23px !important;
+  display: grid !important;
+  grid-template-columns: 132px minmax(0,1fr) !important;
+  align-items: center !important;
+  gap: 7px !important;
+  border-radius: 7px !important;
+  background: rgba(0,0,0,.12) !important;
+  padding: 1px 5px !important;
+  box-sizing: border-box !important;
+}
+
+#profile-window .profile-skill-title-v442{
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+#profile-window .profile-skill-icon-v442{
+  width: 17px !important;
+  min-width: 17px !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+}
+
+#profile-window .profile-skill-name-v442{
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: #eefbff !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+
+#profile-window .profile-skill-upgrade-v442{
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+}
+
+#profile-window .profile-skill-bars-v442{
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  height: 20px !important;
+}
+
+#profile-window .profile-skill-bar-v442{
+  width: 7px !important;
+  height: 18px !important;
+  border-radius: 2px !important;
+  display: inline-block !important;
+  background: rgba(255,255,255,.12) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08) !important;
+}
+
+#profile-window .profile-skill-bar-v442.filled{
+  background: linear-gradient(180deg, #eaffb0, #97ff74 55%, #21d85a) !important;
+  box-shadow: 0 0 6px rgba(98,255,120,.45) !important;
+}
+
+#profile-window .profile-skill-num-v442{
+  width: 14px !important;
+  text-align: center !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  color: #7dff9d !important;
+}
+
+#profile-window .profile-skill-btn-v442{
+  width: 18px !important;
+  height: 18px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: linear-gradient(180deg,#313947,#03060b) !important;
+  color: #fff !important;
+  font-weight: 900 !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+  cursor: pointer !important;
+}
+
+#profile-window .profile-skill-btn-v442.plus{
+  color: #55ff88 !important;
+}
+
+#profile-window .profile-skill-btn-v442:disabled{
+  opacity: .28 !important;
+  cursor: not-allowed !important;
+}
+
+#profile-window .profile-module-panel-v440{
+  height: 350px !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 8px !important;
+}
+
+#profile-window .profile-module-panel-v440 .profile-section-title{
+  font-size: 15px !important;
+  margin-bottom: 7px !important;
+}
+
+#profile-window .profile-module-panel-v440 .profile-module-list{
+  gap: 5px !important;
+}
+
+#profile-window .profile-module-panel-v440 .profile-module-row{
+  min-height: 44px !important;
+  padding: 5px 6px !important;
+}
+
+@media (max-width: 1100px){
+  #profile-window .profile-v440-lower-grid{
+    grid-template-columns: 1fr !important;
+  }
 }
 
 </style>
