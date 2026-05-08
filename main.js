@@ -1,4 +1,4 @@
-// COSMIC CLICKER v437 - SAFE IO + ROOM GHOST FIX
+// COSMIC CLICKER v438 - PROFILE EXP AND REAL STATS FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -113,6 +113,85 @@ const botShotCooldown = 1300;
 let playerHp = 100;
 let playerMaxHp = 100;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
+
+// ===== V438 PROFILE REAL STATS (persistent, not only current battle session) =====
+const profileBattleStats = {
+    totalKills: 0,
+    totalDeaths: 0,
+    teamPoints: 0,
+    flagsCaptured: 0,
+    tournamentWins: 0
+};
+let profileStatsSaveTimer = null;
+
+function getProfileStatSafeNumberV438(value = 0){
+    const num = Number(value || 0);
+    return Number.isFinite(num) && num > 0 ? Math.floor(num) : 0;
+}
+
+function readProfileBattleStatsFromSourceV438(source = {}){
+    const stats = (source?.battleStats && typeof source.battleStats === 'object') ? source.battleStats : {};
+    return {
+        totalKills: Math.max(
+            getProfileStatSafeNumberV438(source?.totalKills),
+            getProfileStatSafeNumberV438(source?.total_kills),
+            getProfileStatSafeNumberV438(source?.killsTotal),
+            getProfileStatSafeNumberV438(source?.playerKills),
+            getProfileStatSafeNumberV438(stats?.totalKills),
+            getProfileStatSafeNumberV438(stats?.playerKills)
+        ),
+        totalDeaths: Math.max(
+            getProfileStatSafeNumberV438(source?.totalDeaths),
+            getProfileStatSafeNumberV438(source?.total_deaths),
+            getProfileStatSafeNumberV438(source?.deathsTotal),
+            getProfileStatSafeNumberV438(source?.playerDeaths),
+            getProfileStatSafeNumberV438(stats?.totalDeaths),
+            getProfileStatSafeNumberV438(stats?.playerDeaths)
+        ),
+        teamPoints: Math.max(getProfileStatSafeNumberV438(source?.teamPoints), getProfileStatSafeNumberV438(source?.team_points), getProfileStatSafeNumberV438(stats?.teamPoints)),
+        flagsCaptured: Math.max(getProfileStatSafeNumberV438(source?.flagsCaptured), getProfileStatSafeNumberV438(source?.flags_captured), getProfileStatSafeNumberV438(stats?.flagsCaptured)),
+        tournamentWins: Math.max(getProfileStatSafeNumberV438(source?.tournamentWins), getProfileStatSafeNumberV438(source?.tournament_wins), getProfileStatSafeNumberV438(stats?.tournamentWins))
+    };
+}
+
+function syncProfileBattleStatsFromSaveV438(source = {}){
+    const next = readProfileBattleStatsFromSourceV438(source || {});
+    profileBattleStats.totalKills = Math.max(profileBattleStats.totalKills, next.totalKills);
+    profileBattleStats.totalDeaths = Math.max(profileBattleStats.totalDeaths, next.totalDeaths);
+    profileBattleStats.teamPoints = Math.max(profileBattleStats.teamPoints, next.teamPoints);
+    profileBattleStats.flagsCaptured = Math.max(profileBattleStats.flagsCaptured, next.flagsCaptured);
+    profileBattleStats.tournamentWins = Math.max(profileBattleStats.tournamentWins, next.tournamentWins);
+}
+
+function getProfileBattleTotalsForSaveV438(){
+    return {
+        totalKills: Math.max(getProfileStatSafeNumberV438(profileBattleStats.totalKills), getProfileStatSafeNumberV438(battleStats?.playerKills)),
+        totalDeaths: Math.max(getProfileStatSafeNumberV438(profileBattleStats.totalDeaths), getProfileStatSafeNumberV438(battleStats?.playerDeaths)),
+        teamPoints: getProfileStatSafeNumberV438(profileBattleStats.teamPoints),
+        flagsCaptured: getProfileStatSafeNumberV438(profileBattleStats.flagsCaptured),
+        tournamentWins: getProfileStatSafeNumberV438(profileBattleStats.tournamentWins)
+    };
+}
+
+function scheduleProfileStatsSaveV438(){
+    try{
+        if(profileStatsSaveTimer) clearTimeout(profileStatsSaveTimer);
+        profileStatsSaveTimer = setTimeout(() => {
+            profileStatsSaveTimer = null;
+            try{ saveGame?.(); }catch(_){}
+        }, 1200);
+    }catch(_){}
+}
+
+function recordProfileBattleStatsV438(killsDelta = 0, deathsDelta = 0){
+    const kd = getProfileStatSafeNumberV438(killsDelta);
+    const dd = getProfileStatSafeNumberV438(deathsDelta);
+    if(!kd && !dd) return;
+    profileBattleStats.totalKills = Math.max(0, getProfileStatSafeNumberV438(profileBattleStats.totalKills) + kd);
+    profileBattleStats.totalDeaths = Math.max(0, getProfileStatSafeNumberV438(profileBattleStats.totalDeaths) + dd);
+    scheduleProfileStatsSaveV438();
+}
+
 let battleKillCombo = 0;
 let battleLastKillAt = 0;
 const BATTLE_COMBO_WINDOW_MS = 1000;
@@ -3919,6 +3998,7 @@ updateUI();
 
 function applySaveData(save){
     if(!save || typeof save !== 'object') return;
+    try{ syncProfileBattleStatsFromSaveV438(save); }catch(_){}
     currentLevel = Number(save.level || 1);
     damage = Number(save.damage || 1);
     player.level = Number(save.playerLevel || currentLevel || 1);
@@ -4026,7 +4106,14 @@ function buildSavePayload(){
         ownedShipIds: Array.isArray(player.ownedShipIds) ? [...player.ownedShipIds] : ['scout_1'],
         selectedShipId: player.selectedShipId || 'scout_1',
         ownedModuleIds: Array.isArray(player.ownedModuleIds) ? [...player.ownedModuleIds] : [],
-        activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {}
+        activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {},
+        battleStats: getProfileBattleTotalsForSaveV438(),
+        totalKills: getProfileBattleTotalsForSaveV438().totalKills,
+        totalDeaths: getProfileBattleTotalsForSaveV438().totalDeaths,
+        teamPoints: getProfileBattleTotalsForSaveV438().teamPoints,
+        flagsCaptured: getProfileBattleTotalsForSaveV438().flagsCaptured,
+        tournamentWins: getProfileBattleTotalsForSaveV438().tournamentWins,
+        experienceMax: getProfileExperienceMaxV429(player?.level || currentLevel || 1)
     };
 }
 
@@ -4417,6 +4504,7 @@ if (gameState === "BATTLE" && playerShip) {
                 hitEnemyBot.userData.alive = false;
                 battleStats.playerKills += 1;
                 battleStats.botDeaths += 1;
+                try{ recordProfileBattleStatsV438(1, 0); }catch(_){}
                 const savedRow = soloBotScoreRows.get(defeatedId) || { id:defeatedId, nickname:defeatedName, kills:0, deaths:0, level:Math.max(1, Number(activeSoloMission?.minLevel || player?.level || 1) || 1), team:'red' };
                 savedRow.deaths = Number(savedRow.deaths || 0) + 1;
                 savedRow.deadUntil = Date.now() + 3000;
@@ -4501,6 +4589,7 @@ if (gameState === "BATTLE" && playerShip) {
             if(playerHp <= 0 && !isBattleRespawning() && !activeSoloMissionEnded){
                 battleStats.botKills += 1;
                 battleStats.playerDeaths += 1;
+                try{ recordProfileBattleStatsV438(0, 1); }catch(_){}
     try{ pushBattleKillFeedLine(`${enemyBot?.userData?.name || 'UFO Raider'} уничтожил ${player?.nickname || 'Commander'}`); }catch(_){}
                 const killerBot = laser.shooter || enemyBot;
                 const killerId = String(killerBot?.userData?.id || 'BOT');
@@ -5062,6 +5151,7 @@ function startShipCrashAnimation(){
     battleShipCrash = { startAt: Date.now(), duration: 250 };
     spawnShipDebris(playerShip.position.clone(), 0xffa36a);
     battleStats.playerDeaths += 1;
+    try{ recordProfileBattleStatsV438(0, 1); }catch(_){}
     try{ pushBattleKillFeedLine(`${enemyBot?.userData?.name || 'UFO Raider'} уничтожил ${player?.nickname || 'Commander'}`); }catch(_){}
     updateBattleScoreboard();
     pushKillFeed(`${player?.nickname || 'Commander'} разбился о планету`, 'kill');
@@ -5079,6 +5169,7 @@ function startSunProminenceDeath(){
     if(!playerShip || battleShipCrash || isBattleRespawning()) return;
     spawnShipDebris(playerShip.position.clone(), 0xffd36a);
     battleStats.playerDeaths += 1;
+    try{ recordProfileBattleStatsV438(0, 1); }catch(_){}
     try{ pushBattleKillFeedLine(`${enemyBot?.userData?.name || 'UFO Raider'} уничтожил ${player?.nickname || 'Commander'}`); }catch(_){}
     updateBattleScoreboard();
     pushKillFeed(`${player?.nickname || 'Commander'} сгорел в протуберанце`, 'kill');
@@ -8660,6 +8751,7 @@ function applyBattleScoreDelta(playerId, changes = {}){
     if(isSelf){
         battleStats.playerKills = nextKills;
         battleStats.playerDeaths = nextDeaths;
+        try{ recordProfileBattleStatsV438(killsDelta, deathsDelta); }catch(_){}
     }
 
     const remoteEntry = (remoteBattleShips instanceof Map) ? remoteBattleShips.get(safeId) : null;
@@ -10902,7 +10994,7 @@ function renderProfileModuleBarsV428(level = 0){
 
 function getProfileExperienceMaxV429(level = 1){
     const safeLevel = Math.max(1, Math.floor(Number(level || 1) || 1));
-    return Math.max(50, safeLevel * 50);
+    return Math.max(100, safeLevel * 600);
 }
 
 function renderProfileSkinStatsV429({ rating = 0, exp = 0, expMax = 50, level = 1, credits = 0, crystals = 0 } = {}){
@@ -10966,10 +11058,12 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
     const credits = Number(profile?.credits ?? source?.credits ?? player?.credits ?? playerResources?.coins ?? 0) || 0;
     const crystals = Number(profile?.crystals ?? source?.crystals ?? source?.playerResources?.crystals ?? playerResources?.crystals ?? 0) || 0;
     const rating = Number(profile?.rating ?? source?.rating ?? source?.leaderRating ?? source?.leader_rating ?? 0) || 0;
-    const expMax = Number(profile?.experience_max ?? source?.experienceMax ?? source?.experience_max ?? getProfileExperienceMaxV429(level)) || getProfileExperienceMaxV429(level);
+    const expMax = Number(profile?.experience_max ?? profile?.experienceMax ?? source?.experienceMax ?? source?.experience_max ?? getProfileExperienceMaxV429(level)) || getProfileExperienceMaxV429(level);
     const modules = getProfileEquippedModulesV428(source);
-    const localKills = isSelf ? Number(battleStats?.playerKills || 0) : 0;
-    const localDeaths = isSelf ? Number(battleStats?.playerDeaths || 0) : 0;
+    const savedBattleStatsV438 = readProfileBattleStatsFromSourceV438(source || {});
+    const localTotalsV438 = isSelf ? getProfileBattleTotalsForSaveV438() : savedBattleStatsV438;
+    const localKills = Math.max(Number(localTotalsV438?.totalKills || 0), isSelf ? Number(battleStats?.playerKills || 0) : 0);
+    const localDeaths = Math.max(Number(localTotalsV438?.totalDeaths || 0), isSelf ? Number(battleStats?.playerDeaths || 0) : 0);
     const totalKills = getProfileStatNumberV430(
         profile?.total_kills, profile?.totalKills, profile?.kills_total,
         source?.totalKills, source?.total_kills, source?.killsTotal,
@@ -10979,17 +11073,17 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
     const teamPoints = getProfileStatNumberV430(
         profile?.team_points, profile?.teamPoints, profile?.team_score, profile?.teamScore,
         source?.teamPoints, source?.team_points, source?.teamScore, source?.team_score,
-        source?.battleStats?.teamPoints, source?.battleStats?.teamScore
+        source?.battleStats?.teamPoints, source?.battleStats?.teamScore, savedBattleStatsV438.teamPoints
     );
     const flagsCaptured = getProfileStatNumberV430(
         profile?.flags_captured, profile?.flagsCaptured, profile?.captured_flags, profile?.capturedFlags,
         source?.flagsCaptured, source?.flags_captured, source?.capturedFlags, source?.captured_flags,
-        source?.battleStats?.flagsCaptured
+        source?.battleStats?.flagsCaptured, savedBattleStatsV438.flagsCaptured
     );
     const tournamentWins = getProfileStatNumberV430(
         profile?.tournament_wins, profile?.tournamentWins, profile?.tournaments_won, profile?.tournamentsWon,
         source?.tournamentWins, source?.tournament_wins, source?.tournamentsWon, source?.tournaments_won,
-        source?.battleStats?.tournamentWins
+        source?.battleStats?.tournamentWins, savedBattleStatsV438.tournamentWins
     );
     const totalDeaths = getProfileStatNumberV430(
         profile?.total_deaths, profile?.totalDeaths, profile?.deaths_total,
@@ -11068,7 +11162,8 @@ function renderProfileStats(){
             saturn_ice: playerResources?.saturn_ice || 0,
             uranus_ammonia: playerResources?.uranus_ammonia || 0,
             neptune_methane: playerResources?.neptune_methane || 0,
-            solar_energy: playerResources?.solar_energy || 0
+            solar_energy: playerResources?.solar_energy || 0,
+            experience_max: getProfileExperienceMaxV429(player?.level || currentLevel || 1)
         },
         save: selfSave,
         isSelf: true,
