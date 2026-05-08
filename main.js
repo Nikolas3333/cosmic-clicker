@@ -1,4 +1,4 @@
-// COSMIC CLICKER v438 - PROFILE EXP AND REAL STATS FIX
+// COSMIC CLICKER v439 - PERSISTENT PROFILE STATS FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -124,6 +124,37 @@ const profileBattleStats = {
 };
 let profileStatsSaveTimer = null;
 
+function getProfileStatsStorageKeyV439(){
+    const accountId = String(authState?.playerId || authState?.email || player?.id || player?.nickname || 'guest').trim() || 'guest';
+    return `cosmicProfileBattleStats:${accountId}`;
+}
+
+function persistProfileBattleStatsLocalV439(){
+    try{
+        const key = getProfileStatsStorageKeyV439();
+        if(!key) return;
+        localStorage.setItem(key, JSON.stringify({
+            totalKills: getProfileStatSafeNumberV438(profileBattleStats.totalKills),
+            totalDeaths: getProfileStatSafeNumberV438(profileBattleStats.totalDeaths),
+            teamPoints: getProfileStatSafeNumberV438(profileBattleStats.teamPoints),
+            flagsCaptured: getProfileStatSafeNumberV438(profileBattleStats.flagsCaptured),
+            tournamentWins: getProfileStatSafeNumberV438(profileBattleStats.tournamentWins)
+        }));
+    }catch(_){}
+}
+
+function loadProfileBattleStatsLocalV439(){
+    try{
+        const key = getProfileStatsStorageKeyV439();
+        if(!key) return null;
+        const raw = localStorage.getItem(key);
+        if(!raw) return null;
+        const parsed = JSON.parse(raw);
+        if(parsed && typeof parsed === 'object') return parsed;
+    }catch(_){}
+    return null;
+}
+
 function getProfileStatSafeNumberV438(value = 0){
     const num = Number(value || 0);
     return Number.isFinite(num) && num > 0 ? Math.floor(num) : 0;
@@ -155,12 +186,15 @@ function readProfileBattleStatsFromSourceV438(source = {}){
 }
 
 function syncProfileBattleStatsFromSaveV438(source = {}){
+    const localSavedV439 = loadProfileBattleStatsLocalV439?.() || {};
     const next = readProfileBattleStatsFromSourceV438(source || {});
-    profileBattleStats.totalKills = Math.max(profileBattleStats.totalKills, next.totalKills);
-    profileBattleStats.totalDeaths = Math.max(profileBattleStats.totalDeaths, next.totalDeaths);
-    profileBattleStats.teamPoints = Math.max(profileBattleStats.teamPoints, next.teamPoints);
-    profileBattleStats.flagsCaptured = Math.max(profileBattleStats.flagsCaptured, next.flagsCaptured);
-    profileBattleStats.tournamentWins = Math.max(profileBattleStats.tournamentWins, next.tournamentWins);
+    const localNext = readProfileBattleStatsFromSourceV438(localSavedV439 || {});
+    profileBattleStats.totalKills = Math.max(profileBattleStats.totalKills, next.totalKills, localNext.totalKills);
+    profileBattleStats.totalDeaths = Math.max(profileBattleStats.totalDeaths, next.totalDeaths, localNext.totalDeaths);
+    profileBattleStats.teamPoints = Math.max(profileBattleStats.teamPoints, next.teamPoints, localNext.teamPoints);
+    profileBattleStats.flagsCaptured = Math.max(profileBattleStats.flagsCaptured, next.flagsCaptured, localNext.flagsCaptured);
+    profileBattleStats.tournamentWins = Math.max(profileBattleStats.tournamentWins, next.tournamentWins, localNext.tournamentWins);
+    try{ persistProfileBattleStatsLocalV439(); }catch(_){}
 }
 
 function getProfileBattleTotalsForSaveV438(){
@@ -187,8 +221,10 @@ function recordProfileBattleStatsV438(killsDelta = 0, deathsDelta = 0){
     const kd = getProfileStatSafeNumberV438(killsDelta);
     const dd = getProfileStatSafeNumberV438(deathsDelta);
     if(!kd && !dd) return;
+    try{ syncProfileBattleStatsFromSaveV438(loadProfileBattleStatsLocalV439?.() || {}); }catch(_){}
     profileBattleStats.totalKills = Math.max(0, getProfileStatSafeNumberV438(profileBattleStats.totalKills) + kd);
     profileBattleStats.totalDeaths = Math.max(0, getProfileStatSafeNumberV438(profileBattleStats.totalDeaths) + dd);
+    try{ persistProfileBattleStatsLocalV439(); }catch(_){}
     scheduleProfileStatsSaveV438();
 }
 
@@ -4060,6 +4096,7 @@ async function loadRemoteSaveFromSupabase(){
 
 async function loadGame(){
     ensureShopOwnershipDefaults?.();
+    try{ syncProfileBattleStatsFromSaveV438(loadProfileBattleStatsLocalV439?.() || {}); }catch(_){}
     const saveKey = getActiveSaveKey();
     if(saveKey){
         const localData = localStorage.getItem(saveKey);
@@ -4069,6 +4106,7 @@ async function loadGame(){
     }
     const remoteSave = await loadRemoteSaveFromSupabase();
     if(remoteSave) applySaveData(remoteSave);
+    try{ syncProfileBattleStatsFromSaveV438(loadProfileBattleStatsLocalV439?.() || {}); }catch(_){}
     ensureShopOwnershipDefaults?.();
     ensureModuleOwnershipDefaults?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
@@ -4095,6 +4133,8 @@ function sleep(ms = 0){
 }
 
 function buildSavePayload(){
+    try{ syncProfileBattleStatsFromSaveV438(loadProfileBattleStatsLocalV439?.() || {}); }catch(_){}
+    const profileTotalsV439 = getProfileBattleTotalsForSaveV438();
     return {
         level: currentLevel,
         damage: damage,
@@ -4107,12 +4147,12 @@ function buildSavePayload(){
         selectedShipId: player.selectedShipId || 'scout_1',
         ownedModuleIds: Array.isArray(player.ownedModuleIds) ? [...player.ownedModuleIds] : [],
         activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {},
-        battleStats: getProfileBattleTotalsForSaveV438(),
-        totalKills: getProfileBattleTotalsForSaveV438().totalKills,
-        totalDeaths: getProfileBattleTotalsForSaveV438().totalDeaths,
-        teamPoints: getProfileBattleTotalsForSaveV438().teamPoints,
-        flagsCaptured: getProfileBattleTotalsForSaveV438().flagsCaptured,
-        tournamentWins: getProfileBattleTotalsForSaveV438().tournamentWins,
+        battleStats: profileTotalsV439,
+        totalKills: profileTotalsV439.totalKills,
+        totalDeaths: profileTotalsV439.totalDeaths,
+        teamPoints: profileTotalsV439.teamPoints,
+        flagsCaptured: profileTotalsV439.flagsCaptured,
+        tournamentWins: profileTotalsV439.tournamentWins,
         experienceMax: getProfileExperienceMaxV429(player?.level || currentLevel || 1)
     };
 }
@@ -4159,6 +4199,7 @@ async function saveRemoteProgress(){
 
 function saveGame(){
     if(isHangarGuestView?.()) return;
+    try{ persistProfileBattleStatsLocalV439(); }catch(_){}
     const saveKey = getActiveSaveKey();
     const payload = buildSavePayload();
     if(saveKey){
@@ -11048,6 +11089,7 @@ function renderProfileBattleStatsV430({ totalKills = 0, teamPoints = 0, flagsCap
 }
 
 function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fallbackName = 'Player', canPm = false, canHangar = false } = {}){
+    if(isSelf){ try{ syncProfileBattleStatsFromSaveV438(loadProfileBattleStatsLocalV439?.() || {}); }catch(_){} }
     const source = save && typeof save === 'object' ? save : {};
     const skin = getProfileSkinMetaV428(source);
     const displayName = profile?.nickname || source?.nickname || fallbackName || player?.nickname || 'Player';
