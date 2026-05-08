@@ -1975,7 +1975,13 @@ function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
 }
 
 
-async function upsertRoomPlayerRowSafe(roomId, playerId, base = {
+async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}){
+    try{
+        return await upsertRoomPlayerRow(roomId, playerId, base);
+    }catch(error){
+        console.warn('upsertRoomPlayerRowSafe warning:', error?.message || error);
+        return null;
+    }
 }
 
 
