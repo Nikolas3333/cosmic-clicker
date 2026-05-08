@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v440 - PROFILE SKILLS PANEL FIX -->
+<!-- COSMIC CLICKER v441 - COMPACT VERTICAL SKILLS -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -10771,4 +10771,133 @@ body.hangar-chat-mode #chat-wrapper.hangar-pm-neon {
   .profile-skills-grid-v440{
     grid-template-columns:1fr;
   }
+}
+
+
+/* ===== V441 COMPACT VERTICAL SKILLS ===== */
+
+.profile-v440-lower-grid{
+  display:grid;
+  grid-template-columns:1fr 300px;
+  gap:8px;
+  align-items:start;
+}
+
+.profile-skills-panel-v441{
+  border:1px solid rgba(120,220,255,0.14);
+  border-radius:14px;
+  background:rgba(255,255,255,0.03);
+  padding:8px 10px;
+}
+
+.profile-skills-title-v441{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+  color:#dff8ff;
+  font-weight:800;
+  font-size:15px;
+}
+
+.profile-skill-points-inline-v441{
+  color:#66ff99;
+  font-size:14px;
+}
+
+.profile-skills-list-v441{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.profile-skill-line-v441{
+  display:grid;
+  grid-template-columns:130px 1fr;
+  align-items:center;
+  gap:8px;
+  min-height:24px;
+}
+
+.profile-skill-name-wrap-v441{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-width:0;
+}
+
+.profile-skill-icon-v441{
+  font-size:14px;
+}
+
+.profile-skill-name-v441{
+  font-size:13px;
+  font-weight:700;
+  color:#f2fbff;
+  white-space:nowrap;
+}
+
+.profile-skill-right-v441{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+
+.profile-skill-bars-v441{
+  display:flex;
+  align-items:flex-end;
+  gap:2px;
+}
+
+.profile-skill-bar-v441{
+  width:6px;
+  height:18px;
+  border-radius:2px;
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.05);
+}
+
+.profile-skill-bar-v441.filled{
+  background:linear-gradient(180deg,#cfffaa,#59ff7f 60%,#00bb44);
+  box-shadow:0 0 6px rgba(100,255,120,0.4);
+}
+
+.profile-skill-level-v441{
+  width:14px;
+  text-align:center;
+  font-size:11px;
+  color:#8fffaa;
+  font-weight:800;
+}
+
+.profile-skill-btn-v441{
+  width:18px;
+  height:18px;
+  padding:0;
+  border:none;
+  border-radius:4px;
+  cursor:pointer;
+  background:#101826;
+  color:white;
+  font-size:12px;
+  font-weight:900;
+}
+
+.profile-skill-btn-v441.plus{
+  color:#55ff88;
+}
+
+.profile-skill-btn-v441:disabled{
+  opacity:0.25;
+  cursor:not-allowed;
+}
+
+.profile-module-panel-v440{
+  max-height:355px;
+  overflow:hidden;
+}
+
+.profile-module-panel-v440 .profile-module-row{
+  min-height:44px;
+  padding:5px 6px;
 }
