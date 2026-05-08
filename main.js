@@ -1,3 +1,4 @@
+// COSMIC CLICKER v436 SAFE IO OPTIMIZATION FIX
 // COSMIC CLICKER v435 - PROFILE LEVEL SHIP ICON FAST FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
@@ -77,7 +78,7 @@ let shipRotationVelocity = new THREE.Vector3();
 let mouseSensitivity = 0.004;
 let activeLasers = [];
 let lastLaserShotAt = 0;
-const laserCooldown = 95;
+const laserCooldown = 120;
 const BASE_BG_MUSIC_VOLUME = 0.4;
 const BASE_BOSS_MUSIC_VOLUME = 0.6;
 const BASE_CLICK_VOLUME = 0.5;
@@ -1421,7 +1422,7 @@ function startBattleHudLoops(){
     updateBattleHudPing();
     measureBattlePing?.();
     updateBattleSoundButtonState();
-    battleHudClockTimer = setInterval(updateBattleHudMeta, 1000);
+    battleHudClockTimer = setInterval(updateBattleHudMeta, 3500);
     battleHudPingTimer = setInterval(() => {
         updateBattleHudPing();
         measureBattlePing?.();
@@ -21509,7 +21510,7 @@ function animateCosmicHangarPresenceAstronautsV426(){
   requestAnimationFrame(animateCosmicHangarPresenceAstronautsV426);
 }
 try{ requestAnimationFrame(animateCosmicHangarPresenceAstronautsV426); }catch(_){ }
-setInterval(function(){ try{ syncCosmicHangarLocalPresencePositionV426(false); }catch(_){ } }, 1000);
+setInterval(function(){ try{ syncCosmicHangarLocalPresencePositionV426(false); }catch(_){ } }, 3500);
 
 setInterval(function(){
   try{
