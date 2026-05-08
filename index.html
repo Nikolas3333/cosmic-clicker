@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v439 - PERSISTENT PROFILE STATS FIX -->
+<!-- COSMIC CLICKER v440 - PROFILE SKILLS PANEL FIX -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -10601,3 +10601,174 @@ body.hangar-chat-mode #chat-wrapper.hangar-pm-neon {
 
 
 <!-- v410: hangar guest list UI placeholder -->
+
+
+/* ===== V440 PROFILE SKILLS ONE-WINDOW LAYOUT ===== */
+#profile-window .profile-content{
+  width:min(1120px, calc(100vw - 300px));
+  min-width:860px;
+  max-height:calc(100vh - 88px);
+  overflow:hidden;
+}
+.profile-v428-main{
+  grid-template-columns:200px minmax(0,1fr);
+  gap:12px;
+}
+.profile-skin-card{
+  height:500px;
+}
+.profile-skin-frame{
+  height:246px;
+}
+.profile-battle-stat-grid{
+  gap:7px;
+}
+.profile-battle-stat-card{
+  min-height:52px;
+  padding:7px 8px;
+}
+.profile-v440-lower-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(260px,0.65fr);
+  gap:10px;
+  min-height:0;
+}
+.profile-skills-panel-v440,
+.profile-module-panel-v440{
+  border:1px solid rgba(125,216,255,0.14);
+  border-radius:16px;
+  background:rgba(255,255,255,0.04);
+  padding:10px;
+  box-sizing:border-box;
+  min-height:0;
+}
+.profile-skills-head-v440{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:7px;
+}
+.profile-skill-points-v440{
+  white-space:nowrap;
+  font-size:12px;
+  color:#bff4ff;
+  opacity:0.9;
+}
+.profile-skill-points-v440 b{
+  color:#00ff88;
+  font-size:15px;
+}
+.profile-skills-grid-v440{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px 8px;
+}
+.profile-skill-row-v440{
+  min-width:0;
+  height:31px;
+  border-radius:10px;
+  background:rgba(0,0,0,0.20);
+  border:1px solid rgba(255,255,255,0.07);
+  padding:4px 6px;
+  box-sizing:border-box;
+  display:grid;
+  grid-template-columns:minmax(95px,1fr) auto;
+  align-items:center;
+  gap:5px;
+}
+.profile-skill-left-v440{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.profile-skill-icon-v440{
+  width:18px;
+  text-align:center;
+  filter:drop-shadow(0 0 5px rgba(0,255,255,0.25));
+}
+.profile-skill-name-v440{
+  min-width:0;
+  color:#e9fbff;
+  font-weight:800;
+  font-size:11px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.profile-skill-controls-v440{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.profile-skill-bars-v440{
+  display:flex;
+  align-items:center;
+  gap:2px;
+}
+.profile-skill-bar-v440{
+  width:5px;
+  height:18px;
+  border-radius:5px;
+  background:rgba(255,255,255,0.10);
+  border:1px solid rgba(255,255,255,0.08);
+  box-sizing:border-box;
+}
+.profile-skill-bar-v440.filled{
+  background:linear-gradient(180deg,#eaffaa,#7dff7d 55%,#00c853);
+  box-shadow:0 0 7px rgba(90,255,120,0.40);
+}
+.profile-skill-level-v440{
+  min-width:28px;
+  text-align:right;
+  font-size:10px;
+  font-weight:800;
+  color:#bfffd0;
+  opacity:0.95;
+}
+.profile-skill-btn-v440{
+  width:20px;
+  height:20px;
+  padding:0;
+  border-radius:6px;
+  border:1px solid rgba(150,230,255,0.20);
+  background:linear-gradient(180deg, rgba(35,55,80,0.95), rgba(5,10,18,0.95));
+  color:#eaffff;
+  font-weight:900;
+  line-height:18px;
+  cursor:pointer;
+}
+.profile-skill-btn-v440.plus{
+  color:#50ff90;
+}
+.profile-skill-btn-v440:disabled{
+  opacity:0.25;
+  cursor:not-allowed;
+}
+.profile-module-panel-v440 .profile-module-list{
+  gap:6px;
+}
+.profile-module-panel-v440 .profile-module-row{
+  min-height:50px;
+  padding:7px 8px;
+}
+.profile-module-panel-v440 .profile-module-bars{
+  height:30px;
+}
+.profile-module-panel-v440 .profile-module-bar{
+  height:25px;
+  width:4px;
+}
+@media (max-width:1180px){
+  #profile-window .profile-content{
+    width:min(980px,94vw);
+    min-width:0;
+  }
+  .profile-v440-lower-grid{
+    grid-template-columns:1fr;
+  }
+  .profile-skills-grid-v440{
+    grid-template-columns:1fr;
+  }
+}
