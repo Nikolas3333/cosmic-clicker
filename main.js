@@ -1,4 +1,4 @@
-// COSMIC CLICKER v447 - PROFILE SHIP CENTER ROTATION REFRESH
+// COSMIC CLICKER v448 - REAL PROFILE SHIP REFRESH CENTER
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -313,19 +313,29 @@ function getProfileSelectedShipItemV444(sourceProfile = null){
             src?.shipId ||
             src?.ship_id ||
             player?.selectedShipId ||
-            localStorage.getItem('cosmicSelectedShipId') ||
             ''
         ).trim();
 
+        const allShips = [];
+        try{ if(Array.isArray(player?.ships)) allShips.push(...player.ships); }catch(_){}
+        try{ if(Array.isArray(getAllShopShips?.())) allShips.push(...getAllShopShips()); }catch(_){}
+        try{ if(window.__cosmicShopData?.shipsByType) allShips.push(...Object.values(window.__cosmicShopData.shipsByType).flat()); }catch(_){}
+
         if(selectedId){
-            const owned = Array.isArray(player?.ships) ? player.ships.find(s => String(s?.id || '').trim() === selectedId) : null;
-            const shop = getShopShipById?.(selectedId) || null;
-            const dock = findOwnedHangarShipById?.(selectedId) || null;
-            return owned || shop || dock || { id:selectedId, name:selectedId, modelPath:'/ships/Spaceship.glb' };
+            const found = allShips.find(s => String(s?.id || '').trim() === selectedId)
+                || getShopShipById?.(selectedId)
+                || findOwnedHangarShipById?.(selectedId)
+                || null;
+
+            if(found) return found;
+            return { id:selectedId, name:selectedId, modelPath:'/ships/Spaceship.glb' };
         }
 
         const fallbackId = String(player?.selectedShipId || 'scout_1').trim();
-        return getShopShipById?.(fallbackId) || player?.ships?.[0] || { id:fallbackId, name:fallbackId, modelPath:'/ships/Spaceship.glb' };
+        return allShips.find(s => String(s?.id || '').trim() === fallbackId)
+            || getShopShipById?.(fallbackId)
+            || player?.ships?.[0]
+            || { id:fallbackId, name:fallbackId, modelPath:'/ships/Spaceship.glb' };
     }catch(_){
         return { id:'scout_1', name:'Cargo Drone', modelPath:'/ships/Spaceship.glb' };
     }
@@ -334,7 +344,7 @@ function getProfileSelectedShipItemV444(sourceProfile = null){
 function getProfileSelectedShipNameV443(sourceProfile = null){
     try{
         const item = getProfileSelectedShipItemV444?.(sourceProfile || player) || {};
-        return String(item?.name || item?.title || item?.id || 'Выбранный корабль').trim() || 'Выбранный корабль';
+        return String(item?.name || item?.title || item?.label || item?.id || 'Выбранный корабль').trim() || 'Выбранный корабль';
     }catch(_){
         return 'Выбранный корабль';
     }
@@ -348,12 +358,14 @@ function getProfileSelectedShipIconV444(item = null){
 }
 
 function renderProfileSelectedShipPreviewV443(sourceProfile = null){
-    const item = getProfileSelectedShipItemV444?.(sourceProfile || player) || {};
-    const name = getProfileSelectedShipNameV443(sourceProfile || player);
-    const selectedId = String(item?.id || sourceProfile?.selectedShipId || sourceProfile?.selected_ship_id || player?.selectedShipId || '').trim();
-    const modelPath = String(item?.modelPath || item?.model_path || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb';
+    const src = (sourceProfile && typeof sourceProfile === 'object') ? sourceProfile : player;
+    const item = getProfileSelectedShipItemV444?.(src) || {};
+    const name = getProfileSelectedShipNameV443(src);
+    const selectedId = String(item?.id || src?.selectedShipId || src?.selected_ship_id || player?.selectedShipId || 'scout_1').trim();
+    const modelPath = String(item?.modelPath || item?.model_path || item?.path || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb';
+
     return `
-      <div class="profile-ship-preview-v443" data-selected-ship-id="${escapeProfileHtmlV428(selectedId)}" data-profile-ship-model="${escapeProfileHtmlV428(modelPath)}">
+      <div class="profile-ship-preview-v448" data-selected-ship-id="${escapeProfileHtmlV428(selectedId)}" data-profile-ship-model="${escapeProfileHtmlV428(modelPath)}">
         <div id="profile-ship-3d-canvas-v445" class="profile-ship-3d-canvas-v445"></div>
         <div class="profile-ship-name-v443">Выбран: ${escapeProfileHtmlV428(name)}</div>
       </div>
@@ -409,22 +421,25 @@ function makeProfileFallbackShipV445(){
 
 function normalizeProfileShipObjectV445(object){
     try{
-        const box = new THREE.Box3().setFromObject(object);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-
-        // v447: создаём реальный pivot в геометрическом центре.
-        // Вращается pivot, а сама модель смещается внутрь него.
         const pivot = new THREE.Group();
-        object.position.set(
-            object.position.x - center.x,
-            object.position.y - center.y,
-            object.position.z - center.z
-        );
 
-        const maxSize = Math.max(size.x, size.y, size.z, 0.001);
+        const boxBefore = new THREE.Box3().setFromObject(object);
+        const sizeBefore = boxBefore.getSize(new THREE.Vector3());
+        const maxSize = Math.max(sizeBefore.x, sizeBefore.y, sizeBefore.z, 0.001);
+
+        // Размер оставлен нормальным. Не уменьшаем корабль, только центрируем ось.
         const scale = 2.05 / maxSize;
         object.scale.multiplyScalar(scale);
+
+        object.updateMatrixWorld(true);
+        const boxAfter = new THREE.Box3().setFromObject(object);
+        const centerAfter = boxAfter.getCenter(new THREE.Vector3());
+
+        // ВАЖНО: переносим модель так, чтобы её геометрический центр был в (0,0,0).
+        // Тогда вращение идёт от центра корпуса, а не от носа/импортного origin.
+        object.position.x -= centerAfter.x;
+        object.position.y -= centerAfter.y;
+        object.position.z -= centerAfter.z;
 
         pivot.add(object);
         pivot.rotation.set(0.15, -0.45, 0.04);
@@ -442,13 +457,13 @@ function initProfileSelectedShip3DPreviewV445(){
     host.innerHTML = '';
 
     const wrap = host.closest('[data-profile-ship-model]');
+    const domShipId = String(wrap?.getAttribute('data-selected-ship-id') || player?.selectedShipId || 'scout_1').trim();
+    const item = getProfileSelectedShipItemV444?.({ selectedShipId: domShipId }) || {};
     const domModelPath = String(wrap?.getAttribute('data-profile-ship-model') || '').trim();
-    const domShipId = String(wrap?.getAttribute('data-selected-ship-id') || '').trim();
-    const item = getProfileSelectedShipItemV444?.({ selectedShipId: domShipId || player?.selectedShipId }) || {};
-    const modelPath = String(domModelPath || item?.modelPath || item?.model_path || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb';
+    const modelPath = String(domModelPath || item?.modelPath || item?.model_path || item?.path || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb';
 
     const width = Math.max(170, host.clientWidth || 230);
-    const height = Math.max(104, host.clientHeight || 126);
+    const height = Math.max(116, host.clientHeight || 128);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
@@ -481,8 +496,9 @@ function initProfileSelectedShip3DPreviewV445(){
         loader.load(modelPath, (gltf) => {
             try{
                 modelRoot.clear();
-                const model = normalizeProfileShipObjectV445(gltf.scene || gltf.scenes?.[0]);
-                modelRoot.add(model);
+                const src = gltf.scene || gltf.scenes?.[0];
+                const centered = normalizeProfileShipObjectV445(src);
+                modelRoot.add(centered);
             }catch(error){
                 console.warn('profile ship model normalize warning:', error?.message || error);
             }
@@ -493,14 +509,13 @@ function initProfileSelectedShip3DPreviewV445(){
         console.warn('profile ship loader warning:', error?.message || error);
     }
 
-    profileShipPreview3DV445 = { renderer, scene, camera, modelRoot, frame:0 };
+    profileShipPreview3DV445 = { renderer, scene, camera, modelRoot, frame:0, shipId:domShipId };
 
     const animate = () => {
         if(!document.body.contains(host)){
             disposeProfileShipPreview3DV445();
             return;
         }
-        // Вращаем корневой pivot, а не нос модели.
         modelRoot.rotation.y += 0.014;
         modelRoot.rotation.x = Math.sin(Date.now() / 900) * 0.025;
         renderer.render(scene, camera);
@@ -514,6 +529,17 @@ function initProfileSelectedShip3DPreviewV445(){
 
 
 
+
+function setSelectedShipIdEverywhereV448(shipId = ''){
+    const safeId = String(shipId || '').trim();
+    if(!safeId) return;
+    try{ player.selectedShipId = safeId; }catch(_){}
+    try{ localStorage.setItem('cosmicSelectedShipId', safeId); }catch(_){}
+    try{ currentBattleShipStats = computeShipBattleStats?.(safeId) || currentBattleShipStats; }catch(_){}
+    try{ saveGame?.(); }catch(_){}
+    try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+}
+
 function restoreSelectedShipFromLocalV447(){
     try{
         const saved = String(localStorage.getItem('cosmicSelectedShipId') || '').trim();
@@ -526,15 +552,39 @@ function restoreSelectedShipFromLocalV447(){
 
 function refreshProfileShipPreviewIfOpenV446(){
     try{
-        const host = document.getElementById('profile-ship-3d-canvas-v445');
-        if(!host) return;
-        const item = getProfileSelectedShipItemV444?.() || {};
-        const nameNode = document.querySelector('#profile-window .profile-ship-name-v443');
-        if(nameNode) nameNode.textContent = `Выбран: ${getProfileSelectedShipNameV443?.() || item?.name || 'Выбранный корабль'}`;
-        setTimeout(() => { try{ initProfileSelectedShip3DPreviewV445?.(); }catch(_){} }, 0);
-    setTimeout(() => { try{ initProfileSelectedShip3DPreviewV445?.(); }catch(_){} }, 180);
+        const oldWrap = document.querySelector('#profile-window .profile-ship-preview-v443, #profile-window .profile-ship-preview-v448');
+        if(!oldWrap) return;
+
+        const selectedId = String(player?.selectedShipId || 'scout_1').trim();
+        const item = getProfileSelectedShipItemV444?.({ selectedShipId:selectedId }) || {};
+        const modelPath = String(item?.modelPath || item?.model_path || item?.path || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb';
+        const name = getProfileSelectedShipNameV443?.({ selectedShipId:selectedId }) || item?.name || selectedId;
+
+        oldWrap.className = 'profile-ship-preview-v448';
+        oldWrap.setAttribute('data-selected-ship-id', selectedId);
+        oldWrap.setAttribute('data-profile-ship-model', modelPath);
+        oldWrap.innerHTML = `
+            <div id="profile-ship-3d-canvas-v445" class="profile-ship-3d-canvas-v445"></div>
+            <div class="profile-ship-name-v443">Выбран: ${escapeProfileHtmlV428(name)}</div>
+        `;
+
+        setTimeout(() => { try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ initProfileSelectedShip3DPreviewV445?.(); }catch(_){} }, 0);
+        setTimeout(() => { try{ initProfileSelectedShip3DPreviewV445?.(); }catch(_){} }, 180);
     }catch(_){}
 }
+
+
+document.addEventListener('click', () => {
+    setTimeout(() => {
+        try{
+            const selectedId = String(player?.selectedShipId || '').trim();
+            if(selectedId){
+                localStorage.setItem('cosmicSelectedShipId', selectedId);
+                refreshProfileShipPreviewIfOpenV446?.();
+            }
+        }catch(_){}
+    }, 80);
+}, true);
 
 function renderProfileSkillsPanelV440(isSelf = false){
     const levels = ensureProfileSkillLevelsV440();
@@ -4360,6 +4410,8 @@ function applySaveData(save){
     }
     const savedSelectedShipIdV446 = String(save?.selectedShipId || save?.selected_ship_id || save?.shipId || save?.ship_id || '').trim();
     if(savedSelectedShipIdV446){ player.selectedShipId = savedSelectedShipIdV446; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} }
+    const savedSelectedShipIdV448 = String(save?.selectedShipId || save?.selected_ship_id || save?.shipId || save?.ship_id || '').trim();
+    if(savedSelectedShipIdV448){ try{ setSelectedShipIdEverywhereV448?.(savedSelectedShipIdV448); }catch(_){ player.selectedShipId = savedSelectedShipIdV448; } }
     try{ applyProfileSkillsFromSaveV440?.(save); }catch(_){}
     ensureShopOwnershipDefaults?.();
     ensureModuleOwnershipDefaults?.();
@@ -11518,6 +11570,8 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
 }
 
 function renderProfileStats(){
+    const renderProfileStatsV448PreviewRefresh = true;
+    try{ restoreSelectedShipFromLocalV447?.(); }catch(_){}
     try{ restoreSelectedShipFromLocalV447?.(); }catch(_){}
     const profileInfo = document.getElementById('profile-info');
     if(!profileInfo) return;
