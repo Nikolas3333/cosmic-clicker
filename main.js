@@ -1,4 +1,4 @@
-// COSMIC CLICKER v443 - PROFILE SKILLS SHIP CLEANUP
+// COSMIC CLICKER v444 - SAFE BATTLE ENTER AND SELECTED SHIP
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -303,24 +303,49 @@ function renderProfileSkillBarsV440(level = 0){
 }
 
 
+function getProfileSelectedShipItemV444(){
+    try{
+        const selectedId = String(player?.selectedShipId || '').trim();
+        return findOwnedHangarShipById?.(selectedId)
+            || getShopShipById?.(selectedId)
+            || getForcedHangarDisplayShip?.()
+            || getSelectedShipItem?.()
+            || currentBattleShipStats?.ship
+            || player?.ships?.[0]
+            || null;
+    }catch(_){
+        return null;
+    }
+}
+
 function getProfileSelectedShipNameV443(){
     try{
-        const item = getSelectedShipItem?.() || getShopShipById?.(player?.selectedShipId || '') || player?.ships?.[0] || {};
-        return String(item?.name || currentBattleShipStats?.ship?.name || 'Выбранный корабль').trim() || 'Выбранный корабль';
+        const item = getProfileSelectedShipItemV444?.() || {};
+        return String(item?.name || 'Выбранный корабль').trim() || 'Выбранный корабль';
     }catch(_){
         return 'Выбранный корабль';
     }
 }
 
+function getProfileSelectedShipIconV444(item = null){
+    const safeId = String(item?.id || player?.selectedShipId || '').trim();
+    if(safeId === 'xwing_1') return '✦';
+    if(safeId === 'scout_1') return '🚀';
+    return '🚀';
+}
+
 function renderProfileSelectedShipPreviewV443(){
+    const item = getProfileSelectedShipItemV444?.() || {};
     const name = getProfileSelectedShipNameV443();
+    const selectedId = String(item?.id || player?.selectedShipId || '').trim();
+    const icon = getProfileSelectedShipIconV444(item);
     return `
-      <div class="profile-ship-preview-v443">
-        <div class="profile-ship-orbit-v443">
-          <div class="profile-ship-rocket-v443">🚀</div>
+      <div class="profile-ship-preview-v443" data-selected-ship-id="${escapeProfileHtmlV428(selectedId)}">
+        <div class="profile-ship-orbit-v443 ${selectedId === 'xwing_1' ? 'xwing' : 'scout'}">
+          <div class="profile-ship-model-v444">${icon}</div>
           <div class="profile-ship-glow-v443"></div>
         </div>
-        <div class="profile-ship-name-v443">${escapeProfileHtmlV428(name)}</div>
+        <div class="profile-ship-name-v443">Выбран: ${escapeProfileHtmlV428(name)}</div>
       </div>
     `;
 }
@@ -1951,6 +1976,62 @@ function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
 
 
 async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}, selectColumns = 'id'){
+    const normalizedRoomId = sanitizeOnlineRoomId(roomId);
+    const safePlayerId = String(playerId || '').trim();
+    if(!normalizedRoomId || !safePlayerId || !window.supabaseClient) return { data:null, error:null, ok:false };
+
+    const payload = buildRoomPlayerRowPayload(normalizedRoomId, safePlayerId, base);
+
+    try{
+        // v444: настоящий UPSERT по room_id + player_id.
+        // Это убирает спам 409, когда игрок уже есть в room_players.
+        const upserted = await window.supabaseClient
+            .from('room_players')
+            .upsert(payload, { onConflict: 'room_id,player_id' })
+            .select(selectColumns)
+            .limit(1);
+
+        if(!upserted?.error){
+            return { data: upserted?.data || null, error:null, ok:true, payload };
+        }
+
+        const code = String(upserted?.error?.code || '').trim();
+        const message = String(upserted?.error?.message || '').toLowerCase();
+
+        if(code === '23505' || message.includes('duplicate') || message.includes('conflict')){
+            const selected = await window.supabaseClient
+                .from('room_players')
+                .select('id,room_id,player_id,nickname')
+                .eq('room_id', normalizedRoomId)
+                .eq('player_id', safePlayerId)
+                .limit(1);
+
+            const row = Array.isArray(selected?.data) ? selected.data[0] : null;
+            if(row?.id){
+                const updatePayload = { ...payload };
+                delete updatePayload.id;
+                delete updatePayload.room_id;
+                delete updatePayload.player_id;
+
+                const updated = await window.supabaseClient
+                    .from('room_players')
+                    .update(updatePayload)
+                    .eq('id', row.id)
+                    .select(selectColumns)
+                    .limit(1);
+
+                if(!updated?.error){
+                    return { data: updated?.data || selected?.data || null, error:null, ok:true, payload };
+                }
+                return { data:null, error:updated?.error || upserted?.error, ok:false, payload };
+            }
+        }
+
+        return { data:null, error:upserted?.error || null, ok:false, payload };
+    }catch(error){
+        return { data:null, error, ok:false, payload };
+    }
+}, selectColumns = 'id'){
     const normalizedRoomId = sanitizeOnlineRoomId(roomId);
     const safePlayerId = String(playerId || '').trim();
     if(!normalizedRoomId || !safePlayerId || !window.supabaseClient) return { data:null, error:null, ok:false };
@@ -10953,6 +11034,7 @@ window.addEventListener('load', () => {
 
     if(joinBtn){
         joinBtn.addEventListener('click', () => {
+            markCosmicBattleEnterAllowedV444?.();
             selectedLobbyMap = getSelectedLobbyMapFromUI();
             currentRoom = { id: `local_${selectedLobbyMap.real}_${Date.now()}`, map: selectedLobbyMap.real, state: 'battle', players: [{name:'Commander'}] };
             window.currentRoomId = currentRoom.id || null;
@@ -10961,6 +11043,31 @@ window.addEventListener('load', () => {
     }
 });
 
+
+
+// ===== V444 SAFE BATTLE ENTER GUARD =====
+// Защита от самопроизвольного перекидывания из лобби на карту.
+// В BATTLE можно перейти только сразу после реального нажатия игрока на вход/создание боя.
+let cosmicBattleEnterAllowedUntilV444 = 0;
+
+function markCosmicBattleEnterAllowedV444(){
+    cosmicBattleEnterAllowedUntilV444 = Date.now() + 30000;
+}
+
+function isCosmicBattleEnterAllowedV444(){
+    return Date.now() <= Number(cosmicBattleEnterAllowedUntilV444 || 0);
+}
+
+document.addEventListener('click', (event) => {
+    try{
+        const target = event.target;
+        if(!target?.closest) return;
+        const battleButton = target.closest(
+            '#join-match-btn, #confirm-create-room, #confirm-tournament-create, #join-map-btn, .join-btn, [data-battle-enter], [data-action="battle-enter"]'
+        );
+        if(battleButton) markCosmicBattleEnterAllowedV444();
+    }catch(_){}
+}, true);
 
 function closeBattlePauseMenu(){
     const menu = document.getElementById('battle-pause-menu');
@@ -16748,6 +16855,7 @@ function limitBattleArea(){
             joinBtnOld.replaceWith(joinBtn);
             joinBtn.dataset.v26Bound = '1';
             joinBtn.addEventListener('click', () => {
+                markCosmicBattleEnterAllowedV444?.();
                 const selected = selectedLobbyMap || getCurrentLobbyDataset()[0];
                 currentRoom = {
                     map: selected.real,
@@ -17370,6 +17478,10 @@ function closeShopView(){
 
     const prevSwitchState = switchState;
     switchState = async function(newState){
+        if(newState === 'BATTLE' && gameState === 'LOBBY' && !isCosmicBattleEnterAllowedV444()){
+            console.warn('BATTLE enter blocked: нет явного нажатия входа в бой');
+            return;
+        }
         await prevSwitchState(newState);
         if(newState === 'LOBBY'){
             closeShopView();
@@ -17959,6 +18071,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
             joinBtnOld.replaceWith(joinBtn);
             joinBtn.dataset.v27Bound = '1';
             joinBtn.addEventListener('click', () => {
+                markCosmicBattleEnterAllowedV444?.();
                 if(!selectedLobbyMap) return;
                 if(lobbyModeV27 === 'solo'){
                     if(isGuestAccount()){
