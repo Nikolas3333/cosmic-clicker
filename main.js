@@ -1,4 +1,4 @@
-// COSMIC CLICKER v439 - PERSISTENT PROFILE STATS FIX
+// COSMIC CLICKER v440 - PROFILE SKILLS PANEL FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -227,6 +227,145 @@ function recordProfileBattleStatsV438(killsDelta = 0, deathsDelta = 0){
     try{ persistProfileBattleStatsLocalV439(); }catch(_){}
     scheduleProfileStatsSaveV438();
 }
+
+
+// ===== V440 PROFILE SKILLS (120 points = 12 skills x 10 levels) =====
+const PROFILE_SKILLS_V440 = [
+    { id:'health', icon:'❤️', name:'Здоровье', desc:'+ HP корабля' },
+    { id:'shield', icon:'🛡️', name:'Щит', desc:'+ прочность щита' },
+    { id:'shieldRegen', icon:'♻️', name:'Реген щита', desc:'быстрее восстановление' },
+    { id:'speed', icon:'⚡', name:'Скорость', desc:'+ скорость полёта' },
+    { id:'boost', icon:'🚀', name:'Форсаж', desc:'+ длительность SHIFT' },
+    { id:'energySave', icon:'🔋', name:'Экономия энергии', desc:'меньше расход энергии' },
+    { id:'maneuver', icon:'🌀', name:'Манёвренность', desc:'+ скорость поворота' },
+    { id:'damage', icon:'💥', name:'Урон', desc:'+ урон оружия' },
+    { id:'accuracy', icon:'🎯', name:'Точность', desc:'меньше разброс' },
+    { id:'reload', icon:'🔄', name:'Перезарядка', desc:'быстрее перезарядка' },
+    { id:'crit', icon:'✨', name:'Крит', desc:'+ шанс крита' },
+    { id:'mining', icon:'⛏️', name:'Добыча', desc:'+ ресурсы с орбиты' }
+];
+
+const PROFILE_SKILL_MAX_LEVEL_V440 = 10;
+let playerSkillLevelsV440 = {};
+
+function ensureProfileSkillLevelsV440(){
+    if(!playerSkillLevelsV440 || typeof playerSkillLevelsV440 !== 'object') playerSkillLevelsV440 = {};
+    PROFILE_SKILLS_V440.forEach(skill => {
+        const value = Number(playerSkillLevelsV440[skill.id] || 0);
+        playerSkillLevelsV440[skill.id] = Math.max(0, Math.min(PROFILE_SKILL_MAX_LEVEL_V440, Number.isFinite(value) ? Math.floor(value) : 0));
+    });
+    Object.keys(playerSkillLevelsV440).forEach(key => {
+        if(!PROFILE_SKILLS_V440.some(skill => skill.id === key)) delete playerSkillLevelsV440[key];
+    });
+    return playerSkillLevelsV440;
+}
+
+function getProfileSkillTotalPointsV440(){
+    const lvl = Number(player?.level || currentLevel || 1) || 1;
+    return Math.max(0, Math.min(120, Math.floor(lvl)));
+}
+
+function getProfileSkillSpentPointsV440(){
+    const levels = ensureProfileSkillLevelsV440();
+    return PROFILE_SKILLS_V440.reduce((sum, skill) => sum + (Number(levels[skill.id] || 0) || 0), 0);
+}
+
+function getProfileSkillFreePointsV440(){
+    return Math.max(0, getProfileSkillTotalPointsV440() - getProfileSkillSpentPointsV440());
+}
+
+function getProfileSkillsForSaveV440(){
+    const levels = ensureProfileSkillLevelsV440();
+    return JSON.parse(JSON.stringify(levels));
+}
+
+function applyProfileSkillsFromSaveV440(save = {}){
+    const source = (save?.skillLevels && typeof save.skillLevels === 'object')
+        ? save.skillLevels
+        : ((save?.skills && typeof save.skills === 'object') ? save.skills : null);
+    if(!source) return;
+    playerSkillLevelsV440 = {};
+    PROFILE_SKILLS_V440.forEach(skill => {
+        const raw = Number(source[skill.id] || 0);
+        playerSkillLevelsV440[skill.id] = Math.max(0, Math.min(PROFILE_SKILL_MAX_LEVEL_V440, Number.isFinite(raw) ? Math.floor(raw) : 0));
+    });
+    ensureProfileSkillLevelsV440();
+}
+
+function renderProfileSkillBarsV440(level = 0){
+    const safeLevel = Math.max(0, Math.min(PROFILE_SKILL_MAX_LEVEL_V440, Number(level || 0) || 0));
+    let html = '<div class="profile-skill-bars-v440">';
+    for(let i = 1; i <= PROFILE_SKILL_MAX_LEVEL_V440; i++){
+        html += `<span class="profile-skill-bar-v440 ${i <= safeLevel ? 'filled' : ''}"></span>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+function renderProfileSkillsPanelV440(isSelf = false){
+    const levels = ensureProfileSkillLevelsV440();
+    const total = getProfileSkillTotalPointsV440();
+    const spent = getProfileSkillSpentPointsV440();
+    const free = getProfileSkillFreePointsV440();
+
+    return `
+      <div class="profile-skills-panel-v440">
+        <div class="profile-skills-head-v440">
+          <div class="profile-section-title">Навыки пилота</div>
+          <div class="profile-skill-points-v440">Очки: <b>${free}</b> / ${total}</div>
+        </div>
+        <div class="profile-skills-grid-v440">
+          ${PROFILE_SKILLS_V440.map(skill => {
+              const lvl = Number(levels[skill.id] || 0) || 0;
+              const canMinus = isSelf && lvl > 0;
+              const canPlus = isSelf && free > 0 && lvl < PROFILE_SKILL_MAX_LEVEL_V440;
+              return `
+                <div class="profile-skill-row-v440" title="${escapeProfileHtmlV428(skill.desc)}">
+                  <div class="profile-skill-left-v440">
+                    <span class="profile-skill-icon-v440">${skill.icon}</span>
+                    <span class="profile-skill-name-v440">${escapeProfileHtmlV428(skill.name)}</span>
+                  </div>
+                  <div class="profile-skill-controls-v440">
+                    ${isSelf ? `<button type="button" class="profile-skill-btn-v440" data-skill-action="minus" data-skill-id="${skill.id}" ${canMinus ? '' : 'disabled'}>−</button>` : ''}
+                    ${renderProfileSkillBarsV440(lvl)}
+                    <span class="profile-skill-level-v440">${lvl}/${PROFILE_SKILL_MAX_LEVEL_V440}</span>
+                    ${isSelf ? `<button type="button" class="profile-skill-btn-v440 plus" data-skill-action="plus" data-skill-id="${skill.id}" ${canPlus ? '' : 'disabled'}>+</button>` : ''}
+                  </div>
+                </div>
+              `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+}
+
+function changeProfileSkillV440(skillId = '', delta = 0){
+    const safeId = String(skillId || '').trim();
+    if(!PROFILE_SKILLS_V440.some(skill => skill.id === safeId)) return;
+    ensureProfileSkillLevelsV440();
+
+    const current = Number(playerSkillLevelsV440[safeId] || 0) || 0;
+    if(delta > 0){
+        if(getProfileSkillFreePointsV440() <= 0) return;
+        if(current >= PROFILE_SKILL_MAX_LEVEL_V440) return;
+        playerSkillLevelsV440[safeId] = current + 1;
+    }else if(delta < 0){
+        if(current <= 0) return;
+        playerSkillLevelsV440[safeId] = current - 1;
+    }
+
+    try{ saveGame?.(); }catch(_){}
+    try{ renderProfileStats?.(); }catch(_){}
+}
+
+document.addEventListener('click', (event) => {
+    const btn = event.target?.closest?.('[data-skill-action][data-skill-id]');
+    if(!btn) return;
+    const action = String(btn.getAttribute('data-skill-action') || '');
+    const skillId = String(btn.getAttribute('data-skill-id') || '');
+    changeProfileSkillV440(skillId, action === 'plus' ? 1 : -1);
+});
+
 
 let battleKillCombo = 0;
 let battleLastKillAt = 0;
@@ -4057,6 +4196,7 @@ function applySaveData(save){
     if(save.activeModulesByShip && typeof save.activeModulesByShip === 'object'){
         player.activeModulesByShip = save.activeModulesByShip;
     }
+    try{ applyProfileSkillsFromSaveV440?.(save); }catch(_){}
     ensureShopOwnershipDefaults?.();
     ensureModuleOwnershipDefaults?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
@@ -4147,6 +4287,9 @@ function buildSavePayload(){
         selectedShipId: player.selectedShipId || 'scout_1',
         ownedModuleIds: Array.isArray(player.ownedModuleIds) ? [...player.ownedModuleIds] : [],
         activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {},
+        skillLevels: getProfileSkillsForSaveV440?.() || {},
+        skillPointsTotal: getProfileSkillTotalPointsV440?.() || 0,
+        skillPointsSpent: getProfileSkillSpentPointsV440?.() || 0,
         battleStats: profileTotalsV439,
         totalKills: profileTotalsV439.totalKills,
         totalDeaths: profileTotalsV439.totalDeaths,
@@ -11154,18 +11297,21 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
           </aside>
           <section class="profile-v428-right">
             ${renderProfileBattleStatsV430({ totalKills, teamPoints, flagsCaptured, tournamentWins, totalDeaths })}
-            <div class="profile-module-panel">
-              <div class="profile-section-title">Установленные модули</div>
-              <div class="profile-module-list">
-                ${modules.map(row => `
-                  <div class="profile-module-row">
-                    <div class="profile-module-info">
-                      <div class="profile-module-name">${escapeProfileHtmlV428(row.name)}</div>
-                      <div class="profile-module-sub">${escapeProfileHtmlV428(row.badge)} • прокачек: ${row.level}</div>
+            <div class="profile-v440-lower-grid">
+              ${renderProfileSkillsPanelV440(isSelf)}
+              <div class="profile-module-panel profile-module-panel-v440">
+                <div class="profile-section-title">Установленные модули</div>
+                <div class="profile-module-list">
+                  ${modules.map(row => `
+                    <div class="profile-module-row">
+                      <div class="profile-module-info">
+                        <div class="profile-module-name">${escapeProfileHtmlV428(row.name)}</div>
+                        <div class="profile-module-sub">${escapeProfileHtmlV428(row.badge)} • прокачек: ${row.level}</div>
+                      </div>
+                      ${renderProfileModuleBarsV428(row.level)}
                     </div>
-                    ${renderProfileModuleBarsV428(row.level)}
-                  </div>
-                `).join('')}
+                  `).join('')}
+                </div>
               </div>
             </div>
           </section>
