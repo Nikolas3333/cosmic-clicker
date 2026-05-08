@@ -1,4 +1,4 @@
-// COSMIC CLICKER v448 - REAL PROFILE SHIP REFRESH CENTER
+// COSMIC CLICKER v449 - SINGLE WEBGL PROFILE SHIP
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -378,13 +378,32 @@ let profileShipPreview3DV445 = null;
 
 function disposeProfileShipPreview3DV445(){
     try{
-        if(profileShipPreview3DV445?.frame) cancelAnimationFrame(profileShipPreview3DV445.frame);
-        if(profileShipPreview3DV445?.renderer){
-            profileShipPreview3DV445.renderer.dispose?.();
-            profileShipPreview3DV445.renderer.domElement?.remove?.();
+        if(profileShipPreview3DV445?.frame){
+            cancelAnimationFrame(profileShipPreview3DV445.frame);
         }
-    }catch(_){}
-    profileShipPreview3DV445 = null;
+
+        if(profileShipPreview3DV445?.renderer){
+            try{
+                profileShipPreview3DV445.renderer.setAnimationLoop?.(null);
+            }catch(_){}
+
+            try{
+                profileShipPreview3DV445.renderer.forceContextLoss?.();
+            }catch(_){}
+
+            try{
+                profileShipPreview3DV445.renderer.dispose?.();
+            }catch(_){}
+
+            try{
+                profileShipPreview3DV445.renderer.domElement?.remove?.();
+            }catch(_){}
+        }
+
+        profileShipPreview3DV445 = null;
+    }catch(_){
+        profileShipPreview3DV445 = null;
+    }
 }
 
 function makeProfileFallbackShipV445(){
@@ -437,9 +456,7 @@ function normalizeProfileShipObjectV445(object){
 
         // ВАЖНО: переносим модель так, чтобы её геометрический центр был в (0,0,0).
         // Тогда вращение идёт от центра корпуса, а не от носа/импортного origin.
-        object.position.x -= centerAfter.x;
-        object.position.y -= centerAfter.y;
-        object.position.z -= centerAfter.z;
+        object.position.set(-centerAfter.x, -centerAfter.y, -centerAfter.z);
 
         pivot.add(object);
         pivot.rotation.set(0.15, -0.45, 0.04);
@@ -537,7 +554,7 @@ function setSelectedShipIdEverywhereV448(shipId = ''){
     try{ localStorage.setItem('cosmicSelectedShipId', safeId); }catch(_){}
     try{ currentBattleShipStats = computeShipBattleStats?.(safeId) || currentBattleShipStats; }catch(_){}
     try{ saveGame?.(); }catch(_){}
-    try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+    try{ setTimeout(() => { refreshProfileShipPreviewIfOpenV446?.(); }, 60); }catch(_){}
 }
 
 function restoreSelectedShipFromLocalV447(){
@@ -555,7 +572,8 @@ function refreshProfileShipPreviewIfOpenV446(){
         const oldWrap = document.querySelector('#profile-window .profile-ship-preview-v443, #profile-window .profile-ship-preview-v448');
         if(!oldWrap) return;
 
-        const selectedId = String(player?.selectedShipId || 'scout_1').trim();
+        const selectedId = String(player?.selectedShipId || localStorage.getItem('cosmicSelectedShipId') || 'scout_1').trim();
+
         const item = getProfileSelectedShipItemV444?.({ selectedShipId:selectedId }) || {};
         const modelPath = String(item?.modelPath || item?.model_path || item?.path || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb';
         const name = getProfileSelectedShipNameV443?.({ selectedShipId:selectedId }) || item?.name || selectedId;
@@ -563,28 +581,27 @@ function refreshProfileShipPreviewIfOpenV446(){
         oldWrap.className = 'profile-ship-preview-v448';
         oldWrap.setAttribute('data-selected-ship-id', selectedId);
         oldWrap.setAttribute('data-profile-ship-model', modelPath);
+
         oldWrap.innerHTML = `
             <div id="profile-ship-3d-canvas-v445" class="profile-ship-3d-canvas-v445"></div>
             <div class="profile-ship-name-v443">Выбран: ${escapeProfileHtmlV428(name)}</div>
         `;
 
-        setTimeout(() => { try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ initProfileSelectedShip3DPreviewV445?.(); }catch(_){} }, 0);
-        setTimeout(() => { try{ initProfileSelectedShip3DPreviewV445?.(); }catch(_){} }, 180);
+        disposeProfileShipPreview3DV445();
+
+        setTimeout(() => {
+            try{
+                initProfileSelectedShip3DPreviewV445?.();
+            }catch(error){
+                console.warn('profile refresh init warning:', error?.message || error);
+            }
+        }, 40);
+
     }catch(_){}
 }
 
 
-document.addEventListener('click', () => {
-    setTimeout(() => {
-        try{
-            const selectedId = String(player?.selectedShipId || '').trim();
-            if(selectedId){
-                localStorage.setItem('cosmicSelectedShipId', selectedId);
-                refreshProfileShipPreviewIfOpenV446?.();
-            }
-        }catch(_){}
-    }, 80);
-}, true);
+// v449 removed recursive profile refresh listener
 
 function renderProfileSkillsPanelV440(isSelf = false){
     const levels = ensureProfileSkillLevelsV440();
