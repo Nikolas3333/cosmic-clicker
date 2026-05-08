@@ -1,4 +1,4 @@
-// COSMIC CLICKER v445 - PROFILE 3D SELECTED SHIP
+// COSMIC CLICKER v446 - PROFILE SHIP PERSIST AND FIT
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -303,16 +303,27 @@ function renderProfileSkillBarsV440(level = 0){
 }
 
 
-function getProfileSelectedShipItemV444(){
+function getProfileSelectedShipItemV444(sourceProfile = null){
     try{
-        const selectedId = String(player?.selectedShipId || '').trim();
-        return findOwnedHangarShipById?.(selectedId)
-            || getShopShipById?.(selectedId)
-            || getForcedHangarDisplayShip?.()
-            || getSelectedShipItem?.()
-            || currentBattleShipStats?.ship
-            || player?.ships?.[0]
-            || null;
+        const src = (sourceProfile && typeof sourceProfile === 'object') ? sourceProfile : player;
+        const selectedId = String(
+            src?.selectedShipId ||
+            src?.selected_ship_id ||
+            src?.shipId ||
+            src?.ship_id ||
+            player?.selectedShipId ||
+            ''
+        ).trim();
+
+        if(selectedId){
+            const owned = Array.isArray(player?.ships) ? player.ships.find(s => String(s?.id || '') === selectedId) : null;
+            return owned
+                || getShopShipById?.(selectedId)
+                || findOwnedHangarShipById?.(selectedId)
+                || { id:selectedId, name:selectedId, modelPath:'/ships/Spaceship.glb' };
+        }
+
+        return currentBattleShipStats?.ship || player?.ships?.[0] || null;
     }catch(_){
         return null;
     }
@@ -320,7 +331,7 @@ function getProfileSelectedShipItemV444(){
 
 function getProfileSelectedShipNameV443(){
     try{
-        const item = getProfileSelectedShipItemV444?.() || {};
+        const item = getProfileSelectedShipItemV444?.(player) || {};
         return String(item?.name || 'Выбранный корабль').trim() || 'Выбранный корабль';
     }catch(_){
         return 'Выбранный корабль';
@@ -401,7 +412,7 @@ function normalizeProfileShipObjectV445(object){
         const center = box.getCenter(new THREE.Vector3());
         object.position.sub(center);
         const maxSize = Math.max(size.x, size.y, size.z, 0.001);
-        const scale = 2.05 / maxSize;
+        const scale = 1.38 / maxSize;
         object.scale.multiplyScalar(scale);
         object.rotation.set(0.15, -0.45, 0.04);
     }catch(_){}
@@ -419,11 +430,11 @@ function initProfileSelectedShip3DPreviewV445(){
     const modelPath = String(item?.modelPath || item?.model_path || host.closest('[data-profile-ship-model]')?.getAttribute('data-profile-ship-model') || '/ships/Spaceship.glb').trim() || '/ships/Spaceship.glb';
 
     const width = Math.max(170, host.clientWidth || 230);
-    const height = Math.max(104, host.clientHeight || 126);
+    const height = Math.max(104, host.clientHeight || 118);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
-    camera.position.set(0, 0.45, 4.2);
+    camera.position.set(0, 0.35, 5.6);
 
     const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
     renderer.setSize(width, height);
@@ -471,7 +482,7 @@ function initProfileSelectedShip3DPreviewV445(){
             disposeProfileShipPreview3DV445();
             return;
         }
-        modelRoot.rotation.y += 0.018;
+        modelRoot.rotation.y += 0.012;
         modelRoot.rotation.x = Math.sin(Date.now() / 900) * 0.035;
         renderer.render(scene, camera);
         if(profileShipPreview3DV445){
@@ -481,6 +492,18 @@ function initProfileSelectedShip3DPreviewV445(){
     animate();
 }
 
+
+
+function refreshProfileShipPreviewIfOpenV446(){
+    try{
+        const host = document.getElementById('profile-ship-3d-canvas-v445');
+        if(!host) return;
+        const item = getProfileSelectedShipItemV444?.() || {};
+        const nameNode = document.querySelector('#profile-window .profile-ship-name-v443');
+        if(nameNode) nameNode.textContent = `Выбран: ${getProfileSelectedShipNameV443?.() || item?.name || 'Выбранный корабль'}`;
+        setTimeout(() => { try{ initProfileSelectedShip3DPreviewV445?.(); }catch(_){} }, 0);
+    }catch(_){}
+}
 
 function renderProfileSkillsPanelV440(isSelf = false){
     const levels = ensureProfileSkillLevelsV440();
@@ -4297,13 +4320,15 @@ function applySaveData(save){
     if(Array.isArray(save.ownedShipIds) && save.ownedShipIds.length){
         player.ownedShipIds = Array.from(new Set(save.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)));
     }
-    if(save.selectedShipId) player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId;
+    if(save.selectedShipId) player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     if(Array.isArray(save.ownedModuleIds)){
         player.ownedModuleIds = Array.from(new Set(save.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean)));
     }
     if(save.activeModulesByShip && typeof save.activeModulesByShip === 'object'){
         player.activeModulesByShip = save.activeModulesByShip;
     }
+    const savedSelectedShipIdV446 = String(save?.selectedShipId || save?.selected_ship_id || save?.shipId || save?.ship_id || '').trim();
+    if(savedSelectedShipIdV446){ player.selectedShipId = savedSelectedShipIdV446; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} }
     try{ applyProfileSkillsFromSaveV440?.(save); }catch(_){}
     ensureShopOwnershipDefaults?.();
     ensureModuleOwnershipDefaults?.();
@@ -4395,6 +4420,8 @@ function buildSavePayload(){
         selectedShipId: player.selectedShipId || 'scout_1',
         ownedModuleIds: Array.isArray(player.ownedModuleIds) ? [...player.ownedModuleIds] : [],
         activeModulesByShip: player.activeModulesByShip && typeof player.activeModulesByShip === 'object' ? JSON.parse(JSON.stringify(player.activeModulesByShip)) : {},
+        selectedShipId: String(player.selectedShipId || 'scout_1'),
+        selected_ship_id: String(player.selectedShipId || 'scout_1'),
         skillLevels: getProfileSkillsForSaveV440?.() || {},
         skillPointsTotal: getProfileSkillTotalPointsV440?.() || 0,
         skillPointsSpent: getProfileSkillSpentPointsV440?.() || 0,
@@ -11737,7 +11764,7 @@ function sellHullFromHangar(hullId){
         delete player.hangarDockAssignments[safeId];
     }
     if(String(player?.selectedShipId || '').trim() === safeId){
-        player.selectedShipId = String(player.ownedShipIds?.[0] || 'scout_1').trim() || 'scout_1';
+        player.selectedShipId = String(player.ownedShipIds?.[0] || 'scout_1').trim() || 'scout_1'; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     }
     refreshOwnedShipsInventory?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
@@ -12317,7 +12344,7 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
     const centerMesh = showcaseGroup?.children?.[0] || null;
     const supportMesh = (hangarState.supportShipMeshes || []).find(mesh => String(mesh?.userData?.shipId || '').trim() === safeNext) || null;
     if(!centerMesh || !supportMesh){
-        player.selectedShipId = safeNext;
+        player.selectedShipId = safeNext; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
         currentBattleShipStats = computeShipBattleStats(safeNext);
         updatePremiumAccountInfo?.();
         updateHUD?.();
@@ -14797,7 +14824,7 @@ function ensureHangarRenderer(){
             if(progress >= 1){
                 const finalShipId = String(transfer.nextShipId || '').trim();
                 if(finalShipId){
-                    player.selectedShipId = finalShipId;
+                    player.selectedShipId = finalShipId; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
                     currentBattleShipStats = computeShipBattleStats(finalShipId);
                     updatePremiumAccountInfo?.();
                     updateHUD?.();
@@ -17016,7 +17043,7 @@ refreshOwnedShipsInventory = refreshOwnedShipsInventoryFull;
 function equipOwnedShip(shipId){
     const safeId = String(shipId || '').trim();
     if(!safeId || !isOwnedShip(safeId)) return false;
-    player.selectedShipId = safeId;
+    player.selectedShipId = safeId; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     currentBattleShipStats = computeShipBattleStats(safeId);
     refreshOwnedShipsInventory?.();
     saveGame?.();
@@ -17058,7 +17085,7 @@ function buyShipFromShop(shipId){
     ensureHangarDockAssignments?.();
 
     const previousSelectedShipId = String(player.selectedShipId || 'scout_1').trim() || 'scout_1';
-    player.selectedShipId = previousSelectedShipId;
+    player.selectedShipId = previousSelectedShipId; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object') player.activeModulesByShip = {};
     if(!player.activeModulesByShip[ship.id] || typeof player.activeModulesByShip[ship.id] !== 'object') player.activeModulesByShip[ship.id] = {};
     const defaultWeapon = player.ownedModuleIds.find(id => getModuleById(id)?.classId === 'weapon') || '';
@@ -19315,7 +19342,7 @@ function applyGuestHangarPayload(profileData = {}, saveData = null, fallbackNick
     // Поэтому не меняем player.nickname / player.id / level / experience / credits / playerResources.
     // Временно подменяется только витрина ангара: корабли, модули и расстановка.
     player.ownedShipIds = Array.from(new Set(guestOwnedShips.length ? guestOwnedShips : ['scout_1']));
-    player.selectedShipId = String(payload.selectedShipId || player.ownedShipIds[0] || 'scout_1').trim() || 'scout_1';
+    player.selectedShipId = String(payload.selectedShipId || player.ownedShipIds[0] || 'scout_1').trim() || 'scout_1'; try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     player.ownedModuleIds = Array.isArray(payload.ownedModuleIds) ? Array.from(new Set(payload.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean))) : ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'];
     player.activeModulesByShip = payload.activeModulesByShip && typeof payload.activeModulesByShip === 'object'
         ? JSON.parse(JSON.stringify(payload.activeModulesByShip))
