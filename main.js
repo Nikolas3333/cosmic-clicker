@@ -1,4 +1,4 @@
-// COSMIC CLICKER v442 - REAL COMPACT PROFILE SKILLS
+// COSMIC CLICKER v443 - PROFILE SKILLS SHIP CLEANUP
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -302,6 +302,29 @@ function renderProfileSkillBarsV440(level = 0){
     return html;
 }
 
+
+function getProfileSelectedShipNameV443(){
+    try{
+        const item = getSelectedShipItem?.() || getShopShipById?.(player?.selectedShipId || '') || player?.ships?.[0] || {};
+        return String(item?.name || currentBattleShipStats?.ship?.name || 'Выбранный корабль').trim() || 'Выбранный корабль';
+    }catch(_){
+        return 'Выбранный корабль';
+    }
+}
+
+function renderProfileSelectedShipPreviewV443(){
+    const name = getProfileSelectedShipNameV443();
+    return `
+      <div class="profile-ship-preview-v443">
+        <div class="profile-ship-orbit-v443">
+          <div class="profile-ship-rocket-v443">🚀</div>
+          <div class="profile-ship-glow-v443"></div>
+        </div>
+        <div class="profile-ship-name-v443">${escapeProfileHtmlV428(name)}</div>
+      </div>
+    `;
+}
+
 function renderProfileSkillsPanelV440(isSelf = false){
     const levels = ensureProfileSkillLevelsV440();
     const total = getProfileSkillTotalPointsV440();
@@ -311,7 +334,7 @@ function renderProfileSkillsPanelV440(isSelf = false){
       <div class="profile-skills-panel-v442">
         <div class="profile-skills-head-v442">
           <span>Навыки пилота</span>
-          <span class="profile-skill-points-v442">Очки: <b>${free}</b> / ${total}</span>
+          ${free > 0 ? `<span class="profile-skill-points-v442">Очки: <b>${free}</b></span>` : ``}
         </div>
         <div class="profile-skills-list-v442">
           ${PROFILE_SKILLS_V440.map(skill => {
@@ -11315,6 +11338,7 @@ function renderProfilePanelV428({ profile = {}, save = null, isSelf = false, fal
                     </div>
                   `).join('')}
                 </div>
+                ${renderProfileSelectedShipPreviewV443()}
               </div>
             </div>
           </section>
@@ -18456,11 +18480,8 @@ async function joinRoomPlayers(roomId) {
   }
 
   const roomConfirmed = await waitForConfirmedRoom(normalizedRoomId, 9000);
-  if(!roomConfirmed){
-    console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
-    return false;
-  }
-
+  // v443: не останавливаем вход только из-за задержки чтения rooms.
+  // Сразу пробуем записать room_players; если FK реально не готов, обработаем ниже.
   const stamp = new Date().toISOString();
   const { data: joinedRows, error } = await upsertRoomPlayerRowSafe(normalizedRoomId, identity.playerId, {
     nickname: identity.displayName,
@@ -18474,7 +18495,6 @@ async function joinRoomPlayers(roomId) {
   if(error){
     const errorCode = String(error?.code || '').trim();
     if(errorCode === '23503'){
-      console.warn('joinRoomPlayers: комната ещё не подтверждена в rooms, повторим позже', normalizedRoomId);
       return false;
     }
 
@@ -18999,7 +19019,8 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
 
   const roomConfirmed = await waitForConfirmedRoom(data.id, 9000);
   if(!roomConfirmed){
-    console.warn('createGameRoom: комната не подтвердилась в rooms вовремя', data?.id);
+    // v443: Supabase иногда задерживает чтение только что созданной комнаты.
+    // Это не критическая ошибка — ниже всё равно пробуем вход в room_players.
   }
 
   let joined = await joinRoomPlayers(data.id);
@@ -19013,7 +19034,7 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
   }
 
   if (!joined) {
-    console.warn('Создатель ещё не вошёл в room_players, оставляем комнату и продолжим без удаления:', data);
+    // v443: без шумного warning в консоли; комната остаётся и повторно подхватится refresh-ом.
   }
 
   await loadRoomsFromSupabase();
