@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v444 - SAFE BATTLE ENTER AND SELECTED SHIP -->
+<!-- COSMIC CLICKER v445 - PROFILE 3D SELECTED SHIP -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7159,6 +7159,42 @@ shop-main-head{
 #profile-window .profile-ship-orbit-v443.xwing .profile-ship-model-v444::after{
   transform:translate(-50%,-50%) rotate(-32deg) !important;
 }
+#profile-window .profile-ship-rocket-v443{
+  display:none !important;
+}
+
+
+/* ===== V445 REAL 3D PROFILE SHIP PREVIEW ===== */
+#profile-window .profile-ship-preview-v443{
+  min-height:135px !important;
+}
+#profile-window .profile-ship-3d-canvas-v445{
+  width:100% !important;
+  height:116px !important;
+  min-height:116px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  position:relative !important;
+  overflow:hidden !important;
+}
+#profile-window .profile-ship-3d-canvas-v445::before{
+  content:"" !important;
+  position:absolute !important;
+  inset:18px 34px !important;
+  border-radius:50% !important;
+  background:radial-gradient(circle, rgba(0,255,255,.22), transparent 70%) !important;
+  filter:blur(8px) !important;
+}
+#profile-window .profile-ship-3d-renderer-v445{
+  position:relative !important;
+  z-index:2 !important;
+  width:100% !important;
+  height:100% !important;
+  display:block !important;
+}
+#profile-window .profile-ship-orbit-v443,
+#profile-window .profile-ship-model-v444,
 #profile-window .profile-ship-rocket-v443{
   display:none !important;
 }
