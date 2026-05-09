@@ -1,4 +1,4 @@
-// COSMIC CLICKER v467 - REAL REMOTE SHIELD FIX + PLAYER NICK FIX
+// COSMIC CLICKER v468 - REAL ROOMPLAYERS NICK REMOTE SHIELD
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -117,8 +117,8 @@ let playerMaxShield = 0;
 let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
 let playerShieldMeshesV462 = [];
-const REMOTE_SHIELD_SCALE_V466 = 2.35;
-const REMOTE_SHIELD_OPACITY_V466 = 0.72;
+const REMOTE_SHIELD_SCALE_V466 = 1.35;
+const REMOTE_SHIELD_OPACITY_V466 = 0.55;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 
 function forceRemoteShieldVisibleV467(mesh){
@@ -2439,45 +2439,31 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
 
         const selectedColumns = String(selectClause || 'id,room_id,player_id,nickname,joined_at').trim();
 
-        const findExistingRow = async () => {
-            try{
-                const found = await client
-                    .from('room_players')
-                    .select('id')
-                    .eq('room_id', safeRoomId)
-                    .eq('player_id', safePlayerId)
-                    .limit(1);
-                const id = Array.isArray(found?.data) && found.data[0]?.id ? String(found.data[0].id) : '';
-                return { id, error: found?.error || null };
-            }catch(error){
-                return { id:'', error };
-            }
+        const updatePayload = {
+            nickname: payload.nickname,
+            updated_at: payload.updated_at,
+            team: payload.team,
+            level: payload.level,
+            ping: payload.ping,
+            ...(payload.position ? { position: payload.position } : {}),
+            ...(payload.rotation ? { rotation: payload.rotation } : {})
         };
 
-        const existing = await findExistingRow();
+        // V468: сначала UPDATE по room_id/player_id.
+        // Это не создаёт POST 409 и убирает постоянный Conflict в консоли, если строка уже есть.
+        const updated = await client
+            .from('room_players')
+            .update(updatePayload)
+            .eq('room_id', safeRoomId)
+            .eq('player_id', safePlayerId)
+            .select(selectedColumns)
+            .limit(1);
 
-        if(existing.id){
-            const updated = await client
-                .from('room_players')
-                .update({
-                    nickname: payload.nickname,
-                    updated_at: payload.updated_at,
-                    team: payload.team,
-                    level: payload.level,
-                    ping: payload.ping,
-                    ...(payload.position ? { position: payload.position } : {}),
-                    ...(payload.rotation ? { rotation: payload.rotation } : {})
-                })
-                .eq('id', existing.id)
-                .select(selectedColumns)
-                .limit(1);
-
-            return {
-                data: Array.isArray(updated?.data) ? updated.data : (updated?.data ? [updated.data] : []),
-                error: updated?.error || null
-            };
+        if(!updated?.error && Array.isArray(updated?.data) && updated.data.length){
+            return { data: updated.data, error:null };
         }
 
+        // Если строки нет — только тогда INSERT.
         const inserted = await client
             .from('room_players')
             .insert(payload)
@@ -2487,39 +2473,33 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
         if(!inserted?.error){
             return {
                 data: Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
-                error: null
+                error:null
             };
         }
 
         const msg = String(inserted?.error?.message || '').toLowerCase();
         const code = String(inserted?.error?.code || '').trim();
+        const isConflict = code === '23505'
+            || code === '409'
+            || msg.includes('duplicate')
+            || msg.includes('conflict')
+            || msg.includes('already exists');
 
-        if(code === '23505' || msg.includes('duplicate') || msg.includes('already exists')){
-            const retryExisting = await findExistingRow();
-            if(retryExisting.id){
-                const updatedAfterDuplicate = await client
-                    .from('room_players')
-                    .update({
-                        nickname: payload.nickname,
-                        updated_at: payload.updated_at,
-                        team: payload.team,
-                        level: payload.level,
-                        ping: payload.ping,
-                        ...(payload.position ? { position: payload.position } : {}),
-                        ...(payload.rotation ? { rotation: payload.rotation } : {})
-                    })
-                    .eq('id', retryExisting.id)
-                    .select(selectedColumns)
-                    .limit(1);
+        if(isConflict){
+            // Важное: НЕ пробрасываем ошибку наверх и не ломаем бой.
+            // Повторяем UPDATE по composite ключу; если Supabase вернёт пусто — всё равно считаем join успешным.
+            const updatedAfterConflict = await client
+                .from('room_players')
+                .update(updatePayload)
+                .eq('room_id', safeRoomId)
+                .eq('player_id', safePlayerId)
+                .select(selectedColumns)
+                .limit(1);
 
-                return {
-                    data: Array.isArray(updatedAfterDuplicate?.data) ? updatedAfterDuplicate.data : (updatedAfterDuplicate?.data ? [updatedAfterDuplicate.data] : []),
-                    error: updatedAfterDuplicate?.error || null
-                };
-            }
-
-            // Для duplicate считаем вход успешным, чтобы не ломать переход на карту.
-            return { data:[], error:null };
+            return {
+                data: Array.isArray(updatedAfterConflict?.data) ? updatedAfterConflict.data : [],
+                error:null
+            };
         }
 
         return {
@@ -9340,62 +9320,61 @@ function stopLiveBattleSync(){
 
 function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     const canvas = document.createElement('canvas');
-    canvas.width = 384;
-    canvas.height = 90;
+    canvas.width = 512;
+    canvas.height = 128;
     const ctx = canvas.getContext('2d');
     const safeLevel = Math.max(1, Math.min(120, Math.floor(Number(levelValue || 1) || 1)));
-    const safeName = String(name || 'Pilot').slice(0, 16);
+    const safeName = String(name || 'Pilot').slice(0, 18);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // V464: без рамки/плашки. Только значок уровня + ник.
-    const iconX = 46;
-    const iconY = 45;
+    // V468: без рамки. Только крупный ник + значок уровня.
+    const iconX = 58;
+    const iconY = 64;
     ctx.save();
     ctx.translate(iconX, iconY);
 
-    const grad = ctx.createRadialGradient(0, -5, 3, 0, 0, 19);
+    const grad = ctx.createRadialGradient(0, -6, 4, 0, 0, 25);
     grad.addColorStop(0, '#ffffff');
     grad.addColorStop(0.45, '#8ff9ff');
     grad.addColorStop(1, '#1c73ff');
-
     ctx.fillStyle = grad;
-    ctx.strokeStyle = 'rgba(160,250,255,0.96)';
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = 'rgba(160,250,255,0.98)';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.arc(0, 0, 24, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#eaffff';
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(0, -15);
-    ctx.lineTo(11, 11);
-    ctx.lineTo(0, 5);
-    ctx.lineTo(-11, 11);
+    ctx.moveTo(0, -20);
+    ctx.lineTo(14, 14);
+    ctx.lineTo(0, 7);
+    ctx.lineTo(-14, 14);
     ctx.closePath();
     ctx.stroke();
     ctx.fill();
 
     ctx.fillStyle = '#051525';
-    ctx.font = '900 13px Arial';
+    ctx.font = '900 18px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(safeLevel), 0, 1);
+    ctx.fillText(String(safeLevel), 0, 2);
     ctx.restore();
 
-    ctx.font = '900 30px Arial';
+    ctx.font = '900 44px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = 'rgba(0,0,0,0.92)';
-    ctx.fillStyle = '#f3fbff';
-    ctx.shadowColor = 'rgba(0,245,255,0.72)';
-    ctx.shadowBlur = 8;
-    ctx.strokeText(safeName, 78, 46);
-    ctx.fillText(safeName, 78, 46);
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = 'rgba(0,0,0,0.94)';
+    ctx.fillStyle = '#f5feff';
+    ctx.shadowColor = 'rgba(0,245,255,0.85)';
+    ctx.shadowBlur = 12;
+    ctx.strokeText(safeName, 96, 66);
+    ctx.fillText(safeName, 96, 66);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -9412,8 +9391,8 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     });
 
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(4.8, 1.12, 1);
-    sprite.position.set(0, 4.2, 0);
+    sprite.scale.set(8.2, 2.05, 1);
+    sprite.position.set(0, 5.2, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
     sprite.userData.staticPilotLabelV461 = true;
@@ -9530,26 +9509,48 @@ function flashRemoteShieldV463(entry){
 function updateRemoteShipShieldV463(entry){
     try{
         if(!entry?.mesh) return;
-        const maxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
-        const shield = Math.max(0, Number(entry.shield ?? entry.mesh?.userData?.shield ?? maxShield) || 0);
 
-        if(maxShield <= 0){
-            disposeRemoteShieldMeshesV463(entry);
-            return;
+        // V468: визуально показываем shield overlay для удалённого корабля даже если maxShield ещё не приехал из room_players.
+        // Это не меняет урон, только гарантирует, что второй аккаунт ВИДИТ эффект.
+        const rawMaxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
+        const visualMaxShield = rawMaxShield > 0 ? rawMaxShield : 100;
+        const shield = Math.max(0, Number(entry.shield ?? entry.mesh?.userData?.shield ?? visualMaxShield) || visualMaxShield);
+
+        entry.maxShield = rawMaxShield > 0 ? rawMaxShield : entry.maxShield;
+        entry.shield = rawMaxShield > 0 ? Math.min(rawMaxShield, shield) : shield;
+        if(entry.mesh?.userData){
+            entry.mesh.userData.maxShield = rawMaxShield > 0 ? rawMaxShield : 100;
+            entry.mesh.userData.shield = shield;
         }
 
-        attachRemoteShipShieldV463(entry);
+        attachRemoteShipShieldV463({
+            ...entry,
+            maxShield: visualMaxShield,
+            mesh: entry.mesh,
+            shieldMeshesV463: entry.shieldMeshesV463
+        });
 
-        const ratio = THREE.MathUtils.clamp(shield / Math.max(1, maxShield), 0, 1);
+        // если attach создал массив на копии, синхронизируем обратно
+        if(!Array.isArray(entry.shieldMeshesV463)) entry.shieldMeshesV463 = [];
+        if(!entry.shieldMeshesV463.length){
+            // fallback явно на entry
+            entry.maxShield = visualMaxShield;
+            attachRemoteShipShieldV463(entry);
+        }
+
+        const ratio = THREE.MathUtils.clamp(shield / Math.max(1, visualMaxShield), 0, 1);
         const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
-        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.82 : 0.26 + ratio * 0.10);
+        const targetOpacity = flashing ? 0.86 : (REMOTE_SHIELD_OPACITY_V466 || 0.55);
         const color = flashing ? 0xffffff : 0x66f7ff;
 
         (entry.shieldMeshesV463 || []).forEach(mesh => {
             try{
                 if(!mesh?.material) return;
-                mesh.visible = targetOpacity > 0.015;
-                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.32;
+                mesh.visible = true;
+                mesh.material.transparent = true;
+                mesh.material.depthWrite = false;
+                mesh.material.depthTest = false;
+                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.45;
                 mesh.material.color?.setHex?.(color);
                 if(mesh.material.map){
                     mesh.material.map.offset.x += flashing ? 0.018 : 0.004;
@@ -9565,16 +9566,16 @@ function updateRemotePilotLabelDistanceV463(entry){
         if(!entry?.labelSprite || !entry?.mesh || !camera) return;
         const dist = camera.position.distanceTo(entry.mesh.position);
 
-        // V464: ник не пропадает. Он просто становится меньше на расстоянии.
         entry.labelSprite.visible = true;
         if(entry.labelSprite.material){
             entry.labelSprite.material.opacity = 1;
             entry.labelSprite.material.transparent = true;
         }
 
-        const baseX = 4.8;
-        const baseY = 1.12;
-        const k = THREE.MathUtils.clamp(36 / Math.max(18, dist), 0.30, 1.0);
+        // V468: ник не пропадает, но не раздувается через всю карту.
+        const baseX = 8.2;
+        const baseY = 2.05;
+        const k = THREE.MathUtils.clamp(52 / Math.max(22, dist), 0.42, 1.18);
         entry.labelSprite.scale.set(baseX * k, baseY * k, 1);
     }catch(_){}
 }
@@ -9623,7 +9624,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue', playerId = '
         nickname: String(name || 'Pilot'),
         level: 1,
         ping: 0,
-        playerId: '',
+        playerId: String(playerId || '').trim(),
         kills: 0,
         deaths: 0,
         hp: 100,
@@ -15291,7 +15292,7 @@ function restoreBattleOverlaysV462(targetGroup){
 function ensureRemotePilotLabelV462(entry){
     try{
         if(!entry?.mesh) return;
-        if(entry.labelSprite && entry.labelSprite.parent === entry.mesh) return;
+        if(entry.labelSprite && entry.labelSprite.parent === entry.mesh && entry.labelSprite.scale.x >= 7) return;
         if(entry.labelSprite && entry.labelSprite.parent) entry.labelSprite.parent.remove(entry.labelSprite);
         entry.labelSprite = createRemotePilotLabel(entry.nickname || entry.mesh?.userData?.pilotName || 'Pilot', entry.team || entry.mesh?.userData?.team || 'blue', entry.level || 1);
         entry.labelSprite.userData.battleOverlayV462 = true;
