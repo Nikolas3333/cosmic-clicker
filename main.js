@@ -1,4 +1,4 @@
-// COSMIC CLICKER v460 - STRONG SKILLS SHIELD ACCURACY
+// COSMIC CLICKER v461 - SHIELD PVP HP STATIC LABELS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -9311,22 +9311,63 @@ function stopLiveBattleSync(){
     clearRemoteBattleShips();
 }
 
-function createRemotePilotLabel(name, team = 'blue'){
+function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
+    canvas.width = 384;
     canvas.height = 96;
     const ctx = canvas.getContext('2d');
+    const safeLevel = Math.max(1, Math.min(120, Math.floor(Number(levelValue || 1) || 1)));
+    const safeName = String(name || 'Pilot').slice(0, 16);
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = 'rgba(5,10,18,0.78)';
-    ctx.fillRect(0, 18, canvas.width, 50);
-    ctx.strokeStyle = getRemoteShipLabelColor(team);
-    ctx.lineWidth = 3;
-    ctx.strokeRect(3, 18, canvas.width - 6, 50);
-    ctx.font = 'bold 42px Arial';
+
+    const borderColor = getRemoteShipLabelColor(team);
+    ctx.fillStyle = 'rgba(5,10,18,0.74)';
+    roundRectV461(ctx, 12, 24, canvas.width - 24, 46, 14);
+    ctx.fill();
+
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 2.5;
+    roundRectV461(ctx, 12, 24, canvas.width - 24, 46, 14);
+    ctx.stroke();
+
+    // мини-значок уровня слева от ника
+    const iconX = 44;
+    const iconY = 47;
+    ctx.save();
+    ctx.translate(iconX, iconY);
+    ctx.fillStyle = 'rgba(30,120,255,0.95)';
+    ctx.strokeStyle = 'rgba(150,250,255,0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#eaffff';
+    ctx.beginPath();
+    ctx.moveTo(0, -15);
+    ctx.lineTo(10, 10);
+    ctx.lineTo(0, 5);
+    ctx.lineTo(-10, 10);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#06131f';
+    ctx.font = '900 13px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillText(String(safeLevel), 0, 1);
+    ctx.restore();
+
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
     ctx.fillStyle = '#f3fbff';
-    ctx.fillText(String(name || 'Pilot'), canvas.width / 2, 43);
+    ctx.strokeText(safeName, 76, 47);
+    ctx.fillText(safeName, 76, 47);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -9337,22 +9378,39 @@ function createRemotePilotLabel(name, team = 'blue'){
         map: texture,
         transparent: true,
         depthWrite: false,
-        depthTest: false
+        depthTest: false,
+        sizeAttenuation: false
     });
 
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(18.0, 4.0, 1);
-    sprite.position.set(0, 3.4, 0);
+    // V461: экранный размер статичный, не растягивается от дистанции.
+    sprite.scale.set(0.18, 0.045, 1);
+    sprite.position.set(0, 4.2, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
+    sprite.userData.staticPilotLabelV461 = true;
     return sprite;
+}
+
+function roundRectV461(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
 }
 
 function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     const shipGroup = new THREE.Group();
     shipGroup.rotation.order = 'YXZ';
 
-    const labelSprite = createRemotePilotLabel(name, team);
+    const labelSprite = createRemotePilotLabel(name, team, 1);
     shipGroup.add(labelSprite);
 
     const side = slotIndex % 2 === 0 ? 1 : -1;
@@ -9370,6 +9428,9 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         slotIndex,
         hp: 100,
         maxHp: 100,
+        shield: 0,
+        maxShield: 0,
+        hasRealHpV461: false,
         hitRadius: 2.6,
         team
     };
@@ -9393,6 +9454,9 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
         deaths: 0,
         hp: 100,
         maxHp: 100,
+        shield: 0,
+        maxShield: 0,
+        hasRealHpV461: false,
         team
     };
 }
@@ -9428,6 +9492,26 @@ function upsertRemoteBattlePresence(payload = {}){
     entry.kills = Math.max(0, Number(payload.kills || scoreSnapshot.kills || entry.kills || 0) || 0);
     entry.deaths = Math.max(0, Number(payload.deaths || scoreSnapshot.deaths || entry.deaths || 0) || 0);
     entry.team = team;
+
+    const payloadMaxHpV461 = Math.max(1, Number(payload.maxHp || payload.max_hp || entry.maxHp || 100) || 100);
+    const payloadHpV461 = Math.max(0, Number(payload.hp ?? entry.hp ?? payloadMaxHpV461) || payloadMaxHpV461);
+    const payloadMaxShieldV461 = Math.max(0, Number(payload.maxShield || payload.max_shield || entry.maxShield || 0) || 0);
+    const payloadShieldV461 = Math.max(0, Number(payload.shield ?? entry.shield ?? payloadMaxShieldV461) || 0);
+
+    entry.maxHp = payloadMaxHpV461;
+    entry.hp = Math.min(payloadMaxHpV461, payloadHpV461);
+    entry.maxShield = payloadMaxShieldV461;
+    entry.shield = Math.min(payloadMaxShieldV461, payloadShieldV461);
+    entry.hasRealHpV461 = true;
+
+    if(entry.mesh?.userData){
+        entry.mesh.userData.maxHp = entry.maxHp;
+        entry.mesh.userData.hp = entry.hp;
+        entry.mesh.userData.maxShield = entry.maxShield;
+        entry.mesh.userData.shield = entry.shield;
+        entry.mesh.userData.hasRealHpV461 = true;
+    }
+
     entry.lastSeenAt = Date.now();
     if(Number(entry.deadUntil || 0) <= Date.now() && Number(entry.hp || 0) <= 0){
         entry.hp = Math.max(1, Number(entry.maxHp || entry.mesh?.userData?.maxHp || 100) || 100);
@@ -9441,6 +9525,15 @@ function upsertRemoteBattlePresence(payload = {}){
     }
 
     tryApplyRemoteShipTeamVisual(entry);
+    try{
+        if(entry.labelSprite && entry.mesh){
+            entry.mesh.remove(entry.labelSprite);
+            try{ entry.labelSprite.material?.map?.dispose?.(); entry.labelSprite.material?.dispose?.(); }catch(_){}
+            entry.labelSprite = createRemotePilotLabel(nickname, team, level);
+            entry.mesh.add(entry.labelSprite);
+        }
+    }catch(_){}
+
 
     const x = Number(payload.x);
     const y = Number(payload.y);
@@ -9701,14 +9794,32 @@ function applyPredictedRemoteDamageV338(victimId, entry, damageValue){
     const now = Date.now();
     if(Number(entry.deadUntil || 0) > now) return true;
 
-    const nextHp = Math.max(0, resolveRemoteBattleHp(entry) - damage);
-    entry.hp = nextHp;
-    if(entry.mesh?.userData){
-        entry.mesh.userData.hp = nextHp;
-        entry.mesh.userData.maxHp = Math.max(1, Number(entry.mesh.userData.maxHp || entry.maxHp || 100) || 100);
+    // V461: раньше враг локально считал цель как 100 HP и отправлял kill.
+    // Теперь без реального maxHp из presence мы НЕ имеем права считать убийство.
+    const hasRealHp = !!(entry.hasRealHpV461 || entry.mesh?.userData?.hasRealHpV461);
+    const maxHp = Math.max(1, Number(entry.maxHp || entry.mesh?.userData?.maxHp || (hasRealHp ? 100 : 950)) || 950);
+    let hp = Math.max(0, Number(entry.hp ?? entry.mesh?.userData?.hp ?? maxHp) || maxHp);
+    let shield = Math.max(0, Number(entry.shield ?? entry.mesh?.userData?.shield ?? 0) || 0);
+
+    let remainingDamage = damage;
+    if(shield > 0){
+        const absorbed = Math.min(shield, remainingDamage);
+        shield = Math.max(0, shield - absorbed);
+        remainingDamage -= absorbed;
     }
 
-    if(nextHp > 0) return false;
+    hp = Math.max(0, hp - remainingDamage);
+    entry.hp = hp;
+    entry.maxHp = maxHp;
+    entry.shield = shield;
+    if(entry.mesh?.userData){
+        entry.mesh.userData.hp = hp;
+        entry.mesh.userData.maxHp = maxHp;
+        entry.mesh.userData.shield = shield;
+        entry.mesh.userData.maxShield = Math.max(0, Number(entry.maxShield || entry.mesh.userData.maxShield || 0) || 0);
+    }
+
+    if(hp > 0 || !hasRealHp) return false;
 
     entry.deadUntil = now + 2000;
     const self = getBattleSelfIdentity();
@@ -9840,7 +9951,7 @@ function applyIncomingBattleHit(payload = {}){
         }
     }
 
-    const damageValue = Math.max(0, Number(payload?.damage || 0) || 0);
+    const damageValue = Math.max(0, Math.min(250, Number(payload?.damage || 0) || 0));
     if(!damageValue) return;
 
     applyPlayerShieldedDamageV460(damageValue, payload);
@@ -10009,6 +10120,10 @@ async function broadcastSelfBattleState(){
         ping: getThrottledPresencePing(now),
         kills: Number(battleStats.playerKills || 0) || 0,
         deaths: Number(battleStats.playerDeaths || 0) || 0,
+        hp: Math.round(Number(playerHp || 0) || 0),
+        maxHp: Math.round(Number(playerMaxHp || currentBattleShipStats?.hp || 100) || 100),
+        shield: Math.round(Number(playerShield || 0) || 0),
+        maxShield: Math.round(Number(playerMaxShield || currentBattleShipStats?.shieldCapacity || 0) || 0),
         x: Number(playerShip.position.x || 0),
         y: Number(playerShip.position.y || 0),
         z: Number(playerShip.position.z || 0),
@@ -10032,7 +10147,11 @@ async function broadcastSelfBattleState(){
         || previousPayload.team !== payload.team
         || (presencePingWindowPassed && Number(previousPayload.ping || 0) !== Number(payload.ping || 0))
         || Number(previousPayload.kills || 0) !== Number(payload.kills || 0)
-        || Number(previousPayload.deaths || 0) !== Number(payload.deaths || 0);
+        || Number(previousPayload.deaths || 0) !== Number(payload.deaths || 0)
+        || Math.abs(Number(previousPayload.hp || 0) - Number(payload.hp || 0)) >= 1
+        || Math.abs(Number(previousPayload.maxHp || 0) - Number(payload.maxHp || 0)) >= 1
+        || Math.abs(Number(previousPayload.shield || 0) - Number(payload.shield || 0)) >= 1
+        || Math.abs(Number(previousPayload.maxShield || 0) - Number(payload.maxShield || 0)) >= 1;
     const changedPosition = !previousPayload || hasMeaningfulBattleVectorDelta(previousPayload, payload, BATTLE_PRESENCE_POSITION_EPSILON);
     const changedRotation = !previousPayload || hasMeaningfulBattleQuaternionDelta(
         { x: previousPayload?.qx, y: previousPayload?.qy, z: previousPayload?.qz, w: previousPayload?.qw },
@@ -10564,7 +10683,7 @@ function animateRemoteBattleShips(){
         }
 
         if(entry.labelSprite){
-            entry.labelSprite.position.set(0, 3.4, 0);
+            entry.labelSprite.position.set(0, 4.2, 0);
         }
     });
 }
@@ -11252,7 +11371,7 @@ function attachPlayerShieldFieldV460(){
             color:0x60f6ff,
             map:makeShieldHoneycombTextureV460(),
             transparent:true,
-            opacity:0.0,
+            opacity:0.24,
             depthWrite:false,
             blending:THREE.AdditiveBlending,
             side:THREE.DoubleSide
@@ -11262,7 +11381,8 @@ function attachPlayerShieldFieldV460(){
         shield.name = 'player-ship-honeycomb-shield-v460';
 
         // Не просто круг: вытянутый овал вокруг формы корабля.
-        shield.scale.set(hitRadius * 0.95, hitRadius * 0.42, hitRadius * 1.42);
+        shield.scale.set(hitRadius * 1.18, hitRadius * 0.58, hitRadius * 1.62);
+        shield.userData.baseScaleV461 = shield.scale.clone();
         shield.renderOrder = 999;
         playerShip.add(shield);
         playerShieldMeshV460 = shield;
@@ -11282,19 +11402,23 @@ function updatePlayerShieldFieldV460(force = false){
         if(!playerShieldMeshV460) return;
         const ratio = THREE.MathUtils.clamp(Number(playerShield || 0) / Math.max(1, Number(playerMaxShield || 1)), 0, 1);
         const flashing = Date.now() < Number(playerShieldFlashUntilV460 || 0);
-        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.58 : 0.10 + ratio * 0.10);
-        playerShieldMeshV460.visible = targetOpacity > 0.01;
-        playerShieldMeshV460.material.opacity = force ? targetOpacity : playerShieldMeshV460.material.opacity + (targetOpacity - playerShieldMeshV460.material.opacity) * 0.25;
-        playerShieldMeshV460.rotation.y += flashing ? 0.035 : 0.006;
-        playerShieldMeshV460.rotation.z += flashing ? 0.012 : 0.002;
-        const pulse = flashing ? 1.08 : 1.0 + Math.sin(Date.now() / 420) * 0.012;
-        playerShieldMeshV460.scale.set(
-            playerShieldMeshV460.scale.x * 0.98 + playerShieldMeshV460.scale.x / Math.max(0.001, playerShieldMeshV460.scale.x) * playerShieldMeshV460.scale.x * 0.02,
-            playerShieldMeshV460.scale.y,
-            playerShieldMeshV460.scale.z
-        );
-        playerShieldMeshV460.userData.pulse = pulse;
-        playerShieldMeshV460.material.color.setHex(flashing ? 0xc7ffff : 0x60f6ff);
+
+        // V461: щит должен быть видимым всегда, если навык щита прокачан.
+        // В спокойном состоянии — тонкое поле вокруг корабля, при попадании — яркие соты.
+        const baseOpacity = ratio > 0 ? 0.24 : 0.0;
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.78 : baseOpacity + ratio * 0.10);
+
+        playerShieldMeshV460.visible = targetOpacity > 0.015;
+        playerShieldMeshV460.material.opacity = force ? targetOpacity : playerShieldMeshV460.material.opacity + (targetOpacity - playerShieldMeshV460.material.opacity) * 0.35;
+        playerShieldMeshV460.rotation.y += flashing ? 0.045 : 0.009;
+        playerShieldMeshV460.rotation.z += flashing ? 0.018 : 0.003;
+        playerShieldMeshV460.material.color.setHex(flashing ? 0xffffff : 0x62f6ff);
+
+        const baseScale = playerShieldMeshV460.userData.baseScaleV461;
+        if(baseScale){
+            const pulse = flashing ? 1.12 : 1.0 + Math.sin(Date.now() / 380) * 0.025;
+            playerShieldMeshV460.scale.set(baseScale.x * pulse, baseScale.y * pulse, baseScale.z * pulse);
+        }
     }catch(_){}
 }
 
@@ -11376,6 +11500,7 @@ function spawnPlayer() {
 
     scene.add(playerShip);
     attachPlayerShieldFieldV460();
+    setTimeout(() => { try{ attachPlayerShieldFieldV460(); }catch(_){} }, 450);
 
     // V457: не ждём плавного lerp из animate().
     // Сразу ставим камеру за корабль, иначе после входа на карту можно увидеть только чёрный экран и прицел.
