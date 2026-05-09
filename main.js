@@ -1,4 +1,4 @@
-// COSMIC CLICKER v466 - REMOTE SHIELD + BIGGER NICK
+// COSMIC CLICKER v467 - REAL REMOTE SHIELD FIX + PLAYER NICK FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -117,9 +117,28 @@ let playerMaxShield = 0;
 let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
 let playerShieldMeshesV462 = [];
-const REMOTE_SHIELD_SCALE_V466 = 1.55;
-const REMOTE_SHIELD_OPACITY_V466 = 0.38;
+const REMOTE_SHIELD_SCALE_V466 = 2.35;
+const REMOTE_SHIELD_OPACITY_V466 = 0.72;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
+
+function forceRemoteShieldVisibleV467(mesh){
+    try{
+        if(!mesh) return;
+        mesh.visible = true;
+        if(mesh.material){
+            mesh.material.transparent = true;
+            mesh.material.opacity = REMOTE_SHIELD_OPACITY_V466;
+            mesh.material.emissiveIntensity = 4;
+            mesh.material.depthWrite = false;
+        }
+        mesh.scale.set(
+            REMOTE_SHIELD_SCALE_V466,
+            REMOTE_SHIELD_SCALE_V466,
+            REMOTE_SHIELD_SCALE_V466
+        );
+    }catch(_){}
+}
+
 
 // ===== V438 PROFILE REAL STATS (persistent, not only current battle session) =====
 const profileBattleStats = {
