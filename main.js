@@ -1,4 +1,4 @@
-// COSMIC CLICKER v461 - SHIELD PVP HP STATIC LABELS
+// COSMIC CLICKER v462 - SHIP-SHAPED SHIELD STATIC NAMES
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -116,6 +116,7 @@ let playerShield = 0;
 let playerMaxShield = 0;
 let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
+let playerShieldMeshesV462 = [];
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 
 // ===== V438 PROFILE REAL STATS (persistent, not only current battle session) =====
@@ -9384,11 +9385,12 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
 
     const sprite = new THREE.Sprite(material);
     // V461: экранный размер статичный, не растягивается от дистанции.
-    sprite.scale.set(0.18, 0.045, 1);
+    sprite.scale.set(0.30, 0.075, 1);
     sprite.position.set(0, 4.2, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
     sprite.userData.staticPilotLabelV461 = true;
+    sprite.userData.battleOverlayV462 = true;
     return sprite;
 }
 
@@ -9436,7 +9438,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     };
 
     const battleShipItem = getSelectedShipItem() || getShopShipById('scout_1') || { id:'scout_1', modelPath:'ships/Spaceship.glb' };
-    mountBattleShipVisual(shipGroup, battleShipItem, team);
+    mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ ensureRemotePilotLabelV462({ mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); }catch(_){} });
 
     scene.add(shipGroup);
     shipGroup.userData.playerId = '';
@@ -10682,8 +10684,10 @@ function animateRemoteBattleShips(){
             mesh.quaternion.slerp(entry.targetQuaternion, 0.18);
         }
 
+        ensureRemotePilotLabelV462(entry);
         if(entry.labelSprite){
             entry.labelSprite.position.set(0, 4.2, 0);
+            entry.labelSprite.quaternion.copy(camera.quaternion);
         }
     });
 }
@@ -11350,6 +11354,20 @@ function makeShieldHoneycombTextureV460(){
 
 function removePlayerShieldFieldV460(){
     try{
+        if(Array.isArray(playerShieldMeshesV462)){
+            playerShieldMeshesV462.forEach(mesh => {
+                try{
+                    if(mesh?.parent) mesh.parent.remove(mesh);
+                    mesh?.geometry?.dispose?.();
+                    mesh?.material?.map?.dispose?.();
+                    mesh?.material?.dispose?.();
+                }catch(_){}
+            });
+        }
+    }catch(_){}
+    playerShieldMeshesV462 = [];
+
+    try{
         if(playerShieldMeshV460?.parent) playerShieldMeshV460.parent.remove(playerShieldMeshV460);
         if(playerShieldMeshV460?.material){
             try{ playerShieldMeshV460.material.map?.dispose?.(); }catch(_){}
@@ -11360,32 +11378,65 @@ function removePlayerShieldFieldV460(){
     playerShieldMeshV460 = null;
 }
 
+function createShieldOverlayMaterialV462(){
+    return new THREE.MeshBasicMaterial({
+        color:0x66f7ff,
+        map:makeShieldHoneycombTextureV460(),
+        transparent:true,
+        opacity:0.0,
+        depthWrite:false,
+        depthTest:true,
+        blending:THREE.AdditiveBlending,
+        side:THREE.DoubleSide
+    });
+}
+
 function attachPlayerShieldFieldV460(){
     try{
         removePlayerShieldFieldV460();
         if(!playerShip || Number(playerMaxShield || 0) <= 0) return;
 
-        const hitRadius = Math.max(2.8, Number(playerShip?.userData?.hitRadius || 2.8) || 2.8);
-        const geometry = new THREE.SphereGeometry(1, 48, 32);
-        const material = new THREE.MeshBasicMaterial({
-            color:0x60f6ff,
-            map:makeShieldHoneycombTextureV460(),
-            transparent:true,
-            opacity:0.24,
-            depthWrite:false,
-            blending:THREE.AdditiveBlending,
-            side:THREE.DoubleSide
+        const overlayMat = createShieldOverlayMaterialV462();
+        let created = 0;
+
+        // V462: щит не овалом вокруг корабля, а копиями геометрии поверх каждого mesh корабля.
+        // Это повторяет форму корпуса/крыльев/деталей.
+        playerShip.traverse((node) => {
+            try{
+                if(created >= 42) return;
+                if(!node?.isMesh || node.userData?.shieldOverlayV462 || node.name === 'player-ship-honeycomb-shield-v460') return;
+                if(node.material?.isSpriteMaterial) return;
+
+                const clonedGeometry = node.geometry?.clone?.();
+                if(!clonedGeometry) return;
+
+                const shieldMesh = new THREE.Mesh(clonedGeometry, overlayMat.clone());
+                shieldMesh.name = 'ship-shaped-shield-overlay-v462';
+                shieldMesh.userData.shieldOverlayV462 = true;
+                shieldMesh.position.copy(node.position);
+                shieldMesh.quaternion.copy(node.quaternion);
+                shieldMesh.scale.copy(node.scale).multiplyScalar(1.035);
+                shieldMesh.renderOrder = 998;
+                node.parent.add(shieldMesh);
+                playerShieldMeshesV462.push(shieldMesh);
+                created++;
+            }catch(_){}
         });
 
-        const shield = new THREE.Mesh(geometry, material);
-        shield.name = 'player-ship-honeycomb-shield-v460';
+        // fallback only if real model meshes are not ready yet.
+        if(!playerShieldMeshesV462.length){
+            const hitRadius = Math.max(2.8, Number(playerShip?.userData?.hitRadius || 2.8) || 2.8);
+            const geometry = new THREE.SphereGeometry(1, 48, 32);
+            const material = createShieldOverlayMaterialV462();
+            const shield = new THREE.Mesh(geometry, material);
+            shield.name = 'player-ship-honeycomb-shield-v460';
+            shield.scale.set(hitRadius * 1.0, hitRadius * 0.38, hitRadius * 1.35);
+            shield.userData.baseScaleV461 = shield.scale.clone();
+            shield.renderOrder = 999;
+            playerShip.add(shield);
+            playerShieldMeshV460 = shield;
+        }
 
-        // Не просто круг: вытянутый овал вокруг формы корабля.
-        shield.scale.set(hitRadius * 1.18, hitRadius * 0.58, hitRadius * 1.62);
-        shield.userData.baseScaleV461 = shield.scale.clone();
-        shield.renderOrder = 999;
-        playerShip.add(shield);
-        playerShieldMeshV460 = shield;
         updatePlayerShieldFieldV460(true);
     }catch(error){
         console.warn('attachPlayerShieldFieldV460 warning:', error?.message || error);
@@ -11393,31 +11444,42 @@ function attachPlayerShieldFieldV460(){
 }
 
 function flashPlayerShieldV460(){
-    playerShieldFlashUntilV460 = Date.now() + 260;
+    playerShieldFlashUntilV460 = Date.now() + 320;
     try{ updatePlayerShieldFieldV460(true); }catch(_){}
 }
 
 function updatePlayerShieldFieldV460(force = false){
     try{
-        if(!playerShieldMeshV460) return;
         const ratio = THREE.MathUtils.clamp(Number(playerShield || 0) / Math.max(1, Number(playerMaxShield || 1)), 0, 1);
         const flashing = Date.now() < Number(playerShieldFlashUntilV460 || 0);
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.82 : 0.14 + ratio * 0.08);
+        const color = flashing ? 0xffffff : 0x66f7ff;
 
-        // V461: щит должен быть видимым всегда, если навык щита прокачан.
-        // В спокойном состоянии — тонкое поле вокруг корабля, при попадании — яркие соты.
-        const baseOpacity = ratio > 0 ? 0.24 : 0.0;
-        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.78 : baseOpacity + ratio * 0.10);
+        const updateMesh = (mesh) => {
+            if(!mesh?.material) return;
+            mesh.visible = targetOpacity > 0.015;
+            mesh.material.opacity = force ? targetOpacity : mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.35;
+            mesh.material.color?.setHex?.(color);
+            try{
+                if(mesh.material.map){
+                    mesh.material.map.offset.x += flashing ? 0.018 : 0.004;
+                    mesh.material.map.offset.y += flashing ? 0.010 : 0.002;
+                }
+            }catch(_){}
+        };
 
-        playerShieldMeshV460.visible = targetOpacity > 0.015;
-        playerShieldMeshV460.material.opacity = force ? targetOpacity : playerShieldMeshV460.material.opacity + (targetOpacity - playerShieldMeshV460.material.opacity) * 0.35;
-        playerShieldMeshV460.rotation.y += flashing ? 0.045 : 0.009;
-        playerShieldMeshV460.rotation.z += flashing ? 0.018 : 0.003;
-        playerShieldMeshV460.material.color.setHex(flashing ? 0xffffff : 0x62f6ff);
-
-        const baseScale = playerShieldMeshV460.userData.baseScaleV461;
-        if(baseScale){
-            const pulse = flashing ? 1.12 : 1.0 + Math.sin(Date.now() / 380) * 0.025;
-            playerShieldMeshV460.scale.set(baseScale.x * pulse, baseScale.y * pulse, baseScale.z * pulse);
+        if(Array.isArray(playerShieldMeshesV462) && playerShieldMeshesV462.length){
+            playerShieldMeshesV462.forEach(updateMesh);
+        }
+        if(playerShieldMeshV460){
+            updateMesh(playerShieldMeshV460);
+            playerShieldMeshV460.rotation.y += flashing ? 0.045 : 0.009;
+            playerShieldMeshV460.rotation.z += flashing ? 0.018 : 0.003;
+            const baseScale = playerShieldMeshV460.userData.baseScaleV461;
+            if(baseScale){
+                const pulse = flashing ? 1.12 : 1.0 + Math.sin(Date.now() / 380) * 0.025;
+                playerShieldMeshV460.scale.set(baseScale.x * pulse, baseScale.y * pulse, baseScale.z * pulse);
+            }
         }
     }catch(_){}
 }
@@ -15000,12 +15062,51 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
     return Promise.resolve(applyBattleVisualTweaks(procedural));
 }
 
+function preserveBattleOverlaysV462(targetGroup, clearFn){
+    if(!targetGroup) return;
+    const overlays = [];
+    try{
+        for(const child of [...targetGroup.children]){
+            if(child?.userData?.staticPilotLabelV461 || child?.userData?.battleOverlayV462){
+                overlays.push(child);
+                targetGroup.remove(child);
+            }
+        }
+        clearFn?.();
+    }catch(_){
+        try{ clearFn?.(); }catch(__){}
+    }
+    targetGroup.userData = targetGroup.userData || {};
+    targetGroup.userData.preservedBattleOverlaysV462 = overlays;
+}
+
+function restoreBattleOverlaysV462(targetGroup){
+    try{
+        const overlays = targetGroup?.userData?.preservedBattleOverlaysV462 || [];
+        overlays.forEach(child => {
+            if(child && !child.parent) targetGroup.add(child);
+        });
+        if(targetGroup?.userData) targetGroup.userData.preservedBattleOverlaysV462 = [];
+    }catch(_){}
+}
+
+function ensureRemotePilotLabelV462(entry){
+    try{
+        if(!entry?.mesh) return;
+        if(entry.labelSprite && entry.labelSprite.parent === entry.mesh) return;
+        if(entry.labelSprite && entry.labelSprite.parent) entry.labelSprite.parent.remove(entry.labelSprite);
+        entry.labelSprite = createRemotePilotLabel(entry.nickname || entry.mesh?.userData?.pilotName || 'Pilot', entry.team || entry.mesh?.userData?.team || 'blue', entry.level || 1);
+        entry.labelSprite.userData.battleOverlayV462 = true;
+        entry.mesh.add(entry.labelSprite);
+    }catch(_){}
+}
+
 function mountBattleShipVisual(targetGroup, item, team = 'blue'){
     if(!targetGroup) return Promise.resolve(null);
     const loadToken = Date.now() + Math.random();
     targetGroup.userData = targetGroup.userData || {};
     targetGroup.userData.visualLoadToken = loadToken;
-    while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
+    preserveBattleOverlaysV462(targetGroup, () => { while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]); });
 
     const immediateFallback = createHangarLoadingPlaceholder();
     immediateFallback.position.set(0, 0, 0);
@@ -15015,10 +15116,16 @@ function mountBattleShipVisual(targetGroup, item, team = 'blue'){
     return buildBattleShipVisualAsync(item, team)
         .then((visual) => {
             if(!visual || targetGroup.userData?.visualLoadToken !== loadToken) return null;
-            while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
+            preserveBattleOverlaysV462(targetGroup, () => {
+                while(targetGroup.children.length) targetGroup.remove(targetGroup.children[0]);
+            });
             visual.position.set(0, 0, 0);
             targetGroup.add(visual);
             targetGroup.userData.hitRadius = Math.max(2.6, Number(visual?.userData?.hangarWidth || 0), Number(visual?.userData?.hangarDepth || 0), 2.6);
+            restoreBattleOverlaysV462(targetGroup);
+            if(targetGroup === playerShip){
+                setTimeout(() => { try{ attachPlayerShieldFieldV460?.(); }catch(_){} }, 60);
+            }
             return visual;
         })
         .catch(() => immediateFallback);
