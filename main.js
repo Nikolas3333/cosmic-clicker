@@ -1,4 +1,4 @@
-// COSMIC CLICKER v457 - BATTLE SCENE VISIBILITY FIX
+// COSMIC CLICKER v458 - ROOM PLAYERS SYNC FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -2298,9 +2298,13 @@ function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
 }
 
 
-// ===== V456 ROOM PLAYER UPSERT FIX =====
-// Базовая функция была отсутствующей/ломаной, из-за этого joinRoomPlayers падал.
-// Возвращаем всегда объект { data, error }, чтобы destructuring в joinRoomPlayers был безопасным.
+// ===== V458 ROOM PLAYERS SYNC FIX =====
+// ВАЖНО: для room_players больше НЕ используем Supabase upsert/on_conflict.
+// У пользователя в консоли были постоянные 409 Conflict, поэтому делаем безопасно:
+// 1) ищем существующую строку room_id + player_id
+// 2) если есть — update по id
+// 3) если нет — insert
+// 4) если insert ловит duplicate — повторно ищем и update
 async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = 'id,room_id,player_id,nickname,joined_at'){
     const client = window.supabaseClient || window.supabase || (typeof supabase !== 'undefined' ? supabase : null);
 
@@ -2309,7 +2313,7 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
         const safePlayerId = String(playerId || authState?.playerId || player?.id || '').trim();
 
         if(!safeRoomId || !safePlayerId){
-            return { data:null, error:new Error('missing roomId/playerId for room_players upsert') };
+            return { data:null, error:new Error('missing roomId/playerId for room_players write') };
         }
 
         if(!client){
@@ -2319,84 +2323,116 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
         const safeBase = (base && typeof base === 'object') ? base : { nickname: String(base || '').trim() };
         const payload = buildRoomPlayerRowPayload(safeRoomId, safePlayerId, {
             ...safeBase,
-            nickname: safeBase.nickname || player?.nickname || 'Commander',
+            nickname: safeBase.nickname || player?.nickname || getDisplayPlayerTag?.() || 'Commander',
             updated_at: safeBase.updated_at || new Date().toISOString()
         });
 
         const selectedColumns = String(selectClause || 'id,room_id,player_id,nickname,joined_at').trim();
 
-        let result = await client
-            .from('room_players')
-            .upsert(payload, { onConflict:'room_id,player_id' })
-            .select(selectedColumns)
-            .limit(1);
-
-        if(!result?.error){
-            return {
-                data: Array.isArray(result?.data) ? result.data : (result?.data ? [result.data] : []),
-                error: null
-            };
-        }
-
-        const msg = String(result?.error?.message || '').toLowerCase();
-        const code = String(result?.error?.code || '').trim();
-
-        if(code === '23505' || code === '42P10' || msg.includes('duplicate') || msg.includes('conflict') || msg.includes('unique')){
-            const probe = await client
-                .from('room_players')
-                .select('id')
-                .eq('room_id', safeRoomId)
-                .eq('player_id', safePlayerId)
-                .limit(1);
-
-            const existingId = Array.isArray(probe?.data) && probe.data[0]?.id ? String(probe.data[0].id) : '';
-
-            if(existingId){
-                const updated = await client
+        const findExistingRow = async () => {
+            try{
+                const found = await client
                     .from('room_players')
-                    .update(payload)
-                    .eq('id', existingId)
-                    .select(selectedColumns)
+                    .select('id')
+                    .eq('room_id', safeRoomId)
+                    .eq('player_id', safePlayerId)
                     .limit(1);
-
-                return {
-                    data: Array.isArray(updated?.data) ? updated.data : (updated?.data ? [updated.data] : []),
-                    error: updated?.error || null
-                };
+                const id = Array.isArray(found?.data) && found.data[0]?.id ? String(found.data[0].id) : '';
+                return { id, error: found?.error || null };
+            }catch(error){
+                return { id:'', error };
             }
+        };
 
-            const inserted = await client
+        const existing = await findExistingRow();
+
+        if(existing.id){
+            const updated = await client
                 .from('room_players')
-                .insert(payload)
+                .update({
+                    nickname: payload.nickname,
+                    updated_at: payload.updated_at,
+                    team: payload.team,
+                    level: payload.level,
+                    ping: payload.ping,
+                    ...(payload.position ? { position: payload.position } : {}),
+                    ...(payload.rotation ? { rotation: payload.rotation } : {})
+                })
+                .eq('id', existing.id)
                 .select(selectedColumns)
                 .limit(1);
 
             return {
-                data: Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
-                error: inserted?.error || null
+                data: Array.isArray(updated?.data) ? updated.data : (updated?.data ? [updated.data] : []),
+                error: updated?.error || null
             };
         }
 
+        const inserted = await client
+            .from('room_players')
+            .insert(payload)
+            .select(selectedColumns)
+            .limit(1);
+
+        if(!inserted?.error){
+            return {
+                data: Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
+                error: null
+            };
+        }
+
+        const msg = String(inserted?.error?.message || '').toLowerCase();
+        const code = String(inserted?.error?.code || '').trim();
+
+        if(code === '23505' || msg.includes('duplicate') || msg.includes('already exists')){
+            const retryExisting = await findExistingRow();
+            if(retryExisting.id){
+                const updatedAfterDuplicate = await client
+                    .from('room_players')
+                    .update({
+                        nickname: payload.nickname,
+                        updated_at: payload.updated_at,
+                        team: payload.team,
+                        level: payload.level,
+                        ping: payload.ping,
+                        ...(payload.position ? { position: payload.position } : {}),
+                        ...(payload.rotation ? { rotation: payload.rotation } : {})
+                    })
+                    .eq('id', retryExisting.id)
+                    .select(selectedColumns)
+                    .limit(1);
+
+                return {
+                    data: Array.isArray(updatedAfterDuplicate?.data) ? updatedAfterDuplicate.data : (updatedAfterDuplicate?.data ? [updatedAfterDuplicate.data] : []),
+                    error: updatedAfterDuplicate?.error || null
+                };
+            }
+
+            // Для duplicate считаем вход успешным, чтобы не ломать переход на карту.
+            return { data:[], error:null };
+        }
+
         return {
-            data: Array.isArray(result?.data) ? result.data : (result?.data ? [result.data] : []),
-            error: result?.error || null
+            data: Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
+            error: inserted?.error || null
         };
 
     }catch(error){
-        console.warn('upsertRoomPlayerRow warning:', error?.message || error);
-        return { data:null, error:error || new Error('upsertRoomPlayerRow failed') };
+        console.warn('upsertRoomPlayerRow manual write warning:', error?.message || error);
+        return { data:null, error:error || new Error('room_players manual write failed') };
     }
 }
 
 async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}, selectClause = 'id,room_id,player_id,nickname,joined_at'){
     try{
         const result = await upsertRoomPlayerRow(roomId, playerId, base, selectClause);
-        return result || { data:null, error:new Error('empty upsertRoomPlayerRow result') };
+        return result || { data:null, error:new Error('empty room_players write result') };
     }catch(error){
         console.warn('upsertRoomPlayerRowSafe warning:', error?.message || error);
         return { data:null, error:error || new Error('upsertRoomPlayerRowSafe failed') };
     }
 }
+
 
 
 
@@ -3134,6 +3170,7 @@ if(gameState === "BATTLE"){
             hideSoloMissionResult?.();
             markBattlePresenceAnnouncementsMuted(2500);
             setTimeout(() => { try{ ensureSelfRoomPlayerState(); }catch(_){} }, 80);
+            setTimeout(() => { try{ ensureSelfRoomPlayerState(); syncCurrentOnlinePresence?.(); loadRoomsFromSupabase?.(); }catch(_){} }, 450);
             updateEnemyHud();
             updateBattleScoreboard();
             startLiveBattleSync();
@@ -11425,7 +11462,7 @@ window.addEventListener('load', () => {
         joinBtn.addEventListener('click', () => {
             markCosmicBattleEnterAllowedV444?.();
             selectedLobbyMap = getSelectedLobbyMapFromUI();
-            currentRoom = { id: `local_${selectedLobbyMap.real}_${Date.now()}`, map: selectedLobbyMap.real, state: 'battle', players: [{name:'Commander'}] };
+            currentRoom = { id: `local_${selectedLobbyMap.real}_${Date.now()}`, map: selectedLobbyMap.real, state: 'battle', players: [], currentPlayers: [] };
             window.currentRoomId = currentRoom.id || null;
             switchState('BATTLE');
         });
@@ -17259,7 +17296,7 @@ function limitBattleArea(){
                     endless: !!selectedLobbyMap?.endless,
                     title: selected.title,
                     mission: selected.mission || '',
-                    players: [{ name: getDisplayPlayerTag() }]
+                    players: []
                 };
                 switchState('BATTLE');
             });
@@ -18610,8 +18647,8 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     minLevel,
                     maxLevel,
                     maxPlayers: created.max_players || playerCount,
-                    players:[getDisplayPlayerTag()],
-                    currentPlayers:[getDisplayPlayerTag()],
+                    players:[],
+                    currentPlayers:[],
                     state:'battle',
                     isBaseMap:false
                 };
@@ -18877,8 +18914,12 @@ function rebuildBattleMapOccupants(rooms = [], presenceRows = []){
   (rooms || []).forEach(room => {
     if(!isPublicBattleRoom(room)) return;
     const mapKey = normalizeBattleMapName(room?.map_name || room?.real || room?.map || 'earth');
+
+    // V458: список игроков на плитке карты должен брать room_players тоже.
+    // Иначе второй аккаунт в лобби не видит, что первый уже зашёл на карту.
+    const joinedPlayers = getRoomOccupantsFromRoomPlayers(room);
     const livePlayers = getRoomOccupantsFromPresence(room?.id, presenceRows);
-    const merged = mergeUniquePlayers(next.get(mapKey) || [], livePlayers);
+    const merged = mergeUniquePlayers(next.get(mapKey) || [], mergeUniquePlayers(joinedPlayers, livePlayers));
     next.set(mapKey, merged);
   });
   supabaseBattleMapOccupants = next;
@@ -19000,12 +19041,16 @@ async function joinRoomPlayers(roomId) {
 
   if(error){
     const errorCode = String(error?.code || '').trim();
+    const errorMessage = String(error?.message || '').toLowerCase();
+
     if(errorCode === '23503'){
       return false;
     }
 
     const joinedAfterConflict = await ensureRoomPlayerRowJoined(normalizedRoomId, identity);
-    if(!joinedAfterConflict){
+
+    // V458: duplicate/409 не должен ломать вход, потому что строка может уже существовать.
+    if(!joinedAfterConflict && !(errorCode === '23505' || errorMessage.includes('duplicate') || errorMessage.includes('conflict'))){
       console.error('Ошибка входа в room_players:', error);
       return false;
     }
