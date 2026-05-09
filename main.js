@@ -1,4 +1,4 @@
-// COSMIC CLICKER v462 - SHIP-SHAPED SHIELD STATIC NAMES
+// COSMIC CLICKER v463 - REMOTE SHIELDS DISTANCE LABELS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -9216,6 +9216,7 @@ function clearRemoteBattleShips(){
         remoteBattleShips = new Map();
     }
     remoteBattleShips.forEach(entry => {
+        try{ disposeRemoteShieldMeshesV463(entry); }catch(_){}
         try{
             if(entry?.labelSprite && entry?.mesh?.remove) entry.mesh.remove(entry.labelSprite);
         }catch(_){ }
@@ -9380,12 +9381,12 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        sizeAttenuation: false
+        sizeAttenuation: true
     });
 
     const sprite = new THREE.Sprite(material);
     // V461: экранный размер статичный, не растягивается от дистанции.
-    sprite.scale.set(0.30, 0.075, 1);
+    sprite.scale.set(5.4, 1.35, 1);
     sprite.position.set(0, 4.2, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
@@ -9407,6 +9408,147 @@ function roundRectV461(ctx, x, y, w, h, r){
     ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
 }
+
+
+// ===== V463 REMOTE SHIP-SHAPED SHIELD =====
+function disposeRemoteShieldMeshesV463(entry){
+    try{
+        if(!entry || !Array.isArray(entry.shieldMeshesV463)) return;
+        entry.shieldMeshesV463.forEach(mesh => {
+            try{
+                if(mesh?.parent) mesh.parent.remove(mesh);
+                mesh?.geometry?.dispose?.();
+                mesh?.material?.map?.dispose?.();
+                mesh?.material?.dispose?.();
+            }catch(_){}
+        });
+        entry.shieldMeshesV463 = [];
+    }catch(_){}
+}
+
+function createRemoteShieldOverlayMaterialV463(){
+    return new THREE.MeshBasicMaterial({
+        color:0x66f7ff,
+        map:makeShieldHoneycombTextureV460(),
+        transparent:true,
+        opacity:0.0,
+        depthWrite:false,
+        depthTest:true,
+        blending:THREE.AdditiveBlending,
+        side:THREE.DoubleSide
+    });
+}
+
+function attachRemoteShipShieldV463(entry){
+    try{
+        if(!entry?.mesh) return;
+        const maxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
+        if(maxShield <= 0){
+            disposeRemoteShieldMeshesV463(entry);
+            return;
+        }
+
+        if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.length){
+            return;
+        }
+
+        entry.shieldMeshesV463 = [];
+        let created = 0;
+
+        entry.mesh.traverse((node) => {
+            try{
+                if(created >= 42) return;
+                if(!node?.isMesh || node.userData?.shieldOverlayV462 || node.userData?.remoteShieldOverlayV463 || node.userData?.staticPilotLabelV461) return;
+                if(node.material?.isSpriteMaterial) return;
+                const geometry = node.geometry?.clone?.();
+                if(!geometry) return;
+
+                const shieldMesh = new THREE.Mesh(geometry, createRemoteShieldOverlayMaterialV463());
+                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v463';
+                shieldMesh.userData.remoteShieldOverlayV463 = true;
+                shieldMesh.userData.battleOverlayV462 = true;
+                shieldMesh.position.copy(node.position);
+                shieldMesh.quaternion.copy(node.quaternion);
+                shieldMesh.scale.copy(node.scale).multiplyScalar(1.035);
+                shieldMesh.renderOrder = 997;
+                node.parent.add(shieldMesh);
+                entry.shieldMeshesV463.push(shieldMesh);
+                created++;
+            }catch(_){}
+        });
+    }catch(error){
+        console.warn('attachRemoteShipShieldV463 warning:', error?.message || error);
+    }
+}
+
+function flashRemoteShieldV463(entry){
+    if(!entry) return;
+    entry.shieldFlashUntilV463 = Date.now() + 280;
+}
+
+function updateRemoteShipShieldV463(entry){
+    try{
+        if(!entry?.mesh) return;
+        const maxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
+        const shield = Math.max(0, Number(entry.shield ?? entry.mesh?.userData?.shield ?? maxShield) || 0);
+
+        if(maxShield <= 0){
+            disposeRemoteShieldMeshesV463(entry);
+            return;
+        }
+
+        attachRemoteShipShieldV463(entry);
+
+        const ratio = THREE.MathUtils.clamp(shield / Math.max(1, maxShield), 0, 1);
+        const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.72 : 0.11 + ratio * 0.07);
+        const color = flashing ? 0xffffff : 0x66f7ff;
+
+        (entry.shieldMeshesV463 || []).forEach(mesh => {
+            try{
+                if(!mesh?.material) return;
+                mesh.visible = targetOpacity > 0.015;
+                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.32;
+                mesh.material.color?.setHex?.(color);
+                if(mesh.material.map){
+                    mesh.material.map.offset.x += flashing ? 0.018 : 0.004;
+                    mesh.material.map.offset.y += flashing ? 0.010 : 0.002;
+                }
+            }catch(_){}
+        });
+    }catch(_){}
+}
+
+function updateRemotePilotLabelDistanceV463(entry){
+    try{
+        if(!entry?.labelSprite || !entry?.mesh || !camera) return;
+        const dist = camera.position.distanceTo(entry.mesh.position);
+
+        // Вблизи видно, вдалеке постепенно исчезает, через всю карту не светится.
+        const showFrom = 18;
+        const fadeStart = 85;
+        const hideAfter = 135;
+
+        if(dist > hideAfter){
+            entry.labelSprite.visible = false;
+            return;
+        }
+
+        entry.labelSprite.visible = dist >= showFrom;
+        const fade = dist <= fadeStart ? 1 : Math.max(0, 1 - (dist - fadeStart) / (hideAfter - fadeStart));
+        if(entry.labelSprite.material){
+            entry.labelSprite.material.opacity = fade;
+            entry.labelSprite.material.transparent = true;
+        }
+
+        // sizeAttenuation=true уже делает ник меньше с расстоянием.
+        // Дополнительно слегка ограничиваем размер, чтобы рядом он не был гигантским.
+        const base = 5.4;
+        const k = THREE.MathUtils.clamp(42 / Math.max(18, dist), 0.42, 1.0);
+        entry.labelSprite.scale.set(base * k, 1.35 * k, 1);
+    }catch(_){}
+}
+
 
 function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     const shipGroup = new THREE.Group();
@@ -9438,7 +9580,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     };
 
     const battleShipItem = getSelectedShipItem() || getShopShipById('scout_1') || { id:'scout_1', modelPath:'ships/Spaceship.glb' };
-    mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ ensureRemotePilotLabelV462({ mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); }catch(_){} });
+    mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ const entry = remoteBattleShips.get(shipGroup.userData.playerId || '') || null; ensureRemotePilotLabelV462(entry || { mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); if(entry) updateRemoteShipShieldV463(entry); }catch(_){} });
 
     scene.add(shipGroup);
     shipGroup.userData.playerId = '';
@@ -9502,8 +9644,10 @@ function upsertRemoteBattlePresence(payload = {}){
 
     entry.maxHp = payloadMaxHpV461;
     entry.hp = Math.min(payloadMaxHpV461, payloadHpV461);
+    const oldShieldV463 = Math.max(0, Number(entry.shield || 0) || 0);
     entry.maxShield = payloadMaxShieldV461;
     entry.shield = Math.min(payloadMaxShieldV461, payloadShieldV461);
+    if(entry.shield < oldShieldV463) flashRemoteShieldV463(entry);
     entry.hasRealHpV461 = true;
 
     if(entry.mesh?.userData){
@@ -9808,6 +9952,7 @@ function applyPredictedRemoteDamageV338(victimId, entry, damageValue){
         const absorbed = Math.min(shield, remainingDamage);
         shield = Math.max(0, shield - absorbed);
         remainingDamage -= absorbed;
+        try{ flashRemoteShieldV463(entry); }catch(_){}
     }
 
     hp = Math.max(0, hp - remainingDamage);
@@ -9820,6 +9965,7 @@ function applyPredictedRemoteDamageV338(victimId, entry, damageValue){
         entry.mesh.userData.shield = shield;
         entry.mesh.userData.maxShield = Math.max(0, Number(entry.maxShield || entry.mesh.userData.maxShield || 0) || 0);
     }
+    try{ updateRemoteShipShieldV463(entry); }catch(_){}
 
     if(hp > 0 || !hasRealHp) return false;
 
@@ -10688,7 +10834,9 @@ function animateRemoteBattleShips(){
         if(entry.labelSprite){
             entry.labelSprite.position.set(0, 4.2, 0);
             entry.labelSprite.quaternion.copy(camera.quaternion);
+            updateRemotePilotLabelDistanceV463(entry);
         }
+        updateRemoteShipShieldV463(entry);
     });
 }
 
