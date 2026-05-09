@@ -1,4 +1,4 @@
-// COSMIC CLICKER v449 - SINGLE WEBGL PROFILE SHIP
+// COSMIC CLICKER v450 - PROFILE LEVEL SHIP ICON
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -951,9 +951,9 @@ function restoreOwnHangarAfterGuest(){
 
 
 function cosmicLevelShipIconHtml(levelValue = 1){
-    const safeLevel = Math.max(1, Math.min(120, Number(levelValue || 1) || 1));
+    const safeLevel = Math.max(1, Math.min(120, Math.floor(Number(levelValue || 1) || 1)));
     return `
-        <span class="cosmic-level-ship-badge" title="Уровень ${safeLevel}">
+        <span class="cosmic-level-ship-badge" title="Уровень ${safeLevel}" aria-label="Уровень ${safeLevel}">
             <span class="cosmic-level-ship-body">
                 <span class="cosmic-level-ship-number">${safeLevel}</span>
             </span>
@@ -11456,7 +11456,7 @@ function renderProfileSkinStatsV429({ rating = 0, exp = 0, expMax = 50, level = 
         </div>
         <div class="profile-mini-stats-grid">
           <div class="profile-mini-row exp-row"><span class="profile-mini-label exp">EXP</span><b>${safeExp} / ${safeExpMax}</b></div>
-          <div class="profile-mini-row"><span class="profile-mini-icon">⭐</span><b>${safeLevel}</b></div>
+          <div class="profile-mini-row profile-level-row-v450"><span id="profile-level-ship-icon" class="profile-mini-icon profile-level-ship-slot-v450" data-cosmic-level-ship>${cosmicLevelShipIconHtml(safeLevel)}</span><b>${safeLevel}</b></div>
           <div class="profile-mini-row"><span class="profile-mini-icon coin-icon" title="Монеты"></span><b>${safeCredits}</b></div>
           <div class="profile-mini-row"><span class="profile-mini-icon">💎</span><b>${safeCrystals}</b></div>
         </div>
