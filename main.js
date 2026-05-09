@@ -1,4 +1,4 @@
-// COSMIC CLICKER v465 - HOTFIX TDZ ERRORS
+// COSMIC CLICKER v466 - REMOTE SHIELD + BIGGER NICK
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -117,6 +117,8 @@ let playerMaxShield = 0;
 let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
 let playerShieldMeshesV462 = [];
+const REMOTE_SHIELD_SCALE_V466 = 1.55;
+const REMOTE_SHIELD_OPACITY_V466 = 0.38;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 
 // ===== V438 PROFILE REAL STATS (persistent, not only current battle session) =====
@@ -14600,7 +14602,7 @@ function createHangarRoomEnvironment(){
 
     const frontGlass = new THREE.Mesh(
         new THREE.PlaneGeometry(50.6, 28.8),
-        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x49619a, transparent:true, opacity:0.12 })
+        new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, color:0x49619a, transparent:true, opacity:REMOTE_SHIELD_OPACITY_V466 })
     );
     frontGlass.position.set(0, 13.2, 58.0);
     group.add(frontGlass);
