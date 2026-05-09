@@ -1,4 +1,4 @@
-// COSMIC CLICKER v452 - CLEAN PROFILE LEVEL SHIP ICON
+// COSMIC CLICKER v453 - PROFILE LEVEL SVG SHIP ICON
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -952,12 +952,41 @@ function restoreOwnHangarAfterGuest(){
 
 function cosmicLevelShipIconHtml(levelValue = 1){
     const safeLevel = Math.max(1, Math.min(120, Math.floor(Number(levelValue || 1) || 1)));
+    const levelText = String(safeLevel);
     return `
         <span class="cosmic-level-ship-badge" title="Уровень ${safeLevel}" aria-label="Уровень ${safeLevel}">
-            <span class="cosmic-level-ship-body">
-                <span class="cosmic-level-ship-number">${safeLevel}</span>
-            </span>
-            <span class="cosmic-level-ship-flame"></span>
+            <svg class="cosmic-level-ship-svg" viewBox="0 0 88 54" role="img" aria-hidden="true">
+                <defs>
+                    <linearGradient id="cosmicLevelShipHull" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#f4fdff"/>
+                        <stop offset="42%" stop-color="#73eaff"/>
+                        <stop offset="100%" stop-color="#1264a0"/>
+                    </linearGradient>
+                    <linearGradient id="cosmicLevelShipWing" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#b9fbff"/>
+                        <stop offset="100%" stop-color="#1a8fd0"/>
+                    </linearGradient>
+                    <radialGradient id="cosmicLevelShipWindow" cx="45%" cy="40%" r="70%">
+                        <stop offset="0%" stop-color="#ffffff"/>
+                        <stop offset="55%" stop-color="#baf8ff"/>
+                        <stop offset="100%" stop-color="#1782ba"/>
+                    </radialGradient>
+                    <radialGradient id="cosmicLevelShipFire" cx="65%" cy="50%" r="70%">
+                        <stop offset="0%" stop-color="#fff4a3"/>
+                        <stop offset="45%" stop-color="#ff9b18"/>
+                        <stop offset="100%" stop-color="#ff3b00"/>
+                    </radialGradient>
+                </defs>
+
+                <path class="cosmic-level-ship-flame-svg" d="M6 27 C0 20 0 34 6 27 C11 22 15 24 18 27 C15 30 11 32 6 27 Z"/>
+                <path class="cosmic-level-ship-wing-back" d="M31 19 L16 7 L38 16 Z"/>
+                <path class="cosmic-level-ship-wing-back lower" d="M31 35 L16 47 L38 38 Z"/>
+                <path class="cosmic-level-ship-hull" d="M13 27 C25 11 55 8 78 27 C55 46 25 43 13 27 Z"/>
+                <path class="cosmic-level-ship-nose" d="M62 18 C70 20 76 24 81 27 C76 30 70 34 62 36 C67 30 67 24 62 18 Z"/>
+                <ellipse class="cosmic-level-ship-window" cx="44" cy="27" rx="17" ry="12"/>
+                <path class="cosmic-level-ship-shine" d="M24 21 C35 13 53 15 65 24" />
+                <text class="cosmic-level-ship-text" x="44" y="31" text-anchor="middle">${levelText}</text>
+            </svg>
         </span>
     `;
 }
