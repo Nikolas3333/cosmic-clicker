@@ -1,4 +1,4 @@
-// COSMIC CLICKER v459 - PERSISTENT WORKING SKILLS
+// COSMIC CLICKER v460 - STRONG SKILLS SHIELD ACCURACY
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -112,6 +112,10 @@ let lastBotShotAt = 0;
 const botShotCooldown = 1300;
 let playerHp = 100;
 let playerMaxHp = 100;
+let playerShield = 0;
+let playerMaxShield = 0;
+let playerShieldMeshV460 = null;
+let playerShieldFlashUntilV460 = 0;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 
 // ===== V438 PROFILE REAL STATS (persistent, not only current battle session) =====
@@ -5118,8 +5122,12 @@ if (gameState === "BATTLE" && playerShip) {
     try{
         const regenLevelV459 = getProfileSkillLevelV459?.('shieldRegen') || 0;
         if(regenLevelV459 > 0 && !battleShipCrash && !isBattleRespawning?.()){
-            playerHp = Math.min(playerMaxHp, Number(playerHp || 0) + regenLevelV459 * 0.0028);
+            playerHp = Math.min(playerMaxHp, Number(playerHp || 0) + regenLevelV459 * 0.006);
+            if(Number(playerMaxShield || 0) > 0){
+                playerShield = Math.min(playerMaxShield, Number(playerShield || 0) + Number(currentBattleShipStats?.shieldRegenPerTick || 0));
+            }
         }
+        updatePlayerShieldFieldV460?.();
     }catch(_){}
 
     updateBattlePlayerWorldHp();
@@ -5317,7 +5325,7 @@ if (gameState === "BATTLE" && playerShip) {
                 const pullDir = laser.shooter.position.clone().sub(playerShip.position).normalize();
                 shipVelocity.add(pullDir.multiplyScalar(Number(laser.pullStrength || 0)));
             }
-            playerHp = Math.max(0, playerHp - laser.damage);
+            applyPlayerShieldedDamageV460(laser.damage, laser.shooter || enemyBot);
             if(playerHp <= 0 && !isBattleRespawning() && !activeSoloMissionEnded){
                 battleStats.botKills += 1;
                 battleStats.playerDeaths += 1;
@@ -5714,7 +5722,10 @@ function tryFireLaser(){
             scale: projectileScale
         });
 
-        const localDirection = new THREE.Vector3(spreadOffset, 0, -1).normalize().applyQuaternion(playerShip.quaternion);
+        // V460: без точности пули летят хаотично, прокачка точности выравнивает полёт.
+        const randomChaosX = (Math.random() - 0.5) * spread;
+        const randomChaosY = (Math.random() - 0.5) * spread * 0.72;
+        const localDirection = new THREE.Vector3(spreadOffset + randomChaosX, randomChaosY, -1).normalize().applyQuaternion(playerShip.quaternion);
         const localOffset = new THREE.Vector3(offsetX, 0, -2.2).applyQuaternion(playerShip.quaternion);
         projectileGroup.position.copy(playerShip.position.clone().add(localOffset));
         projectileGroup.lookAt(projectileGroup.position.clone().add(localDirection));
@@ -5770,6 +5781,7 @@ function scheduleBattleRespawn(delayMs=2000){
         battleRespawnTimer = null;
     }
     if(playerShip){
+        removePlayerShieldFieldV460?.();
         playerShip.visible = false;
         playerShip.position.set(99999,99999,99999);
     }
@@ -5847,8 +5859,9 @@ function updateBattlePlayerHud(){
     }
     const hpPercent = THREE.MathUtils.clamp((playerHp / Math.max(1, playerMaxHp)) * 100, 0, 100);
     hpFill.style.width = hpPercent + '%';
-    hpText.textContent = `HP: ${Math.round(playerHp)} / ${playerMaxHp}`;
-    if(hpInlineText) hpInlineText.textContent = `${Math.round(playerHp)} / ${playerMaxHp}`;
+    const shieldTextV460 = Number(playerMaxShield || 0) > 0 ? ` | Щит: ${Math.round(playerShield)} / ${playerMaxShield}` : '';
+    hpText.textContent = `HP: ${Math.round(playerHp)} / ${playerMaxHp}${shieldTextV460}`;
+    if(hpInlineText) hpInlineText.textContent = `${Math.round(playerHp)} / ${playerMaxHp}${Number(playerMaxShield || 0) > 0 ? ` • 🛡 ${Math.round(playerShield)}/${playerMaxShield}` : ''}`;
     ammoText.textContent = `Боеприпасы: ${battleWeapon.ammoInClip} / ${battleWeapon.clipSize} | запас ${formatAmmoReserve()}`;
     damageText.textContent = `Урон: ${battleWeapon.damage}`;
     const energyCap = Math.max(20, Number(currentBattleShipStats?.energyCapacity || battleEnergyCapacity || 60) || 60);
@@ -9830,7 +9843,7 @@ function applyIncomingBattleHit(payload = {}){
     const damageValue = Math.max(0, Number(payload?.damage || 0) || 0);
     if(!damageValue) return;
 
-    playerHp = Math.max(0, Number(playerHp || 0) - damageValue);
+    applyPlayerShieldedDamageV460(damageValue, payload);
     updateBattlePlayerHud?.();
     updateBattlePlayerWorldHp?.();
 
@@ -11171,9 +11184,143 @@ function verifyBattleSceneVisibleV457(reason = ''){
     }
 }
 
+
+// ===== V460 PLAYER SHIELD FIELD =====
+function makeShieldHoneycombTextureV460(){
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    ctx.strokeStyle = 'rgba(115,245,255,0.82)';
+    ctx.lineWidth = 2.2;
+    ctx.shadowColor = 'rgba(0,235,255,0.85)';
+    ctx.shadowBlur = 7;
+
+    const r = 14;
+    const w = Math.sqrt(3) * r;
+    const h = 2 * r;
+    const yStep = h * 0.75;
+
+    for(let y = -h; y < canvas.height + h; y += yStep){
+        const row = Math.round(y / yStep);
+        for(let x = -w; x < canvas.width + w; x += w){
+            const cx = x + (row % 2 ? w / 2 : 0);
+            const cy = y;
+            ctx.beginPath();
+            for(let i = 0; i < 6; i++){
+                const a = Math.PI / 6 + i * Math.PI / 3;
+                const px = cx + Math.cos(a) * r;
+                const py = cy + Math.sin(a) * r;
+                if(i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(2.3, 1.7);
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function removePlayerShieldFieldV460(){
+    try{
+        if(playerShieldMeshV460?.parent) playerShieldMeshV460.parent.remove(playerShieldMeshV460);
+        if(playerShieldMeshV460?.material){
+            try{ playerShieldMeshV460.material.map?.dispose?.(); }catch(_){}
+            try{ playerShieldMeshV460.material.dispose?.(); }catch(_){}
+        }
+        try{ playerShieldMeshV460?.geometry?.dispose?.(); }catch(_){}
+    }catch(_){}
+    playerShieldMeshV460 = null;
+}
+
+function attachPlayerShieldFieldV460(){
+    try{
+        removePlayerShieldFieldV460();
+        if(!playerShip || Number(playerMaxShield || 0) <= 0) return;
+
+        const hitRadius = Math.max(2.8, Number(playerShip?.userData?.hitRadius || 2.8) || 2.8);
+        const geometry = new THREE.SphereGeometry(1, 48, 32);
+        const material = new THREE.MeshBasicMaterial({
+            color:0x60f6ff,
+            map:makeShieldHoneycombTextureV460(),
+            transparent:true,
+            opacity:0.0,
+            depthWrite:false,
+            blending:THREE.AdditiveBlending,
+            side:THREE.DoubleSide
+        });
+
+        const shield = new THREE.Mesh(geometry, material);
+        shield.name = 'player-ship-honeycomb-shield-v460';
+
+        // Не просто круг: вытянутый овал вокруг формы корабля.
+        shield.scale.set(hitRadius * 0.95, hitRadius * 0.42, hitRadius * 1.42);
+        shield.renderOrder = 999;
+        playerShip.add(shield);
+        playerShieldMeshV460 = shield;
+        updatePlayerShieldFieldV460(true);
+    }catch(error){
+        console.warn('attachPlayerShieldFieldV460 warning:', error?.message || error);
+    }
+}
+
+function flashPlayerShieldV460(){
+    playerShieldFlashUntilV460 = Date.now() + 260;
+    try{ updatePlayerShieldFieldV460(true); }catch(_){}
+}
+
+function updatePlayerShieldFieldV460(force = false){
+    try{
+        if(!playerShieldMeshV460) return;
+        const ratio = THREE.MathUtils.clamp(Number(playerShield || 0) / Math.max(1, Number(playerMaxShield || 1)), 0, 1);
+        const flashing = Date.now() < Number(playerShieldFlashUntilV460 || 0);
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.58 : 0.10 + ratio * 0.10);
+        playerShieldMeshV460.visible = targetOpacity > 0.01;
+        playerShieldMeshV460.material.opacity = force ? targetOpacity : playerShieldMeshV460.material.opacity + (targetOpacity - playerShieldMeshV460.material.opacity) * 0.25;
+        playerShieldMeshV460.rotation.y += flashing ? 0.035 : 0.006;
+        playerShieldMeshV460.rotation.z += flashing ? 0.012 : 0.002;
+        const pulse = flashing ? 1.08 : 1.0 + Math.sin(Date.now() / 420) * 0.012;
+        playerShieldMeshV460.scale.set(
+            playerShieldMeshV460.scale.x * 0.98 + playerShieldMeshV460.scale.x / Math.max(0.001, playerShieldMeshV460.scale.x) * playerShieldMeshV460.scale.x * 0.02,
+            playerShieldMeshV460.scale.y,
+            playerShieldMeshV460.scale.z
+        );
+        playerShieldMeshV460.userData.pulse = pulse;
+        playerShieldMeshV460.material.color.setHex(flashing ? 0xc7ffff : 0x60f6ff);
+    }catch(_){}
+}
+
+function applyPlayerShieldedDamageV460(amount = 0, source = null){
+    let incoming = Math.max(0, Number(amount || 0) || 0);
+    if(incoming <= 0) return 0;
+
+    if(Number(playerShield || 0) > 0){
+        const absorbed = Math.min(Number(playerShield || 0), incoming);
+        playerShield = Math.max(0, Number(playerShield || 0) - absorbed);
+        incoming -= absorbed;
+        flashPlayerShieldV460();
+    }
+
+    if(incoming > 0){
+        playerHp = Math.max(0, Number(playerHp || 0) - incoming);
+    }
+
+    try{ updateBattlePlayerHud?.(); updateBattlePlayerWorldHp?.(); }catch(_){}
+    return incoming;
+}
+
 function spawnPlayer() {
 
     if (playerShip) {
+        removePlayerShieldFieldV460?.();
         scene.remove(playerShip);
         playerShip = null;
     }
@@ -11200,6 +11347,9 @@ function spawnPlayer() {
     playerShip.userData = {
         ...(playerShip.userData || {}),
         hp: currentBattleShipStats.hp,
+        maxHp: currentBattleShipStats.hp,
+        shield: Number(currentBattleShipStats?.shieldCapacity || 0) || 0,
+        maxShield: Number(currentBattleShipStats?.shieldCapacity || 0) || 0,
         weapon: currentBattleShipStats.ship?.weapon || 'laser',
         speed: currentBattleShipStats.maxSpeed,
         handling: currentBattleShipStats.handlingLabel,
@@ -11215,6 +11365,8 @@ function spawnPlayer() {
 
     playerMaxHp = currentBattleShipStats.hp;
     playerHp = playerMaxHp;
+    playerMaxShield = Math.max(0, Math.round(Number(currentBattleShipStats?.shieldCapacity || 0) || 0));
+    playerShield = playerMaxShield;
     battleWeapon.damage = currentBattleShipStats.weaponDamage;
     battleWeapon.clipSize = currentBattleShipStats.clipSize;
     battleWeapon.ammoInClip = battleWeapon.clipSize;
@@ -11223,6 +11375,7 @@ function spawnPlayer() {
     battleWeapon.reloadEndsAt = 0;
 
     scene.add(playerShip);
+    attachPlayerShieldFieldV460();
 
     // V457: не ждём плавного lerp из animate().
     // Сразу ставим камеру за корабль, иначе после входа на карту можно увидеть только чёрный экран и прицел.
@@ -12656,8 +12809,10 @@ function computeShipBattleStats(shipId){
         }
     });
 
-    // ===== V459 REAL PROFILE SKILL BONUSES =====
-    // Каждый уровень навыка реально влияет на боевые параметры.
+    // ===== V460 STRONG PROFILE SKILL BONUSES =====
+    // Здоровье 10/10 должно давать итог около 950 HP.
+    // Урон должен расти заметно с каждого уровня.
+    // Точность делает пули из хаотичных всё более ровными.
     try{
         const skillHealth = getProfileSkillLevelV459('health');
         const skillShield = getProfileSkillLevelV459('shield');
@@ -12672,30 +12827,45 @@ function computeShipBattleStats(shipId){
         const skillCrit = getProfileSkillLevelV459('crit');
         const skillMining = getProfileSkillLevelV459('mining');
 
-        stats.hp *= (1 + skillHealth * 0.035 + skillShield * 0.025);
-        stats.shieldBonus = Number((skillShield * 0.04).toFixed(3));
-        stats.shieldRegenBonus = Number((skillShieldRegen * 0.05).toFixed(3));
+        stats.baseHpBeforeSkills = Math.round(stats.hp);
+        if(skillHealth > 0){
+            // 0/10 остаётся от корабля, 10/10 даёт примерно 950 HP.
+            stats.hp = Math.max(stats.hp, 100 + skillHealth * 85);
+        }
 
-        stats.maxSpeed *= (1 + skillSpeed * 0.025);
-        stats.forwardAcceleration *= (1 + skillSpeed * 0.018);
-        stats.backwardAcceleration *= (1 + skillSpeed * 0.012);
-        stats.strafeAcceleration *= (1 + skillSpeed * 0.014);
+        // Щит — отдельная полоска/слой поверх HP. Он не смешивается с HP.
+        stats.shieldCapacity = Math.round(skillShield * 95);
+        stats.shieldRegenPerTick = Number((skillShieldRegen * 0.045).toFixed(4));
+        stats.shieldRegenBonus = Number((skillShieldRegen * 0.08).toFixed(3));
 
-        stats.boostDurationBonus = Number((skillBoost * 0.06).toFixed(3));
-        stats.boostEfficiencyBonus = Number((skillEnergySave * 0.055).toFixed(3));
+        stats.maxSpeed *= (1 + skillSpeed * 0.04);
+        stats.forwardAcceleration *= (1 + skillSpeed * 0.03);
+        stats.backwardAcceleration *= (1 + skillSpeed * 0.02);
+        stats.strafeAcceleration *= (1 + skillSpeed * 0.025);
 
-        stats.turnYaw *= (1 + skillManeuver * 0.025);
-        stats.turnPitch *= (1 + skillManeuver * 0.025);
-        stats.rollLimit *= (1 + skillManeuver * 0.018);
+        stats.boostDurationBonus = Number((skillBoost * 0.08).toFixed(3));
+        stats.boostEfficiencyBonus = Number((skillEnergySave * 0.07).toFixed(3));
 
-        stats.weaponDamage *= (1 + skillDamage * 0.035);
-        stats.spread = Math.max(0, stats.spread * (1 - skillAccuracy * 0.055));
-        stats.fireCooldown *= (1 - skillReload * 0.026);
-        stats.reloadTime *= (1 - skillReload * 0.032);
+        stats.turnYaw *= (1 + skillManeuver * 0.04);
+        stats.turnPitch *= (1 + skillManeuver * 0.04);
+        stats.rollLimit *= (1 + skillManeuver * 0.025);
 
-        stats.critChance = Number((skillCrit * 0.018).toFixed(3));
-        stats.critDamageMult = Number((1.45 + skillCrit * 0.035).toFixed(2));
-        stats.miningBonus = Number((skillMining * 0.05).toFixed(3));
+        // Урон: +6 чистого урона за уровень + 8% множитель за уровень.
+        // Даже 1 прокачка должна быть видна в HUD.
+        stats.weaponDamage = (stats.weaponDamage + skillDamage * 6) * (1 + skillDamage * 0.08);
+
+        // Вводим базовую хаотичность. Точность постепенно её убирает.
+        // 0 точности = заметный разброс, 10 точности = почти ровно.
+        stats.accuracyLevel = skillAccuracy;
+        stats.chaosSpread = Number(Math.max(0.004, 0.085 * (1 - skillAccuracy * 0.085)).toFixed(4));
+        stats.spread = Math.max(Number(stats.spread || 0), stats.chaosSpread);
+
+        stats.fireCooldown *= (1 - skillReload * 0.04);
+        stats.reloadTime *= (1 - skillReload * 0.045);
+
+        stats.critChance = Number((skillCrit * 0.022).toFixed(3));
+        stats.critDamageMult = Number((1.5 + skillCrit * 0.05).toFixed(2));
+        stats.miningBonus = Number((skillMining * 0.075).toFixed(3));
 
         if(skillHealth || skillShield || skillSpeed || skillManeuver || skillDamage || skillAccuracy || skillReload || skillCrit || skillMining){
             stats.moduleSummary.push('навыки пилота');
@@ -12717,6 +12887,7 @@ function computeShipBattleStats(shipId){
     stats.strafeAcceleration = Number(stats.strafeAcceleration.toFixed(3));
     stats.damping = Number(Math.min(0.994, stats.damping).toFixed(3));
     stats.hp = Math.max(80, Math.round(stats.hp));
+    stats.shieldCapacity = Math.max(0, Math.round(Number(stats.shieldCapacity || 0) || 0));
     stats.weaponDamage = Math.max(8, Math.round(stats.weaponDamage));
     stats.clipSize = Math.max(8, Math.round(stats.clipSize));
     stats.reloadTime = Math.max(650, Math.round(stats.reloadTime));
@@ -12729,7 +12900,7 @@ function computeShipBattleStats(shipId){
     stats.projectileWidth = Number(stats.projectileWidth.toFixed(2));
     stats.projectileLength = Number(stats.projectileLength.toFixed(2));
     stats.projectileOffset = Number(stats.projectileOffset.toFixed(2));
-    stats.spread = Number(stats.spread.toFixed(3));
+    stats.spread = Number(Math.max(0, stats.spread).toFixed(4));
 
     return stats;
 }
