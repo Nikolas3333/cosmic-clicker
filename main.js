@@ -1,4 +1,4 @@
-// COSMIC CLICKER v454 - PROFILE LEVEL EMBLEM SHIP ICON
+// COSMIC CLICKER v455 - BRIGHT PREMIUM LEVEL SHIP ICON
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -953,52 +953,79 @@ function restoreOwnHangarAfterGuest(){
 function cosmicLevelShipIconHtml(levelValue = 1){
     const safeLevel = Math.max(1, Math.min(120, Math.floor(Number(levelValue || 1) || 1)));
     const levelText = String(safeLevel);
+
     return `
         <span class="cosmic-level-ship-badge" title="Уровень ${safeLevel}" aria-label="Уровень ${safeLevel}">
-            <svg class="cosmic-level-ship-svg" viewBox="0 0 72 72" role="img" aria-hidden="true">
+            <svg class="cosmic-level-ship-svg" viewBox="0 0 78 78" role="img" aria-hidden="true">
+
                 <defs>
-                    <radialGradient id="cosmicLevelBadgeBg" cx="50%" cy="38%" r="62%">
-                        <stop offset="0%" stop-color="#1cf8ff" stop-opacity=".55"/>
-                        <stop offset="48%" stop-color="#08244a" stop-opacity=".96"/>
-                        <stop offset="100%" stop-color="#020711" stop-opacity="1"/>
+                    <radialGradient id="cosmicPremiumBg" cx="50%" cy="38%" r="70%">
+                        <stop offset="0%" stop-color="#6ffbff"/>
+                        <stop offset="42%" stop-color="#1f6fff"/>
+                        <stop offset="100%" stop-color="#071122"/>
                     </radialGradient>
-                    <linearGradient id="cosmicLevelShipMain" x1="0" y1="0" x2="1" y2="1">
+
+                    <linearGradient id="cosmicPremiumHull" x1="0" y1="0" x2="1" y2="1">
                         <stop offset="0%" stop-color="#ffffff"/>
-                        <stop offset="36%" stop-color="#9ff7ff"/>
-                        <stop offset="100%" stop-color="#1677d2"/>
+                        <stop offset="38%" stop-color="#dfffff"/>
+                        <stop offset="100%" stop-color="#5ddcff"/>
                     </linearGradient>
-                    <linearGradient id="cosmicLevelShipWing" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stop-color="#73f7ff"/>
-                        <stop offset="100%" stop-color="#073c79"/>
+
+                    <linearGradient id="cosmicPremiumWing" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#d7ffff"/>
+                        <stop offset="100%" stop-color="#4dc8ff"/>
                     </linearGradient>
-                    <radialGradient id="cosmicLevelShipCore" cx="45%" cy="35%" r="72%">
+
+                    <radialGradient id="cosmicPremiumCore" cx="50%" cy="35%" r="75%">
                         <stop offset="0%" stop-color="#ffffff"/>
-                        <stop offset="52%" stop-color="#9ef9ff"/>
-                        <stop offset="100%" stop-color="#0b5fa5"/>
+                        <stop offset="48%" stop-color="#f7ffff"/>
+                        <stop offset="100%" stop-color="#82eaff"/>
                     </radialGradient>
-                    <radialGradient id="cosmicLevelShipFire" cx="50%" cy="50%" r="65%">
-                        <stop offset="0%" stop-color="#fff8b0"/>
-                        <stop offset="48%" stop-color="#ff9a16"/>
-                        <stop offset="100%" stop-color="#ff3900"/>
+
+                    <radialGradient id="cosmicPremiumFire" cx="50%" cy="50%" r="70%">
+                        <stop offset="0%" stop-color="#fff7bb"/>
+                        <stop offset="50%" stop-color="#ffbf32"/>
+                        <stop offset="100%" stop-color="#ff4f00"/>
                     </radialGradient>
                 </defs>
 
-                <circle class="cosmic-level-ship-ring outer" cx="36" cy="36" r="31"/>
-                <circle class="cosmic-level-ship-ring inner" cx="36" cy="36" r="25"/>
+                <circle class="cosmic-premium-ring" cx="39" cy="39" r="34"/>
+                <circle class="cosmic-premium-inner-ring" cx="39" cy="39" r="28"/>
 
-                <path class="cosmic-level-ship-star" d="M20 16 l1.7 4.2 4.5 1.1 -4.2 1.7 -1.1 4.5 -1.7 -4.2 -4.5 -1.1 4.2 -1.7z"/>
-                <path class="cosmic-level-ship-star small" d="M54 17 l1 2.5 2.7 .7 -2.5 1 -.7 2.7 -1-2.5 -2.7-.7 2.5-1z"/>
+                <g class="cosmic-premium-stars">
+                    <circle cx="18" cy="18" r="1.8"/>
+                    <circle cx="59" cy="16" r="1.4"/>
+                    <circle cx="63" cy="57" r="1.7"/>
+                </g>
 
-                <g class="cosmic-level-ship-model">
-                    <path class="cosmic-level-flame-left" d="M28 51 C21 55 19 61 18 66 C24 63 29 60 31 54 Z"/>
-                    <path class="cosmic-level-flame-right" d="M44 51 C51 55 53 61 54 66 C48 63 43 60 41 54 Z"/>
-                    <path class="cosmic-level-wing left" d="M28 38 L12 49 L27 50 L35 42 Z"/>
-                    <path class="cosmic-level-wing right" d="M44 38 L60 49 L45 50 L37 42 Z"/>
-                    <path class="cosmic-level-hull" d="M36 7 C48 23 49 44 36 58 C23 44 24 23 36 7 Z"/>
-                    <path class="cosmic-level-hull-shadow" d="M37 12 C45 27 45 42 37 53 C43 47 45 31 40 18 Z"/>
-                    <ellipse class="cosmic-level-core" cx="36" cy="31" rx="11" ry="13"/>
-                    <text class="cosmic-level-ship-text" x="36" y="35" text-anchor="middle">${levelText}</text>
-                    <path class="cosmic-level-nose-shine" d="M32 16 C34 12 36 10 38 16"/>
+                <g class="cosmic-premium-ship">
+
+                    <path class="cosmic-premium-flame-left"
+                        d="M31 55 C25 59 23 66 22 71 C27 67 32 63 34 58 Z"/>
+
+                    <path class="cosmic-premium-flame-right"
+                        d="M47 55 C53 59 55 66 56 71 C51 67 46 63 44 58 Z"/>
+
+                    <path class="cosmic-premium-wing left"
+                        d="M30 41 L12 52 L29 54 L38 45 Z"/>
+
+                    <path class="cosmic-premium-wing right"
+                        d="M48 41 L66 52 L49 54 L40 45 Z"/>
+
+                    <path class="cosmic-premium-hull"
+                        d="M39 8 C52 24 53 47 39 62 C25 47 26 24 39 8 Z"/>
+
+                    <ellipse class="cosmic-premium-core"
+                        cx="39" cy="34" rx="12" ry="14"/>
+
+                    <text class="cosmic-premium-level"
+                        x="39"
+                        y="39"
+                        text-anchor="middle">${levelText}</text>
+
+                    <path class="cosmic-premium-shine"
+                        d="M34 16 C37 11 41 11 44 16"/>
+
                 </g>
             </svg>
         </span>
