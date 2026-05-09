@@ -1,4 +1,4 @@
-// COSMIC CLICKER v469 - STABLE REMOTE SYNC MAP TEXT FIX
+// COSMIC CLICKER v470 - REMOTE NICK AND SHIELD REAL FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -117,8 +117,8 @@ let playerMaxShield = 0;
 let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
 let playerShieldMeshesV462 = [];
-const REMOTE_SHIELD_SCALE_V466 = 1.35;
-const REMOTE_SHIELD_OPACITY_V466 = 0.55;
+const REMOTE_SHIELD_SCALE_V466 = 1.65;
+const REMOTE_SHIELD_OPACITY_V466 = 0.62;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 
 function forceRemoteShieldVisibleV467(mesh){
@@ -9373,7 +9373,7 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     ctx.fillText(String(safeLevel), 0, 2);
     ctx.restore();
 
-    ctx.font = '900 36px Arial';
+    ctx.font = '900 54px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 7;
@@ -9381,8 +9381,8 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     ctx.fillStyle = '#f5feff';
     ctx.shadowColor = 'rgba(0,245,255,0.85)';
     ctx.shadowBlur = 12;
-    ctx.strokeText(safeName, 96, 66);
-    ctx.fillText(safeName, 96, 66);
+    ctx.strokeText(safeName, 104, 66);
+    ctx.fillText(safeName, 104, 66);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -9399,8 +9399,8 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     });
 
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(6.8, 1.65, 1);
-    sprite.position.set(0, 5.2, 0);
+    sprite.scale.set(11.2, 2.7, 1);
+    sprite.position.set(0, 7.2, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
     sprite.userData.staticPilotLabelV461 = true;
@@ -9444,7 +9444,7 @@ function createRemoteShieldOverlayMaterialV463(){
         color:0x66f7ff,
         map:makeShieldHoneycombTextureV460(),
         transparent:true,
-        opacity:0.24,
+        opacity:0.62,
         depthWrite:false,
         depthTest:false,
         blending:THREE.AdditiveBlending,
@@ -9455,12 +9455,9 @@ function createRemoteShieldOverlayMaterialV463(){
 function attachRemoteShipShieldV463(entry){
     try{
         if(!entry?.mesh) return;
-        const maxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
-        if(maxShield <= 0){
-            disposeRemoteShieldMeshesV463(entry);
-            return;
-        }
 
+        // V470: remote shield должен быть видимым как визуальный слой.
+        // Даже если maxShield ещё не приехал/равен 0, создаём визуальный overlay.
         if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.length){
             return;
         }
@@ -9477,30 +9474,29 @@ function attachRemoteShipShieldV463(entry){
                 if(!geometry) return;
 
                 const shieldMesh = new THREE.Mesh(geometry, createRemoteShieldOverlayMaterialV463());
-                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v463';
+                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v470';
                 shieldMesh.userData.remoteShieldOverlayV463 = true;
                 shieldMesh.userData.battleOverlayV462 = true;
                 shieldMesh.position.copy(node.position);
                 shieldMesh.quaternion.copy(node.quaternion);
-                shieldMesh.scale.copy(node.scale).multiplyScalar(1.045);
-                shieldMesh.renderOrder = 997;
+                shieldMesh.scale.copy(node.scale).multiplyScalar(1.09);
+                shieldMesh.renderOrder = 1200;
                 node.parent.add(shieldMesh);
                 entry.shieldMeshesV463.push(shieldMesh);
                 created++;
             }catch(_){}
         });
 
-        // Fallback: если модель ещё не успела дать mesh-детали, всё равно показываем щит.
         if(!entry.shieldMeshesV463.length){
             const hitRadius = Math.max(2.8, Number(entry.mesh?.userData?.hitRadius || 2.8) || 2.8);
-            const geometry = new THREE.SphereGeometry(1, 48, 32);
+            const geometry = new THREE.SphereGeometry(1, 64, 40);
             const material = createRemoteShieldOverlayMaterialV463();
             const shieldMesh = new THREE.Mesh(geometry, material);
-            shieldMesh.name = 'remote-fallback-shield-v464';
+            shieldMesh.name = 'remote-fallback-shield-v470';
             shieldMesh.userData.remoteShieldOverlayV463 = true;
             shieldMesh.userData.battleOverlayV462 = true;
-            shieldMesh.scale.set(hitRadius * 1.08, hitRadius * 0.44, hitRadius * 1.45);
-            shieldMesh.renderOrder = 997;
+            shieldMesh.scale.set(hitRadius * 1.25, hitRadius * 0.52, hitRadius * 1.72);
+            shieldMesh.renderOrder = 1200;
             entry.mesh.add(shieldMesh);
             entry.shieldMeshesV463.push(shieldMesh);
         }
@@ -9518,41 +9514,21 @@ function updateRemoteShipShieldV463(entry){
     try{
         if(!entry?.mesh) return;
 
-        // V468: визуально показываем shield overlay для удалённого корабля даже если maxShield ещё не приехал из room_players.
-        // Это не меняет урон, только гарантирует, что второй аккаунт ВИДИТ эффект.
         const rawMaxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
-        const visualMaxShield = rawMaxShield;
-        const shield = Math.max(0, Number(entry.shield ?? entry.mesh?.userData?.shield ?? visualMaxShield) || visualMaxShield);
-        if(visualMaxShield <= 0){
-            disposeRemoteShieldMeshesV463(entry);
-            return;
-        }
+        const visualMaxShield = Math.max(100, rawMaxShield);
+        const shield = Math.max(1, Number(entry.shield ?? entry.mesh?.userData?.shield ?? visualMaxShield) || visualMaxShield);
 
-        entry.maxShield = rawMaxShield > 0 ? rawMaxShield : entry.maxShield;
-        entry.shield = rawMaxShield > 0 ? Math.min(rawMaxShield, shield) : shield;
+        // Сохраняем реальные значения, но визуально overlay не выключаем.
         if(entry.mesh?.userData){
             entry.mesh.userData.maxShield = rawMaxShield;
-            entry.mesh.userData.shield = shield;
+            entry.mesh.userData.shield = rawMaxShield > 0 ? Math.min(rawMaxShield, shield) : 0;
         }
 
-        attachRemoteShipShieldV463({
-            ...entry,
-            maxShield: visualMaxShield,
-            mesh: entry.mesh,
-            shieldMeshesV463: entry.shieldMeshesV463
-        });
-
-        // если attach создал массив на копии, синхронизируем обратно
-        if(!Array.isArray(entry.shieldMeshesV463)) entry.shieldMeshesV463 = [];
-        if(!entry.shieldMeshesV463.length){
-            // fallback явно на entry
-            entry.maxShield = visualMaxShield;
-            attachRemoteShipShieldV463(entry);
-        }
+        attachRemoteShipShieldV463(entry);
 
         const ratio = THREE.MathUtils.clamp(shield / Math.max(1, visualMaxShield), 0, 1);
         const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
-        const targetOpacity = flashing ? 0.86 : (REMOTE_SHIELD_OPACITY_V466 || 0.55);
+        const targetOpacity = flashing ? 0.88 : (REMOTE_SHIELD_OPACITY_V466 || 0.62);
         const color = flashing ? 0xffffff : 0x66f7ff;
 
         (entry.shieldMeshesV463 || []).forEach(mesh => {
@@ -9562,11 +9538,11 @@ function updateRemoteShipShieldV463(entry){
                 mesh.material.transparent = true;
                 mesh.material.depthWrite = false;
                 mesh.material.depthTest = false;
-                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.45;
+                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.50;
                 mesh.material.color?.setHex?.(color);
                 if(mesh.material.map){
-                    mesh.material.map.offset.x += flashing ? 0.018 : 0.004;
-                    mesh.material.map.offset.y += flashing ? 0.010 : 0.002;
+                    mesh.material.map.offset.x += flashing ? 0.020 : 0.0045;
+                    mesh.material.map.offset.y += flashing ? 0.012 : 0.0025;
                 }
             }catch(_){}
         });
@@ -9582,13 +9558,16 @@ function updateRemotePilotLabelDistanceV463(entry){
         if(entry.labelSprite.material){
             entry.labelSprite.material.opacity = 1;
             entry.labelSprite.material.transparent = true;
+            entry.labelSprite.material.depthTest = false;
+            entry.labelSprite.material.depthWrite = false;
         }
 
-        // V468: ник не пропадает, но не раздувается через всю карту.
-        const baseX = 6.8;
-        const baseY = 1.65;
-        const k = THREE.MathUtils.clamp(52 / Math.max(22, dist), 0.42, 1.18);
+        // V470: ник всегда видимый, но не раздувается через всю карту.
+        const baseX = 11.2;
+        const baseY = 2.7;
+        const k = THREE.MathUtils.clamp(62 / Math.max(24, dist), 0.52, 1.15);
         entry.labelSprite.scale.set(baseX * k, baseY * k, 1);
+        entry.labelSprite.position.set(0, 7.2, 0);
     }catch(_){}
 }
 
@@ -9623,7 +9602,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue', playerId = '
     };
 
     const battleShipItem = getSelectedShipItem() || getShopShipById('scout_1') || { id:'scout_1', modelPath:'ships/Spaceship.glb' };
-    mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ const entry = remoteBattleShips.get(shipGroup.userData.playerId || '') || null; ensureRemotePilotLabelV462(entry || { mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); if(entry) updateRemoteShipShieldV463(entry); }catch(_){} });
+    mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ const entry = remoteBattleShips.get(shipGroup.userData.playerId || '') || null; ensureRemotePilotLabelV462(entry || { mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); if(entry){ updateRemoteShipShieldV463(entry); setTimeout(() => { try{ updateRemoteShipShieldV463(entry); ensureRemotePilotLabelV462(entry); }catch(_){} }, 250); } }catch(_){} });
 
     scene.add(shipGroup);
     shipGroup.userData.playerId = String(playerId || '').trim();
@@ -10926,7 +10905,7 @@ function animateRemoteBattleShips(){
 
         ensureRemotePilotLabelV462(entry);
         if(entry.labelSprite){
-            entry.labelSprite.position.set(0, 4.2, 0);
+            entry.labelSprite.position.set(0, 7.2, 0);
             entry.labelSprite.quaternion.copy(camera.quaternion);
             updateRemotePilotLabelDistanceV463(entry);
         }
@@ -15335,7 +15314,7 @@ function restoreBattleOverlaysV462(targetGroup){
 function ensureRemotePilotLabelV462(entry){
     try{
         if(!entry?.mesh) return;
-        if(entry.labelSprite && entry.labelSprite.parent === entry.mesh && entry.labelSprite.scale.x >= 7) return;
+        if(entry.labelSprite && entry.labelSprite.parent === entry.mesh && entry.labelSprite.scale.x >= 6) return;
         if(entry.labelSprite && entry.labelSprite.parent) entry.labelSprite.parent.remove(entry.labelSprite);
         entry.labelSprite = createRemotePilotLabel(entry.nickname || entry.mesh?.userData?.pilotName || 'Pilot', entry.team || entry.mesh?.userData?.team || 'blue', entry.level || 1);
         entry.labelSprite.userData.battleOverlayV462 = true;
