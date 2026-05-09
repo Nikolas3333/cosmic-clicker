@@ -1,4 +1,4 @@
-// COSMIC CLICKER v463 - REMOTE SHIELDS DISTANCE LABELS
+// COSMIC CLICKER v464 - REMOTE SHIELD NO-FRAME NAMES
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -2567,7 +2567,11 @@ function ensureSelfRoomPlayerState(){
         position: {
             x: Number(playerShip.position.x || 0),
             y: Number(playerShip.position.y || 0),
-            z: Number(playerShip.position.z || 0)
+            z: Number(playerShip.position.z || 0),
+            hp: Math.round(Number(playerHp || 0) || 0),
+            maxHp: Math.round(Number(playerMaxHp || currentBattleShipStats?.hp || 100) || 100),
+            shield: Math.round(Number(playerShield || 0) || 0),
+            maxShield: Math.round(Number(playerMaxShield || currentBattleShipStats?.shieldCapacity || 0) || 0)
         },
         rotation: {
             x: Number(playerShip.quaternion.x || 0),
@@ -6603,7 +6607,7 @@ function isPmTabClosedV338(peerId){
 const localHandledChatMessageIds = new Set();
 const BATTLE_HISTORY_SEARCH_LIMIT = 80;
 const battleHistorySearchState = {
-    playerId: '',
+    playerId: String(playerId || '').trim(),
     loading: false,
     error: '',
     messages: [],
@@ -9316,60 +9320,61 @@ function stopLiveBattleSync(){
 function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     const canvas = document.createElement('canvas');
     canvas.width = 384;
-    canvas.height = 96;
+    canvas.height = 90;
     const ctx = canvas.getContext('2d');
     const safeLevel = Math.max(1, Math.min(120, Math.floor(Number(levelValue || 1) || 1)));
     const safeName = String(name || 'Pilot').slice(0, 16);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const borderColor = getRemoteShipLabelColor(team);
-    ctx.fillStyle = 'rgba(5,10,18,0.74)';
-    roundRectV461(ctx, 12, 24, canvas.width - 24, 46, 14);
-    ctx.fill();
-
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 2.5;
-    roundRectV461(ctx, 12, 24, canvas.width - 24, 46, 14);
-    ctx.stroke();
-
-    // мини-значок уровня слева от ника
-    const iconX = 44;
-    const iconY = 47;
+    // V464: без рамки/плашки. Только значок уровня + ник.
+    const iconX = 46;
+    const iconY = 45;
     ctx.save();
     ctx.translate(iconX, iconY);
-    ctx.fillStyle = 'rgba(30,120,255,0.95)';
-    ctx.strokeStyle = 'rgba(150,250,255,0.95)';
-    ctx.lineWidth = 2;
+
+    const grad = ctx.createRadialGradient(0, -5, 3, 0, 0, 19);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.45, '#8ff9ff');
+    grad.addColorStop(1, '#1c73ff');
+
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = 'rgba(160,250,255,0.96)';
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
     ctx.arc(0, 0, 18, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#eaffff';
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(0, -15);
-    ctx.lineTo(10, 10);
+    ctx.lineTo(11, 11);
     ctx.lineTo(0, 5);
-    ctx.lineTo(-10, 10);
+    ctx.lineTo(-11, 11);
     ctx.closePath();
+    ctx.stroke();
     ctx.fill();
 
-    ctx.fillStyle = '#06131f';
+    ctx.fillStyle = '#051525';
     ctx.font = '900 13px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(safeLevel), 0, 1);
     ctx.restore();
 
-    ctx.font = 'bold 28px Arial';
+    ctx.font = '900 30px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.92)';
     ctx.fillStyle = '#f3fbff';
-    ctx.strokeText(safeName, 76, 47);
-    ctx.fillText(safeName, 76, 47);
+    ctx.shadowColor = 'rgba(0,245,255,0.72)';
+    ctx.shadowBlur = 8;
+    ctx.strokeText(safeName, 78, 46);
+    ctx.fillText(safeName, 78, 46);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
@@ -9379,14 +9384,14 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     const material = new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
+        opacity: 1,
         depthWrite: false,
         depthTest: false,
         sizeAttenuation: true
     });
 
     const sprite = new THREE.Sprite(material);
-    // V461: экранный размер статичный, не растягивается от дистанции.
-    sprite.scale.set(5.4, 1.35, 1);
+    sprite.scale.set(4.8, 1.12, 1);
     sprite.position.set(0, 4.2, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
@@ -9431,9 +9436,9 @@ function createRemoteShieldOverlayMaterialV463(){
         color:0x66f7ff,
         map:makeShieldHoneycombTextureV460(),
         transparent:true,
-        opacity:0.0,
+        opacity:0.24,
         depthWrite:false,
-        depthTest:true,
+        depthTest:false,
         blending:THREE.AdditiveBlending,
         side:THREE.DoubleSide
     });
@@ -9469,13 +9474,28 @@ function attachRemoteShipShieldV463(entry){
                 shieldMesh.userData.battleOverlayV462 = true;
                 shieldMesh.position.copy(node.position);
                 shieldMesh.quaternion.copy(node.quaternion);
-                shieldMesh.scale.copy(node.scale).multiplyScalar(1.035);
+                shieldMesh.scale.copy(node.scale).multiplyScalar(1.045);
                 shieldMesh.renderOrder = 997;
                 node.parent.add(shieldMesh);
                 entry.shieldMeshesV463.push(shieldMesh);
                 created++;
             }catch(_){}
         });
+
+        // Fallback: если модель ещё не успела дать mesh-детали, всё равно показываем щит.
+        if(!entry.shieldMeshesV463.length){
+            const hitRadius = Math.max(2.8, Number(entry.mesh?.userData?.hitRadius || 2.8) || 2.8);
+            const geometry = new THREE.SphereGeometry(1, 48, 32);
+            const material = createRemoteShieldOverlayMaterialV463();
+            const shieldMesh = new THREE.Mesh(geometry, material);
+            shieldMesh.name = 'remote-fallback-shield-v464';
+            shieldMesh.userData.remoteShieldOverlayV463 = true;
+            shieldMesh.userData.battleOverlayV462 = true;
+            shieldMesh.scale.set(hitRadius * 1.08, hitRadius * 0.44, hitRadius * 1.45);
+            shieldMesh.renderOrder = 997;
+            entry.mesh.add(shieldMesh);
+            entry.shieldMeshesV463.push(shieldMesh);
+        }
     }catch(error){
         console.warn('attachRemoteShipShieldV463 warning:', error?.message || error);
     }
@@ -9501,7 +9521,7 @@ function updateRemoteShipShieldV463(entry){
 
         const ratio = THREE.MathUtils.clamp(shield / Math.max(1, maxShield), 0, 1);
         const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
-        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.72 : 0.11 + ratio * 0.07);
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.82 : 0.26 + ratio * 0.10);
         const color = flashing ? 0xffffff : 0x66f7ff;
 
         (entry.shieldMeshesV463 || []).forEach(mesh => {
@@ -9524,33 +9544,22 @@ function updateRemotePilotLabelDistanceV463(entry){
         if(!entry?.labelSprite || !entry?.mesh || !camera) return;
         const dist = camera.position.distanceTo(entry.mesh.position);
 
-        // Вблизи видно, вдалеке постепенно исчезает, через всю карту не светится.
-        const showFrom = 18;
-        const fadeStart = 85;
-        const hideAfter = 135;
-
-        if(dist > hideAfter){
-            entry.labelSprite.visible = false;
-            return;
-        }
-
-        entry.labelSprite.visible = dist >= showFrom;
-        const fade = dist <= fadeStart ? 1 : Math.max(0, 1 - (dist - fadeStart) / (hideAfter - fadeStart));
+        // V464: ник не пропадает. Он просто становится меньше на расстоянии.
+        entry.labelSprite.visible = true;
         if(entry.labelSprite.material){
-            entry.labelSprite.material.opacity = fade;
+            entry.labelSprite.material.opacity = 1;
             entry.labelSprite.material.transparent = true;
         }
 
-        // sizeAttenuation=true уже делает ник меньше с расстоянием.
-        // Дополнительно слегка ограничиваем размер, чтобы рядом он не был гигантским.
-        const base = 5.4;
-        const k = THREE.MathUtils.clamp(42 / Math.max(18, dist), 0.42, 1.0);
-        entry.labelSprite.scale.set(base * k, 1.35 * k, 1);
+        const baseX = 4.8;
+        const baseY = 1.12;
+        const k = THREE.MathUtils.clamp(36 / Math.max(18, dist), 0.30, 1.0);
+        entry.labelSprite.scale.set(baseX * k, baseY * k, 1);
     }catch(_){}
 }
 
 
-function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
+function createRemoteBattleShipMesh(name, slotIndex, team = 'blue', playerId = ''){
     const shipGroup = new THREE.Group();
     shipGroup.rotation.order = 'YXZ';
 
@@ -9583,7 +9592,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue'){
     mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ const entry = remoteBattleShips.get(shipGroup.userData.playerId || '') || null; ensureRemotePilotLabelV462(entry || { mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); if(entry) updateRemoteShipShieldV463(entry); }catch(_){} });
 
     scene.add(shipGroup);
-    shipGroup.userData.playerId = '';
+    shipGroup.userData.playerId = String(playerId || '').trim();
     return {
         mesh: shipGroup,
         labelSprite,
@@ -10538,7 +10547,7 @@ async function syncLiveBattlePlayers(){
 
         let remoteState = remoteBattleShips.get(entryId);
         if(!remoteState){
-            remoteState = createRemoteBattleShipMesh(displayName, remoteBattleShips.size, team);
+            remoteState = createRemoteBattleShipMesh(displayName, remoteBattleShips.size, team, entryId);
             remoteBattleShips.set(entryId, remoteState);
         }
 
@@ -10550,13 +10559,33 @@ async function syncLiveBattlePlayers(){
         remoteState.lastSeenAt = Date.now();
         remoteState.kills = Math.max(0, Number(scoreSnapshot.kills || remoteState.kills || 0) || 0);
         remoteState.deaths = Math.max(0, Number(scoreSnapshot.deaths || remoteState.deaths || 0) || 0);
+        const posStatsV464 = entry?.position || {};
+        const maxHpFromRoomV464 = Math.max(1, Number(posStatsV464.maxHp || posStatsV464.max_hp || remoteState.maxHp || 100) || 100);
+        const hpFromRoomV464 = Math.max(0, Number(posStatsV464.hp ?? remoteState.hp ?? maxHpFromRoomV464) || maxHpFromRoomV464);
+        const maxShieldFromRoomV464 = Math.max(0, Number(posStatsV464.maxShield || posStatsV464.max_shield || remoteState.maxShield || 0) || 0);
+        const shieldFromRoomV464 = Math.max(0, Number(posStatsV464.shield ?? remoteState.shield ?? maxShieldFromRoomV464) || 0);
+
+        const oldShieldFromRoomV464 = Math.max(0, Number(remoteState.shield || 0) || 0);
+        remoteState.maxHp = maxHpFromRoomV464;
+        remoteState.hp = Math.min(maxHpFromRoomV464, hpFromRoomV464);
+        remoteState.maxShield = maxShieldFromRoomV464;
+        remoteState.shield = Math.min(maxShieldFromRoomV464, shieldFromRoomV464);
+        remoteState.hasRealHpV461 = true;
+        if(remoteState.shield < oldShieldFromRoomV464) flashRemoteShieldV463(remoteState);
+
 
         if(remoteState.mesh?.userData){
             remoteState.mesh.userData.team = team;
             remoteState.mesh.userData.pilotName = displayName;
             remoteState.mesh.userData.playerId = entryId;
+            remoteState.mesh.userData.hp = remoteState.hp;
+            remoteState.mesh.userData.maxHp = remoteState.maxHp;
+            remoteState.mesh.userData.shield = remoteState.shield;
+            remoteState.mesh.userData.maxShield = remoteState.maxShield;
+            remoteState.mesh.userData.hasRealHpV461 = true;
         }
         tryApplyRemoteShipTeamVisual(remoteState);
+        try{ updateRemoteShipShieldV463(remoteState); }catch(_){}
 
         const pos = entry?.position || {};
         const x = Number(pos?.x);
