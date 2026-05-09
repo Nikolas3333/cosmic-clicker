@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v454 - PROFILE LEVEL EMBLEM SHIP ICON -->
+<!-- COSMIC CLICKER v455 - BRIGHT PREMIUM LEVEL SHIP ICON -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7224,11 +7224,14 @@ shop-main-head{
 
 
 
-/* ===== V454 PROFILE LEVEL MINI SHIP ICON — EMBLEM SHIP VERSION ===== */
+
+
+/* ===== V455 PROFILE LEVEL PREMIUM SHIP ICON ===== */
+
 #profile-window #profile-level-ship-icon{
-  width:48px !important;
-  height:48px !important;
-  flex:0 0 48px !important;
+  width:54px !important;
+  height:54px !important;
+  flex:0 0 54px !important;
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
@@ -7236,107 +7239,82 @@ shop-main-head{
 }
 
 #profile-window .cosmic-level-ship-badge{
-  width:48px !important;
-  height:48px !important;
+  width:54px !important;
+  height:54px !important;
   display:inline-flex !important;
   align-items:center !important;
   justify-content:center !important;
-  position:relative !important;
-  transform:none !important;
   filter:
-    drop-shadow(0 0 6px rgba(0,255,255,.72))
-    drop-shadow(0 0 12px rgba(30,120,255,.35)) !important;
+    drop-shadow(0 0 8px rgba(0,255,255,.85))
+    drop-shadow(0 0 16px rgba(60,120,255,.48)) !important;
 }
 
 #profile-window .cosmic-level-ship-svg{
-  width:48px !important;
-  height:48px !important;
+  width:54px !important;
+  height:54px !important;
   display:block !important;
-  overflow:visible !important;
 }
 
-#profile-window .cosmic-level-ship-ring.outer{
-  fill:url(#cosmicLevelBadgeBg) !important;
-  stroke:rgba(111,242,255,.95) !important;
-  stroke-width:2.2 !important;
+#profile-window .cosmic-premium-ring{
+  fill:url(#cosmicPremiumBg) !important;
+  stroke:#9ffcff !important;
+  stroke-width:2.3 !important;
 }
 
-#profile-window .cosmic-level-ship-ring.inner{
+#profile-window .cosmic-premium-inner-ring{
   fill:none !important;
-  stroke:rgba(255,255,255,.16) !important;
-  stroke-width:1 !important;
-  stroke-dasharray:2.2 3.2 !important;
+  stroke:rgba(255,255,255,.26) !important;
+  stroke-width:1.2 !important;
+  stroke-dasharray:2 4 !important;
 }
 
-#profile-window .cosmic-level-ship-star{
-  fill:rgba(190,252,255,.92) !important;
-  opacity:.82 !important;
-  filter:drop-shadow(0 0 4px rgba(0,255,255,.75)) !important;
+#profile-window .cosmic-premium-stars circle{
+  fill:#dfffff !important;
+  opacity:.95 !important;
+  filter:drop-shadow(0 0 4px rgba(255,255,255,.85)) !important;
 }
 
-#profile-window .cosmic-level-ship-star.small{
-  opacity:.58 !important;
+#profile-window .cosmic-premium-wing{
+  fill:url(#cosmicPremiumWing) !important;
+  stroke:#dfffff !important;
+  stroke-width:1.1 !important;
 }
 
-#profile-window .cosmic-level-ship-model{
-  filter:drop-shadow(0 0 4px rgba(0,245,255,.55)) !important;
+#profile-window .cosmic-premium-hull{
+  fill:url(#cosmicPremiumHull) !important;
+  stroke:#ffffff !important;
+  stroke-width:1.6 !important;
 }
 
-#profile-window .cosmic-level-wing{
-  fill:url(#cosmicLevelShipWing) !important;
-  stroke:rgba(170,250,255,.88) !important;
-  stroke-width:1.15 !important;
+#profile-window .cosmic-premium-core{
+  fill:url(#cosmicPremiumCore) !important;
+  stroke:#ffffff !important;
+  stroke-width:1.2 !important;
 }
 
-#profile-window .cosmic-level-wing.left{
-  opacity:.82 !important;
+#profile-window .cosmic-premium-flame-left,
+#profile-window .cosmic-premium-flame-right{
+  fill:url(#cosmicPremiumFire) !important;
+  filter:drop-shadow(0 0 6px rgba(255,140,0,.95)) !important;
 }
 
-#profile-window .cosmic-level-wing.right{
-  opacity:.82 !important;
-}
-
-#profile-window .cosmic-level-hull{
-  fill:url(#cosmicLevelShipMain) !important;
-  stroke:rgba(235,253,255,.98) !important;
-  stroke-width:1.55 !important;
-}
-
-#profile-window .cosmic-level-hull-shadow{
-  fill:rgba(0,20,45,.22) !important;
-}
-
-#profile-window .cosmic-level-core{
-  fill:url(#cosmicLevelShipCore) !important;
-  stroke:rgba(5,38,80,.72) !important;
-  stroke-width:1.05 !important;
-}
-
-#profile-window .cosmic-level-flame-left,
-#profile-window .cosmic-level-flame-right{
-  fill:url(#cosmicLevelShipFire) !important;
-  opacity:.86 !important;
-  filter:drop-shadow(0 0 5px rgba(255,130,0,.85)) !important;
-}
-
-#profile-window .cosmic-level-nose-shine{
-  fill:none !important;
-  stroke:rgba(255,255,255,.9) !important;
-  stroke-width:1.5 !important;
-  stroke-linecap:round !important;
-  opacity:.85 !important;
-}
-
-#profile-window .cosmic-level-ship-text{
-  font-family:Arial, sans-serif !important;
-  font-size:13px !important;
+#profile-window .cosmic-premium-level{
+  font-family:Arial,sans-serif !important;
+  font-size:15px !important;
   font-weight:900 !important;
-  fill:#03111c !important;
-  stroke:rgba(255,255,255,.78) !important;
-  stroke-width:.55px !important;
+  fill:#02101d !important;
+  stroke:#ffffff !important;
+  stroke-width:.9px !important;
   paint-order:stroke fill !important;
   dominant-baseline:middle !important;
-  pointer-events:none !important;
+  letter-spacing:-0.3px !important;
+}
+
+#profile-window .cosmic-premium-shine{
+  fill:none !important;
+  stroke:rgba(255,255,255,.92) !important;
+  stroke-width:1.8 !important;
+  stroke-linecap:round !important;
 }
 
 </style>
