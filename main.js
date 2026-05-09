@@ -1,4 +1,4 @@
-// COSMIC CLICKER v456 - SMALL LEVEL EMBLEM AND ROOM JOIN FIX
+// COSMIC CLICKER v456 - SMALL LEVEL EMBLEM + ROOM PLAYER FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -2298,66 +2298,106 @@ function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
 }
 
 
+// ===== V456 ROOM PLAYER UPSERT FIX =====
+// Базовая функция была отсутствующей/ломаной, из-за этого joinRoomPlayers падал.
+// Возвращаем всегда объект { data, error }, чтобы destructuring в joinRoomPlayers был безопасным.
+async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = 'id,room_id,player_id,nickname,joined_at'){
+    const client = window.supabaseClient || window.supabase || (typeof supabase !== 'undefined' ? supabase : null);
 
-// ===== V456 ROOM PLAYER UPSERT FALLBACK =====
-// Нужен потому что upsertRoomPlayerRowSafe уже вызывался, но базовая функция отсутствовала.
-// Возвращает объект формата { data, error }, чтобы joinRoomPlayers не падал на destructuring.
-async function upsertRoomPlayerRow(roomId, playerId, nickname = ''){
     try{
-        const safeRoomId = String(roomId || '').trim();
+        const safeRoomId = sanitizeOnlineRoomId?.(roomId) || String(roomId || '').trim();
         const safePlayerId = String(playerId || authState?.playerId || player?.id || '').trim();
-        const safeNickname = String(nickname || player?.nickname || authState?.email || 'Player').trim() || 'Player';
 
         if(!safeRoomId || !safePlayerId){
             return { data:null, error:new Error('missing roomId/playerId for room_players upsert') };
         }
 
-        if(!supabase){
-            return { data:null, error:new Error('Supabase is not ready') };
+        if(!client){
+            return { data:null, error:new Error('Supabase client is not ready') };
         }
 
-        const payload = {
-            room_id: safeRoomId,
-            player_id: safePlayerId,
-            nickname: safeNickname,
-            joined_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
+        const safeBase = (base && typeof base === 'object') ? base : { nickname: String(base || '').trim() };
+        const payload = buildRoomPlayerRowPayload(safeRoomId, safePlayerId, {
+            ...safeBase,
+            nickname: safeBase.nickname || player?.nickname || 'Commander',
+            updated_at: safeBase.updated_at || new Date().toISOString()
+        });
 
-        try{
-            if(typeof currentLevel !== 'undefined') payload.level = Number(currentLevel || player?.level || 1) || 1;
-        }catch(_){}
+        const selectedColumns = String(selectClause || 'id,room_id,player_id,nickname,joined_at').trim();
 
-        try{
-            if(typeof lastMeasuredPing !== 'undefined') payload.ping = Number(lastMeasuredPing || 0) || 0;
-        }catch(_){}
-
-        try{
-            if(typeof selectedLobbyMap !== 'undefined' && selectedLobbyMap?.team) payload.team = selectedLobbyMap.team;
-        }catch(_){}
-
-        const result = await supabase
+        let result = await client
             .from('room_players')
             .upsert(payload, { onConflict:'room_id,player_id' })
-            .select('id,room_id,player_id,nickname,joined_at')
-            .limit(1)
-            .maybeSingle();
+            .select(selectedColumns)
+            .limit(1);
 
-        return result || { data:null, error:null };
+        if(!result?.error){
+            return {
+                data: Array.isArray(result?.data) ? result.data : (result?.data ? [result.data] : []),
+                error: null
+            };
+        }
+
+        const msg = String(result?.error?.message || '').toLowerCase();
+        const code = String(result?.error?.code || '').trim();
+
+        if(code === '23505' || code === '42P10' || msg.includes('duplicate') || msg.includes('conflict') || msg.includes('unique')){
+            const probe = await client
+                .from('room_players')
+                .select('id')
+                .eq('room_id', safeRoomId)
+                .eq('player_id', safePlayerId)
+                .limit(1);
+
+            const existingId = Array.isArray(probe?.data) && probe.data[0]?.id ? String(probe.data[0].id) : '';
+
+            if(existingId){
+                const updated = await client
+                    .from('room_players')
+                    .update(payload)
+                    .eq('id', existingId)
+                    .select(selectedColumns)
+                    .limit(1);
+
+                return {
+                    data: Array.isArray(updated?.data) ? updated.data : (updated?.data ? [updated.data] : []),
+                    error: updated?.error || null
+                };
+            }
+
+            const inserted = await client
+                .from('room_players')
+                .insert(payload)
+                .select(selectedColumns)
+                .limit(1);
+
+            return {
+                data: Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
+                error: inserted?.error || null
+            };
+        }
+
+        return {
+            data: Array.isArray(result?.data) ? result.data : (result?.data ? [result.data] : []),
+            error: result?.error || null
+        };
+
     }catch(error){
-        console.warn('upsertRoomPlayerRow fallback warning:', error?.message || error);
-        return { data:null, error };
+        console.warn('upsertRoomPlayerRow warning:', error?.message || error);
+        return { data:null, error:error || new Error('upsertRoomPlayerRow failed') };
     }
 }
 
-async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}){
+async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}, selectClause = 'id,room_id,player_id,nickname,joined_at'){
     try{
-        return await upsertRoomPlayerRow(roomId, playerId, base);
+        const result = await upsertRoomPlayerRow(roomId, playerId, base, selectClause);
+        return result || { data:null, error:new Error('empty upsertRoomPlayerRow result') };
     }catch(error){
         console.warn('upsertRoomPlayerRowSafe warning:', error?.message || error);
         return { data:null, error:error || new Error('upsertRoomPlayerRowSafe failed') };
     }
 }
+
 
 
 function getJoinedLobbyRoomId(){
