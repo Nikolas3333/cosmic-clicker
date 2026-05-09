@@ -1,4 +1,4 @@
-// COSMIC CLICKER v458 - ROOM PLAYERS SYNC FIX
+// COSMIC CLICKER v459 - PERSISTENT WORKING SKILLS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -279,6 +279,74 @@ function getProfileSkillsForSaveV440(){
     return JSON.parse(JSON.stringify(levels));
 }
 
+const PROFILE_SKILL_RESET_COST_DIAMONDS_V459 = 5;
+let isApplyingSaveDataV459 = false;
+
+function getProfileSkillStorageKeyV459(){
+    const accountId = String(authState?.playerId || authState?.email || player?.id || player?.nickname || 'guest').trim() || 'guest';
+    return `cosmicProfileSkillLevels:${accountId}`;
+}
+
+function saveProfileSkillsLocalV459(){
+    try{
+        localStorage.setItem(getProfileSkillStorageKeyV459(), JSON.stringify(getProfileSkillsForSaveV440()));
+    }catch(_){}
+}
+
+function loadProfileSkillsLocalV459(){
+    try{
+        const raw = localStorage.getItem(getProfileSkillStorageKeyV459());
+        if(!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    }catch(_){
+        return null;
+    }
+}
+
+function getProfileDiamondBalanceV459(){
+    return Math.max(
+        Number(playerResources?.crystals || 0) || 0,
+        Number(playerResources?.diamonds || 0) || 0,
+        Number(player?.crystals || 0) || 0,
+        Number(player?.diamonds || 0) || 0
+    );
+}
+
+function spendProfileDiamondsV459(amount = 0){
+    const cost = Math.max(0, Number(amount || 0) || 0);
+    if(cost <= 0) return true;
+    const current = getProfileDiamondBalanceV459();
+    if(current < cost) return false;
+
+    const next = Math.max(0, current - cost);
+    try{ playerResources.crystals = next; }catch(_){}
+    try{ playerResources.diamonds = next; }catch(_){}
+    try{ player.crystals = next; }catch(_){}
+    try{ player.diamonds = next; }catch(_){}
+    try{ markLocalResourceDirty?.(7000); }catch(_){}
+    return true;
+}
+
+function getProfileSkillLevelV459(skillId = ''){
+    const levels = ensureProfileSkillLevelsV440();
+    return Math.max(0, Math.min(PROFILE_SKILL_MAX_LEVEL_V440, Number(levels[String(skillId || '').trim()] || 0) || 0));
+}
+
+function getProfileSkillBonusV459(skillId = '', perLevel = 0){
+    return getProfileSkillLevelV459(skillId) * Number(perLevel || 0);
+}
+
+function applyProfileSkillsLocalFallbackV459(){
+    const local = loadProfileSkillsLocalV459();
+    if(local && typeof local === 'object'){
+        applyProfileSkillsFromSaveV440({ skillLevels: local });
+    }else{
+        ensureProfileSkillLevelsV440();
+    }
+}
+
+
 function applyProfileSkillsFromSaveV440(save = {}){
     const source = (save?.skillLevels && typeof save.skillLevels === 'object')
         ? save.skillLevels
@@ -290,6 +358,7 @@ function applyProfileSkillsFromSaveV440(save = {}){
         playerSkillLevelsV440[skill.id] = Math.max(0, Math.min(PROFILE_SKILL_MAX_LEVEL_V440, Number.isFinite(raw) ? Math.floor(raw) : 0));
     });
     ensureProfileSkillLevelsV440();
+    try{ saveProfileSkillsLocalV459?.(); }catch(_){}
 }
 
 function renderProfileSkillBarsV440(level = 0){
@@ -553,7 +622,7 @@ function setSelectedShipIdEverywhereV448(shipId = ''){
     try{ player.selectedShipId = safeId; }catch(_){}
     try{ localStorage.setItem('cosmicSelectedShipId', safeId); }catch(_){}
     try{ currentBattleShipStats = computeShipBattleStats?.(safeId) || currentBattleShipStats; }catch(_){}
-    try{ saveGame?.(); }catch(_){}
+    try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){}
     try{ setTimeout(() => { refreshProfileShipPreviewIfOpenV446?.(); }, 60); }catch(_){}
 }
 
@@ -611,7 +680,7 @@ function renderProfileSkillsPanelV440(isSelf = false){
     return `
       <div class="profile-skills-panel-v442">
         <div class="profile-skills-head-v442">
-          <span>Навыки пилота</span>
+          <span>Навыки пилота</span><small class="profile-skill-reset-cost-v459">− навык: 5 💎</small>
           ${free > 0 ? `<span class="profile-skill-points-v442">Очки: <b>${free}</b></span>` : ``}
         </div>
         <div class="profile-skills-list-v442">
@@ -630,7 +699,7 @@ function renderProfileSkillsPanelV440(isSelf = false){
                     <span class="profile-skill-name-v442">${escapeProfileHtmlV428(skill.name)}</span>
                   </div>
                   <div class="profile-skill-upgrade-v442">
-                    ${isSelf ? `<button type="button" class="profile-skill-btn-v442" data-skill-action="minus" data-skill-id="${skill.id}" ${canMinus ? '' : 'disabled'}>−</button>` : ''}
+                    ${isSelf ? `<button type="button" class="profile-skill-btn-v442" data-skill-action="minus" data-skill-id="${skill.id}" title="Сброс навыка: 5 💎" ${canMinus ? '' : 'disabled'}>−</button>` : ''}
                     <div class="profile-skill-bars-v442">${bars}</div>
                     <span class="profile-skill-num-v442">${lvl}</span>
                     ${isSelf ? `<button type="button" class="profile-skill-btn-v442 plus" data-skill-action="plus" data-skill-id="${skill.id}" ${canPlus ? '' : 'disabled'}>+</button>` : ''}
@@ -649,15 +718,30 @@ function changeProfileSkillV440(skillId = '', delta = 0){
     ensureProfileSkillLevelsV440();
 
     const current = Number(playerSkillLevelsV440[safeId] || 0) || 0;
+
     if(delta > 0){
         if(getProfileSkillFreePointsV440() <= 0) return;
         if(current >= PROFILE_SKILL_MAX_LEVEL_V440) return;
         playerSkillLevelsV440[safeId] = current + 1;
     }else if(delta < 0){
         if(current <= 0) return;
+
+        if(!spendProfileDiamondsV459(PROFILE_SKILL_RESET_COST_DIAMONDS_V459)){
+            try{ alert(`Недостаточно диамантов. Сброс 1 навыка стоит ${PROFILE_SKILL_RESET_COST_DIAMONDS_V459} 💎`); }catch(_){}
+            return;
+        }
+
         playerSkillLevelsV440[safeId] = current - 1;
+    }else{
+        return;
     }
 
+    ensureProfileSkillLevelsV440();
+    saveProfileSkillsLocalV459();
+
+    try{ currentBattleShipStats = computeShipBattleStats?.(player?.selectedShipId || '') || currentBattleShipStats; }catch(_){}
+    try{ inventory?.syncFromPlayerResources?.(); }catch(_){}
+    try{ updateHUD?.(); updateUI?.(); updatePremiumAccountInfo?.(); updateBattlePlayerHud?.(); updateHangarHeaderNumbers?.(); }catch(_){}
     try{ saveGame?.(); }catch(_){}
     try{ renderProfileStats?.(); }catch(_){}
 }
@@ -4447,7 +4531,10 @@ window.addEventListener("click",(event)=>{
     /* ===== ДОБЫЧА РЕСУРСА ===== */
 if(planet.currentResourceAmount > 0){
 
-    planet.currentResourceAmount -= damage;
+    const miningBonusV459 = Math.max(0, Number(getProfileSkillBonusV459?.('mining', 0.05) || 0) || 0);
+    const harvestAmountV459 = Math.max(1, Math.round(Number(damage || 1) * (1 + miningBonusV459)));
+
+    planet.currentResourceAmount -= harvestAmountV459;
 
     if(planet.currentResourceAmount < 0)
         planet.currentResourceAmount = 0;
@@ -4459,8 +4546,8 @@ if(planet.currentResourceAmount > 0){
         if(!playerResources[randomResource])
             playerResources[randomResource] = 0;
 
-        playerResources[randomResource] += damage;
-        inventory.addResource(randomResource, damage, planet.name);
+        playerResources[randomResource] += harvestAmountV459;
+        inventory.addResource(randomResource, harvestAmountV459, planet.name);
     }
 
     playEffectSound(clickSound);
@@ -4604,6 +4691,7 @@ updateUI();
 
 function applySaveData(save){
     if(!save || typeof save !== 'object') return;
+    isApplyingSaveDataV459 = true;
     try{ syncProfileBattleStatsFromSaveV438(save); }catch(_){}
     currentLevel = Number(save.level || 1);
     damage = Number(save.damage || 1);
@@ -4620,7 +4708,7 @@ function applySaveData(save){
     if(Array.isArray(save.ownedShipIds) && save.ownedShipIds.length){
         player.ownedShipIds = Array.from(new Set(save.ownedShipIds.map(id => String(id || '').trim()).filter(Boolean)));
     }
-    if(save.selectedShipId) player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+    if(save.selectedShipId) player.selectedShipId = String(save.selectedShipId || '').trim() || player.selectedShipId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     if(Array.isArray(save.ownedModuleIds)){
         player.ownedModuleIds = Array.from(new Set(save.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean)));
     }
@@ -4628,7 +4716,7 @@ function applySaveData(save){
         player.activeModulesByShip = save.activeModulesByShip;
     }
     const savedSelectedShipIdV446 = String(save?.selectedShipId || save?.selected_ship_id || save?.shipId || save?.ship_id || '').trim();
-    if(savedSelectedShipIdV446){ player.selectedShipId = savedSelectedShipIdV446; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} }
+    if(savedSelectedShipIdV446){ player.selectedShipId = savedSelectedShipIdV446; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} }
     const savedSelectedShipIdV448 = String(save?.selectedShipId || save?.selected_ship_id || save?.shipId || save?.ship_id || '').trim();
     if(savedSelectedShipIdV448){ try{ setSelectedShipIdEverywhereV448?.(savedSelectedShipIdV448); }catch(_){ player.selectedShipId = savedSelectedShipIdV448; } }
     try{ applyProfileSkillsFromSaveV440?.(save); }catch(_){}
@@ -4636,9 +4724,12 @@ function applySaveData(save){
     ensureModuleOwnershipDefaults?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     for(let i=0;i<planets.length;i++) planets[i].unlocked = i < currentLevel;
+    try{ applyProfileSkillsLocalFallbackV459?.(); }catch(_){}
+    currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
     updatePremiumAccountInfo?.();
     updateHUD?.();
     updateUI?.();
+    isApplyingSaveDataV459 = false;
 }
 
 function getSafePlayerPublicId(){
@@ -4672,6 +4763,7 @@ async function loadRemoteSaveFromSupabase(){
 async function loadGame(){
     ensureShopOwnershipDefaults?.();
     try{ syncProfileBattleStatsFromSaveV438(loadProfileBattleStatsLocalV439?.() || {}); }catch(_){}
+    try{ applyProfileSkillsLocalFallbackV459?.(); }catch(_){}
     const saveKey = getActiveSaveKey();
     if(saveKey){
         const localData = localStorage.getItem(saveKey);
@@ -4681,6 +4773,7 @@ async function loadGame(){
     }
     const remoteSave = await loadRemoteSaveFromSupabase();
     if(remoteSave) applySaveData(remoteSave);
+    try{ applyProfileSkillsLocalFallbackV459?.(); }catch(_){}
     try{ syncProfileBattleStatsFromSaveV438(loadProfileBattleStatsLocalV439?.() || {}); }catch(_){}
     ensureShopOwnershipDefaults?.();
     ensureModuleOwnershipDefaults?.();
@@ -4725,6 +4818,7 @@ function buildSavePayload(){
         selectedShipId: String(player.selectedShipId || 'scout_1'),
         selected_ship_id: String(player.selectedShipId || 'scout_1'),
         skillLevels: getProfileSkillsForSaveV440?.() || {},
+        skills: getProfileSkillsForSaveV440?.() || {},
         skillPointsTotal: getProfileSkillTotalPointsV440?.() || 0,
         skillPointsSpent: getProfileSkillSpentPointsV440?.() || 0,
         battleStats: profileTotalsV439,
@@ -5019,6 +5113,15 @@ const BATTLE_LIMIT = 920;
 if (gameState === "BATTLE" && playerShip) {
     updateBattleReloadState();
     updateBattleRespawnState();
+
+    // V459: навык регена щита постепенно восстанавливает HP в бою.
+    try{
+        const regenLevelV459 = getProfileSkillLevelV459?.('shieldRegen') || 0;
+        if(regenLevelV459 > 0 && !battleShipCrash && !isBattleRespawning?.()){
+            playerHp = Math.min(playerMaxHp, Number(playerHp || 0) + regenLevelV459 * 0.0028);
+        }
+    }catch(_){}
+
     updateBattlePlayerWorldHp();
     updateBattlePlayerWorldName();
     if(battleShipCrash){
@@ -5046,10 +5149,10 @@ if (gameState === "BATTLE" && playerShip) {
     if(!Number.isFinite(battleEnergyPool) || battleEnergyPool < 0){
         battleEnergyPool = Math.min(Math.max(0, Number(playerResources?.solar_energy || 0) || 0), battleEnergyCapacity);
     }
-    const boostDrain = 0.0045;
+    const boostDrain = Math.max(0.0015, 0.0045 * (1 - Number(currentBattleShipStats?.boostEfficiencyBonus || 0)));
     const boostActive = !!(keys.shift && hasMoveInput && battleEnergyPool > boostDrain);
     if(boostActive){
-        forwardAcceleration *= 1.62;
+        forwardAcceleration *= (1.62 + Number(currentBattleShipStats?.boostDurationBonus || 0));
         backwardAcceleration *= 1.34;
         strafeAcceleration *= 1.22;
         maxSpeed *= 1.42;
@@ -5107,7 +5210,15 @@ if (gameState === "BATTLE" && playerShip) {
         }
         if (hitEnemyBot) {
             const armor = Math.max(0, Math.min(0.65, Number(hitEnemyBot.userData?.armor || 0) || 0));
-            const dealtDamage = Math.max(1, Math.round((Number(laser.damage || 0) || 1) * (1 - armor)));
+            let rawLaserDamageV459 = Number(laser.damage || 0) || 1;
+            try{
+                const critChanceV459 = Number(currentBattleShipStats?.critChance || 0) || 0;
+                if(critChanceV459 > 0 && Math.random() < critChanceV459){
+                    rawLaserDamageV459 *= Number(currentBattleShipStats?.critDamageMult || 1.5) || 1.5;
+                    try{ laser.mesh.userData.critical = true; }catch(_){}
+                }
+            }catch(_){}
+            const dealtDamage = Math.max(1, Math.round(rawLaserDamageV459 * (1 - armor)));
             hitEnemyBot.userData.hp -= dealtDamage;
             scene.remove(laser.mesh);
             activeLasers.splice(i, 1);
@@ -12165,7 +12276,7 @@ function sellHullFromHangar(hullId){
         delete player.hangarDockAssignments[safeId];
     }
     if(String(player?.selectedShipId || '').trim() === safeId){
-        player.selectedShipId = String(player.ownedShipIds?.[0] || 'scout_1').trim() || 'scout_1'; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+        player.selectedShipId = String(player.ownedShipIds?.[0] || 'scout_1').trim() || 'scout_1'; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     }
     refreshOwnedShipsInventory?.();
     currentBattleShipStats = computeShipBattleStats(player?.selectedShipId || '');
@@ -12545,6 +12656,54 @@ function computeShipBattleStats(shipId){
         }
     });
 
+    // ===== V459 REAL PROFILE SKILL BONUSES =====
+    // Каждый уровень навыка реально влияет на боевые параметры.
+    try{
+        const skillHealth = getProfileSkillLevelV459('health');
+        const skillShield = getProfileSkillLevelV459('shield');
+        const skillShieldRegen = getProfileSkillLevelV459('shieldRegen');
+        const skillSpeed = getProfileSkillLevelV459('speed');
+        const skillBoost = getProfileSkillLevelV459('boost');
+        const skillEnergySave = getProfileSkillLevelV459('energySave');
+        const skillManeuver = getProfileSkillLevelV459('maneuver');
+        const skillDamage = getProfileSkillLevelV459('damage');
+        const skillAccuracy = getProfileSkillLevelV459('accuracy');
+        const skillReload = getProfileSkillLevelV459('reload');
+        const skillCrit = getProfileSkillLevelV459('crit');
+        const skillMining = getProfileSkillLevelV459('mining');
+
+        stats.hp *= (1 + skillHealth * 0.035 + skillShield * 0.025);
+        stats.shieldBonus = Number((skillShield * 0.04).toFixed(3));
+        stats.shieldRegenBonus = Number((skillShieldRegen * 0.05).toFixed(3));
+
+        stats.maxSpeed *= (1 + skillSpeed * 0.025);
+        stats.forwardAcceleration *= (1 + skillSpeed * 0.018);
+        stats.backwardAcceleration *= (1 + skillSpeed * 0.012);
+        stats.strafeAcceleration *= (1 + skillSpeed * 0.014);
+
+        stats.boostDurationBonus = Number((skillBoost * 0.06).toFixed(3));
+        stats.boostEfficiencyBonus = Number((skillEnergySave * 0.055).toFixed(3));
+
+        stats.turnYaw *= (1 + skillManeuver * 0.025);
+        stats.turnPitch *= (1 + skillManeuver * 0.025);
+        stats.rollLimit *= (1 + skillManeuver * 0.018);
+
+        stats.weaponDamage *= (1 + skillDamage * 0.035);
+        stats.spread = Math.max(0, stats.spread * (1 - skillAccuracy * 0.055));
+        stats.fireCooldown *= (1 - skillReload * 0.026);
+        stats.reloadTime *= (1 - skillReload * 0.032);
+
+        stats.critChance = Number((skillCrit * 0.018).toFixed(3));
+        stats.critDamageMult = Number((1.45 + skillCrit * 0.035).toFixed(2));
+        stats.miningBonus = Number((skillMining * 0.05).toFixed(3));
+
+        if(skillHealth || skillShield || skillSpeed || skillManeuver || skillDamage || skillAccuracy || skillReload || skillCrit || skillMining){
+            stats.moduleSummary.push('навыки пилота');
+        }
+    }catch(error){
+        console.warn('profile skill stats warning:', error?.message || error);
+    }
+
     stats.maxSpeed *= 0.76;
     stats.forwardAcceleration *= 0.72;
     stats.backwardAcceleration *= 0.72;
@@ -12745,7 +12904,7 @@ function startHangarShipTransfer(previousShipId, nextShipId, clickedDockIndex = 
     const centerMesh = showcaseGroup?.children?.[0] || null;
     const supportMesh = (hangarState.supportShipMeshes || []).find(mesh => String(mesh?.userData?.shipId || '').trim() === safeNext) || null;
     if(!centerMesh || !supportMesh){
-        player.selectedShipId = safeNext; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+        player.selectedShipId = safeNext; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
         currentBattleShipStats = computeShipBattleStats(safeNext);
         updatePremiumAccountInfo?.();
         updateHUD?.();
@@ -15225,7 +15384,7 @@ function ensureHangarRenderer(){
             if(progress >= 1){
                 const finalShipId = String(transfer.nextShipId || '').trim();
                 if(finalShipId){
-                    player.selectedShipId = finalShipId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+                    player.selectedShipId = finalShipId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
                     currentBattleShipStats = computeShipBattleStats(finalShipId);
                     updatePremiumAccountInfo?.();
                     updateHUD?.();
@@ -17444,7 +17603,7 @@ refreshOwnedShipsInventory = refreshOwnedShipsInventoryFull;
 function equipOwnedShip(shipId){
     const safeId = String(shipId || '').trim();
     if(!safeId || !isOwnedShip(safeId)) return false;
-    player.selectedShipId = safeId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+    player.selectedShipId = safeId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     currentBattleShipStats = computeShipBattleStats(safeId);
     refreshOwnedShipsInventory?.();
     saveGame?.();
@@ -17486,7 +17645,7 @@ function buyShipFromShop(shipId){
     ensureHangarDockAssignments?.();
 
     const previousSelectedShipId = String(player.selectedShipId || 'scout_1').trim() || 'scout_1';
-    player.selectedShipId = previousSelectedShipId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+    player.selectedShipId = previousSelectedShipId; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     if(!player.activeModulesByShip || typeof player.activeModulesByShip !== 'object') player.activeModulesByShip = {};
     if(!player.activeModulesByShip[ship.id] || typeof player.activeModulesByShip[ship.id] !== 'object') player.activeModulesByShip[ship.id] = {};
     const defaultWeapon = player.ownedModuleIds.find(id => getModuleById(id)?.classId === 'weapon') || '';
@@ -19751,7 +19910,7 @@ function applyGuestHangarPayload(profileData = {}, saveData = null, fallbackNick
     // Поэтому не меняем player.nickname / player.id / level / experience / credits / playerResources.
     // Временно подменяется только витрина ангара: корабли, модули и расстановка.
     player.ownedShipIds = Array.from(new Set(guestOwnedShips.length ? guestOwnedShips : ['scout_1']));
-    player.selectedShipId = String(payload.selectedShipId || player.ownedShipIds[0] || 'scout_1').trim() || 'scout_1'; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
+    player.selectedShipId = String(payload.selectedShipId || player.ownedShipIds[0] || 'scout_1').trim() || 'scout_1'; try{ localStorage.setItem("cosmicSelectedShipId", String(player.selectedShipId || "")); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){} try{ if(!isApplyingSaveDataV459) saveGame?.(); }catch(_){} try{ refreshProfileShipPreviewIfOpenV446?.(); }catch(_){}
     player.ownedModuleIds = Array.isArray(payload.ownedModuleIds) ? Array.from(new Set(payload.ownedModuleIds.map(id => String(id || '').trim()).filter(Boolean))) : ['weapon_laser_s1','shield_micro_s1','booster_ion_s1'];
     player.activeModulesByShip = payload.activeModulesByShip && typeof payload.activeModulesByShip === 'object'
         ? JSON.parse(JSON.stringify(payload.activeModulesByShip))
