@@ -1,4 +1,4 @@
-// COSMIC CLICKER v456 - SMALL LEVEL EMBLEM + ROOM PLAYER FIX
+// COSMIC CLICKER v457 - BATTLE SCENE VISIBILITY FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -3107,6 +3107,9 @@ if(gameState === "BATTLE"){
     } else {
         const cross = document.getElementById('battle-crosshair'); if(cross) cross.style.display = 'block';
         spawnPlayer();
+        verifyBattleSceneVisibleV457('switchState-immediate');
+        setTimeout(() => { try{ verifyBattleSceneVisibleV457('switchState-delay-180'); }catch(_){} }, 180);
+        setTimeout(() => { try{ verifyBattleSceneVisibleV457('switchState-delay-700'); }catch(_){} }, 700);
         if(isSoloBattleActive()){
             activeSoloMission = { ...(currentRoom || selectedLobbyMap || {}), real: targetMap, name: targetMap };
             activeSoloMissionCompleted = false;
@@ -5305,6 +5308,18 @@ if(gameState === "BATTLE" && isEndlessSoloBattle()){
 }
 limitBattleArea();
 updateBattlePlayerHud();
+
+if(gameState === "BATTLE" && playerShip){
+    try{
+        const canvas = renderer?.domElement || document.querySelector('canvas');
+        if(canvas){
+            canvas.style.setProperty('display', 'block', 'important');
+            canvas.style.setProperty('visibility', 'visible', 'important');
+            canvas.style.setProperty('opacity', '1', 'important');
+        }
+    }catch(_){}
+}
+
 renderer.render(scene,camera);
 }
 
@@ -10928,6 +10943,86 @@ function updateBattleScoreboard(){
 
 // ================= SPAWN PLAYER =================
 
+
+// ===== V457 BATTLE SCENE VISIBILITY GUARD =====
+// Если после входа на карту виден только чёрный экран и прицел,
+// принудительно ставим камеру за корабль и проверяем, что сцена реально собрана.
+function forceBattleCameraBehindPlayerV457(reason = ''){
+    try{
+        if(gameState !== 'BATTLE' && gameState !== 'OBSERVE') return;
+        if(!playerShip || !camera || !scene) return;
+
+        const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(playerShip.quaternion).normalize();
+        const followDistance = Number(playerShip?.userData?.cameraDistance || 16) || 16;
+        const followHeight = Number(playerShip?.userData?.cameraHeight || 5.5) || 5.5;
+
+        const camPos = playerShip.position.clone()
+            .add(direction.clone().multiplyScalar(-followDistance))
+            .add(new THREE.Vector3(0, followHeight, 0));
+
+        camera.position.copy(camPos);
+        camera.lookAt(playerShip.position.clone().add(direction.clone().multiplyScalar(35)));
+        camera.updateProjectionMatrix?.();
+
+        if(renderer?.domElement){
+            renderer.domElement.style.display = 'block';
+            renderer.domElement.style.visibility = 'visible';
+            renderer.domElement.style.opacity = '1';
+        }
+    }catch(error){
+        console.warn('forceBattleCameraBehindPlayerV457 warning:', reason, error?.message || error);
+    }
+}
+
+function verifyBattleSceneVisibleV457(reason = ''){
+    try{
+        if(gameState !== 'BATTLE') return;
+
+        const mapKey = normalizeBattleMapName(currentRoom?.real || selectedLobbyMap?.real || currentRoom?.map || selectedLobbyMap?.name || currentRoom?.title || 'earth');
+
+        if(!battleMapPlanet && !isEndlessSoloBattle()){
+            try{
+                enterBattleMap(mapKey);
+            }catch(error){
+                console.warn('verifyBattleSceneVisibleV457 enterBattleMap warning:', error?.message || error);
+            }
+        }
+
+        if(!playerShip){
+            try{
+                spawnPlayer();
+            }catch(error){
+                console.warn('verifyBattleSceneVisibleV457 spawnPlayer warning:', error?.message || error);
+            }
+        }
+
+        forceBattleCameraBehindPlayerV457(reason || 'verify');
+
+        try{
+            if(typeof battleMapPlanet !== 'undefined' && battleMapPlanet){
+                battleMapPlanet.visible = true;
+            }
+            if(playerShip){
+                playerShip.visible = true;
+            }
+            if(typeof stars !== 'undefined' && stars){
+                stars.visible = true;
+            }
+        }catch(_){}
+
+        try{
+            const canvas = document.querySelector('canvas');
+            if(canvas){
+                canvas.style.setProperty('display', 'block', 'important');
+                canvas.style.setProperty('visibility', 'visible', 'important');
+                canvas.style.setProperty('opacity', '1', 'important');
+            }
+        }catch(_){}
+    }catch(error){
+        console.warn('verifyBattleSceneVisibleV457 warning:', reason, error?.message || error);
+    }
+}
+
 function spawnPlayer() {
 
     if (playerShip) {
@@ -10980,7 +11075,11 @@ function spawnPlayer() {
     battleWeapon.reloadEndsAt = 0;
 
     scene.add(playerShip);
-    camera.lookAt(playerShip.position);
+
+    // V457: не ждём плавного lerp из animate().
+    // Сразу ставим камеру за корабль, иначе после входа на карту можно увидеть только чёрный экран и прицел.
+    forceBattleCameraBehindPlayerV457('spawnPlayer');
+
     updateBattlePlayerHud();
 }
 
