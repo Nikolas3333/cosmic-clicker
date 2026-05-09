@@ -1,4 +1,4 @@
-// COSMIC CLICKER v455 - BRIGHT PREMIUM LEVEL SHIP ICON
+// COSMIC CLICKER v456 - SMALL LEVEL EMBLEM AND ROOM JOIN FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -2298,12 +2298,64 @@ function buildRoomPlayerRowPayload(roomId, playerId, base = {}){
 }
 
 
+
+// ===== V456 ROOM PLAYER UPSERT FALLBACK =====
+// Нужен потому что upsertRoomPlayerRowSafe уже вызывался, но базовая функция отсутствовала.
+// Возвращает объект формата { data, error }, чтобы joinRoomPlayers не падал на destructuring.
+async function upsertRoomPlayerRow(roomId, playerId, nickname = ''){
+    try{
+        const safeRoomId = String(roomId || '').trim();
+        const safePlayerId = String(playerId || authState?.playerId || player?.id || '').trim();
+        const safeNickname = String(nickname || player?.nickname || authState?.email || 'Player').trim() || 'Player';
+
+        if(!safeRoomId || !safePlayerId){
+            return { data:null, error:new Error('missing roomId/playerId for room_players upsert') };
+        }
+
+        if(!supabase){
+            return { data:null, error:new Error('Supabase is not ready') };
+        }
+
+        const payload = {
+            room_id: safeRoomId,
+            player_id: safePlayerId,
+            nickname: safeNickname,
+            joined_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        try{
+            if(typeof currentLevel !== 'undefined') payload.level = Number(currentLevel || player?.level || 1) || 1;
+        }catch(_){}
+
+        try{
+            if(typeof lastMeasuredPing !== 'undefined') payload.ping = Number(lastMeasuredPing || 0) || 0;
+        }catch(_){}
+
+        try{
+            if(typeof selectedLobbyMap !== 'undefined' && selectedLobbyMap?.team) payload.team = selectedLobbyMap.team;
+        }catch(_){}
+
+        const result = await supabase
+            .from('room_players')
+            .upsert(payload, { onConflict:'room_id,player_id' })
+            .select('id,room_id,player_id,nickname,joined_at')
+            .limit(1)
+            .maybeSingle();
+
+        return result || { data:null, error:null };
+    }catch(error){
+        console.warn('upsertRoomPlayerRow fallback warning:', error?.message || error);
+        return { data:null, error };
+    }
+}
+
 async function upsertRoomPlayerRowSafe(roomId, playerId, base = {}){
     try{
         return await upsertRoomPlayerRow(roomId, playerId, base);
     }catch(error){
         console.warn('upsertRoomPlayerRowSafe warning:', error?.message || error);
-        return null;
+        return { data:null, error:error || new Error('upsertRoomPlayerRowSafe failed') };
     }
 }
 
