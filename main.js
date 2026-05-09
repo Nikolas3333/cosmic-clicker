@@ -1,4 +1,4 @@
-// COSMIC CLICKER v468 - REAL ROOMPLAYERS NICK REMOTE SHIELD
+// COSMIC CLICKER v469 - STABLE REMOTE SYNC MAP TEXT FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -2438,7 +2438,6 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
         });
 
         const selectedColumns = String(selectClause || 'id,room_id,player_id,nickname,joined_at').trim();
-
         const updatePayload = {
             nickname: payload.nickname,
             updated_at: payload.updated_at,
@@ -2449,21 +2448,43 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
             ...(payload.rotation ? { rotation: payload.rotation } : {})
         };
 
-        // V468: сначала UPDATE по room_id/player_id.
-        // Это не создаёт POST 409 и убирает постоянный Conflict в консоли, если строка уже есть.
-        const updated = await client
-            .from('room_players')
-            .update(updatePayload)
-            .eq('room_id', safeRoomId)
-            .eq('player_id', safePlayerId)
-            .select(selectedColumns)
-            .limit(1);
+        const updateByPair = async () => {
+            return await client
+                .from('room_players')
+                .update(updatePayload)
+                .eq('room_id', safeRoomId)
+                .eq('player_id', safePlayerId)
+                .select(selectedColumns)
+                .limit(1);
+        };
 
+        const updated = await updateByPair();
         if(!updated?.error && Array.isArray(updated?.data) && updated.data.length){
-            return { data: updated.data, error:null };
+            return { data:updated.data, error:null };
         }
 
-        // Если строки нет — только тогда INSERT.
+        // Перед INSERT делаем SELECT. Это резко снижает 409, если строка уже существует.
+        const found = await client
+            .from('room_players')
+            .select('id')
+            .eq('room_id', safeRoomId)
+            .eq('player_id', safePlayerId)
+            .limit(1);
+
+        const existingId = Array.isArray(found?.data) && found.data[0]?.id ? String(found.data[0].id) : '';
+        if(existingId){
+            const updatedById = await client
+                .from('room_players')
+                .update(updatePayload)
+                .eq('id', existingId)
+                .select(selectedColumns)
+                .limit(1);
+            return {
+                data:Array.isArray(updatedById?.data) ? updatedById.data : [],
+                error:null
+            };
+        }
+
         const inserted = await client
             .from('room_players')
             .insert(payload)
@@ -2472,39 +2493,26 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
 
         if(!inserted?.error){
             return {
-                data: Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
+                data:Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
                 error:null
             };
         }
 
         const msg = String(inserted?.error?.message || '').toLowerCase();
         const code = String(inserted?.error?.code || '').trim();
-        const isConflict = code === '23505'
-            || code === '409'
-            || msg.includes('duplicate')
-            || msg.includes('conflict')
-            || msg.includes('already exists');
+        const isConflict = code === '23505' || code === '409' || msg.includes('duplicate') || msg.includes('conflict') || msg.includes('already exists');
 
         if(isConflict){
-            // Важное: НЕ пробрасываем ошибку наверх и не ломаем бой.
-            // Повторяем UPDATE по composite ключу; если Supabase вернёт пусто — всё равно считаем join успешным.
-            const updatedAfterConflict = await client
-                .from('room_players')
-                .update(updatePayload)
-                .eq('room_id', safeRoomId)
-                .eq('player_id', safePlayerId)
-                .select(selectedColumns)
-                .limit(1);
-
+            const retry = await updateByPair();
             return {
-                data: Array.isArray(updatedAfterConflict?.data) ? updatedAfterConflict.data : [],
+                data:Array.isArray(retry?.data) ? retry.data : [],
                 error:null
             };
         }
 
         return {
-            data: Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
-            error: inserted?.error || null
+            data:Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
+            error:inserted?.error || null
         };
 
     }catch(error){
@@ -9365,7 +9373,7 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     ctx.fillText(String(safeLevel), 0, 2);
     ctx.restore();
 
-    ctx.font = '900 44px Arial';
+    ctx.font = '900 36px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 7;
@@ -9391,7 +9399,7 @@ function createRemotePilotLabel(name, team = 'blue', levelValue = 1){
     });
 
     const sprite = new THREE.Sprite(material);
-    sprite.scale.set(8.2, 2.05, 1);
+    sprite.scale.set(6.8, 1.65, 1);
     sprite.position.set(0, 5.2, 0);
     sprite.renderOrder = 1000;
     sprite.center.set(0.5, 0.0);
@@ -9513,13 +9521,17 @@ function updateRemoteShipShieldV463(entry){
         // V468: визуально показываем shield overlay для удалённого корабля даже если maxShield ещё не приехал из room_players.
         // Это не меняет урон, только гарантирует, что второй аккаунт ВИДИТ эффект.
         const rawMaxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
-        const visualMaxShield = rawMaxShield > 0 ? rawMaxShield : 100;
+        const visualMaxShield = rawMaxShield;
         const shield = Math.max(0, Number(entry.shield ?? entry.mesh?.userData?.shield ?? visualMaxShield) || visualMaxShield);
+        if(visualMaxShield <= 0){
+            disposeRemoteShieldMeshesV463(entry);
+            return;
+        }
 
         entry.maxShield = rawMaxShield > 0 ? rawMaxShield : entry.maxShield;
         entry.shield = rawMaxShield > 0 ? Math.min(rawMaxShield, shield) : shield;
         if(entry.mesh?.userData){
-            entry.mesh.userData.maxShield = rawMaxShield > 0 ? rawMaxShield : 100;
+            entry.mesh.userData.maxShield = rawMaxShield;
             entry.mesh.userData.shield = shield;
         }
 
@@ -9573,8 +9585,8 @@ function updateRemotePilotLabelDistanceV463(entry){
         }
 
         // V468: ник не пропадает, но не раздувается через всю карту.
-        const baseX = 8.2;
-        const baseY = 2.05;
+        const baseX = 6.8;
+        const baseY = 1.65;
         const k = THREE.MathUtils.clamp(52 / Math.max(22, dist), 0.42, 1.18);
         entry.labelSprite.scale.set(baseX * k, baseY * k, 1);
     }catch(_){}
@@ -9590,8 +9602,8 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue', playerId = '
 
     const side = slotIndex % 2 === 0 ? 1 : -1;
     const rank = Math.floor(slotIndex / 2);
-    shipGroup.position.set(side * (70 + rank * 28), 8 + ((slotIndex % 3) - 1) * 6, -40 - rank * 26);
-    shipGroup.lookAt(new THREE.Vector3(0, 0, 0));
+    shipGroup.position.set(0, -9999, 0);
+    shipGroup.visible = false;
 
     const targetPosition = shipGroup.position.clone();
     const targetQuaternion = shipGroup.quaternion.clone();
@@ -10503,7 +10515,11 @@ async function fetchCurrentRoomLivePlayers(){
                     position: {
                         x: Number(playerShip.position.x || 0),
                         y: Number(playerShip.position.y || 0),
-                        z: Number(playerShip.position.z || 0)
+                        z: Number(playerShip.position.z || 0),
+                        hp: Math.round(Number(playerHp || 0) || 0),
+                        maxHp: Math.round(Number(playerMaxHp || currentBattleShipStats?.hp || 100) || 100),
+                        shield: Math.round(Number(playerShield || 0) || 0),
+                        maxShield: Math.round(Number(playerMaxShield || currentBattleShipStats?.shieldCapacity || 0) || 0)
                     },
                     rotation: {
                         x: Number(playerShip.quaternion.x || 0),
@@ -10529,6 +10545,29 @@ async function fetchCurrentRoomLivePlayers(){
             return null;
         }
     })();
+}
+
+
+function isReasonableRemotePositionV469(remoteState, nextPos){
+    try{
+        if(!remoteState?.mesh || !nextPos) return true;
+        if(!remoteState.mesh.userData?.hasInitialSync) return true;
+        const current = remoteState.mesh.position;
+        const dist = current.distanceTo(nextPos);
+        // Карты большие, но резкий скачок на сотни единиц почти всегда stale/чужая строка/параллельная карта.
+        if(dist > 260){
+            remoteState.suspiciousJumpCountV469 = (remoteState.suspiciousJumpCountV469 || 0) + 1;
+            if(remoteState.suspiciousJumpCountV469 <= 2){
+                console.warn('remote position jump ignored v469:', remoteState.nickname, Math.round(dist));
+                return false;
+            }
+        }else{
+            remoteState.suspiciousJumpCountV469 = 0;
+        }
+        return true;
+    }catch(_){
+        return true;
+    }
 }
 
 async function syncLiveBattlePlayers(){
@@ -10614,10 +10653,14 @@ async function syncLiveBattlePlayers(){
         const y = Number(pos?.y);
         const z = Number(pos?.z);
         if(Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)){
-            remoteState.targetPosition.set(x, y, z);
-            if(remoteState.mesh && !remoteState.mesh.userData.hasInitialSync){
-                remoteState.mesh.position.copy(remoteState.targetPosition);
-                remoteState.mesh.userData.hasInitialSync = true;
+            const nextRemotePosV469 = new THREE.Vector3(x, y, z);
+            if(isReasonableRemotePositionV469(remoteState, nextRemotePosV469)){
+                remoteState.targetPosition.copy(nextRemotePosV469);
+                if(remoteState.mesh && !remoteState.mesh.userData.hasInitialSync){
+                    remoteState.mesh.position.copy(remoteState.targetPosition);
+                    remoteState.mesh.userData.hasInitialSync = true;
+                    remoteState.mesh.visible = true;
+                }
             }
         }
 
