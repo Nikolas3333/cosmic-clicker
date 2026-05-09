@@ -1,4 +1,4 @@
-// COSMIC CLICKER v464 - REMOTE SHIELD NO-FRAME NAMES
+// COSMIC CLICKER v465 - HOTFIX TDZ ERRORS
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -6607,7 +6607,7 @@ function isPmTabClosedV338(peerId){
 const localHandledChatMessageIds = new Set();
 const BATTLE_HISTORY_SEARCH_LIMIT = 80;
 const battleHistorySearchState = {
-    playerId: String(playerId || '').trim(),
+    playerId: '',
     loading: false,
     error: '',
     messages: [],
@@ -6616,7 +6616,7 @@ const battleHistorySearchState = {
     keywordQuery: ''
 };
 
-const playerStaffRoleCache = {};
+var playerStaffRoleCache = {};
 const STAFF_ROLE_META = {
     player: { short: "", label: "Игрок", color: "#9fd7ff" },
     mod: { short: "mod", label: "Moderator", color: "#ff2a2a" },
@@ -12554,7 +12554,7 @@ function renderProfileStats(){
 }
 
 
-const hangarState = {
+var hangarState = {
     shipIndex: 0,
     moduleIndex: 0,
     shipFilter: 'all',
@@ -20375,7 +20375,8 @@ function isAccountPublicId(value){
 }
 
 function getOnlineFreshCutoffIso(){
-    return new Date(Date.now() - ONLINE_TTL_MS).toISOString();
+    const ttl = (typeof ONLINE_TTL_MS !== 'undefined' && Number.isFinite(Number(ONLINE_TTL_MS))) ? Number(ONLINE_TTL_MS) : 45000;
+    return new Date(Date.now() - ttl).toISOString();
 }
 
 function ensurePlayerActionMenu(){
