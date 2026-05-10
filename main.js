@@ -1,4 +1,4 @@
-// COSMIC CLICKER v473 - SHIELD OWNER ONLY SLOW HONEYCOMB
+// COSMIC CLICKER v474 - STABLE ROOM SYNC SHIELD ROLLBACK
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -123,21 +123,8 @@ let remoteShieldTextureV471 = null;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 
 function forceRemoteShieldVisibleV467(mesh){
-    try{
-        if(!mesh) return;
-        mesh.visible = true;
-        if(mesh.material){
-            mesh.material.transparent = true;
-            mesh.material.opacity = REMOTE_SHIELD_OPACITY_V466;
-            mesh.material.emissiveIntensity = 4;
-            mesh.material.depthWrite = false;
-        }
-        mesh.scale.set(
-            REMOTE_SHIELD_SCALE_V466,
-            REMOTE_SHIELD_SCALE_V466,
-            REMOTE_SHIELD_SCALE_V466
-        );
-    }catch(_){}
+    // V474: disabled. Forced remote shield caused fake shields and sync confusion.
+    return;
 }
 
 
@@ -9432,13 +9419,7 @@ function hasVisibleRemoteShieldV473(entry){
             Number(entry?.maxShield || 0) || 0,
             Number(entry?.mesh?.userData?.maxShield || 0) || 0
         );
-        const shield = Math.max(
-            Number(entry?.shield || 0) || 0,
-            Number(entry?.mesh?.userData?.shield || 0) || 0
-        );
-
-        // Показываем щит только тем, у кого он реально есть.
-        return maxShield > 0 || shield > 0;
+        return maxShield > 0;
     }catch(_){
         return false;
     }
@@ -9597,7 +9578,7 @@ function attachRemoteShipShieldV463(entry){
 
 function flashRemoteShieldV463(entry){
     if(!entry) return;
-    entry.shieldFlashUntilV463 = Date.now() + 900;
+    entry.shieldFlashUntilV463 = Date.now() + 1400;
 }
 
 function updateRemoteShipShieldV463(entry){
@@ -9634,12 +9615,12 @@ function updateRemoteShipShieldV463(entry){
                 mesh.material.transparent = true;
                 mesh.material.depthWrite = false;
                 mesh.material.depthTest = false;
-                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.14;
+                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.07;
                 mesh.material.color?.setHex?.(color);
                 if(mesh.material.map){
                     mesh.material.map.repeat.set(3.4, 2.6);
-                    mesh.material.map.offset.x += flashing ? 0.004 : 0.0008;
-                    mesh.material.map.offset.y += flashing ? 0.0025 : 0.0005;
+                    mesh.material.map.offset.x += flashing ? 0.0015 : 0.00035;
+                    mesh.material.map.offset.y += flashing ? 0.0010 : 0.00025;
                     mesh.material.map.needsUpdate = true;
                 }
             }catch(_){}
@@ -10519,6 +10500,18 @@ async function resolveObservedRoomBinding(force = false){
     return sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
 }
 
+function resetRoomPlayersCacheV474(){
+    try{
+        roomPlayersFetchInFlight = false;
+        cachedRoomPlayersRows = [];
+        cachedRoomPlayersFetchedAt = 0;
+        lastRoomPlayersFetchAt = 0;
+        lastRoomPlayersFetchRoomIdV474 = '';
+    }catch(_){}
+}
+
+let lastRoomPlayersFetchRoomIdV474 = '';
+
 async function fetchCurrentRoomLivePlayers(){
     const now = Date.now();
     const requestSerial = Number(battleClientResetSerial || 0);
@@ -10627,25 +10620,9 @@ async function fetchCurrentRoomLivePlayers(){
 
 
 function isReasonableRemotePositionV469(remoteState, nextPos){
-    try{
-        if(!remoteState?.mesh || !nextPos) return true;
-        if(!remoteState.mesh.userData?.hasInitialSync) return true;
-        const current = remoteState.mesh.position;
-        const dist = current.distanceTo(nextPos);
-        // Карты большие, но резкий скачок на сотни единиц почти всегда stale/чужая строка/параллельная карта.
-        if(dist > 260){
-            remoteState.suspiciousJumpCountV469 = (remoteState.suspiciousJumpCountV469 || 0) + 1;
-            if(remoteState.suspiciousJumpCountV469 <= 2){
-                console.warn('remote position jump ignored v469:', remoteState.nickname, Math.round(dist));
-                return false;
-            }
-        }else{
-            remoteState.suspiciousJumpCountV469 = 0;
-        }
-        return true;
-    }catch(_){
-        return true;
-    }
+    // V474: не блокируем позицию игрока в той же комнате.
+    // Старый jump-guard мог оставлять второго игрока в фантомной/старой позиции.
+    return true;
 }
 
 async function syncLiveBattlePlayers(){
@@ -11764,7 +11741,7 @@ function attachPlayerShieldFieldV460(){
 }
 
 function flashPlayerShieldV460(){
-    playerShieldFlashUntilV460 = Date.now() + 900;
+    playerShieldFlashUntilV460 = Date.now() + 1400;
     try{ updatePlayerShieldFieldV460(true); }catch(_){}
 }
 
@@ -11792,8 +11769,8 @@ function updatePlayerShieldFieldV460(force = false){
             try{
                 if(mesh.material.map){
                     mesh.material.map.repeat.set(3.4, 2.6);
-                    mesh.material.map.offset.x += flashing ? 0.004 : 0.0008;
-                    mesh.material.map.offset.y += flashing ? 0.0025 : 0.0005;
+                    mesh.material.map.offset.x += flashing ? 0.0015 : 0.00035;
+                    mesh.material.map.offset.y += flashing ? 0.0010 : 0.00025;
                     mesh.material.map.needsUpdate = true;
                 }
             }catch(_){}
@@ -19476,6 +19453,9 @@ window.renderPlayersOnPlanet = function(entry = {}){
 
                     currentRoom = room;
                     window.currentRoomId = room.id || room.roomId || null;
+                    activeBattleChatRoomId = window.currentRoomId;
+                    persistBattleChatRoomId?.(window.currentRoomId);
+                    resetRoomPlayersCacheV474?.();
                     switchState('BATTLE');
                 })();
             });
@@ -19564,6 +19544,9 @@ window.renderPlayersOnPlanet = function(entry = {}){
 
                 selectedLobbyMap = { ...currentRoom };
                 window.currentRoomId = currentRoom.id || null;
+                activeBattleChatRoomId = currentRoom.id || null;
+                persistBattleChatRoomId?.(currentRoom.id);
+                resetRoomPlayersCacheV474?.();
                 document.getElementById('create-match-window')?.classList.add('hidden');
                 if(roomTitleInput) roomTitleInput.value = '';
 
