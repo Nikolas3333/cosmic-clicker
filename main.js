@@ -1,4 +1,4 @@
-// COSMIC CLICKER v471 - TEAM NICK COLORS REMOTE SHIELD
+// COSMIC CLICKER v472 - CREATE ROOM + SHIP COLOR + SHAPED REMOTE SHIELD
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -2346,8 +2346,7 @@ function getRemoteShipLabelColor(team = 'blue'){
 }
 
 function tryApplyRemoteShipTeamVisual(entry){
-    // V471: корпус корабля НЕ красим по команде.
-    // Командный цвет теперь отображается только на нике над кораблём.
+    // V472: корпус корабля НЕ красим по команде.
     return;
 }
 
@@ -9513,46 +9512,53 @@ function attachRemoteShipShieldV463(entry){
     try{
         if(!entry?.mesh) return;
 
-        // V470: remote shield должен быть видимым как визуальный слой.
-        // Даже если maxShield ещё не приехал/равен 0, создаём визуальный overlay.
-        if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.length){
-            return;
-        }
+        const hasRealMeshShield = Array.isArray(entry.shieldMeshesV463)
+            && entry.shieldMeshesV463.some(mesh => String(mesh?.name || '').includes('remote-ship-shaped-shield-overlay-v472'));
+        if(hasRealMeshShield) return;
 
+        // Удаляем старые fallback/forced щиты перед сборкой настоящей формы.
+        disposeRemoteShieldMeshesV463(entry);
         entry.shieldMeshesV463 = [];
+
         let created = 0;
+        entry.mesh.updateMatrixWorld?.(true);
 
         entry.mesh.traverse((node) => {
             try{
-                if(created >= 42) return;
+                if(created >= 54) return;
                 if(!node?.isMesh || node.userData?.shieldOverlayV462 || node.userData?.remoteShieldOverlayV463 || node.userData?.staticPilotLabelV461) return;
                 if(node.material?.isSpriteMaterial) return;
+                const nodeName = String(node.name || '').toLowerCase();
+                if(nodeName.includes('shield') || nodeName.includes('label')) return;
+
                 const geometry = node.geometry?.clone?.();
                 if(!geometry) return;
 
                 const shieldMesh = new THREE.Mesh(geometry, createRemoteShieldOverlayMaterialV463());
-                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v470';
+                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v472';
                 shieldMesh.userData.remoteShieldOverlayV463 = true;
                 shieldMesh.userData.battleOverlayV462 = true;
                 shieldMesh.position.copy(node.position);
                 shieldMesh.quaternion.copy(node.quaternion);
-                shieldMesh.scale.copy(node.scale).multiplyScalar(1.09);
-                shieldMesh.renderOrder = 1200;
+                shieldMesh.scale.copy(node.scale).multiplyScalar(1.055);
+                shieldMesh.renderOrder = 1500;
                 node.parent.add(shieldMesh);
                 entry.shieldMeshesV463.push(shieldMesh);
                 created++;
             }catch(_){}
         });
 
+        // Только пока модель не загрузилась: временный слабый fallback, чтобы не было пустоты.
+        // После загрузки mountBattleShipVisual вызовет updateRemoteShipShieldV463 и заменит на mesh-форму.
         if(!entry.shieldMeshesV463.length){
             const hitRadius = Math.max(2.8, Number(entry.mesh?.userData?.hitRadius || 2.8) || 2.8);
-            const geometry = new THREE.SphereGeometry(1, 64, 40);
+            const geometry = new THREE.SphereGeometry(1, 36, 24);
             const material = createRemoteShieldOverlayMaterialV463();
             const shieldMesh = new THREE.Mesh(geometry, material);
-            shieldMesh.name = 'remote-fallback-shield-v470';
+            shieldMesh.name = 'remote-temporary-loading-shield-v472';
             shieldMesh.userData.remoteShieldOverlayV463 = true;
             shieldMesh.userData.battleOverlayV462 = true;
-            shieldMesh.scale.set(hitRadius * 1.25, hitRadius * 0.52, hitRadius * 1.72);
+            shieldMesh.scale.set(hitRadius * 1.06, hitRadius * 0.42, hitRadius * 1.42);
             shieldMesh.renderOrder = 1200;
             entry.mesh.add(shieldMesh);
             entry.shieldMeshesV463.push(shieldMesh);
@@ -9571,11 +9577,23 @@ function updateRemoteShipShieldV463(entry){
     try{
         if(!entry?.mesh) return;
 
-        const forcedShield = createGuaranteedRemoteShieldV471(entry);
+        // V472: убираем старый сферический forced shield.
+        // У чужого корабля щит должен быть как у владельца — поверх mesh-формы корабля.
+        if(entry.remoteForcedShieldV471){
+            try{ if(entry.remoteForcedShieldV471.parent) entry.remoteForcedShieldV471.parent.remove(entry.remoteForcedShieldV471); }catch(_){}
+            try{ entry.remoteForcedShieldV471.geometry?.dispose?.(); entry.remoteForcedShieldV471.material?.dispose?.(); }catch(_){}
+            entry.remoteForcedShieldV471 = null;
+        }
+
+        // Если в массиве остался старый fallback-шар, удаляем и пересобираем.
+        if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.some(m => String(m?.name || '').includes('fallback') || String(m?.name || '').includes('guaranteed'))){
+            disposeRemoteShieldMeshesV463(entry);
+        }
+
         attachRemoteShipShieldV463(entry);
 
         const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
-        const targetOpacity = flashing ? 0.92 : 0.42;
+        const targetOpacity = flashing ? 0.88 : 0.34;
         const color = flashing ? 0xffffff : 0x66f7ff;
 
         (entry.shieldMeshesV463 || []).forEach(mesh => {
@@ -9585,20 +9603,14 @@ function updateRemoteShipShieldV463(entry){
                 mesh.material.transparent = true;
                 mesh.material.depthWrite = false;
                 mesh.material.depthTest = false;
-                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.55;
+                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.45;
                 mesh.material.color?.setHex?.(color);
                 if(mesh.material.map){
-                    mesh.material.map.offset.x += flashing ? 0.024 : 0.005;
-                    mesh.material.map.offset.y += flashing ? 0.014 : 0.003;
+                    mesh.material.map.offset.x += flashing ? 0.020 : 0.004;
+                    mesh.material.map.offset.y += flashing ? 0.012 : 0.0025;
                 }
             }catch(_){}
         });
-
-        if(forcedShield){
-            forcedShield.visible = true;
-            forcedShield.rotation.y += flashing ? 0.040 : 0.010;
-            forcedShield.rotation.z += flashing ? 0.012 : 0.003;
-        }
     }catch(_){}
 }
 
@@ -9656,7 +9668,7 @@ function createRemoteBattleShipMesh(name, slotIndex, team = 'blue', playerId = '
     shipGroup.userData.playerId = String(playerId || '').trim();
 
     const battleShipItem = getSelectedShipItem() || getShopShipById('scout_1') || { id:'scout_1', modelPath:'ships/Spaceship.glb' };
-    mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ const entry = remoteBattleShips.get(shipGroup.userData.playerId || '') || null; ensureRemotePilotLabelV462(entry || { mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); if(entry){ updateRemoteShipShieldV463(entry); setTimeout(() => { try{ updateRemoteShipShieldV463(entry); ensureRemotePilotLabelV462(entry); }catch(_){} }, 250); setTimeout(() => { try{ updateRemoteShipShieldV463(entry); }catch(_){} }, 900); } }catch(_){} });
+    mountBattleShipVisual(shipGroup, battleShipItem, team).then(() => { try{ const entry = remoteBattleShips.get(shipGroup.userData.playerId || '') || null; ensureRemotePilotLabelV462(entry || { mesh:shipGroup, labelSprite, nickname:String(name || 'Pilot'), level:1, team }); if(entry){ disposeRemoteShieldMeshesV463(entry); updateRemoteShipShieldV463(entry); setTimeout(() => { try{ disposeRemoteShieldMeshesV463(entry); updateRemoteShipShieldV463(entry); ensureRemotePilotLabelV462(entry); }catch(_){} }, 250); setTimeout(() => { try{ updateRemoteShipShieldV463(entry); }catch(_){} }, 900); } }catch(_){} });
 
     scene.add(shipGroup);
     shipGroup.userData.playerId = String(playerId || '').trim();
@@ -12215,7 +12227,7 @@ document.addEventListener('click', (event) => {
         const target = event.target;
         if(!target?.closest) return;
         const battleButton = target.closest(
-            '#join-match-btn, #confirm-create-room, #confirm-tournament-create, #join-map-btn, .join-btn, [data-battle-enter], [data-action="battle-enter"]'
+            '#join-match-btn, #confirm-create, #confirm-create-room, #confirm-tournament-create, #join-map-btn, .join-btn, [data-battle-enter], [data-action="battle-enter"]'
         );
         if(battleButton) markCosmicBattleEnterAllowedV444();
     }catch(_){}
@@ -15288,7 +15300,7 @@ function getBattleShipVisualConfig(shipId){
 function buildBattleShipVisualAsync(item, team = 'blue'){
     const safeShipId = String(item?.id || '').trim();
     const externalPath = String(item?.modelPath || '').trim();
-    const tint = new THREE.Color(getBattleShipColorHex(team));
+    // V472: team is used for nick color only, not ship body color.
     const visualConfig = getBattleShipVisualConfig(safeShipId);
 
     const applyBattleVisualTweaks = (root) => {
@@ -15302,12 +15314,7 @@ function buildBattleShipVisualAsync(item, team = 'blue'){
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
                 materials.forEach((mat) => {
                     if(!mat) return;
-                    if(mat.color?.isColor){
-                        try{ mat.color.lerp(tint, 0.22); }catch(_){ }
-                    }
-                    if(mat.emissive?.isColor){
-                        try{ mat.emissive.copy(tint).multiplyScalar(0.06); }catch(_){ }
-                    }
+                    // V472: не красим корпус и emissive по команде.
                     if('metalness' in mat && Number(mat.metalness || 0) < 0.42) mat.metalness = 0.42;
                     if('roughness' in mat && Number(mat.roughness || 0) > 0.7) mat.roughness = 0.7;
                 });
@@ -19462,6 +19469,7 @@ window.renderPlayersOnPlanet = function(entry = {}){
             confirmOld.replaceWith(btn);
             btn.dataset.v27Bound = '1';
             btn.addEventListener('click', async () => {
+                markCosmicBattleEnterAllowedV444?.();
                 const uiSelected = (typeof getSelectedLobbyMapFromUI === 'function' ? getSelectedLobbyMapFromUI() : null);
                 const selectedBase = uiSelected || (selectedLobbyMap?.isBaseMap ? selectedLobbyMap : null) || (typeof LOBBY_MAP_DATA !== 'undefined' ? LOBBY_MAP_DATA[0] : null);
                 if(!selectedBase) return;
@@ -19478,7 +19486,20 @@ window.renderPlayersOnPlanet = function(entry = {}){
                 const hostName = (typeof player !== 'undefined' && player?.nickname) ? player.nickname : 'Commander';
 
                 const created = await createGameRoom(roomTitle, normalizedMap, playerCount, hostName);
-                if(!created) return;
+                if(!created?.id) return;
+
+                let joinedCreatedV472 = await joinRoomPlayers(created.id);
+                if(!joinedCreatedV472){
+                    for(const retryDelayV472 of [180, 420, 800, 1300]){
+                        await sleep(retryDelayV472);
+                        joinedCreatedV472 = await joinRoomPlayers(created.id);
+                        if(joinedCreatedV472) break;
+                    }
+                }
+                if(!joinedCreatedV472){
+                    console.warn('create room join failed v472:', created.id);
+                    return;
+                }
 
                 currentRoom = {
                     id: created.id,
