@@ -1,4 +1,4 @@
-// COSMIC CLICKER v480 - FAST ROOM JOIN + INSTANT SHIELD BREAK
+// COSMIC CLICKER v481 - INSTANT ROOM ENTER + STARTUP BATTLE SYNC FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -23601,3 +23601,327 @@ setInterval(function(){
 
 
 
+
+
+
+// ===== V481 FAST ROOM ENTER + STARTUP BATTLE SYNC FIX =====
+// Цель:
+// 1) кнопка "Войти" больше не ждёт повторный loadRoomsFromSupabase перед переходом в бой;
+// 2) оба клиента сразу записывают room_players + online_players для одной комнаты;
+// 3) первые секунды боя делаем частый bootstrap-sync, чтобы корабли появились друг у друга сразу.
+var battleJoinClickInProgressV481 = false;
+var __cosmicFastEnterLastAtV481 = 0;
+
+function setMatchStatusNoteV481(text){
+  try{
+    const note = document.getElementById('match-status-note');
+    if(note) note.textContent = String(text || '');
+  }catch(_){ }
+}
+
+function cloneBattleRoomForEnterV481(source = {}){
+  const roomId = sanitizeOnlineRoomId?.(source?.id || source?.roomId || source?.rawRoom?.id || '') || String(source?.id || source?.roomId || '').trim();
+  const mapName = normalizeBattleMapName?.(source?.real || source?.map || source?.name || source?.map_name || source?.rawRoom?.map_name || 'earth') || 'earth';
+  const players = Array.isArray(source?.currentPlayers)
+    ? [...source.currentPlayers]
+    : (Array.isArray(source?.players) ? [...source.players] : []);
+  const room = {
+    ...(source || {}),
+    id: roomId || source?.id || null,
+    roomId: roomId || source?.roomId || source?.id || null,
+    real: mapName,
+    map: mapName,
+    name: source?.name || source?.title || mapName,
+    title: source?.title || source?.room_name || source?.rawRoom?.room_name || mapName,
+    players,
+    currentPlayers: [...players],
+    state: 'battle',
+    mode: source?.mode || 'DM'
+  };
+  const me = (typeof getDisplayPlayerTag === 'function') ? getDisplayPlayerTag() : (player?.nickname || 'Commander');
+  if(me){
+    const hasMe = room.currentPlayers.some(row => String(row?.name || row?.nickname || row || '').trim() === String(me).trim());
+    if(!hasMe) room.currentPlayers.push(me);
+    const hasMe2 = room.players.some(row => String(row?.name || row?.nickname || row || '').trim() === String(me).trim());
+    if(!hasMe2) room.players.push(me);
+  }
+  return room;
+}
+
+async function joinRoomPlayersFastV481(roomId){
+  if(!window.supabaseClient || !roomId) return false;
+  const normalizedRoomId = sanitizeOnlineRoomId?.(roomId) || String(roomId || '').trim();
+  if(!normalizedRoomId) return false;
+  const identity = (typeof getCurrentPlayerIdentity === 'function') ? (getCurrentPlayerIdentity() || {}) : {};
+  const playerId = String(identity.playerId || getSelfBattlePlayerId?.() || authState?.playerId || player?.id || '').trim();
+  if(!playerId) return false;
+
+  try{ resetRoomPlayersCacheV474?.(); }catch(_){ }
+  try{ setPlayerOnlineStatus?.('battle', normalizedRoomId); }catch(_){ }
+  try{ cleanupOwnGhostRoomPlayersBeforeJoinV478?.(normalizedRoomId, { ...identity, playerId }); }catch(_){ }
+
+  const stamp = new Date().toISOString();
+  const payload = {
+    nickname: identity.displayName || identity.nickname || player?.nickname || 'Commander',
+    joined_at: stamp,
+    updated_at: stamp,
+    team: getBattleRoomPlayerTeam?.(playerId) || 'blue',
+    level: Number(player?.level || 1) || 1,
+    ping: Number(getBattlePingValue?.() || 0) || 0
+  };
+
+  let result = null;
+  try{
+    result = await upsertRoomPlayerRowSafe(normalizedRoomId, playerId, payload, 'id,room_id,player_id,nickname,joined_at,updated_at');
+  }catch(error){
+    result = { data:null, error };
+  }
+
+  if(result?.error){
+    const code = String(result.error?.code || '').trim();
+    const msg = String(result.error?.message || '').toLowerCase();
+    if(code === '23503') return false;
+    const conflictOk = code === '23505' || code === '409' || msg.includes('duplicate') || msg.includes('conflict');
+    if(!conflictOk){
+      try{ console.warn('joinRoomPlayersFastV481 warning:', result.error?.message || result.error); }catch(_){ }
+      return false;
+    }
+  }
+
+  try{
+    const rows = Array.isArray(result?.data) ? result.data : [];
+    if(rows[0]?.id) selfRoomPlayerRowId = String(rows[0].id);
+  }catch(_){ }
+  try{ setPlayerOnlineStatus?.('battle', normalizedRoomId); }catch(_){ }
+  try{
+    cachedRoomPlayersFetchedAt = 0;
+    cachedRoomPlayersRows = [];
+    roomPlayersFetchInFlight = false;
+  }catch(_){ }
+  return true;
+}
+
+try{
+  const __baseJoinRoomPlayersV481 = (typeof joinRoomPlayers === 'function') ? joinRoomPlayers : null;
+  joinRoomPlayers = async function(roomId){
+    const fastOk = await joinRoomPlayersFastV481(roomId);
+    if(fastOk) return true;
+    if(__baseJoinRoomPlayersV481) return await __baseJoinRoomPlayersV481.apply(this, arguments);
+    return false;
+  };
+  window.joinRoomPlayers = joinRoomPlayers;
+}catch(_){ }
+
+async function getOrCreatePublicBattleRoomFastV481(mapName, maxPlayers){
+  if(!window.supabaseClient) return null;
+  const normalizedMap = normalizeBattleMapName?.(mapName || 'earth') || 'earth';
+  const safeRoomName = `Public ${String(normalizedMap || 'earth').toUpperCase()}`;
+  const safeMaxPlayers = Math.max(2, Number(maxPlayers || 8) || 8);
+  try{
+    const existing = await window.supabaseClient
+      .from('rooms')
+      .select('id,room_name,map_name,max_players,host_name,created_at')
+      .eq('room_name', safeRoomName)
+      .eq('host_name', 'SYSTEM')
+      .order('created_at', { ascending:false })
+      .limit(1);
+    if(Array.isArray(existing?.data) && existing.data[0]?.id){
+      return existing.data[0];
+    }
+  }catch(_){ }
+
+  try{
+    const created = await window.supabaseClient
+      .from('rooms')
+      .insert([{ room_name:safeRoomName, map_name:normalizedMap, max_players:safeMaxPlayers, host_name:'SYSTEM' }])
+      .select('id,room_name,map_name,max_players,host_name,created_at')
+      .single();
+    if(created?.data?.id) return created.data;
+  }catch(error){
+    try{ console.warn('getOrCreatePublicBattleRoomFastV481 create warning:', error?.message || error); }catch(_){ }
+  }
+
+  try{
+    const fallback = await window.supabaseClient
+      .from('rooms')
+      .select('id,room_name,map_name,max_players,host_name,created_at')
+      .eq('room_name', safeRoomName)
+      .eq('host_name', 'SYSTEM')
+      .order('created_at', { ascending:false })
+      .limit(1);
+    if(Array.isArray(fallback?.data) && fallback.data[0]?.id) return fallback.data[0];
+  }catch(_){ }
+  return null;
+}
+
+async function enterSelectedBattleRoomFastV481(){
+  if(battleJoinClickInProgressV481) return;
+  if(!selectedLobbyMap) return;
+  if((typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 !== 'battle')) return;
+
+  battleJoinClickInProgressV481 = true;
+  __cosmicFastEnterLastAtV481 = Date.now();
+  setMatchStatusNoteV481('Входим...');
+
+  try{
+    let room = cloneBattleRoomForEnterV481(selectedLobbyMap);
+    let roomId = sanitizeOnlineRoomId?.(room.id || room.roomId || '') || '';
+
+    if(!roomId){
+      const createdOrExisting = await getOrCreatePublicBattleRoomFastV481(
+        selectedLobbyMap.real || selectedLobbyMap.map || selectedLobbyMap.name || 'earth',
+        Number(selectedLobbyMap.maxPlayers || selectedLobbyMap.playerCount || 8) || 8
+      );
+      if(!createdOrExisting?.id){
+        setMatchStatusNoteV481('Комната ещё создаётся, попробуй ещё раз');
+        return;
+      }
+      roomId = sanitizeOnlineRoomId?.(createdOrExisting.id) || String(createdOrExisting.id || '').trim();
+      room = cloneBattleRoomForEnterV481({
+        ...selectedLobbyMap,
+        id: roomId,
+        roomId,
+        rawRoom: createdOrExisting,
+        real: createdOrExisting.map_name || selectedLobbyMap.real || selectedLobbyMap.map || 'earth',
+        map: createdOrExisting.map_name || selectedLobbyMap.map || selectedLobbyMap.real || 'earth',
+        title: createdOrExisting.room_name || selectedLobbyMap.title || selectedLobbyMap.name,
+        maxPlayers: createdOrExisting.max_players || selectedLobbyMap.maxPlayers || 8
+      });
+    }
+
+    const joined = await joinRoomPlayersFastV481(roomId);
+    if(!joined){
+      setMatchStatusNoteV481('Не удалось войти, попробуй ещё раз');
+      return;
+    }
+
+    room.id = roomId;
+    room.roomId = roomId;
+    room.state = 'battle';
+    currentRoom = room;
+    selectedLobbyMap = { ...(selectedLobbyMap || {}), id:roomId, roomId, state:'battle' };
+    window.currentRoomId = roomId;
+    activeBattleChatRoomId = roomId;
+    try{ persistBattleChatRoomId?.(roomId); }catch(_){ }
+    try{ setPlayerOnlineStatus?.('battle', roomId); }catch(_){ }
+    try{ resetRoomPlayersCacheV474?.(); }catch(_){ }
+    try{ lastBattlePresenceSnapshot?.clear?.(); battlePresenceMissingCounts?.clear?.(); }catch(_){ }
+
+    setMatchStatusNoteV481('');
+    await switchState('BATTLE');
+    forceStartupBattleSyncV481();
+  }catch(error){
+    try{ console.warn('enterSelectedBattleRoomFastV481 warning:', error?.message || error); }catch(_){ }
+    setMatchStatusNoteV481('Не удалось войти, попробуй ещё раз');
+  }finally{
+    battleJoinClickInProgressV481 = false;
+  }
+}
+
+try{
+  document.addEventListener('click', function(event){
+    const btn = event.target?.closest?.('#join-match-btn');
+    if(!btn) return;
+    if(!selectedLobbyMap) return;
+    if(typeof lobbyModeV27 !== 'undefined' && lobbyModeV27 !== 'battle') return;
+    const now = Date.now();
+    if(now - __cosmicFastEnterLastAtV481 < 250) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    enterSelectedBattleRoomFastV481();
+  }, true);
+}catch(_){ }
+
+async function writeSelfRoomPlayerStateNowV481(){
+  try{
+    if(gameState !== 'BATTLE' || battleLeavingInProgress) return false;
+    if(!window.supabaseClient || !playerShip) return false;
+    const roomId = getBattleRoomIdSafe?.() || sanitizeOnlineRoomId?.(currentRoom?.id || currentRoom?.roomId || '');
+    const playerId = getSelfBattlePlayerId?.() || String(authState?.playerId || player?.id || '').trim();
+    if(!roomId || !playerId) return false;
+    const nowIso = new Date().toISOString();
+    const payload = {
+      nickname: player?.nickname || 'Commander',
+      joined_at: nowIso,
+      updated_at: nowIso,
+      team: getBattleRoomPlayerTeam?.(playerId) || 'blue',
+      level: Number(player?.level || 1) || 1,
+      ping: Number(getBattlePingValue?.() || 0) || 0,
+      position: {
+        x: Number(playerShip.position.x || 0),
+        y: Number(playerShip.position.y || 0),
+        z: Number(playerShip.position.z || 0),
+        hp: Math.round(Number(playerHp || 0) || 0),
+        maxHp: Math.round(Number(playerMaxHp || currentBattleShipStats?.hp || 100) || 100),
+        shield: Math.round(Number(playerShield || 0) || 0),
+        maxShield: Math.round(Number(playerMaxShield || currentBattleShipStats?.shieldCapacity || 0) || 0)
+      },
+      rotation: {
+        x: Number(playerShip.quaternion.x || 0),
+        y: Number(playerShip.quaternion.y || 0),
+        z: Number(playerShip.quaternion.z || 0),
+        w: Number(playerShip.quaternion.w || 1)
+      }
+    };
+    const result = await upsertRoomPlayerRowSafe(roomId, playerId, payload, 'id');
+    if(result?.error) return false;
+    if(Array.isArray(result?.data) && result.data[0]?.id) selfRoomPlayerRowId = String(result.data[0].id);
+    try{ setPlayerOnlineStatus?.('battle', roomId); }catch(_){ }
+    try{
+      cachedRoomPlayersFetchedAt = 0;
+      cachedRoomPlayersRows = [];
+      roomPlayersFetchInFlight = false;
+    }catch(_){ }
+    return true;
+  }catch(_){
+    return false;
+  }
+}
+
+function forceStartupBattleSyncV481(){
+  const roomId = getBattleRoomIdSafe?.() || sanitizeOnlineRoomId?.(currentRoom?.id || currentRoom?.roomId || '');
+  if(!roomId) return;
+  const delays = [0, 90, 180, 320, 520, 800, 1200, 1700, 2400, 3400, 4800];
+  delays.forEach(delay => {
+    setTimeout(async () => {
+      try{
+        if(gameState !== 'BATTLE' || battleLeavingInProgress) return;
+        if(roomId !== (getBattleRoomIdSafe?.() || sanitizeOnlineRoomId?.(currentRoom?.id || currentRoom?.roomId || ''))) return;
+        await writeSelfRoomPlayerStateNowV481();
+        try{ broadcastSelfBattleState?.(); }catch(_){ }
+        try{
+          cachedRoomPlayersFetchedAt = 0;
+          cachedRoomPlayersRows = [];
+          roomPlayersFetchInFlight = false;
+        }catch(_){ }
+        try{ await syncLiveBattlePlayers?.(); }catch(_){ }
+      }catch(_){ }
+    }, delay);
+  });
+}
+
+try{
+  const __baseStartLiveBattleSyncV481 = (typeof startLiveBattleSync === 'function') ? startLiveBattleSync : null;
+  if(__baseStartLiveBattleSyncV481){
+    startLiveBattleSync = async function(){
+      const result = await __baseStartLiveBattleSyncV481.apply(this, arguments);
+      forceStartupBattleSyncV481();
+      return result;
+    };
+    window.startLiveBattleSync = startLiveBattleSync;
+  }
+}catch(_){ }
+
+try{
+  const __baseSwitchStateV481 = (typeof switchState === 'function') ? switchState : null;
+  if(__baseSwitchStateV481){
+    switchState = async function(newState){
+      const result = await __baseSwitchStateV481.apply(this, arguments);
+      if(newState === 'BATTLE'){
+        forceStartupBattleSyncV481();
+      }
+      return result;
+    };
+    window.switchState = switchState;
+  }
+}catch(_){ }
