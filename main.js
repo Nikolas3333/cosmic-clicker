@@ -2309,8 +2309,8 @@ function getBattleRoomPlayerTeam(entryId = ''){
     return String(key).slice(-1).charCodeAt(0) % 2 === 0 ? 'blue' : 'red';
 }
 
-const ROOM_PLAYER_STALE_MS = 12000;
-const ROOM_EMPTY_DELETE_GRACE_MS = 20000;
+const ROOM_PLAYER_STALE_MS = 65000; // v476: было 12 сек — из-за этого аккаунты через ~15 сек расходились/удалялись как stale
+const ROOM_EMPTY_DELETE_GRACE_MS = 90000; // v476: не удаляем статичную комнату слишком рано при задержке heartbeat
 
 function getRoomPlayerFreshCutoffIso(){
     return new Date(Date.now() - ROOM_PLAYER_STALE_MS).toISOString();
@@ -9198,7 +9198,7 @@ const BATTLE_PRESENCE_PING_UPDATE_MS = 9000;
 const LIVE_BATTLE_SYNC_INTERVAL_MS = 900;
 const LIVE_BATTLE_PRESENCE_PUSH_INTERVAL_MS = 900;
 const LIVE_BATTLE_HIT_POLL_INTERVAL_MS = 650;
-const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 2800;
+const ROOM_PLAYER_STATE_FORCE_INTERVAL_MS = 1800; // v476: room_players heartbeat чаще, stale cleanup больше не выбивает игрока
 const ROOM_PLAYER_POSITION_EPSILON = 0.65;
 const ROOM_PLAYER_ROTATION_EPSILON = 0.06;
 const BATTLE_PRESENCE_FORCE_INTERVAL_MS = 900;
@@ -9442,10 +9442,10 @@ function tuneShieldMaterialHoneycombV473(material, flashing = false){
         material.depthWrite = false;
         material.depthTest = false;
         material.blending = THREE.AdditiveBlending;
-        material.opacity = flashing ? 0.72 : 0.18;
-        material.color?.setHex?.(flashing ? 0xdfffff : 0x66f7ff);
+        material.opacity = flashing ? 0.58 : 0.24;
+        material.color?.setHex?.(flashing ? 0xffd45a : 0x66f7ff);
         if(material.map){
-            material.map.repeat.set(3.4, 2.6);
+            material.map.repeat.set(5.2, 4.0);
             material.map.needsUpdate = true;
         }
     }catch(_){}
@@ -9527,7 +9527,7 @@ function createRemoteShieldOverlayMaterialV463(){
         color:0x66f7ff,
         map:makeShieldHoneycombTextureV460(),
         transparent:true,
-        opacity:0.62,
+        opacity:0.24,
         depthWrite:false,
         depthTest:false,
         blending:THREE.AdditiveBlending,
@@ -9588,7 +9588,7 @@ function attachRemoteShipShieldV463(entry){
 
 function flashRemoteShieldV463(entry){
     if(!entry) return;
-    entry.shieldFlashUntilV463 = Date.now() + 1400;
+    entry.shieldFlashUntilV463 = Date.now() + 900;
 }
 
 function updateRemoteShipShieldV463(entry){
@@ -9615,8 +9615,8 @@ function updateRemoteShipShieldV463(entry){
         attachRemoteShipShieldV463(entry);
 
         const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
-        const targetOpacity = flashing ? 0.72 : 0.18;
-        const color = flashing ? 0xdfffff : 0x66f7ff;
+        const targetOpacity = flashing ? 0.58 : 0.24;
+        const color = flashing ? 0xffd45a : 0x66f7ff;
 
         (entry.shieldMeshesV463 || []).forEach(mesh => {
             try{
@@ -9628,9 +9628,9 @@ function updateRemoteShipShieldV463(entry){
                 mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.07;
                 mesh.material.color?.setHex?.(color);
                 if(mesh.material.map){
-                    mesh.material.map.repeat.set(3.4, 2.6);
-                    mesh.material.map.offset.x += flashing ? 0.0015 : 0.00035;
-                    mesh.material.map.offset.y += flashing ? 0.0010 : 0.00025;
+                    mesh.material.map.repeat.set(5.2, 4.0);
+                    mesh.material.map.offset.x += flashing ? 0.00045 : 0.00008;
+                    mesh.material.map.offset.y += flashing ? 0.00028 : 0.00005;
                     mesh.material.map.needsUpdate = true;
                 }
             }catch(_){}
@@ -11623,12 +11623,12 @@ function makeShieldHoneycombTextureV460(){
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    ctx.strokeStyle = 'rgba(115,245,255,0.82)';
-    ctx.lineWidth = 3.2;
-    ctx.shadowColor = 'rgba(0,235,255,0.85)';
-    ctx.shadowBlur = 10;
+    ctx.strokeStyle = 'rgba(125,250,255,0.92)';
+    ctx.lineWidth = 4.2;
+    ctx.shadowColor = 'rgba(0,235,255,0.95)';
+    ctx.shadowBlur = 12;
 
-    const r = 14;
+    const r = 12;
     const w = Math.sqrt(3) * r;
     const h = 2 * r;
     const yStep = h * 0.75;
@@ -11751,7 +11751,7 @@ function attachPlayerShieldFieldV460(){
 }
 
 function flashPlayerShieldV460(){
-    playerShieldFlashUntilV460 = Date.now() + 1400;
+    playerShieldFlashUntilV460 = Date.now() + 900;
     try{ updatePlayerShieldFieldV460(true); }catch(_){}
 }
 
@@ -11765,8 +11765,8 @@ function updatePlayerShieldFieldV460(force = false){
 
         const ratio = THREE.MathUtils.clamp(Number(playerShield || 0) / Math.max(1, Number(playerMaxShield || 1)), 0, 1);
         const flashing = Date.now() < Number(playerShieldFlashUntilV460 || 0);
-        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.72 : 0.16 + ratio * 0.06);
-        const color = flashing ? 0xdfffff : 0x66f7ff;
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.58 : 0.22 + ratio * 0.08);
+        const color = flashing ? 0xffd45a : 0x66f7ff;
 
         const updateMesh = (mesh) => {
             if(!mesh?.material) return;
@@ -11774,13 +11774,13 @@ function updatePlayerShieldFieldV460(force = false){
             mesh.material.transparent = true;
             mesh.material.depthWrite = false;
             mesh.material.depthTest = false;
-            mesh.material.opacity = force ? targetOpacity : mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.14;
+            mesh.material.opacity = force ? targetOpacity : mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.06;
             mesh.material.color?.setHex?.(color);
             try{
                 if(mesh.material.map){
-                    mesh.material.map.repeat.set(3.4, 2.6);
-                    mesh.material.map.offset.x += flashing ? 0.0015 : 0.00035;
-                    mesh.material.map.offset.y += flashing ? 0.0010 : 0.00025;
+                    mesh.material.map.repeat.set(5.2, 4.0);
+                    mesh.material.map.offset.x += flashing ? 0.00045 : 0.00008;
+                    mesh.material.map.offset.y += flashing ? 0.00028 : 0.00005;
                     mesh.material.map.needsUpdate = true;
                 }
             }catch(_){}
@@ -11791,11 +11791,11 @@ function updatePlayerShieldFieldV460(force = false){
         }
         if(playerShieldMeshV460){
             updateMesh(playerShieldMeshV460);
-            playerShieldMeshV460.rotation.y += flashing ? 0.008 : 0.002;
-            playerShieldMeshV460.rotation.z += flashing ? 0.003 : 0.0008;
+            playerShieldMeshV460.rotation.y += flashing ? 0.0025 : 0.0006;
+            playerShieldMeshV460.rotation.z += flashing ? 0.0012 : 0.00025;
             const baseScale = playerShieldMeshV460.userData.baseScaleV461;
             if(baseScale){
-                const pulse = flashing ? 1.045 : 1.0 + Math.sin(Date.now() / 900) * 0.012;
+                const pulse = flashing ? 1.018 : 1.0 + Math.sin(Date.now() / 1600) * 0.006;
                 playerShieldMeshV460.scale.set(baseScale.x * pulse, baseScale.y * pulse, baseScale.z * pulse);
             }
         }
@@ -20364,8 +20364,8 @@ async function loadRoomsFromSupabase() {
   if(selectedId){
     const freshSelected = supabaseBattleRoomsCache.find(room => String(room?.id || '') === selectedId);
     if(freshSelected){
-      if(selectedLobbyMap?.id) selectedLobbyMap = { ...freshSelected, name: freshSelected.real };
-      if(currentRoom?.id) currentRoom = { ...currentRoom, ...freshSelected, currentPlayers:[...(freshSelected.currentPlayers||[])], players:[...(freshSelected.players||[])] };
+      if(selectedLobbyMap?.id && gameState !== 'BATTLE' && gameState !== 'OBSERVE') selectedLobbyMap = { ...freshSelected, name: freshSelected.real };
+      if(currentRoom?.id && gameState !== 'BATTLE' && gameState !== 'OBSERVE') currentRoom = { ...currentRoom, ...freshSelected, currentPlayers:[...(freshSelected.currentPlayers||[])], players:[...(freshSelected.players||[])] };
     }
   } else if(selectedLobbyMap?.isBaseMap || (!selectedLobbyMap?.id && selectedLobbyMap?.real)) {
     const occupants = getBattleMapOccupants(selectedLobbyMap.real || selectedLobbyMap.map || selectedLobbyMap.name);
@@ -20550,8 +20550,8 @@ function showGuestOnlyPvpMessage(){
 
 // ================= ONLINE PLAYERS (SUPABASE) =================
 
-const ONLINE_TTL_MS = 35000;
-const ONLINE_HEARTBEAT_MS = 10000;
+const ONLINE_TTL_MS = 70000; // v476: держим presence дольше, чтобы вкладки не выпадали из одной комнаты
+const ONLINE_HEARTBEAT_MS = 7000; // v476: чаще подтверждаем присутствие в бою
 let onlineHeartbeatTimer = null;
 let onlineRenderTimer = null;
 let playerActionMenuEl = null;
@@ -20802,6 +20802,36 @@ async function setPlayerOnlineStatus(status = 'lobby', roomId = null){
     }
 }
 
+
+// ===== V476 BATTLE ROOM MEMBERSHIP GUARD =====
+// Защита от ситуации, когда два аккаунта входят в одну статичную комнату,
+// но через несколько секунд один клиент оказывается в "параллельной" комнате/состоянии.
+// Причина чаще всего была в слишком агрессивном stale cleanup + редком heartbeat.
+async function verifyCurrentBattleRoomMembershipV476(){
+    try{
+        if(gameState !== 'BATTLE' || battleLeavingInProgress) return;
+        if(!window.supabaseClient || !playerShip) return;
+        const roomId = getBattleRoomIdSafe?.() || sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || null);
+        const playerId = getSelfBattlePlayerId?.() || String(authState?.playerId || player?.id || '').trim();
+        if(!roomId || !playerId) return;
+
+        const { data, error } = await window.supabaseClient
+            .from('room_players')
+            .select('id,room_id,player_id,updated_at')
+            .eq('room_id', roomId)
+            .eq('player_id', playerId)
+            .limit(1);
+
+        if(error) return;
+        if(!Array.isArray(data) || data.length <= 0){
+            selfRoomPlayerRowId = '';
+            lastSelfRoomPlayerStatePayload = '';
+            lastSelfRoomPlayerStateSentAt = 0;
+            ensureSelfRoomPlayerState?.();
+        }
+    }catch(_){}
+}
+
 async function removePlayerFromOnline(){
     if(!window.supabaseClient) return;
 
@@ -20951,6 +20981,7 @@ function syncCurrentOnlinePresence(){
         : null;
 
     setPlayerOnlineStatus(status, roomId);
+    if(status === 'in-game') verifyCurrentBattleRoomMembershipV476?.();
 }
 
 function startOnlinePresenceHeartbeat(){
