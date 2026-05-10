@@ -1,4 +1,4 @@
-// COSMIC CLICKER v474 - STABLE ROOM SYNC SHIELD ROLLBACK
+// COSMIC CLICKER v475 - STATIC ROOM JOIN 409 FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -2466,6 +2466,16 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
                 error:null
             };
         }
+
+        // V475: для статичных комнат старая строка игрока могла оставаться в room_players.
+        // Перед INSERT удаляем только свою строку room_id+player_id, чтобы не ловить POST 409 Conflict.
+        try{
+            await client
+                .from('room_players')
+                .delete()
+                .eq('room_id', safeRoomId)
+                .eq('player_id', safePlayerId);
+        }catch(_){}
 
         const inserted = await client
             .from('room_players')
@@ -19719,6 +19729,16 @@ async function ensureRoomPlayerRowJoined(roomId, identity){
       return true;
     }
 
+    // V475: статичные комнаты могли иметь старую строку этого же игрока.
+    // Удаляем только свою старую строку, потом вставляем свежую.
+    try{
+      await window.supabaseClient
+        .from('room_players')
+        .delete()
+        .eq('room_id', normalizedRoomId)
+        .eq('player_id', playerId);
+    }catch(_){}
+
     const inserted = await window.supabaseClient
       .from('room_players')
       .insert(buildRoomPlayerRowPayload(normalizedRoomId, playerId, basePayload))
@@ -19728,7 +19748,17 @@ async function ensureRoomPlayerRowJoined(roomId, identity){
     if(!inserted?.error) return true;
 
     const code = String(inserted?.error?.code || '').trim();
-    if(code === '23505' || String(inserted?.error?.message || '').toLowerCase().includes('duplicate')){
+    const msg = String(inserted?.error?.message || '').toLowerCase();
+    if(code === '23505' || code === '409' || msg.includes('duplicate') || msg.includes('conflict')){
+      try{
+        await window.supabaseClient
+          .from('room_players')
+          .update(basePayload)
+          .eq('room_id', normalizedRoomId)
+          .eq('player_id', playerId)
+          .select('id')
+          .limit(1);
+      }catch(_){}
       return true;
     }
   }catch(_){}
@@ -19911,6 +19941,7 @@ async function joinRoomPlayers(roomId) {
 
   const normalizedRoomId = sanitizeOnlineRoomId(roomId);
   if(!normalizedRoomId) return false;
+  try{ resetRoomPlayersCacheV474?.(); }catch(_){}
 
   const identity = getCurrentPlayerIdentity();
   if (!identity.playerId) {
@@ -19951,6 +19982,10 @@ async function joinRoomPlayers(roomId) {
   try{
     if(Array.isArray(joinedRows) && joinedRows[0]?.id){
       selfRoomPlayerRowId = String(joinedRows[0].id);
+    }else{
+      // V475: если Supabase не вернул строку после безопасного входа,
+      // всё равно пробуем подтвердить membership, чтобы статичные комнаты не блокировались.
+      await ensureRoomPlayerRowJoined(normalizedRoomId, identity);
     }
   }catch(_){}
 
