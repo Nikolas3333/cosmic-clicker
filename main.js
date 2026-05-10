@@ -1,4 +1,4 @@
-// COSMIC CLICKER v475 - STATIC ROOM JOIN 409 FIX
+// COSMIC CLICKER v477 - SHIELD WAVE HONEYCOMB VISUAL FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -117,8 +117,9 @@ let playerMaxShield = 0;
 let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
 let playerShieldMeshesV462 = [];
+let playerShieldWaveMeshesV477 = [];
 const REMOTE_SHIELD_SCALE_V466 = 1.65;
-const REMOTE_SHIELD_OPACITY_V466 = 0.62;
+const REMOTE_SHIELD_OPACITY_V466 = 0.34;
 let remoteShieldTextureV471 = null;
 const battleStats = { playerKills:0, playerDeaths:0, botKills:0, botDeaths:0 };
 
@@ -9479,7 +9480,7 @@ function createGuaranteedRemoteShieldV471(entry){
             transparent:true,
             opacity:0.0,
             depthWrite:false,
-            depthTest:false,
+            depthTest:true,
             blending:THREE.AdditiveBlending,
             side:THREE.DoubleSide
         });
@@ -9488,7 +9489,7 @@ function createGuaranteedRemoteShieldV471(entry){
         shield.name = 'remote-guaranteed-visible-shield-v471';
         shield.userData.remoteShieldOverlayV463 = true;
         shield.userData.battleOverlayV462 = true;
-        shield.scale.set(hitRadius * 1.28, hitRadius * 0.54, hitRadius * 1.78);
+        shield.scale.set(hitRadius * 1.14, hitRadius * 0.50, hitRadius * 1.58);
         shield.renderOrder = 1600;
         entry.mesh.add(shield);
         entry.remoteForcedShieldV471 = shield;
@@ -11618,20 +11619,20 @@ function verifyBattleSceneVisibleV457(reason = ''){
 // ===== V460 PLAYER SHIELD FIELD =====
 function makeShieldHoneycombTextureV460(){
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    ctx.strokeStyle = 'rgba(125,250,255,0.92)';
-    ctx.lineWidth = 4.2;
-    ctx.shadowColor = 'rgba(0,235,255,0.95)';
-    ctx.shadowBlur = 12;
-
-    const r = 12;
+    const r = 15;
     const w = Math.sqrt(3) * r;
     const h = 2 * r;
     const yStep = h * 0.75;
+
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = 'rgba(124,252,255,0.86)';
+    ctx.shadowColor = 'rgba(0,235,255,0.75)';
+    ctx.shadowBlur = 7;
 
     for(let y = -h; y < canvas.height + h; y += yStep){
         const row = Math.round(y / yStep);
@@ -11651,10 +11652,22 @@ function makeShieldHoneycombTextureV460(){
         }
     }
 
+    // Лёгкая прозрачная дымка, чтобы щит читался как энергетическое поле,
+    // но не превращался в залитую оболочку и не скрывал корабль.
+    const gradient = ctx.createRadialGradient(256, 256, 40, 256, 256, 255);
+    gradient.addColorStop(0.0, 'rgba(105,255,255,0.04)');
+    gradient.addColorStop(0.55, 'rgba(105,255,255,0.018)');
+    gradient.addColorStop(1.0, 'rgba(105,255,255,0.0)');
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(2.3, 1.7);
+    texture.repeat.set(3.4, 2.4);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     texture.needsUpdate = true;
     return texture;
 }
@@ -11675,6 +11688,20 @@ function removePlayerShieldFieldV460(){
     playerShieldMeshesV462 = [];
 
     try{
+        if(Array.isArray(playerShieldWaveMeshesV477)){
+            playerShieldWaveMeshesV477.forEach(mesh => {
+                try{
+                    if(mesh?.parent) mesh.parent.remove(mesh);
+                    mesh?.geometry?.dispose?.();
+                    mesh?.material?.map?.dispose?.();
+                    mesh?.material?.dispose?.();
+                }catch(_){}
+            });
+        }
+    }catch(_){}
+    playerShieldWaveMeshesV477 = [];
+
+    try{
         if(playerShieldMeshV460?.parent) playerShieldMeshV460.parent.remove(playerShieldMeshV460);
         if(playerShieldMeshV460?.material){
             try{ playerShieldMeshV460.material.map?.dispose?.(); }catch(_){}
@@ -11685,16 +11712,17 @@ function removePlayerShieldFieldV460(){
     playerShieldMeshV460 = null;
 }
 
-function createShieldOverlayMaterialV462(){
+function createShieldOverlayMaterialV462(options = {}){
+    const isWave = !!options.wave;
     return new THREE.MeshBasicMaterial({
-        color:0x66f7ff,
+        color:isWave ? 0xffd76a : 0x66f7ff,
         map:makeShieldHoneycombTextureV460(),
         transparent:true,
         opacity:0.0,
         depthWrite:false,
         depthTest:true,
         blending:THREE.AdditiveBlending,
-        side:THREE.DoubleSide
+        side:THREE.FrontSide
     });
 }
 
@@ -11703,45 +11731,28 @@ function attachPlayerShieldFieldV460(){
         removePlayerShieldFieldV460();
         if(!playerShip || Number(playerMaxShield || 0) <= 0) return;
 
-        const overlayMat = createShieldOverlayMaterialV462();
-        let created = 0;
+        const hitRadius = Math.max(2.8, Number(playerShip?.userData?.hitRadius || 2.8) || 2.8);
+        const geometry = new THREE.SphereGeometry(1, 80, 48);
+        const shield = new THREE.Mesh(geometry, createShieldOverlayMaterialV462());
+        shield.name = 'player-honeycomb-shield-shell-v477';
+        shield.userData.baseScaleV461 = new THREE.Vector3(hitRadius * 1.08, hitRadius * 0.48, hitRadius * 1.50);
+        shield.scale.copy(shield.userData.baseScaleV461);
+        shield.renderOrder = 999;
+        playerShip.add(shield);
+        playerShieldMeshV460 = shield;
 
-        // V462: щит не овалом вокруг корабля, а копиями геометрии поверх каждого mesh корабля.
-        // Это повторяет форму корпуса/крыльев/деталей.
-        playerShip.traverse((node) => {
-            try{
-                if(created >= 42) return;
-                if(!node?.isMesh || node.userData?.shieldOverlayV462 || node.name === 'player-ship-honeycomb-shield-v460') return;
-                if(node.material?.isSpriteMaterial) return;
-
-                const clonedGeometry = node.geometry?.clone?.();
-                if(!clonedGeometry) return;
-
-                const shieldMesh = new THREE.Mesh(clonedGeometry, overlayMat.clone());
-                shieldMesh.name = 'ship-shaped-shield-overlay-v462';
-                shieldMesh.userData.shieldOverlayV462 = true;
-                shieldMesh.position.copy(node.position);
-                shieldMesh.quaternion.copy(node.quaternion);
-                shieldMesh.scale.copy(node.scale).multiplyScalar(1.035);
-                shieldMesh.renderOrder = 998;
-                node.parent.add(shieldMesh);
-                playerShieldMeshesV462.push(shieldMesh);
-                created++;
-            }catch(_){}
-        });
-
-        // fallback only if real model meshes are not ready yet.
-        if(!playerShieldMeshesV462.length){
-            const hitRadius = Math.max(2.8, Number(playerShip?.userData?.hitRadius || 2.8) || 2.8);
-            const geometry = new THREE.SphereGeometry(1, 48, 32);
-            const material = createShieldOverlayMaterialV462();
-            const shield = new THREE.Mesh(geometry, material);
-            shield.name = 'player-ship-honeycomb-shield-v460';
-            shield.scale.set(hitRadius * 1.0, hitRadius * 0.38, hitRadius * 1.35);
-            shield.userData.baseScaleV461 = shield.scale.clone();
-            shield.renderOrder = 999;
-            playerShip.add(shield);
-            playerShieldMeshV460 = shield;
+        // V477: отдельные волны попадания. Не мигаем всем щитом целиком.
+        playerShieldWaveMeshesV477 = [];
+        for(let i = 0; i < 3; i++){
+            const wave = new THREE.Mesh(new THREE.SphereGeometry(1, 80, 48), createShieldOverlayMaterialV462({ wave:true }));
+            wave.name = `player-honeycomb-shield-hit-wave-v477-${i}`;
+            wave.userData.baseScaleV461 = shield.userData.baseScaleV461.clone();
+            wave.userData.waveIndexV477 = i;
+            wave.scale.copy(wave.userData.baseScaleV461);
+            wave.renderOrder = 1000 + i;
+            wave.visible = false;
+            playerShip.add(wave);
+            playerShieldWaveMeshesV477.push(wave);
         }
 
         updatePlayerShieldFieldV460(true);
@@ -11751,7 +11762,7 @@ function attachPlayerShieldFieldV460(){
 }
 
 function flashPlayerShieldV460(){
-    playerShieldFlashUntilV460 = Date.now() + 900;
+    playerShieldFlashUntilV460 = Date.now() + 1150;
     try{ updatePlayerShieldFieldV460(true); }catch(_){}
 }
 
@@ -11764,40 +11775,66 @@ function updatePlayerShieldFieldV460(force = false){
         }
 
         const ratio = THREE.MathUtils.clamp(Number(playerShield || 0) / Math.max(1, Number(playerMaxShield || 1)), 0, 1);
-        const flashing = Date.now() < Number(playerShieldFlashUntilV460 || 0);
-        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.58 : 0.22 + ratio * 0.08);
-        const color = flashing ? 0xffd45a : 0x66f7ff;
+        const now = Date.now();
+        const flashEnd = Number(playerShieldFlashUntilV460 || 0);
+        const flashing = now < flashEnd;
+        const flashProgress = flashing ? THREE.MathUtils.clamp(1 - ((flashEnd - now) / 1150), 0, 1) : 1;
+        const baseOpacity = ratio <= 0 ? 0 : 0.055 + ratio * 0.045;
 
-        const updateMesh = (mesh) => {
-            if(!mesh?.material) return;
-            mesh.visible = targetOpacity > 0.015;
-            mesh.material.transparent = true;
-            mesh.material.depthWrite = false;
-            mesh.material.depthTest = false;
-            mesh.material.opacity = force ? targetOpacity : mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.06;
-            mesh.material.color?.setHex?.(color);
+        const updateTexture = (material, speedX = 0.00005, speedY = 0.000025) => {
             try{
-                if(mesh.material.map){
-                    mesh.material.map.repeat.set(5.2, 4.0);
-                    mesh.material.map.offset.x += flashing ? 0.00045 : 0.00008;
-                    mesh.material.map.offset.y += flashing ? 0.00028 : 0.00005;
-                    mesh.material.map.needsUpdate = true;
+                if(material?.map){
+                    material.map.repeat.set(3.8, 2.65);
+                    material.map.offset.x += speedX;
+                    material.map.offset.y += speedY;
+                    material.map.needsUpdate = true;
                 }
             }catch(_){}
         };
 
-        if(Array.isArray(playerShieldMeshesV462) && playerShieldMeshesV462.length){
-            playerShieldMeshesV462.forEach(updateMesh);
-        }
-        if(playerShieldMeshV460){
-            updateMesh(playerShieldMeshV460);
-            playerShieldMeshV460.rotation.y += flashing ? 0.0025 : 0.0006;
-            playerShieldMeshV460.rotation.z += flashing ? 0.0012 : 0.00025;
-            const baseScale = playerShieldMeshV460.userData.baseScaleV461;
+        if(playerShieldMeshV460?.material){
+            const mesh = playerShieldMeshV460;
+            const mat = mesh.material;
+            mesh.visible = baseOpacity > 0.01;
+            mat.transparent = true;
+            mat.depthWrite = false;
+            mat.depthTest = true;
+            mat.opacity = force ? baseOpacity : mat.opacity + (baseOpacity - mat.opacity) * 0.08;
+            mat.color?.setHex?.(0x64f6ff);
+            updateTexture(mat, 0.000035, 0.00002);
+
+            mesh.rotation.y += 0.00045;
+            mesh.rotation.z += 0.00018;
+            const baseScale = mesh.userData.baseScaleV461;
             if(baseScale){
-                const pulse = flashing ? 1.018 : 1.0 + Math.sin(Date.now() / 1600) * 0.006;
-                playerShieldMeshV460.scale.set(baseScale.x * pulse, baseScale.y * pulse, baseScale.z * pulse);
+                const idlePulse = 1.0 + Math.sin(now / 2200) * 0.004;
+                mesh.scale.set(baseScale.x * idlePulse, baseScale.y * idlePulse, baseScale.z * idlePulse);
             }
+        }
+
+        if(Array.isArray(playerShieldWaveMeshesV477)){
+            playerShieldWaveMeshesV477.forEach((wave, index) => {
+                if(!wave?.material) return;
+                const delay = index * 0.18;
+                const p = THREE.MathUtils.clamp((flashProgress - delay) / 0.72, 0, 1);
+                const active = flashing && p > 0 && p < 1;
+                const strength = active ? Math.sin(p * Math.PI) : 0;
+                const waveOpacity = ratio <= 0 ? 0 : strength * (0.34 - index * 0.055);
+                wave.visible = waveOpacity > 0.012;
+                wave.material.opacity = force ? waveOpacity : wave.material.opacity + (waveOpacity - wave.material.opacity) * 0.18;
+                wave.material.color?.setHex?.(0xffd05a);
+                wave.material.depthWrite = false;
+                wave.material.depthTest = true;
+                updateTexture(wave.material, 0.00018 + index * 0.00005, 0.00010 + index * 0.00003);
+
+                const baseScale = wave.userData.baseScaleV461;
+                if(baseScale){
+                    const expand = 1.0 + p * (0.13 + index * 0.025);
+                    wave.scale.set(baseScale.x * expand, baseScale.y * expand, baseScale.z * expand);
+                }
+                wave.rotation.y += 0.0016 + index * 0.00045;
+                wave.rotation.z += 0.0007 + index * 0.00025;
+            });
         }
     }catch(_){}
 }
