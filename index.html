@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v484 - PRE AUTH LOADING SCREEN + GAME PRELOAD -->
+<!-- COSMIC CLICKER v485 - CINEMATIC PRE AUTH LOADING SCREEN -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -8149,7 +8149,10 @@ body:not(.cosmic-preload-done) #auth-screen #register-modal{
   opacity:0 !important;
   visibility:hidden !important;
   pointer-events:none !important;
-  transform:translateY(18px) scale(0.985);
+  transform:translateY(24px) scale(0.975);
+}
+body.cosmic-preload-done #auth-screen .auth-stage{
+  animation:cosmicAuthRevealV485 .75s ease both;
 }
 body.cosmic-preload-done #cosmic-preloader-v484{
   opacity:0 !important;
@@ -8198,12 +8201,12 @@ body.cosmic-preload-done #cosmic-preloader-v484{
 .cosmic-preloader-box-v484{
   position:relative;
   z-index:2;
-  width:min(560px,92vw);
-  padding:34px 28px 28px;
+  width:min(640px,92vw);
+  padding:40px 32px 30px;
   border-radius:26px;
   text-align:center;
-  background:rgba(5,10,24,.62);
-  border:1px solid rgba(130,230,255,.25);
+  background:linear-gradient(180deg, rgba(8,16,38,.78), rgba(4,8,20,.66));
+  border:1px solid rgba(130,230,255,.30);
   box-shadow:0 0 40px rgba(0,220,255,.20), inset 0 0 28px rgba(0,220,255,.07);
   backdrop-filter:blur(10px);
 }
@@ -8271,6 +8274,126 @@ body.cosmic-preload-done #cosmic-preloader-v484{
 @keyframes cosmicLoaderOrbitV484{to{transform:rotate(360deg)}}
 @keyframes cosmicLoaderStarsV484{to{background-position:260px 180px,-310px 250px,220px -180px,-360px -220px}}
 @keyframes cosmicTitleFloatV484{0%,100%{transform:translateY(0);filter:brightness(1)}50%{transform:translateY(-8px);filter:brightness(1.35)}}
+
+#cosmic-preloader-v484 .cosmic-loader-planet-v485{
+  position:absolute;
+  width:164px;
+  height:164px;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.92), transparent 0 10px),
+    radial-gradient(circle at 36% 34%, #79f7ff 0%, #1266b8 35%, #09234f 67%, #020714 100%);
+  box-shadow:0 0 40px rgba(0,240,255,.36), inset -20px -18px 34px rgba(0,0,0,.42);
+  opacity:.22;
+  filter:blur(.1px);
+  animation:cosmicPlanetPulseV485 3.8s ease-in-out infinite;
+}
+#cosmic-preloader-v484 .cosmic-loader-planet-v485::before,
+#cosmic-preloader-v484 .cosmic-loader-planet-v485::after{
+  content:"";
+  position:absolute;
+  inset:50% auto auto 50%;
+  width:270px;
+  height:66px;
+  border:2px solid rgba(126,245,255,.26);
+  border-left-color:rgba(255,210,106,.28);
+  border-right-color:rgba(0,240,255,.38);
+  border-radius:50%;
+  transform:translate(-50%,-50%) rotate(-18deg);
+  box-shadow:0 0 24px rgba(0,240,255,.18);
+}
+#cosmic-preloader-v484 .cosmic-loader-planet-v485::after{
+  width:330px;
+  height:86px;
+  transform:translate(-50%,-50%) rotate(-18deg) scale(.9);
+  opacity:.55;
+}
+.cosmic-preloader-box-v484::before{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  border-radius:28px;
+  padding:1px;
+  background:linear-gradient(135deg, rgba(0,240,255,.62), transparent 34%, rgba(255,210,106,.52), transparent 72%, rgba(128,96,255,.55));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+  animation:cosmicBorderGlowV485 2.4s ease-in-out infinite;
+}
+.cosmic-preloader-title-v484{
+  position:relative;
+}
+.cosmic-preloader-title-v484::after{
+  content:"";
+  position:absolute;
+  left:5%;
+  right:5%;
+  top:0;
+  bottom:0;
+  background:linear-gradient(110deg, transparent 0%, rgba(255,255,255,.0) 34%, rgba(255,255,255,.72) 48%, rgba(255,255,255,.0) 62%, transparent 100%);
+  transform:translateX(-130%);
+  animation:cosmicTitleSweepV485 2.2s ease-in-out infinite;
+  mix-blend-mode:screen;
+  pointer-events:none;
+}
+.cosmic-loader-stage-list-v485{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin:18px auto 0;
+  width:min(420px,84vw);
+}
+.cosmic-loader-stage-v485{
+  padding:7px 8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(140,230,255,.14);
+  color:#94c9df;
+  font-size:11px;
+  letter-spacing:.04em;
+  transition:.25s ease;
+}
+.cosmic-loader-stage-v485.active{
+  color:#ffffff;
+  border-color:rgba(0,240,255,.55);
+  background:rgba(0,240,255,.11);
+  box-shadow:0 0 18px rgba(0,240,255,.20);
+}
+.cosmic-loader-stage-v485.done{
+  color:#ffd983;
+  border-color:rgba(255,210,106,.36);
+  background:rgba(255,210,106,.08);
+}
+.cosmic-loader-tip-v485{
+  margin-top:14px;
+  min-height:18px;
+  color:#85abc1;
+  font-size:12px;
+  opacity:.86;
+}
+.cosmic-shooting-star-v485{
+  position:absolute;
+  z-index:1;
+  width:130px;
+  height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.9), rgba(0,240,255,.8), transparent);
+  transform:rotate(-24deg);
+  opacity:0;
+  animation:cosmicShootV485 3.2s ease-in-out infinite;
+}
+.cosmic-shooting-star-v485.s1{top:20%;left:14%;animation-delay:.2s;}
+.cosmic-shooting-star-v485.s2{top:37%;left:72%;animation-delay:1.35s;}
+.cosmic-shooting-star-v485.s3{top:72%;left:30%;animation-delay:2.2s;}
+@keyframes cosmicPlanetPulseV485{0%,100%{transform:translate(-50%,-50%) scale(.96);opacity:.18}50%{transform:translate(-50%,-50%) scale(1.04);opacity:.28}}
+@keyframes cosmicBorderGlowV485{0%,100%{opacity:.58;filter:brightness(1)}50%{opacity:1;filter:brightness(1.35)}}
+@keyframes cosmicTitleSweepV485{0%{transform:translateX(-130%);opacity:0}26%{opacity:.7}60%,100%{transform:translateX(130%);opacity:0}}
+@keyframes cosmicShootV485{0%,58%{opacity:0;transform:translate(0,0) rotate(-24deg)}68%{opacity:.9}100%{opacity:0;transform:translate(-280px,150px) rotate(-24deg)}}
+@keyframes cosmicAuthRevealV485{0%{opacity:0;transform:translateY(24px) scale(.97);filter:blur(8px)}100%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+
 </style>
 
 </head>
@@ -8292,12 +8415,25 @@ body.cosmic-preload-done #cosmic-preloader-v484{
 <div id="auth-screen">
 
   <div id="cosmic-preloader-v484" aria-live="polite">
+    <span class="cosmic-shooting-star-v485 s1"></span>
+    <span class="cosmic-shooting-star-v485 s2"></span>
+    <span class="cosmic-shooting-star-v485 s3"></span>
+    <div class="cosmic-loader-planet-v485"></div>
     <div class="cosmic-preloader-box-v484">
       <div class="cosmic-preloader-title-v484"><span>COSMIC</span><span>CLICKER</span><span>★</span></div>
-      <div class="cosmic-preloader-subtitle-v484">preparing galaxy systems</div>
+      <div class="cosmic-preloader-subtitle-v484">initializing deep-space systems</div>
       <div class="cosmic-loader-ring-v484"></div>
       <div id="cosmic-loader-status-v484" class="cosmic-loader-status-v484">Запуск звёздных систем...</div>
       <div class="cosmic-loader-bar-v484"><div id="cosmic-loader-progress-v484"></div></div>
+      <div class="cosmic-loader-stage-list-v485">
+        <div class="cosmic-loader-stage-v485" data-loader-stage-v485="0">Сервер</div>
+        <div class="cosmic-loader-stage-v485" data-loader-stage-v485="1">Игроки</div>
+        <div class="cosmic-loader-stage-v485" data-loader-stage-v485="2">Комнаты</div>
+        <div class="cosmic-loader-stage-v485" data-loader-stage-v485="3">Текстуры</div>
+        <div class="cosmic-loader-stage-v485" data-loader-stage-v485="4">Интерфейс</div>
+        <div class="cosmic-loader-stage-v485" data-loader-stage-v485="5">Готово</div>
+      </div>
+      <div id="cosmic-loader-tip-v485" class="cosmic-loader-tip-v485">Подготавливаем аккаунты, чтобы после входа меньше ждать.</div>
     </div>
   </div>
   <div class="auth-stage">
