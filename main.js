@@ -1,4 +1,4 @@
-// COSMIC CLICKER v479 - REMOTE ROUND SHIELD + BREAK SPARKS + FAST GHOST CLEANUP
+// COSMIC CLICKER v480 - FAST ROOM JOIN + INSTANT SHIELD BREAK
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -121,6 +121,7 @@ let playerShieldWaveMeshesV477 = [];
 let shieldBreakSparksV479 = [];
 let lastPlayerShieldBreakAtV479 = 0;
 const PLAYER_SHIELD_HIT_WAVE_DURATION_MS_V478 = 520;
+const PLAYER_SHIELD_BREAK_SPARK_COOLDOWN_MS_V480 = 180;
 const REMOTE_SHIELD_SCALE_V466 = 1.65;
 const REMOTE_SHIELD_OPACITY_V466 = 0.34;
 let remoteShieldTextureV471 = null;
@@ -9170,6 +9171,7 @@ function enterBattleMap(mapName){
 
 var remoteBattleShips = new Map();
 let battleLeavingInProgress = false;
+let battleJoinClickInProgressV480 = false;
 var lastBattlePresenceSnapshot = new Map();
 var battlePresenceBaselineReady = false;
 var liveBattleSyncTimer = null;
@@ -11907,18 +11909,27 @@ function applyPlayerShieldedDamageV460(amount = 0, source = null){
     if(incoming <= 0) return 0;
 
     if(Number(playerShield || 0) > 0){
-        const beforeShieldV479 = Math.max(0, Number(playerShield || 0) || 0);
-        const absorbed = Math.min(beforeShieldV479, incoming);
-        playerShield = Math.max(0, beforeShieldV479 - absorbed);
+        const beforeShieldV480 = Math.max(0, Number(playerShield || 0) || 0);
+        const absorbed = Math.min(beforeShieldV480, incoming);
+        const nextShieldV480 = Math.max(0, beforeShieldV480 - absorbed);
+        const shieldBrokenNowV480 = beforeShieldV480 > 0 && nextShieldV480 <= 0;
+
+        playerShield = nextShieldV480;
         incoming -= absorbed;
-        flashPlayerShieldV460();
-        if(beforeShieldV479 > 0 && Number(playerShield || 0) <= 0){
-            const nowBreakV479 = Date.now();
-            if(nowBreakV479 - Number(lastPlayerShieldBreakAtV479 || 0) > 450){
-                lastPlayerShieldBreakAtV479 = nowBreakV479;
+
+        if(shieldBrokenNowV480){
+            // V480: если щит закончился этим попаданием, убираем его сразу.
+            // Раньше сначала запускалась волна попадания, поэтому визуально казалось,
+            // что щит ломается с опозданием.
+            const nowBreakV480 = Date.now();
+            if(nowBreakV480 - Number(lastPlayerShieldBreakAtV479 || 0) > PLAYER_SHIELD_BREAK_SPARK_COOLDOWN_MS_V480){
+                lastPlayerShieldBreakAtV479 = nowBreakV480;
                 spawnShieldBreakSparksV479?.(playerShip, 0x7df7ff);
             }
+            playerShieldFlashUntilV460 = 0;
             removePlayerShieldFieldV460?.();
+        }else{
+            flashPlayerShieldV460();
         }
     }
 
@@ -19530,6 +19541,10 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     return;
                 }
                 (async () => {
+                    if(battleJoinClickInProgressV480) return;
+                    battleJoinClickInProgressV480 = true;
+                    const statusNoteV480 = document.getElementById('match-status-note');
+                    if(statusNoteV480) statusNoteV480.textContent = 'Входим в комнату...';
                     const room = {
                         ...selectedLobbyMap,
                         players:[...(selectedLobbyMap.currentPlayers || selectedLobbyMap.players || [])],
@@ -19542,7 +19557,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
 
                     if(selectedLobbyMap.id){
                         const joined = await joinRoomPlayers(selectedLobbyMap.id);
-                        if(!joined) return;
+                        if(!joined){
+                            battleJoinClickInProgressV480 = false;
+                            const statusNoteFailV480 = document.getElementById('match-status-note');
+                            if(statusNoteFailV480) statusNoteFailV480.textContent = 'Не удалось войти, попробуй ещё раз';
+                            return;
+                        }
                         await loadRoomsFromSupabase();
                         const freshRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
                             .find(entry => String(entry?.id || '') === String(selectedLobbyMap.id));
@@ -19556,7 +19576,12 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     } else if(selectedLobbyMap.real){
                         const publicRoomName = `Public ${String(selectedLobbyMap.real || 'earth').toUpperCase()}`;
                         const createdOrExisting = await createGameRoom(publicRoomName, selectedLobbyMap.real, Number(selectedLobbyMap.maxPlayers || selectedLobbyMap.playerCount || 8), getDisplayPlayerTag());
-                        if(!createdOrExisting?.id) return;
+                        if(!createdOrExisting?.id){
+                            battleJoinClickInProgressV480 = false;
+                            const statusNoteFailV480 = document.getElementById('match-status-note');
+                            if(statusNoteFailV480) statusNoteFailV480.textContent = 'Комната ещё создаётся, попробуй ещё раз';
+                            return;
+                        }
                         await loadRoomsFromSupabase();
                         const freshRoom = (Array.isArray(supabaseBattleRoomsCache) ? supabaseBattleRoomsCache : [])
                             .find(entry => String(entry?.id || '') === String(createdOrExisting.id));
@@ -19577,7 +19602,13 @@ window.renderPlayersOnPlanet = function(entry = {}){
                     persistBattleChatRoomId?.(window.currentRoomId);
                     resetRoomPlayersCacheV474?.();
                     switchState('BATTLE');
-                })();
+                    battleJoinClickInProgressV480 = false;
+                })().catch((error) => {
+                    console.warn('join battle room warning:', error?.message || error);
+                    battleJoinClickInProgressV480 = false;
+                    const statusNoteV480 = document.getElementById('match-status-note');
+                    if(statusNoteV480) statusNoteV480.textContent = 'Не удалось войти, попробуй ещё раз';
+                });
             });
         }
         const observeBtnOld = document.getElementById('observe-match-btn');
@@ -20131,9 +20162,9 @@ async function joinRoomPlayers(roomId) {
 
   await cleanupOwnGhostRoomPlayersBeforeJoinV478?.(normalizedRoomId, identity);
 
-  const roomConfirmed = await waitForConfirmedRoom(normalizedRoomId, 9000);
-  // v443: не останавливаем вход только из-за задержки чтения rooms.
-  // Сразу пробуем записать room_players; если FK реально не готов, обработаем ниже.
+  // V480: не ждём rooms перед обычным входом. Комната уже выбрана из лобби,
+  // а лишнее ожидание делало кнопку "Войти" визуально медленной.
+  // Если FK ещё не готов после создания комнаты, ниже вернётся 23503 и сработают внешние retry.
   const stamp = new Date().toISOString();
   const { data: joinedRows, error } = await upsertRoomPlayerRowSafe(normalizedRoomId, identity.playerId, {
     nickname: identity.displayName,
@@ -20662,7 +20693,7 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
 
   if (Array.isArray(existingRows) && existingRows.length > 0) {
     const existingRoom = existingRows[0];
-    await waitForConfirmedRoom(existingRoom.id, 9000);
+    // V480: не блокируем вход ожиданием rooms; joinRoomPlayers сам обработает FK/retry.
     let joinedExisting = await joinRoomPlayers(existingRoom.id);
     if (!joinedExisting) {
       for(const retryDelay of [260, 520, 900, 1400]){
@@ -20698,7 +20729,7 @@ async function createGameRoom(roomName, mapName, maxPlayers, hostName) {
     return null;
   }
 
-  const roomConfirmed = await waitForConfirmedRoom(data.id, 9000);
+  const roomConfirmed = await waitForConfirmedRoom(data.id, 1200);
   if(!roomConfirmed){
     // v443: Supabase иногда задерживает чтение только что созданной комнаты.
     // Это не критическая ошибка — ниже всё равно пробуем вход в room_players.
