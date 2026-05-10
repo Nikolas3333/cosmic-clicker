@@ -1,4 +1,4 @@
-// COSMIC CLICKER v478 - ROUND SHIELD TUNE + FAST WAVE + GHOST ROOM CLEANUP
+// COSMIC CLICKER v479 - REMOTE ROUND SHIELD + BREAK SPARKS + FAST GHOST CLEANUP
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -118,6 +118,8 @@ let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
 let playerShieldMeshesV462 = [];
 let playerShieldWaveMeshesV477 = [];
+let shieldBreakSparksV479 = [];
+let lastPlayerShieldBreakAtV479 = 0;
 const PLAYER_SHIELD_HIT_WAVE_DURATION_MS_V478 = 520;
 const REMOTE_SHIELD_SCALE_V466 = 1.65;
 const REMOTE_SHIELD_OPACITY_V466 = 0.34;
@@ -5119,6 +5121,7 @@ function animate(){
     // ================= SHIP MOVEMENT =================
 
     animateRemoteBattleShips();
+    updateShieldBreakSparksV479?.();
 
 const BATTLE_LIMIT = 920;
 
@@ -9490,7 +9493,7 @@ function createGuaranteedRemoteShieldV471(entry){
         shield.name = 'remote-guaranteed-visible-shield-v471';
         shield.userData.remoteShieldOverlayV463 = true;
         shield.userData.battleOverlayV462 = true;
-        shield.scale.set(hitRadius * 1.14, hitRadius * 0.50, hitRadius * 1.58);
+        shield.scale.set(hitRadius * 1.28, hitRadius * 1.28, hitRadius * 1.28);
         shield.renderOrder = 1600;
         entry.mesh.add(shield);
         entry.remoteForcedShieldV471 = shield;
@@ -9546,43 +9549,16 @@ function attachRemoteShipShieldV463(entry){
             return;
         }
 
-        const hasRealMeshShield = Array.isArray(entry.shieldMeshesV463)
-            && entry.shieldMeshesV463.some(mesh => String(mesh?.name || '').includes('remote-ship-shaped-shield-overlay-v473'));
-        if(hasRealMeshShield) return;
+        // V479: remote shield должен выглядеть так же, как локальный — круглая энергетическая сфера с сотами.
+        // Старые ship-shaped overlay-сетки удаляем, чтобы щит не превращался в "скелет" корабля.
+        if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.some(mesh => String(mesh?.name || '').includes('remote-ship-shaped-shield-overlay'))){
+            disposeRemoteShieldMeshesV463(entry);
+        }
 
-        disposeRemoteShieldMeshesV463(entry);
-        entry.shieldMeshesV463 = [];
-
-        let created = 0;
-        entry.mesh.updateMatrixWorld?.(true);
-
-        entry.mesh.traverse((node) => {
-            try{
-                if(created >= 54) return;
-                if(!node?.isMesh || node.userData?.shieldOverlayV462 || node.userData?.remoteShieldOverlayV463 || node.userData?.staticPilotLabelV461) return;
-                if(node.material?.isSpriteMaterial) return;
-                const nodeName = String(node.name || '').toLowerCase();
-                if(nodeName.includes('shield') || nodeName.includes('label')) return;
-
-                const geometry = node.geometry?.clone?.();
-                if(!geometry) return;
-
-                const material = createRemoteShieldOverlayMaterialV463();
-                tuneShieldMaterialHoneycombV473(material, false);
-
-                const shieldMesh = new THREE.Mesh(geometry, material);
-                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v473';
-                shieldMesh.userData.remoteShieldOverlayV463 = true;
-                shieldMesh.userData.battleOverlayV462 = true;
-                shieldMesh.position.copy(node.position);
-                shieldMesh.quaternion.copy(node.quaternion);
-                shieldMesh.scale.copy(node.scale).multiplyScalar(1.055);
-                shieldMesh.renderOrder = 1500;
-                node.parent.add(shieldMesh);
-                entry.shieldMeshesV463.push(shieldMesh);
-                created++;
-            }catch(_){}
-        });
+        const shield = createGuaranteedRemoteShieldV471(entry);
+        if(!shield) return;
+        if(!Array.isArray(entry.shieldMeshesV463)) entry.shieldMeshesV463 = [];
+        if(!entry.shieldMeshesV463.includes(shield)) entry.shieldMeshesV463.push(shield);
     }catch(error){
         console.warn('attachRemoteShipShieldV463 warning:', error?.message || error);
     }
@@ -9602,42 +9578,39 @@ function updateRemoteShipShieldV463(entry){
             return;
         }
 
-        // Убираем старый сферический forced shield, если он остался от прошлых версий.
-        if(entry.remoteForcedShieldV471){
-            try{ if(entry.remoteForcedShieldV471.parent) entry.remoteForcedShieldV471.parent.remove(entry.remoteForcedShieldV471); }catch(_){}
-            try{ entry.remoteForcedShieldV471.geometry?.dispose?.(); entry.remoteForcedShieldV471.material?.dispose?.(); }catch(_){}
-            entry.remoteForcedShieldV471 = null;
-        }
-
-        // Если остался временный шар — удаляем и пересобираем только mesh-форму.
-        if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.some(m => String(m?.name || '').includes('fallback') || String(m?.name || '').includes('guaranteed') || String(m?.name || '').includes('temporary'))){
-            disposeRemoteShieldMeshesV463(entry);
-        }
-
         attachRemoteShipShieldV463(entry);
 
+        const maxShield = Math.max(0, Number(entry.maxShield || entry.mesh?.userData?.maxShield || 0) || 0);
+        const shieldValue = Math.max(0, Number(entry.shield ?? entry.mesh?.userData?.shield ?? 0) || 0);
+        const ratio = maxShield > 0 ? THREE.MathUtils.clamp(shieldValue / Math.max(1, maxShield), 0, 1) : 0;
         const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
-        const targetOpacity = flashing ? 0.58 : 0.24;
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.48 : (0.075 + ratio * 0.065));
         const color = flashing ? 0xffd45a : 0x66f7ff;
+        const hitRadius = Math.max(3.2, Number(entry.mesh?.userData?.hitRadius || 3.2) || 3.2);
 
+        // V479: гарантируем круглую форму и одинаковый визуал для других игроков.
+        const sphereScale = hitRadius * 1.28;
         (entry.shieldMeshesV463 || []).forEach(mesh => {
             try{
                 if(!mesh?.material) return;
-                mesh.visible = true;
+                mesh.visible = targetOpacity > 0.012;
                 mesh.material.transparent = true;
                 mesh.material.depthWrite = false;
-                mesh.material.depthTest = false;
-                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.07;
+                mesh.material.depthTest = true;
+                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.16;
                 mesh.material.color?.setHex?.(color);
+                mesh.scale.set(sphereScale, sphereScale, sphereScale);
+                mesh.rotation.y += flashing ? 0.0012 : 0.00045;
+                mesh.rotation.z += flashing ? 0.0007 : 0.00018;
                 if(mesh.material.map){
-                    mesh.material.map.repeat.set(5.2, 4.0);
+                    mesh.material.map.repeat.set(3.8, 2.65);
                     mesh.material.map.offset.x += flashing ? 0.00045 : 0.00008;
-                    mesh.material.map.offset.y += flashing ? 0.00028 : 0.00005;
+                    mesh.material.map.offset.y += flashing ? 0.00024 : 0.00005;
                     mesh.material.map.needsUpdate = true;
                 }
-            }catch(_){}
+            }catch(_){ }
         });
-    }catch(_){}
+    }catch(_){ }
 }
 
 function updateRemotePilotLabelDistanceV463(entry){
@@ -10700,6 +10673,10 @@ async function syncLiveBattlePlayers(){
         remoteState.shield = Math.min(maxShieldFromRoomV464, shieldFromRoomV464);
         remoteState.hasRealHpV461 = true;
         if(remoteState.shield < oldShieldFromRoomV464) flashRemoteShieldV463(remoteState);
+        if(oldShieldFromRoomV464 > 0 && remoteState.shield <= 0){
+            spawnShieldBreakSparksV479?.(remoteState.mesh, 0x7df7ff);
+            disposeRemoteShieldMeshesV463?.(remoteState);
+        }
 
 
         if(remoteState.mesh?.userData){
@@ -11768,6 +11745,83 @@ function attachPlayerShieldFieldV460(){
     }
 }
 
+
+function spawnShieldBreakSparksV479(targetObject = null, color = 0x87f8ff){
+    try{
+        if(!scene) return;
+        const origin = new THREE.Vector3();
+        if(targetObject?.getWorldPosition) targetObject.getWorldPosition(origin);
+        else if(playerShip?.getWorldPosition) playerShip.getWorldPosition(origin);
+        else if(targetObject?.position) origin.copy(targetObject.position);
+
+        const count = 28;
+        for(let i = 0; i < count; i++){
+            const geometry = new THREE.SphereGeometry(0.045 + Math.random() * 0.045, 8, 6);
+            const material = new THREE.MeshBasicMaterial({
+                color: i % 3 === 0 ? 0xffd66a : color,
+                transparent:true,
+                opacity:0.95,
+                depthWrite:false,
+                blending:THREE.AdditiveBlending
+            });
+            const spark = new THREE.Mesh(geometry, material);
+            const dir = new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2
+            ).normalize();
+            const radius = 2.0 + Math.random() * 1.7;
+            spark.position.copy(origin).add(dir.clone().multiplyScalar(radius));
+            spark.userData.velocityV479 = dir.multiplyScalar(0.085 + Math.random() * 0.13);
+            spark.userData.createdAtV479 = Date.now();
+            spark.userData.lifeMsV479 = 420 + Math.random() * 360;
+            spark.renderOrder = 2100;
+            scene.add(spark);
+            shieldBreakSparksV479.push(spark);
+        }
+    }catch(_){ }
+}
+
+function updateShieldBreakSparksV479(){
+    try{
+        if(!Array.isArray(shieldBreakSparksV479) || !shieldBreakSparksV479.length) return;
+        const now = Date.now();
+        shieldBreakSparksV479 = shieldBreakSparksV479.filter(spark => {
+            try{
+                const age = now - Number(spark?.userData?.createdAtV479 || now);
+                const life = Math.max(1, Number(spark?.userData?.lifeMsV479 || 600));
+                const p = THREE.MathUtils.clamp(age / life, 0, 1);
+                if(p >= 1){
+                    if(spark?.parent) spark.parent.remove(spark);
+                    spark?.geometry?.dispose?.();
+                    spark?.material?.dispose?.();
+                    return false;
+                }
+                const v = spark.userData.velocityV479 || new THREE.Vector3();
+                spark.position.add(v);
+                v.multiplyScalar(0.965);
+                if(spark.material) spark.material.opacity = Math.max(0, (1 - p) * 0.95);
+                const s = 1 + p * 1.8;
+                spark.scale.set(s, s, s);
+                return true;
+            }catch(_){ return false; }
+        });
+    }catch(_){ }
+}
+
+function clearShieldBreakSparksV479(){
+    try{
+        (Array.isArray(shieldBreakSparksV479) ? shieldBreakSparksV479 : []).forEach(spark => {
+            try{
+                if(spark?.parent) spark.parent.remove(spark);
+                spark?.geometry?.dispose?.();
+                spark?.material?.dispose?.();
+            }catch(_){ }
+        });
+    }catch(_){ }
+    shieldBreakSparksV479 = [];
+}
+
 function flashPlayerShieldV460(){
     playerShieldFlashUntilV460 = Date.now() + PLAYER_SHIELD_HIT_WAVE_DURATION_MS_V478;
     try{ updatePlayerShieldFieldV460(true); }catch(_){}
@@ -11853,10 +11907,19 @@ function applyPlayerShieldedDamageV460(amount = 0, source = null){
     if(incoming <= 0) return 0;
 
     if(Number(playerShield || 0) > 0){
-        const absorbed = Math.min(Number(playerShield || 0), incoming);
-        playerShield = Math.max(0, Number(playerShield || 0) - absorbed);
+        const beforeShieldV479 = Math.max(0, Number(playerShield || 0) || 0);
+        const absorbed = Math.min(beforeShieldV479, incoming);
+        playerShield = Math.max(0, beforeShieldV479 - absorbed);
         incoming -= absorbed;
         flashPlayerShieldV460();
+        if(beforeShieldV479 > 0 && Number(playerShield || 0) <= 0){
+            const nowBreakV479 = Date.now();
+            if(nowBreakV479 - Number(lastPlayerShieldBreakAtV479 || 0) > 450){
+                lastPlayerShieldBreakAtV479 = nowBreakV479;
+                spawnShieldBreakSparksV479?.(playerShip, 0x7df7ff);
+            }
+            removePlayerShieldFieldV460?.();
+        }
     }
 
     if(incoming > 0){
@@ -11871,6 +11934,7 @@ function spawnPlayer() {
 
     if (playerShip) {
         removePlayerShieldFieldV460?.();
+        clearShieldBreakSparksV479?.();
         scene.remove(playerShip);
         playerShip = null;
     }
@@ -20025,12 +20089,14 @@ async function cleanupRoomPlayersWithoutFreshOnlinePresenceV478(allRooms = [], p
       const rows = Array.isArray(room?.room_players) ? room.room_players : [];
       rows.forEach(row => {
         const pid = String(row?.player_id || '').trim();
-        if(!pid || (selfId && pid === selfId)) return;
+        if(!pid) return;
         if(activeKeys.has(`${roomId}::${pid}`)) return;
         const stamp = row?.updated_at || row?.joined_at || null;
         const age = stamp ? (Date.now() - new Date(stamp).getTime()) : Infinity;
-        // Свежим даём небольшой шанс, чтобы не удалить игрока в первые секунды входа до записи online_players.
-        if(Number.isFinite(age) && age < 12000) return;
+        const selfIsReallyInThisBattleV479 = !!(selfId && pid === selfId && gameState === 'BATTLE' && sanitizeOnlineRoomId(currentRoom?.id || currentRoom?.roomId || '') === roomId);
+        if(selfIsReallyInThisBattleV479) return;
+        // V479: лобби не должно показывать фантомы после перезахода. Даём только короткий буфер на запись online_players.
+        if(Number.isFinite(age) && age < 2500) return;
         ghosts.push({ room_id: roomId, player_id: pid });
       });
     });
@@ -20408,6 +20474,12 @@ async function loadRoomsFromSupabase() {
   }
 
   const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
+  const activeRoomPlayerKeysV479 = new Set();
+  presenceRows.forEach(row => {
+    const rid = sanitizeOnlineRoomId(row?.room_id || '');
+    const pid = String(row?.player_id || '').trim();
+    if(rid && pid) activeRoomPlayerKeysV479.add(`${rid}::${pid}`);
+  });
   let allRooms = Array.isArray(data) ? data : [];
 
   await cleanupRoomPlayersWithoutFreshOnlinePresenceV478?.(allRooms, presenceRows);
@@ -20415,15 +20487,28 @@ async function loadRoomsFromSupabase() {
   const staleRoomPlayers = [];
   allRooms.forEach(room => {
     const rows = Array.isArray(room?.room_players) ? room.room_players : [];
+    const roomIdForRowsV479 = sanitizeOnlineRoomId(room?.id || '');
     rows.forEach(row => {
-      if(row?.room_id && row?.player_id && !isFreshRoomPlayerRow(row)){
+      const pid = String(row?.player_id || '').trim();
+      const key = `${roomIdForRowsV479}::${pid}`;
+      const stamp = row?.updated_at || row?.joined_at || null;
+      const age = stamp ? (Date.now() - new Date(stamp).getTime()) : Infinity;
+      const hasFreshOnlinePresenceV479 = activeRoomPlayerKeysV479.has(key);
+      const isVeryFreshJoinV479 = Number.isFinite(age) && age < 2500;
+      if(row?.player_id && (!isFreshRoomPlayerRow(row) || (!hasFreshOnlinePresenceV479 && !isVeryFreshJoinV479))){
         staleRoomPlayers.push({
-          room_id: String(row.room_id).trim(),
-          player_id: String(row.player_id).trim()
+          room_id: roomIdForRowsV479 || String(row.room_id || '').trim(),
+          player_id: pid
         });
       }
     });
-    room.room_players = rows.filter(row => isFreshRoomPlayerRow(row));
+    room.room_players = rows.filter(row => {
+      const pid = String(row?.player_id || '').trim();
+      const key = `${roomIdForRowsV479}::${pid}`;
+      const stamp = row?.updated_at || row?.joined_at || null;
+      const age = stamp ? (Date.now() - new Date(stamp).getTime()) : Infinity;
+      return isFreshRoomPlayerRow(row) && (activeRoomPlayerKeysV479.has(key) || (Number.isFinite(age) && age < 2500));
+    });
   });
 
   if(staleRoomPlayers.length){
