@@ -1,4 +1,4 @@
-// COSMIC CLICKER v472 - CREATE ROOM + SHIP COLOR + SHAPED REMOTE SHIELD
+// COSMIC CLICKER v473 - SHIELD OWNER ONLY SLOW HONEYCOMB
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -9424,6 +9424,42 @@ function roundRectV461(ctx, x, y, w, h, r){
 }
 
 
+
+// ===== V473 SHIELD OWNERSHIP HELPERS =====
+function hasVisibleRemoteShieldV473(entry){
+    try{
+        const maxShield = Math.max(
+            Number(entry?.maxShield || 0) || 0,
+            Number(entry?.mesh?.userData?.maxShield || 0) || 0
+        );
+        const shield = Math.max(
+            Number(entry?.shield || 0) || 0,
+            Number(entry?.mesh?.userData?.shield || 0) || 0
+        );
+
+        // Показываем щит только тем, у кого он реально есть.
+        return maxShield > 0 || shield > 0;
+    }catch(_){
+        return false;
+    }
+}
+
+function tuneShieldMaterialHoneycombV473(material, flashing = false){
+    try{
+        if(!material) return;
+        material.transparent = true;
+        material.depthWrite = false;
+        material.depthTest = false;
+        material.blending = THREE.AdditiveBlending;
+        material.opacity = flashing ? 0.72 : 0.18;
+        material.color?.setHex?.(flashing ? 0xdfffff : 0x66f7ff);
+        if(material.map){
+            material.map.repeat.set(3.4, 2.6);
+            material.map.needsUpdate = true;
+        }
+    }catch(_){}
+}
+
 // ===== V463 REMOTE SHIP-SHAPED SHIELD =====
 function getRemoteShieldTextureV471(){
     try{
@@ -9512,11 +9548,15 @@ function attachRemoteShipShieldV463(entry){
     try{
         if(!entry?.mesh) return;
 
+        if(!hasVisibleRemoteShieldV473(entry)){
+            disposeRemoteShieldMeshesV463(entry);
+            return;
+        }
+
         const hasRealMeshShield = Array.isArray(entry.shieldMeshesV463)
-            && entry.shieldMeshesV463.some(mesh => String(mesh?.name || '').includes('remote-ship-shaped-shield-overlay-v472'));
+            && entry.shieldMeshesV463.some(mesh => String(mesh?.name || '').includes('remote-ship-shaped-shield-overlay-v473'));
         if(hasRealMeshShield) return;
 
-        // Удаляем старые fallback/forced щиты перед сборкой настоящей формы.
         disposeRemoteShieldMeshesV463(entry);
         entry.shieldMeshesV463 = [];
 
@@ -9534,8 +9574,11 @@ function attachRemoteShipShieldV463(entry){
                 const geometry = node.geometry?.clone?.();
                 if(!geometry) return;
 
-                const shieldMesh = new THREE.Mesh(geometry, createRemoteShieldOverlayMaterialV463());
-                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v472';
+                const material = createRemoteShieldOverlayMaterialV463();
+                tuneShieldMaterialHoneycombV473(material, false);
+
+                const shieldMesh = new THREE.Mesh(geometry, material);
+                shieldMesh.name = 'remote-ship-shaped-shield-overlay-v473';
                 shieldMesh.userData.remoteShieldOverlayV463 = true;
                 shieldMesh.userData.battleOverlayV462 = true;
                 shieldMesh.position.copy(node.position);
@@ -9547,22 +9590,6 @@ function attachRemoteShipShieldV463(entry){
                 created++;
             }catch(_){}
         });
-
-        // Только пока модель не загрузилась: временный слабый fallback, чтобы не было пустоты.
-        // После загрузки mountBattleShipVisual вызовет updateRemoteShipShieldV463 и заменит на mesh-форму.
-        if(!entry.shieldMeshesV463.length){
-            const hitRadius = Math.max(2.8, Number(entry.mesh?.userData?.hitRadius || 2.8) || 2.8);
-            const geometry = new THREE.SphereGeometry(1, 36, 24);
-            const material = createRemoteShieldOverlayMaterialV463();
-            const shieldMesh = new THREE.Mesh(geometry, material);
-            shieldMesh.name = 'remote-temporary-loading-shield-v472';
-            shieldMesh.userData.remoteShieldOverlayV463 = true;
-            shieldMesh.userData.battleOverlayV462 = true;
-            shieldMesh.scale.set(hitRadius * 1.06, hitRadius * 0.42, hitRadius * 1.42);
-            shieldMesh.renderOrder = 1200;
-            entry.mesh.add(shieldMesh);
-            entry.shieldMeshesV463.push(shieldMesh);
-        }
     }catch(error){
         console.warn('attachRemoteShipShieldV463 warning:', error?.message || error);
     }
@@ -9570,31 +9597,35 @@ function attachRemoteShipShieldV463(entry){
 
 function flashRemoteShieldV463(entry){
     if(!entry) return;
-    entry.shieldFlashUntilV463 = Date.now() + 280;
+    entry.shieldFlashUntilV463 = Date.now() + 900;
 }
 
 function updateRemoteShipShieldV463(entry){
     try{
         if(!entry?.mesh) return;
 
-        // V472: убираем старый сферический forced shield.
-        // У чужого корабля щит должен быть как у владельца — поверх mesh-формы корабля.
+        if(!hasVisibleRemoteShieldV473(entry)){
+            disposeRemoteShieldMeshesV463(entry);
+            return;
+        }
+
+        // Убираем старый сферический forced shield, если он остался от прошлых версий.
         if(entry.remoteForcedShieldV471){
             try{ if(entry.remoteForcedShieldV471.parent) entry.remoteForcedShieldV471.parent.remove(entry.remoteForcedShieldV471); }catch(_){}
             try{ entry.remoteForcedShieldV471.geometry?.dispose?.(); entry.remoteForcedShieldV471.material?.dispose?.(); }catch(_){}
             entry.remoteForcedShieldV471 = null;
         }
 
-        // Если в массиве остался старый fallback-шар, удаляем и пересобираем.
-        if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.some(m => String(m?.name || '').includes('fallback') || String(m?.name || '').includes('guaranteed'))){
+        // Если остался временный шар — удаляем и пересобираем только mesh-форму.
+        if(Array.isArray(entry.shieldMeshesV463) && entry.shieldMeshesV463.some(m => String(m?.name || '').includes('fallback') || String(m?.name || '').includes('guaranteed') || String(m?.name || '').includes('temporary'))){
             disposeRemoteShieldMeshesV463(entry);
         }
 
         attachRemoteShipShieldV463(entry);
 
         const flashing = Date.now() < Number(entry.shieldFlashUntilV463 || 0);
-        const targetOpacity = flashing ? 0.88 : 0.34;
-        const color = flashing ? 0xffffff : 0x66f7ff;
+        const targetOpacity = flashing ? 0.72 : 0.18;
+        const color = flashing ? 0xdfffff : 0x66f7ff;
 
         (entry.shieldMeshesV463 || []).forEach(mesh => {
             try{
@@ -9603,11 +9634,13 @@ function updateRemoteShipShieldV463(entry){
                 mesh.material.transparent = true;
                 mesh.material.depthWrite = false;
                 mesh.material.depthTest = false;
-                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.45;
+                mesh.material.opacity = mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.14;
                 mesh.material.color?.setHex?.(color);
                 if(mesh.material.map){
-                    mesh.material.map.offset.x += flashing ? 0.020 : 0.004;
-                    mesh.material.map.offset.y += flashing ? 0.012 : 0.0025;
+                    mesh.material.map.repeat.set(3.4, 2.6);
+                    mesh.material.map.offset.x += flashing ? 0.004 : 0.0008;
+                    mesh.material.map.offset.y += flashing ? 0.0025 : 0.0005;
+                    mesh.material.map.needsUpdate = true;
                 }
             }catch(_){}
         });
@@ -10669,7 +10702,7 @@ async function syncLiveBattlePlayers(){
         const maxHpFromRoomV464 = Math.max(1, Number(posStatsV464.maxHp || posStatsV464.max_hp || remoteState.maxHp || 100) || 100);
         const hpFromRoomV464 = Math.max(0, Number(posStatsV464.hp ?? remoteState.hp ?? maxHpFromRoomV464) || maxHpFromRoomV464);
         const maxShieldFromRoomV464 = Math.max(0, Number(posStatsV464.maxShield || posStatsV464.max_shield || remoteState.maxShield || 0) || 0);
-        const shieldFromRoomV464 = Math.max(0, Number(posStatsV464.shield ?? remoteState.shield ?? maxShieldFromRoomV464) || 0);
+        const shieldFromRoomV464 = Math.max(0, Number(posStatsV464.shield ?? remoteState.shield ?? 0) || 0);
 
         const oldShieldFromRoomV464 = Math.max(0, Number(remoteState.shield || 0) || 0);
         remoteState.maxHp = maxHpFromRoomV464;
@@ -11604,9 +11637,9 @@ function makeShieldHoneycombTextureV460(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
     ctx.strokeStyle = 'rgba(115,245,255,0.82)';
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 3.2;
     ctx.shadowColor = 'rgba(0,235,255,0.85)';
-    ctx.shadowBlur = 7;
+    ctx.shadowBlur = 10;
 
     const r = 14;
     const w = Math.sqrt(3) * r;
@@ -11731,26 +11764,37 @@ function attachPlayerShieldFieldV460(){
 }
 
 function flashPlayerShieldV460(){
-    playerShieldFlashUntilV460 = Date.now() + 320;
+    playerShieldFlashUntilV460 = Date.now() + 900;
     try{ updatePlayerShieldFieldV460(true); }catch(_){}
 }
 
 function updatePlayerShieldFieldV460(force = false){
     try{
+        const hasShieldV473 = Number(playerMaxShield || 0) > 0 || Number(playerShield || 0) > 0;
+        if(!hasShieldV473){
+            removePlayerShieldFieldV460?.();
+            return;
+        }
+
         const ratio = THREE.MathUtils.clamp(Number(playerShield || 0) / Math.max(1, Number(playerMaxShield || 1)), 0, 1);
         const flashing = Date.now() < Number(playerShieldFlashUntilV460 || 0);
-        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.82 : 0.14 + ratio * 0.08);
-        const color = flashing ? 0xffffff : 0x66f7ff;
+        const targetOpacity = ratio <= 0 ? 0 : (flashing ? 0.72 : 0.16 + ratio * 0.06);
+        const color = flashing ? 0xdfffff : 0x66f7ff;
 
         const updateMesh = (mesh) => {
             if(!mesh?.material) return;
             mesh.visible = targetOpacity > 0.015;
-            mesh.material.opacity = force ? targetOpacity : mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.35;
+            mesh.material.transparent = true;
+            mesh.material.depthWrite = false;
+            mesh.material.depthTest = false;
+            mesh.material.opacity = force ? targetOpacity : mesh.material.opacity + (targetOpacity - mesh.material.opacity) * 0.14;
             mesh.material.color?.setHex?.(color);
             try{
                 if(mesh.material.map){
-                    mesh.material.map.offset.x += flashing ? 0.018 : 0.004;
-                    mesh.material.map.offset.y += flashing ? 0.010 : 0.002;
+                    mesh.material.map.repeat.set(3.4, 2.6);
+                    mesh.material.map.offset.x += flashing ? 0.004 : 0.0008;
+                    mesh.material.map.offset.y += flashing ? 0.0025 : 0.0005;
+                    mesh.material.map.needsUpdate = true;
                 }
             }catch(_){}
         };
@@ -11760,11 +11804,11 @@ function updatePlayerShieldFieldV460(force = false){
         }
         if(playerShieldMeshV460){
             updateMesh(playerShieldMeshV460);
-            playerShieldMeshV460.rotation.y += flashing ? 0.045 : 0.009;
-            playerShieldMeshV460.rotation.z += flashing ? 0.018 : 0.003;
+            playerShieldMeshV460.rotation.y += flashing ? 0.008 : 0.002;
+            playerShieldMeshV460.rotation.z += flashing ? 0.003 : 0.0008;
             const baseScale = playerShieldMeshV460.userData.baseScaleV461;
             if(baseScale){
-                const pulse = flashing ? 1.12 : 1.0 + Math.sin(Date.now() / 380) * 0.025;
+                const pulse = flashing ? 1.045 : 1.0 + Math.sin(Date.now() / 900) * 0.012;
                 playerShieldMeshV460.scale.set(baseScale.x * pulse, baseScale.y * pulse, baseScale.z * pulse);
             }
         }
