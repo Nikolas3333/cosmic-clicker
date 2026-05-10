@@ -1,4 +1,4 @@
-// COSMIC CLICKER v481 - INSTANT ROOM ENTER + STARTUP BATTLE SYNC FIX
+// COSMIC CLICKER v481 - INSTANT ROOM ENTER + PARALLEL ROOM FIX
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -63,6 +63,30 @@ function getPersistedBattleChatRoomId() {
     } catch (_) {}
     return '';
 }
+
+// ===== V482 PARALLEL ROOM HARD LOCK =====
+let battleJoinLockV482 = false;
+let activeBattleRoomIdV482 = '';
+
+function resetBattleJoinLockV482(){
+    battleJoinLockV482 = false;
+}
+
+function beginBattleJoinLockV482(roomId=''){
+    const safeRoomId = String(roomId || '').trim();
+    if(battleJoinLockV482 && activeBattleRoomIdV482 && activeBattleRoomIdV482 !== safeRoomId){
+        console.warn('V482 blocked parallel room join', activeBattleRoomIdV482, safeRoomId);
+        return false;
+    }
+    battleJoinLockV482 = true;
+    activeBattleRoomIdV482 = safeRoomId;
+    try{
+        currentRoom = null;
+        window.currentRoomId = safeRoomId;
+    }catch(_){}
+    return true;
+}
+
 let playerShip = null;
 let keys = {
     w: false,
@@ -23604,7 +23628,7 @@ setInterval(function(){
 
 
 
-// ===== V481 FAST ROOM ENTER + STARTUP BATTLE SYNC FIX =====
+// ===== V481 FAST ROOM ENTER + PARALLEL ROOM FIX =====
 // Цель:
 // 1) кнопка "Войти" больше не ждёт повторный loadRoomsFromSupabase перед переходом в бой;
 // 2) оба клиента сразу записывают room_players + online_players для одной комнаты;
