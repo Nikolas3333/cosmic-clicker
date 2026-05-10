@@ -2474,66 +2474,29 @@ async function upsertRoomPlayerRow(roomId, playerId, base = {}, selectClause = '
             return { data:updated.data, error:null };
         }
 
-        // Перед INSERT делаем SELECT. Это резко снижает 409, если строка уже существует.
-        const found = await client
+        // V483: НЕ делаем plain INSERT после SELECT — между двумя вкладками/аккаунтами
+        // строка room_id+player_id может появиться в тот же момент, и браузер получает POST 409.
+        // Поэтому создание делаем только через UPSERT по уникальной паре room_id,player_id.
+        // В payload нет id, чтобы Supabase не конфликтовал с серверным id.
+        const upserted = await client
             .from('room_players')
-            .select('id')
-            .eq('room_id', safeRoomId)
-            .eq('player_id', safePlayerId)
-            .limit(1);
-
-        const existingId = Array.isArray(found?.data) && found.data[0]?.id ? String(found.data[0].id) : '';
-        if(existingId){
-            const updatedById = await client
-                .from('room_players')
-                .update(updatePayload)
-                .eq('id', existingId)
-                .select(selectedColumns)
-                .limit(1);
-            return {
-                data:Array.isArray(updatedById?.data) ? updatedById.data : [],
-                error:null
-            };
-        }
-
-        // V475: для статичных комнат старая строка игрока могла оставаться в room_players.
-        // Перед INSERT удаляем только свою строку room_id+player_id, чтобы не ловить POST 409 Conflict.
-        try{
-            await client
-                .from('room_players')
-                .delete()
-                .eq('room_id', safeRoomId)
-                .eq('player_id', safePlayerId);
-        }catch(_){}
-
-        const inserted = await client
-            .from('room_players')
-            .insert(payload)
+            .upsert(payload, { onConflict:'room_id,player_id' })
             .select(selectedColumns)
             .limit(1);
 
-        if(!inserted?.error){
+        if(!upserted?.error){
             return {
-                data:Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
+                data:Array.isArray(upserted?.data) ? upserted.data : (upserted?.data ? [upserted.data] : []),
                 error:null
             };
         }
 
-        const msg = String(inserted?.error?.message || '').toLowerCase();
-        const code = String(inserted?.error?.code || '').trim();
-        const isConflict = code === '23505' || code === '409' || msg.includes('duplicate') || msg.includes('conflict') || msg.includes('already exists');
-
-        if(isConflict){
-            const retry = await updateByPair();
-            return {
-                data:Array.isArray(retry?.data) ? retry.data : [],
-                error:null
-            };
-        }
-
+        // Если у конкретной таблицы onConflict не сработал, не повторяем INSERT.
+        // Только повторный UPDATE по паре — так не создаётся новый 409 в консоли.
+        const retry = await updateByPair();
         return {
-            data:Array.isArray(inserted?.data) ? inserted.data : (inserted?.data ? [inserted.data] : []),
-            error:inserted?.error || null
+            data:Array.isArray(retry?.data) ? retry.data : [],
+            error: retry?.error || upserted?.error || null
         };
 
     }catch(error){
@@ -19894,38 +19857,27 @@ async function ensureRoomPlayerRowJoined(roomId, identity){
       return true;
     }
 
-    // V475: статичные комнаты могли иметь старую строку этого же игрока.
-    // Удаляем только свою старую строку, потом вставляем свежую.
-    try{
-      await window.supabaseClient
-        .from('room_players')
-        .delete()
-        .eq('room_id', normalizedRoomId)
-        .eq('player_id', playerId);
-    }catch(_){}
-
-    const inserted = await window.supabaseClient
+    // V483: создание строки только через UPSERT, без предварительного DELETE/INSERT.
+    // Это убирает POST 409 Conflict при быстром входе/повторном входе.
+    const upserted = await window.supabaseClient
       .from('room_players')
-      .insert(buildRoomPlayerRowPayload(normalizedRoomId, playerId, basePayload))
+      .upsert(buildRoomPlayerRowPayload(normalizedRoomId, playerId, basePayload), { onConflict:'room_id,player_id' })
       .select('id')
       .limit(1);
 
-    if(!inserted?.error) return true;
+    if(!upserted?.error) return true;
 
-    const code = String(inserted?.error?.code || '').trim();
-    const msg = String(inserted?.error?.message || '').toLowerCase();
-    if(code === '23505' || code === '409' || msg.includes('duplicate') || msg.includes('conflict')){
-      try{
-        await window.supabaseClient
-          .from('room_players')
-          .update(basePayload)
-          .eq('room_id', normalizedRoomId)
-          .eq('player_id', playerId)
-          .select('id')
-          .limit(1);
-      }catch(_){}
-      return true;
-    }
+    // Fallback без INSERT: пробуем только UPDATE, чтобы не плодить 409 в консоли.
+    try{
+      const retry = await window.supabaseClient
+        .from('room_players')
+        .update(basePayload)
+        .eq('room_id', normalizedRoomId)
+        .eq('player_id', playerId)
+        .select('id')
+        .limit(1);
+      if(!retry?.error) return true;
+    }catch(_){}
   }catch(_){}
 
   return false;
