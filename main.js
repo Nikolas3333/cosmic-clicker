@@ -1,4 +1,4 @@
-// COSMIC CLICKER v481 - INSTANT ROOM ENTER + PARALLEL ROOM FIX
+// COSMIC CLICKER v484 - PRE AUTH LOADING SCREEN + GAME PRELOAD
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -6097,9 +6097,133 @@ document.addEventListener('click', (event) => {
 
 window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
+
+// ===== V484 PRE-AUTH GAME PRELOADER =====
+function setCosmicPreloaderStatusV484(text = '', progress = null){
+    try{
+        const status = document.getElementById('cosmic-loader-status-v484');
+        if(status && text) status.textContent = text;
+        const bar = document.getElementById('cosmic-loader-progress-v484');
+        if(bar && progress !== null){
+            const value = Math.max(5, Math.min(100, Number(progress) || 0));
+            bar.style.width = value + '%';
+        }
+    }catch(_){}
+}
+
+function withCosmicPreloadTimeoutV484(promise, ms = 1800){
+    return new Promise((resolve) => {
+        let done = false;
+        const timer = setTimeout(() => {
+            if(done) return;
+            done = true;
+            resolve(false);
+        }, ms);
+        Promise.resolve(promise).then((value) => {
+            if(done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve(value);
+        }).catch((error) => {
+            if(done) return;
+            done = true;
+            clearTimeout(timer);
+            console.warn('preload step warning:', error?.message || error);
+            resolve(false);
+        });
+    });
+}
+
+function preloadCosmicImageV484(src = ''){
+    return new Promise((resolve) => {
+        const safeSrc = String(src || '').trim();
+        if(!safeSrc) return resolve(false);
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = safeSrc;
+    });
+}
+
+async function preloadCosmicBaseAssetsV484(){
+    const assets = [
+        'images/lobby_space_1.png',
+        'maps/sun.jpg','maps/mercury.jpg','maps/venus.jpg','maps/earth.jpg','maps/mars.jpg',
+        'maps/jupiter.jpg','maps/saturn.jpg','maps/uranus.jpg','maps/neptune.jpg',
+        '/ships/Spaceship.glb'
+    ];
+    await Promise.allSettled(assets.map((src) => preloadCosmicImageV484(src)));
+}
+
+async function runCosmicPreAuthLoaderV484(){
+    const startedAt = Date.now();
+    try{ document.body.classList.remove('cosmic-preload-done'); }catch(_){}
+
+    const steps = [
+        async () => {
+            setCosmicPreloaderStatusV484('Проверка соединения с сервером...', 16);
+            if(window.supabaseClient?.auth?.getSession){
+                await withCosmicPreloadTimeoutV484(window.supabaseClient.auth.getSession(), 1600);
+            }
+        },
+        async () => {
+            setCosmicPreloaderStatusV484('Прогружаем онлайн игроков...', 34);
+            if(typeof loadOnlinePlayersFromSupabase === 'function'){
+                window.cosmicPreloadedOnlinePlayersV484 = await withCosmicPreloadTimeoutV484(loadOnlinePlayersFromSupabase(), 1800) || [];
+            }
+        },
+        async () => {
+            setCosmicPreloaderStatusV484('Прогружаем комнаты и карты...', 56);
+            if(typeof loadRoomsFromSupabase === 'function'){
+                window.cosmicPreloadedRoomsV484 = await withCosmicPreloadTimeoutV484(loadRoomsFromSupabase(), 2200) || [];
+            }
+        },
+        async () => {
+            setCosmicPreloaderStatusV484('Загружаем космические текстуры...', 78);
+            await withCosmicPreloadTimeoutV484(preloadCosmicBaseAssetsV484(), 2600);
+        },
+        async () => {
+            setCosmicPreloaderStatusV484('Подготавливаем интерфейс входа...', 92);
+            try{ renderRoomsInLobby?.(); }catch(_){}
+            await withCosmicPreloadTimeoutV484(new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))), 800);
+        }
+    ];
+
+    for(const step of steps){
+        try{ await step(); }catch(error){ console.warn('pre-auth preload warning:', error?.message || error); }
+    }
+
+    const minVisibleMs = 1650;
+    const elapsed = Date.now() - startedAt;
+    if(elapsed < minVisibleMs){
+        await new Promise(resolve => setTimeout(resolve, minVisibleMs - elapsed));
+    }
+
+    setCosmicPreloaderStatusV484('Готово. Добро пожаловать, пилот.', 100);
+    await new Promise(resolve => setTimeout(resolve, 320));
+    try{ document.body.classList.add('cosmic-preload-done'); }catch(_){}
+}
+
+function scheduleCosmicPreAuthLoaderV484(){
+    try{
+        if(window.__cosmicPreAuthLoaderStartedV484) return;
+        window.__cosmicPreAuthLoaderStartedV484 = true;
+        setTimeout(() => {
+            runCosmicPreAuthLoaderV484().catch((error) => {
+                console.warn('pre-auth loader failed:', error?.message || error);
+                try{ document.body.classList.add('cosmic-preload-done'); }catch(_){}
+            });
+        }, 0);
+    }catch(error){
+        console.warn('pre-auth loader schedule warning:', error?.message || error);
+        try{ document.body.classList.add('cosmic-preload-done'); }catch(_){}
+    }
+}
+
 initSettingsUI();
 initLobbyBackground();
 initAuthScreen();
+scheduleCosmicPreAuthLoaderV484();
 updateHUD();
 updateUI();
 switchState('AUTH');
