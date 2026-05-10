@@ -1,4 +1,4 @@
-// COSMIC CLICKER v484 - PRE AUTH LOADING SCREEN + GAME PRELOAD
+// COSMIC CLICKER v485 - CINEMATIC PRE AUTH LOADING SCREEN
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -6099,7 +6099,29 @@ window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
 
 // ===== V484 PRE-AUTH GAME PRELOADER =====
-function setCosmicPreloaderStatusV484(text = '', progress = null){
+function setCosmicPreloaderStageV485(stageIndex = 0){
+    try{
+        document.querySelectorAll('[data-loader-stage-v485]').forEach((node) => {
+            const idx = Number(node.getAttribute('data-loader-stage-v485') || 0);
+            node.classList.toggle('done', idx < stageIndex);
+            node.classList.toggle('active', idx === stageIndex);
+        });
+        const tip = document.getElementById('cosmic-loader-tip-v485');
+        if(tip){
+            const tips = [
+                'Связываемся с Supabase и готовим сессию пилота.',
+                'Проверяем онлайн игроков и свежие статусы.',
+                'Подтягиваем комнаты, карты и список активных зон.',
+                'Прогреваем космические текстуры и корабли.',
+                'Собираем интерфейс входа без рывков.',
+                'Галактика готова. Добро пожаловать, пилот.'
+            ];
+            tip.textContent = tips[Math.max(0, Math.min(tips.length - 1, stageIndex))];
+        }
+    }catch(_){}
+}
+
+function setCosmicPreloaderStatusV484(text = '', progress = null, stageIndex = null){
     try{
         const status = document.getElementById('cosmic-loader-status-v484');
         if(status && text) status.textContent = text;
@@ -6108,6 +6130,7 @@ function setCosmicPreloaderStatusV484(text = '', progress = null){
             const value = Math.max(5, Math.min(100, Number(progress) || 0));
             bar.style.width = value + '%';
         }
+        if(stageIndex !== null) setCosmicPreloaderStageV485(stageIndex);
     }catch(_){}
 }
 
@@ -6161,29 +6184,29 @@ async function runCosmicPreAuthLoaderV484(){
 
     const steps = [
         async () => {
-            setCosmicPreloaderStatusV484('Проверка соединения с сервером...', 16);
+            setCosmicPreloaderStatusV484('Проверка соединения с сервером...', 14, 0);
             if(window.supabaseClient?.auth?.getSession){
                 await withCosmicPreloadTimeoutV484(window.supabaseClient.auth.getSession(), 1600);
             }
         },
         async () => {
-            setCosmicPreloaderStatusV484('Прогружаем онлайн игроков...', 34);
+            setCosmicPreloaderStatusV484('Прогружаем онлайн игроков...', 31, 1);
             if(typeof loadOnlinePlayersFromSupabase === 'function'){
                 window.cosmicPreloadedOnlinePlayersV484 = await withCosmicPreloadTimeoutV484(loadOnlinePlayersFromSupabase(), 1800) || [];
             }
         },
         async () => {
-            setCosmicPreloaderStatusV484('Прогружаем комнаты и карты...', 56);
+            setCosmicPreloaderStatusV484('Прогружаем комнаты и карты...', 52, 2);
             if(typeof loadRoomsFromSupabase === 'function'){
                 window.cosmicPreloadedRoomsV484 = await withCosmicPreloadTimeoutV484(loadRoomsFromSupabase(), 2200) || [];
             }
         },
         async () => {
-            setCosmicPreloaderStatusV484('Загружаем космические текстуры...', 78);
+            setCosmicPreloaderStatusV484('Загружаем космические текстуры и корабли...', 74, 3);
             await withCosmicPreloadTimeoutV484(preloadCosmicBaseAssetsV484(), 2600);
         },
         async () => {
-            setCosmicPreloaderStatusV484('Подготавливаем интерфейс входа...', 92);
+            setCosmicPreloaderStatusV484('Подготавливаем интерфейс входа...', 90, 4);
             try{ renderRoomsInLobby?.(); }catch(_){}
             await withCosmicPreloadTimeoutV484(new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))), 800);
         }
@@ -6193,14 +6216,14 @@ async function runCosmicPreAuthLoaderV484(){
         try{ await step(); }catch(error){ console.warn('pre-auth preload warning:', error?.message || error); }
     }
 
-    const minVisibleMs = 1650;
+    const minVisibleMs = 4300;
     const elapsed = Date.now() - startedAt;
     if(elapsed < minVisibleMs){
         await new Promise(resolve => setTimeout(resolve, minVisibleMs - elapsed));
     }
 
-    setCosmicPreloaderStatusV484('Готово. Добро пожаловать, пилот.', 100);
-    await new Promise(resolve => setTimeout(resolve, 320));
+    setCosmicPreloaderStatusV484('Готово. Добро пожаловать, пилот.', 100, 5);
+    await new Promise(resolve => setTimeout(resolve, 720));
     try{ document.body.classList.add('cosmic-preload-done'); }catch(_){}
 }
 
