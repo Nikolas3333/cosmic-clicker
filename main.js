@@ -1,4 +1,4 @@
-// COSMIC CLICKER v485 - CINEMATIC PRE AUTH LOADING SCREEN
+// COSMIC CLICKER v486 - 7 SEC EXPERIMENTAL CINEMATIC PRE AUTH LOADER
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -6098,7 +6098,7 @@ document.addEventListener('click', (event) => {
 window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
 
-// ===== V484 PRE-AUTH GAME PRELOADER =====
+// ===== V486 PRE-AUTH GAME PRELOADER =====
 function setCosmicPreloaderStageV485(stageIndex = 0){
     try{
         document.querySelectorAll('[data-loader-stage-v485]').forEach((node) => {
@@ -6109,12 +6109,12 @@ function setCosmicPreloaderStageV485(stageIndex = 0){
         const tip = document.getElementById('cosmic-loader-tip-v485');
         if(tip){
             const tips = [
-                'Связываемся с Supabase и готовим сессию пилота.',
-                'Проверяем онлайн игроков и свежие статусы.',
-                'Подтягиваем комнаты, карты и список активных зон.',
-                'Прогреваем космические текстуры и корабли.',
-                'Собираем интерфейс входа без рывков.',
-                'Галактика готова. Добро пожаловать, пилот.'
+                'Связываемся с Supabase и прогреваем ядро галактики.',
+                'Синхронизируем пилотов, онлайн и статусы.',
+                'Сканируем комнаты, карты и активные зоны.',
+                'Разогреваем текстуры, корабли и звёздный фон.',
+                'Собираем панель входа и стабилизируем интерфейс.',
+                'Галактика готова. Добро пожаловать на борт, пилот.'
             ];
             tip.textContent = tips[Math.max(0, Math.min(tips.length - 1, stageIndex))];
         }
@@ -6184,29 +6184,29 @@ async function runCosmicPreAuthLoaderV484(){
 
     const steps = [
         async () => {
-            setCosmicPreloaderStatusV484('Проверка соединения с сервером...', 14, 0);
+            setCosmicPreloaderStatusV484('Проверка гиперсвязи с сервером...', 12, 0);
             if(window.supabaseClient?.auth?.getSession){
                 await withCosmicPreloadTimeoutV484(window.supabaseClient.auth.getSession(), 1600);
             }
         },
         async () => {
-            setCosmicPreloaderStatusV484('Прогружаем онлайн игроков...', 31, 1);
+            setCosmicPreloaderStatusV484('Синхронизация пилотов и онлайн-статусов...', 28, 1);
             if(typeof loadOnlinePlayersFromSupabase === 'function'){
                 window.cosmicPreloadedOnlinePlayersV484 = await withCosmicPreloadTimeoutV484(loadOnlinePlayersFromSupabase(), 1800) || [];
             }
         },
         async () => {
-            setCosmicPreloaderStatusV484('Прогружаем комнаты и карты...', 52, 2);
+            setCosmicPreloaderStatusV484('Сканирование комнат, карт и боевых зон...', 47, 2);
             if(typeof loadRoomsFromSupabase === 'function'){
                 window.cosmicPreloadedRoomsV484 = await withCosmicPreloadTimeoutV484(loadRoomsFromSupabase(), 2200) || [];
             }
         },
         async () => {
-            setCosmicPreloaderStatusV484('Загружаем космические текстуры и корабли...', 74, 3);
+            setCosmicPreloaderStatusV484('Разогрев текстур, кораблей и космического фона...', 68, 3);
             await withCosmicPreloadTimeoutV484(preloadCosmicBaseAssetsV484(), 2600);
         },
         async () => {
-            setCosmicPreloaderStatusV484('Подготавливаем интерфейс входа...', 90, 4);
+            setCosmicPreloaderStatusV484('Сборка панели входа и стабилизация интерфейса...', 88, 4);
             try{ renderRoomsInLobby?.(); }catch(_){}
             await withCosmicPreloadTimeoutV484(new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))), 800);
         }
@@ -6214,16 +6214,17 @@ async function runCosmicPreAuthLoaderV484(){
 
     for(const step of steps){
         try{ await step(); }catch(error){ console.warn('pre-auth preload warning:', error?.message || error); }
+        await new Promise(resolve => setTimeout(resolve, 520));
     }
 
-    const minVisibleMs = 4300;
+    const minVisibleMs = 7000;
     const elapsed = Date.now() - startedAt;
     if(elapsed < minVisibleMs){
         await new Promise(resolve => setTimeout(resolve, minVisibleMs - elapsed));
     }
 
-    setCosmicPreloaderStatusV484('Готово. Добро пожаловать, пилот.', 100, 5);
-    await new Promise(resolve => setTimeout(resolve, 720));
+    setCosmicPreloaderStatusV484('Готово. Добро пожаловать на борт, пилот.', 100, 5);
+    await new Promise(resolve => setTimeout(resolve, 950));
     try{ document.body.classList.add('cosmic-preload-done'); }catch(_){}
 }
 
