@@ -1,4 +1,4 @@
-// COSMIC CLICKER v477 - SHIELD WAVE HONEYCOMB VISUAL FIX
+// COSMIC CLICKER v478 - ROUND SHIELD TUNE + FAST WAVE + GHOST ROOM CLEANUP
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -118,6 +118,7 @@ let playerShieldMeshV460 = null;
 let playerShieldFlashUntilV460 = 0;
 let playerShieldMeshesV462 = [];
 let playerShieldWaveMeshesV477 = [];
+const PLAYER_SHIELD_HIT_WAVE_DURATION_MS_V478 = 520;
 const REMOTE_SHIELD_SCALE_V466 = 1.65;
 const REMOTE_SHIELD_OPACITY_V466 = 0.34;
 let remoteShieldTextureV471 = null;
@@ -11655,8 +11656,8 @@ function makeShieldHoneycombTextureV460(){
     // Лёгкая прозрачная дымка, чтобы щит читался как энергетическое поле,
     // но не превращался в залитую оболочку и не скрывал корабль.
     const gradient = ctx.createRadialGradient(256, 256, 40, 256, 256, 255);
-    gradient.addColorStop(0.0, 'rgba(105,255,255,0.04)');
-    gradient.addColorStop(0.55, 'rgba(105,255,255,0.018)');
+    gradient.addColorStop(0.0, 'rgba(105,255,255,0.055)');
+    gradient.addColorStop(0.55, 'rgba(105,255,255,0.026)');
     gradient.addColorStop(1.0, 'rgba(105,255,255,0.0)');
     ctx.shadowBlur = 0;
     ctx.fillStyle = gradient;
@@ -11734,24 +11735,30 @@ function attachPlayerShieldFieldV460(){
         const hitRadius = Math.max(2.8, Number(playerShip?.userData?.hitRadius || 2.8) || 2.8);
         const geometry = new THREE.SphereGeometry(1, 80, 48);
         const shield = new THREE.Mesh(geometry, createShieldOverlayMaterialV462());
-        shield.name = 'player-honeycomb-shield-shell-v477';
-        shield.userData.baseScaleV461 = new THREE.Vector3(hitRadius * 1.08, hitRadius * 0.48, hitRadius * 1.50);
+        shield.name = 'player-honeycomb-shield-shell-v478';
+        // V478: щит больше не висит внутри playerShip, чтобы scale/roll корабля не превращали его в овал.
+        // Держим отдельную круглую энергетическую сферу и вручную ведём её за кораблём.
+        shield.userData.baseScaleV461 = new THREE.Vector3(hitRadius * 1.28, hitRadius * 1.28, hitRadius * 1.28);
+        shield.userData.followTargetV478 = playerShip;
         shield.scale.copy(shield.userData.baseScaleV461);
         shield.renderOrder = 999;
-        playerShip.add(shield);
+        playerShip.getWorldPosition?.(shield.position);
+        scene.add(shield);
         playerShieldMeshV460 = shield;
 
         // V477: отдельные волны попадания. Не мигаем всем щитом целиком.
         playerShieldWaveMeshesV477 = [];
         for(let i = 0; i < 3; i++){
             const wave = new THREE.Mesh(new THREE.SphereGeometry(1, 80, 48), createShieldOverlayMaterialV462({ wave:true }));
-            wave.name = `player-honeycomb-shield-hit-wave-v477-${i}`;
+            wave.name = `player-honeycomb-shield-hit-wave-v478-${i}`;
             wave.userData.baseScaleV461 = shield.userData.baseScaleV461.clone();
+            wave.userData.followTargetV478 = playerShip;
             wave.userData.waveIndexV477 = i;
             wave.scale.copy(wave.userData.baseScaleV461);
             wave.renderOrder = 1000 + i;
             wave.visible = false;
-            playerShip.add(wave);
+            playerShip.getWorldPosition?.(wave.position);
+            scene.add(wave);
             playerShieldWaveMeshesV477.push(wave);
         }
 
@@ -11762,7 +11769,7 @@ function attachPlayerShieldFieldV460(){
 }
 
 function flashPlayerShieldV460(){
-    playerShieldFlashUntilV460 = Date.now() + 1150;
+    playerShieldFlashUntilV460 = Date.now() + PLAYER_SHIELD_HIT_WAVE_DURATION_MS_V478;
     try{ updatePlayerShieldFieldV460(true); }catch(_){}
 }
 
@@ -11778,8 +11785,8 @@ function updatePlayerShieldFieldV460(force = false){
         const now = Date.now();
         const flashEnd = Number(playerShieldFlashUntilV460 || 0);
         const flashing = now < flashEnd;
-        const flashProgress = flashing ? THREE.MathUtils.clamp(1 - ((flashEnd - now) / 1150), 0, 1) : 1;
-        const baseOpacity = ratio <= 0 ? 0 : 0.055 + ratio * 0.045;
+        const flashProgress = flashing ? THREE.MathUtils.clamp(1 - ((flashEnd - now) / PLAYER_SHIELD_HIT_WAVE_DURATION_MS_V478), 0, 1) : 1;
+        const baseOpacity = ratio <= 0 ? 0 : 0.075 + ratio * 0.065;
 
         const updateTexture = (material, speedX = 0.00005, speedY = 0.000025) => {
             try{
@@ -11795,11 +11802,12 @@ function updatePlayerShieldFieldV460(force = false){
         if(playerShieldMeshV460?.material){
             const mesh = playerShieldMeshV460;
             const mat = mesh.material;
+            try{ mesh.userData.followTargetV478?.getWorldPosition?.(mesh.position); }catch(_){ }
             mesh.visible = baseOpacity > 0.01;
             mat.transparent = true;
             mat.depthWrite = false;
             mat.depthTest = true;
-            mat.opacity = force ? baseOpacity : mat.opacity + (baseOpacity - mat.opacity) * 0.08;
+            mat.opacity = force ? baseOpacity : mat.opacity + (baseOpacity - mat.opacity) * 0.16;
             mat.color?.setHex?.(0x64f6ff);
             updateTexture(mat, 0.000035, 0.00002);
 
@@ -11807,7 +11815,7 @@ function updatePlayerShieldFieldV460(force = false){
             mesh.rotation.z += 0.00018;
             const baseScale = mesh.userData.baseScaleV461;
             if(baseScale){
-                const idlePulse = 1.0 + Math.sin(now / 2200) * 0.004;
+                const idlePulse = 1.0 + Math.sin(now / 2200) * 0.003;
                 mesh.scale.set(baseScale.x * idlePulse, baseScale.y * idlePulse, baseScale.z * idlePulse);
             }
         }
@@ -11815,13 +11823,14 @@ function updatePlayerShieldFieldV460(force = false){
         if(Array.isArray(playerShieldWaveMeshesV477)){
             playerShieldWaveMeshesV477.forEach((wave, index) => {
                 if(!wave?.material) return;
-                const delay = index * 0.18;
-                const p = THREE.MathUtils.clamp((flashProgress - delay) / 0.72, 0, 1);
+                const delay = index * 0.08;
+                const p = THREE.MathUtils.clamp((flashProgress - delay) / 0.46, 0, 1);
                 const active = flashing && p > 0 && p < 1;
-                const strength = active ? Math.sin(p * Math.PI) : 0;
-                const waveOpacity = ratio <= 0 ? 0 : strength * (0.34 - index * 0.055);
+                const strength = active ? Math.pow(Math.sin(p * Math.PI), 1.15) * (1 - p * 0.15) : 0;
+                const waveOpacity = ratio <= 0 ? 0 : strength * (0.42 - index * 0.075);
                 wave.visible = waveOpacity > 0.012;
-                wave.material.opacity = force ? waveOpacity : wave.material.opacity + (waveOpacity - wave.material.opacity) * 0.18;
+                try{ wave.userData.followTargetV478?.getWorldPosition?.(wave.position); }catch(_){ }
+                wave.material.opacity = force ? waveOpacity : wave.material.opacity + (waveOpacity - wave.material.opacity) * 0.42;
                 wave.material.color?.setHex?.(0xffd05a);
                 wave.material.depthWrite = false;
                 wave.material.depthTest = true;
@@ -11829,7 +11838,7 @@ function updatePlayerShieldFieldV460(force = false){
 
                 const baseScale = wave.userData.baseScaleV461;
                 if(baseScale){
-                    const expand = 1.0 + p * (0.13 + index * 0.025);
+                    const expand = 1.0 + p * (0.18 + index * 0.035);
                     wave.scale.set(baseScale.x * expand, baseScale.y * expand, baseScale.z * expand);
                 }
                 wave.rotation.y += 0.0016 + index * 0.00045;
@@ -19973,6 +19982,74 @@ async function ensureDefaultBattleRoomsInSupabase() {
   return [];
 }
 
+
+// ===== V478 ROOM GHOST CLEANUP =====
+// При входе в комнату удаляем старые следы текущего аккаунта из других комнат.
+// Это не трогает других игроков и не ломает статичные комнаты, но убирает фантом собственного аккаунта после обновления/перезахода.
+async function cleanupOwnGhostRoomPlayersBeforeJoinV478(targetRoomId = '', identity = null){
+  try{
+    if(!window.supabaseClient) return;
+    const normalizedRoomId = sanitizeOnlineRoomId(targetRoomId);
+    const safeIdentity = identity || getCurrentPlayerIdentity?.() || {};
+    const selfId = String(getSelfBattlePlayerId?.() || authState?.playerId || player?.id || safeIdentity?.playerId || '').trim();
+    if(!normalizedRoomId || !selfId) return;
+
+    await window.supabaseClient
+      .from('room_players')
+      .delete()
+      .eq('player_id', selfId)
+      .neq('room_id', normalizedRoomId);
+  }catch(error){
+    console.warn('cleanupOwnGhostRoomPlayersBeforeJoinV478 warning:', error?.message || error);
+  }
+}
+
+// Убираем из room_players строки, у которых уже нет свежего online_players в этой же комнате.
+// Это чистит настоящих фантомов в списке комнат, но с мягкой защитой: собственного игрока и свежие локальные строки не удаляем.
+async function cleanupRoomPlayersWithoutFreshOnlinePresenceV478(allRooms = [], presenceRows = []){
+  try{
+    if(!window.supabaseClient || !Array.isArray(allRooms) || !Array.isArray(presenceRows)) return;
+    const selfId = String(getSelfBattlePlayerId?.() || authState?.playerId || player?.id || '').trim();
+    const activeKeys = new Set();
+    presenceRows.forEach(row => {
+      const rid = sanitizeOnlineRoomId(row?.room_id || '');
+      const pid = String(row?.player_id || '').trim();
+      const status = String(row?.status || '').toLowerCase();
+      if(rid && pid && status === 'in-game') activeKeys.add(`${rid}::${pid}`);
+    });
+
+    const ghosts = [];
+    allRooms.forEach(room => {
+      const roomId = sanitizeOnlineRoomId(room?.id || '');
+      if(!roomId) return;
+      const rows = Array.isArray(room?.room_players) ? room.room_players : [];
+      rows.forEach(row => {
+        const pid = String(row?.player_id || '').trim();
+        if(!pid || (selfId && pid === selfId)) return;
+        if(activeKeys.has(`${roomId}::${pid}`)) return;
+        const stamp = row?.updated_at || row?.joined_at || null;
+        const age = stamp ? (Date.now() - new Date(stamp).getTime()) : Infinity;
+        // Свежим даём небольшой шанс, чтобы не удалить игрока в первые секунды входа до записи online_players.
+        if(Number.isFinite(age) && age < 12000) return;
+        ghosts.push({ room_id: roomId, player_id: pid });
+      });
+    });
+
+    if(!ghosts.length) return;
+    for(const ghost of ghosts){
+      try{
+        await window.supabaseClient
+          .from('room_players')
+          .delete()
+          .eq('room_id', ghost.room_id)
+          .eq('player_id', ghost.player_id);
+      }catch(_){ }
+    }
+  }catch(error){
+    console.warn('cleanupRoomPlayersWithoutFreshOnlinePresenceV478 warning:', error?.message || error);
+  }
+}
+
 async function joinRoomPlayers(roomId) {
   if (!window.supabaseReady || !window.supabaseClient || !roomId) return false;
 
@@ -19985,6 +20062,8 @@ async function joinRoomPlayers(roomId) {
     console.error('Ошибка входа в room_players: пустой playerId', identity);
     return false;
   }
+
+  await cleanupOwnGhostRoomPlayersBeforeJoinV478?.(normalizedRoomId, identity);
 
   const roomConfirmed = await waitForConfirmedRoom(normalizedRoomId, 9000);
   // v443: не останавливаем вход только из-за задержки чтения rooms.
@@ -20330,6 +20409,8 @@ async function loadRoomsFromSupabase() {
 
   const presenceRows = Array.isArray(onlineData) ? onlineData.filter(row => row?.room_id) : [];
   let allRooms = Array.isArray(data) ? data : [];
+
+  await cleanupRoomPlayersWithoutFreshOnlinePresenceV478?.(allRooms, presenceRows);
 
   const staleRoomPlayers = [];
   allRooms.forEach(room => {
