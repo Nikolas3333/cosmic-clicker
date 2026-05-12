@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v494 - SINGLE CLEAN CINEMATIC LOADER -->
+<!-- COSMIC CLICKER v486 - 7 SEC EXPERIMENTAL CINEMATIC PRE AUTH LOADER -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -10,252 +10,6 @@
 
 <style>
 
-/* ===== V494 SINGLE CLEAN CINEMATIC LOADER ===== */
-#cosmic-loader-v494{
-  position:fixed !important;
-  inset:0 !important;
-  width:100vw !important;
-  height:100vh !important;
-  z-index:2147483647 !important;
-  overflow:hidden !important;
-  background:#02030a !important;
-  color:#eafcff !important;
-  font-family:Arial, sans-serif !important;
-}
-
-#cosmic-loader-v494 *{
-  box-sizing:border-box !important;
-}
-
-#cosmic-loader-v494 .space-bg-v494{
-  position:absolute;
-  inset:-10%;
-  background:
-    radial-gradient(ellipse at 50% 46%, rgba(255,165,55,.16), transparent 18%),
-    radial-gradient(ellipse at 21% 33%, rgba(0,210,255,.24), transparent 32%),
-    radial-gradient(ellipse at 77% 25%, rgba(150,72,255,.28), transparent 36%),
-    radial-gradient(ellipse at 54% 84%, rgba(255,90,45,.12), transparent 33%),
-    linear-gradient(145deg,#010814 0%, #041022 32%, #0b0820 64%, #02030a 100%);
-  animation:v494NebulaMove 22s ease-in-out infinite alternate;
-}
-
-#cosmic-loader-v494 .nebula-v494{
-  position:absolute;
-  inset:-18%;
-  opacity:.92;
-  background:
-    radial-gradient(circle at 30% 56%, rgba(72,238,255,.24), transparent 25%),
-    radial-gradient(circle at 69% 34%, rgba(255,92,216,.20), transparent 31%),
-    radial-gradient(circle at 53% 66%, rgba(255,176,70,.16), transparent 28%),
-    radial-gradient(circle at 58% 18%, rgba(96,88,255,.22), transparent 34%);
-  filter:blur(32px);
-  mix-blend-mode:screen;
-  animation:v494NebulaBreath 13s ease-in-out infinite alternate;
-}
-
-#cosmic-loader-v494 .stars-v494{
-  position:absolute;
-  inset:0;
-  background-image:
-    radial-gradient(1px 1px at 6% 14%, rgba(255,255,255,.95), transparent),
-    radial-gradient(2px 2px at 12% 38%, rgba(210,245,255,.95), transparent),
-    radial-gradient(1px 1px at 22% 18%, rgba(255,255,255,.72), transparent),
-    radial-gradient(2px 2px at 31% 78%, rgba(160,230,255,.85), transparent),
-    radial-gradient(1px 1px at 44% 22%, rgba(255,255,255,.82), transparent),
-    radial-gradient(2px 2px at 57% 61%, rgba(255,255,255,.8), transparent),
-    radial-gradient(1px 1px at 66% 13%, rgba(180,220,255,.76), transparent),
-    radial-gradient(2px 2px at 82% 36%, rgba(255,255,255,.9), transparent),
-    radial-gradient(1px 1px at 93% 81%, rgba(255,255,255,.7), transparent),
-    radial-gradient(1px 1px at 74% 88%, rgba(160,235,255,.8), transparent);
-  opacity:.96;
-  animation:v494StarDrift 46s linear infinite;
-}
-
-#cosmic-loader-v494 .orbit-field-v494{
-  position:absolute;
-  left:50%;
-  top:55%;
-  width:min(96vw, 1360px);
-  height:min(96vw, 1360px);
-  transform:translate(-50%,-50%) rotateX(66deg) rotateZ(-18deg);
-}
-
-#cosmic-loader-v494 .orbit-v494{
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  border:1px solid rgba(130,235,255,.20);
-  border-radius:50%;
-  box-shadow:0 0 20px rgba(60,215,255,.08), inset 0 0 12px rgba(100,220,255,.04);
-}
-#cosmic-loader-v494 .o1{width:20%;height:20%;}
-#cosmic-loader-v494 .o2{width:34%;height:34%;}
-#cosmic-loader-v494 .o3{width:50%;height:50%;}
-#cosmic-loader-v494 .o4{width:69%;height:69%;}
-#cosmic-loader-v494 .o5{width:88%;height:88%;}
-
-#cosmic-loader-v494 .sun-v494{
-  position:absolute;
-  left:50%;
-  top:55%;
-  width:165px;
-  height:165px;
-  margin-left:-82px;
-  margin-top:-82px;
-  border-radius:50%;
-  background:radial-gradient(circle at 38% 34%, #fffbd4 0%, #ffe285 22%, #ffae3b 45%, #ff671f 70%, rgba(255,90,0,0) 84%);
-  box-shadow:
-    0 0 58px rgba(255,225,130,.92),
-    0 0 130px rgba(255,144,40,.70),
-    0 0 255px rgba(255,90,0,.35);
-  z-index:5;
-  animation:v494SunPulse 4.6s ease-in-out infinite alternate;
-}
-
-#cosmic-loader-v494 .planet-v494{
-  position:absolute;
-  z-index:6;
-  border-radius:50%;
-  box-shadow:inset -16px -20px 30px rgba(0,0,0,.58), 0 0 34px rgba(100,220,255,.30);
-}
-
-#cosmic-loader-v494 .p1{
-  width:28px;height:28px;left:calc(50% + 132px);top:calc(55% - 36px);
-  background:radial-gradient(circle at 34% 30%, #d8fbff, #56b4ff 50%, #14376c);
-  animation:v494P1 8s ease-in-out infinite alternate;
-}
-#cosmic-loader-v494 .p2{
-  width:48px;height:48px;left:calc(50% - 285px);top:calc(55% + 82px);
-  background:radial-gradient(circle at 34% 30%, #ffdca8, #c9782e 58%, #4b210e);
-  animation:v494P2 10s ease-in-out infinite alternate;
-}
-#cosmic-loader-v494 .p3{
-  width:86px;height:86px;right:10%;bottom:15%;
-  background:radial-gradient(circle at 32% 28%, #c8fff7, #2d7ee0 45%, #11194d 78%);
-  box-shadow:inset -22px -28px 44px rgba(0,0,0,.60), 0 0 70px rgba(65,220,255,.36);
-  animation:v494P3 13s ease-in-out infinite alternate;
-}
-#cosmic-loader-v494 .p4{
-  width:54px;height:54px;left:11%;top:20%;
-  background:radial-gradient(circle at 35% 30%, #ffc2e9, #8d4aff 54%, #23104b);
-  box-shadow:inset -18px -18px 32px rgba(0,0,0,.55), 0 0 54px rgba(180,90,255,.40);
-  animation:v494P4 12s ease-in-out infinite alternate;
-}
-
-#cosmic-loader-v494 .comet-v494{
-  position:absolute;
-  left:-20%;
-  top:23%;
-  width:240px;
-  height:3px;
-  background:linear-gradient(90deg, transparent, rgba(130,240,255,.36), rgba(255,255,255,.98));
-  box-shadow:0 0 26px rgba(120,240,255,.88);
-  transform:rotate(-18deg);
-  z-index:7;
-  animation:v494Comet 7.8s ease-in-out infinite;
-}
-
-#cosmic-loader-v494 .title-v494{
-  position:absolute;
-  left:50%;
-  top:7%;
-  transform:translateX(-50%);
-  z-index:12;
-  width:100%;
-  text-align:center;
-  font-family:"Orbitron","Arial Black",Arial,sans-serif;
-  font-weight:900;
-  text-transform:uppercase;
-  letter-spacing:.17em;
-  font-size:clamp(40px, 6.6vw, 100px);
-  line-height:.90;
-  color:#eaffff;
-  text-shadow:
-    0 0 10px rgba(170,250,255,.90),
-    0 0 26px rgba(0,220,255,.78),
-    0 0 62px rgba(60,140,255,.60);
-  animation:v494TitleBreath 4s ease-in-out infinite alternate;
-}
-#cosmic-loader-v494 .title-v494 span{display:block;margin-top:12px;color:#7ef7ff;}
-#cosmic-loader-v494 .title-v494 b{color:#ffd76e;text-shadow:0 0 18px rgba(255,215,100,.95),0 0 40px rgba(255,150,30,.68);}
-
-#cosmic-loader-v494 .panel-v494{
-  position:absolute;
-  left:50%;
-  bottom:40px;
-  transform:translateX(-50%);
-  z-index:13;
-  width:min(650px, calc(100vw - 40px));
-  padding:18px 22px;
-  border-radius:22px;
-  background:rgba(2,8,18,.36);
-  border:1px solid rgba(120,240,255,.30);
-  box-shadow:0 0 36px rgba(0,210,255,.16), inset 0 0 26px rgba(120,220,255,.06);
-  backdrop-filter:blur(8px);
-  text-align:center;
-}
-
-#cosmic-loader-v494 .status-v494{
-  color:#e7fdff;
-  font-size:16px;
-  margin-bottom:12px;
-  text-shadow:0 0 12px rgba(120,230,255,.36);
-}
-
-#cosmic-loader-v494 .bar-v494{
-  height:11px;
-  border-radius:999px;
-  background:rgba(255,255,255,.10);
-  overflow:hidden;
-  border:1px solid rgba(160,235,255,.22);
-}
-
-#cosmic-loader-v494 .fill-v494{
-  width:0%;
-  height:100%;
-  background:linear-gradient(90deg,#52f7ff,#8e7bff,#ffe072,#52f7ff);
-  box-shadow:0 0 22px rgba(120,240,255,.78);
-  animation:v494Fill 7s linear forwards;
-}
-
-#cosmic-loader-v494 .ready-v494{
-  display:inline-block;
-  margin:16px auto 0;
-  padding:13px 42px;
-  border-radius:999px;
-  border:1px solid rgba(160,245,255,.45);
-  color:rgba(255,255,255,.72);
-  background:linear-gradient(180deg, rgba(30,70,96,.56), rgba(5,18,40,.72));
-  box-shadow:0 0 20px rgba(0,220,255,.16), inset 0 0 14px rgba(130,240,255,.08);
-  cursor:not-allowed;
-  font-weight:900;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  transition:.22s ease;
-}
-
-#cosmic-loader-v494.ready .ready-v494{
-  color:#ffffff;
-  border-color:rgba(160,245,255,.78);
-  background:linear-gradient(180deg, rgba(26,120,210,.92), rgba(4,34,82,.96));
-  box-shadow:0 0 42px rgba(0,220,255,.52), inset 0 0 20px rgba(130,240,255,.18);
-  cursor:pointer;
-  animation:v494ReadyPulse 1.2s ease-in-out infinite alternate;
-}
-
-@keyframes v494NebulaMove{from{transform:scale(1) translate(-2%,-1%);}to{transform:scale(1.08) translate(2%,1%);}}
-@keyframes v494NebulaBreath{from{opacity:.58;transform:scale(1);}to{opacity:.96;transform:scale(1.05);}}
-@keyframes v494StarDrift{from{transform:translateY(0);}to{transform:translateY(90px);}}
-@keyframes v494SunPulse{from{transform:scale(1);}to{transform:scale(1.055);}}
-@keyframes v494P1{from{transform:translate(0,0);}to{transform:translate(18px,-13px);}}
-@keyframes v494P2{from{transform:translate(0,0);}to{transform:translate(-20px,15px);}}
-@keyframes v494P3{from{transform:translate(0,0) scale(1);}to{transform:translate(-18px,-18px) scale(1.035);}}
-@keyframes v494P4{from{transform:translate(0,0);}to{transform:translate(16px,20px);}}
-@keyframes v494Comet{0%,42%{transform:translateX(0) rotate(-18deg);opacity:0;}52%{opacity:1;}100%{transform:translateX(145vw) rotate(-18deg);opacity:0;}}
-@keyframes v494TitleBreath{from{opacity:.90;transform:translateX(-50%) scale(.99);}to{opacity:1;transform:translateX(-50%) scale(1.018);}}
-@keyframes v494Fill{from{width:0%;}to{width:100%;}}
-@keyframes v494ReadyPulse{from{transform:translateY(0);}to{transform:translateY(-3px);}}
 
 
 body {
@@ -7585,29 +7339,6 @@ shop-main-head{
   font-size:12px !important;
 }
 
-
-to{ width:100%; }
-}
-
-
-
-to{ transform:translateY(-2px); box-shadow:0 0 36px rgba(0,220,255,.58), inset 0 0 20px rgba(130,240,255,.2); }
-}
-
-
-
-
-/* V492 safety: hide old image-based loader if old code recreates it */
-#cosmic-preloader-v484,
-#cosmic-preloader-v485,
-#cosmic-preloader-v486,
-#cosmic-cinematic-loader-v487,
-#cosmic-solar-loader-v488,
-#cosmic-loader-v490,
-#cosmic-loader-v491{
-  display:none !important;
-}
-
 </style>
 <style id="v378-bot-nameplate-hard-override">
 html body .battle-bot-name-label,
@@ -8412,79 +8143,354 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 
 
 <!-- V484 PRE-AUTH GAME LOADER -->
+<style id="v486-pre-auth-loader-style">
+body:not(.cosmic-preload-done) #auth-screen .auth-stage,
+body:not(.cosmic-preload-done) #auth-screen #register-modal{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transform:translateY(24px) scale(0.975);
+}
+body.cosmic-preload-done #auth-screen .auth-stage{
+  animation:cosmicAuthRevealV485 .75s ease both;
+}
+body.cosmic-preload-done #cosmic-preloader-v484{
+  opacity:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  transition:opacity .72s ease, visibility .72s ease;
+}
+#cosmic-preloader-v484{
+  position:absolute;
+  inset:0;
+  z-index:20;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(0,220,255,.20), transparent 25%),
+    radial-gradient(circle at 25% 28%, rgba(122,88,255,.15), transparent 28%),
+    radial-gradient(circle at 72% 70%, rgba(255,176,0,.10), transparent 27%),
+    linear-gradient(180deg,#02040d 0%,#050916 55%,#010208 100%);
+}
+#cosmic-preloader-v484::before{
+  content:"";
+  position:absolute;
+  width:120vmax;
+  height:120vmax;
+  background:
+    repeating-radial-gradient(circle, rgba(140,235,255,.12) 0 1px, transparent 1px 78px),
+    conic-gradient(from 0deg, transparent, rgba(0,240,255,.20), transparent, rgba(255,196,60,.12), transparent);
+  animation:cosmicLoaderOrbitV484 13s linear infinite;
+  opacity:.68;
+}
+#cosmic-preloader-v484::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255,255,255,.95) 0 1px, transparent 2px),
+    radial-gradient(circle at 62% 24%, rgba(255,255,255,.8) 0 1px, transparent 2px),
+    radial-gradient(circle at 75% 60%, rgba(255,255,255,.7) 0 1px, transparent 2px),
+    radial-gradient(circle at 35% 76%, rgba(255,255,255,.65) 0 1px, transparent 2px);
+  background-size:260px 260px,310px 310px,220px 220px,360px 360px;
+  animation:cosmicLoaderStarsV484 8.5s linear infinite;
+  opacity:.82;
+}
+.cosmic-preloader-box-v484{
+  position:relative;
+  z-index:2;
+  width:min(640px,92vw);
+  padding:40px 32px 30px;
+  border-radius:26px;
+  text-align:center;
+  background:linear-gradient(180deg, rgba(9,18,44,.82), rgba(4,8,22,.70));
+  border:1px solid rgba(130,230,255,.30);
+  box-shadow:0 0 56px rgba(0,220,255,.26),0 0 110px rgba(95,80,255,.13), inset 0 0 32px rgba(0,220,255,.09);
+  backdrop-filter:blur(10px);
+}
+.cosmic-preloader-title-v484{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+  font-size:clamp(34px,7vw,70px);
+  font-weight:900;
+  letter-spacing:.12em;
+  line-height:.95;
+  text-shadow:0 0 18px rgba(0,238,255,.65),0 0 38px rgba(0,128,255,.35);
+}
+.cosmic-preloader-title-v484 span{
+  display:inline-block;
+  color:#dffbff;
+  animation:cosmicTitleFloatV484 1.45s ease-in-out infinite;
+}
+.cosmic-preloader-title-v484 span:nth-child(2){animation-delay:.08s;color:#8ff5ff;}
+.cosmic-preloader-title-v484 span:nth-child(3){animation-delay:.16s;color:#ffd477;text-shadow:0 0 18px rgba(255,190,70,.65),0 0 38px rgba(255,130,20,.28);}
+.cosmic-preloader-subtitle-v484{
+  margin-top:14px;
+  color:#bddfff;
+  font-size:14px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  opacity:.88;
+}
+.cosmic-loader-ring-v484{
+  width:96px;
+  height:96px;
+  margin:24px auto 18px;
+  border-radius:50%;
+  border:2px solid rgba(120,230,255,.18);
+  border-top-color:#00f0ff;
+  border-right-color:#ffd26a;
+  box-shadow:0 0 20px rgba(0,240,255,.25), inset 0 0 16px rgba(0,240,255,.12);
+  animation:cosmicLoaderSpinV484 1.45s linear infinite;
+}
+.cosmic-loader-status-v484{
+  min-height:22px;
+  color:#e8fbff;
+  font-size:15px;
+  text-shadow:0 0 10px rgba(0,240,255,.28);
+}
+.cosmic-loader-bar-v484{
+  margin:18px auto 0;
+  width:min(380px,80vw);
+  height:10px;
+  border-radius:999px;
+  overflow:hidden;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(130,230,255,.18);
+}
+#cosmic-loader-progress-v484{
+  height:100%;
+  width:5%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#00eaff,#7effff,#ffd26a);
+  box-shadow:0 0 18px rgba(0,238,255,.50);
+  transition:width .7s cubic-bezier(.22,.9,.25,1);
+}
+@keyframes cosmicLoaderSpinV484{to{transform:rotate(360deg)}}
+@keyframes cosmicLoaderOrbitV484{to{transform:rotate(360deg)}}
+@keyframes cosmicLoaderStarsV484{to{background-position:260px 180px,-310px 250px,220px -180px,-360px -220px}}
+@keyframes cosmicTitleFloatV484{0%,100%{transform:translateY(0);filter:brightness(1)}50%{transform:translateY(-8px);filter:brightness(1.35)}}
+
+#cosmic-preloader-v484 .cosmic-loader-planet-v485{
+  position:absolute;
+  width:164px;
+  height:164px;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.92), transparent 0 10px),
+    radial-gradient(circle at 36% 34%, #79f7ff 0%, #1266b8 35%, #09234f 67%, #020714 100%);
+  box-shadow:0 0 40px rgba(0,240,255,.36), inset -20px -18px 34px rgba(0,0,0,.42);
+  opacity:.22;
+  filter:blur(.1px);
+  animation:cosmicPlanetPulseV485 3.8s ease-in-out infinite;
+}
+#cosmic-preloader-v484 .cosmic-loader-planet-v485::before,
+#cosmic-preloader-v484 .cosmic-loader-planet-v485::after{
+  content:"";
+  position:absolute;
+  inset:50% auto auto 50%;
+  width:270px;
+  height:66px;
+  border:2px solid rgba(126,245,255,.26);
+  border-left-color:rgba(255,210,106,.28);
+  border-right-color:rgba(0,240,255,.38);
+  border-radius:50%;
+  transform:translate(-50%,-50%) rotate(-18deg);
+  box-shadow:0 0 24px rgba(0,240,255,.18);
+}
+#cosmic-preloader-v484 .cosmic-loader-planet-v485::after{
+  width:330px;
+  height:86px;
+  transform:translate(-50%,-50%) rotate(-18deg) scale(.9);
+  opacity:.55;
+}
+.cosmic-preloader-box-v484::before{
+  content:"";
+  position:absolute;
+  inset:-2px;
+  border-radius:28px;
+  padding:1px;
+  background:linear-gradient(135deg, rgba(0,240,255,.62), transparent 34%, rgba(255,210,106,.52), transparent 72%, rgba(128,96,255,.55));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+  animation:cosmicBorderGlowV485 2.4s ease-in-out infinite;
+}
+.cosmic-preloader-title-v484{
+  position:relative;
+}
+.cosmic-preloader-title-v484::after{
+  content:"";
+  position:absolute;
+  left:5%;
+  right:5%;
+  top:0;
+  bottom:0;
+  background:linear-gradient(110deg, transparent 0%, rgba(255,255,255,.0) 34%, rgba(255,255,255,.72) 48%, rgba(255,255,255,.0) 62%, transparent 100%);
+  transform:translateX(-130%);
+  animation:cosmicTitleSweepV485 2.2s ease-in-out infinite;
+  mix-blend-mode:screen;
+  pointer-events:none;
+}
+.cosmic-loader-stage-list-v485{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin:18px auto 0;
+  width:min(420px,84vw);
+}
+.cosmic-loader-stage-v485{
+  padding:7px 8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(140,230,255,.14);
+  color:#94c9df;
+  font-size:11px;
+  letter-spacing:.04em;
+  transition:.25s ease;
+}
+.cosmic-loader-stage-v485.active{
+  color:#ffffff;
+  border-color:rgba(0,240,255,.55);
+  background:rgba(0,240,255,.11);
+  box-shadow:0 0 18px rgba(0,240,255,.20);
+}
+.cosmic-loader-stage-v485.done{
+  color:#ffd983;
+  border-color:rgba(255,210,106,.36);
+  background:rgba(255,210,106,.08);
+}
+.cosmic-loader-tip-v485{
+  margin-top:14px;
+  min-height:18px;
+  color:#85abc1;
+  font-size:12px;
+  opacity:.86;
+}
+.cosmic-shooting-star-v485{
+  position:absolute;
+  z-index:1;
+  width:130px;
+  height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.9), rgba(0,240,255,.8), transparent);
+  transform:rotate(-24deg);
+  opacity:0;
+  animation:cosmicShootV485 3.2s ease-in-out infinite;
+}
+.cosmic-shooting-star-v485.s1{top:20%;left:14%;animation-delay:.2s;}
+.cosmic-shooting-star-v485.s2{top:37%;left:72%;animation-delay:1.35s;}
+.cosmic-shooting-star-v485.s3{top:72%;left:30%;animation-delay:2.2s;}
+@keyframes cosmicPlanetPulseV485{0%,100%{transform:translate(-50%,-50%) scale(.96);opacity:.18}50%{transform:translate(-50%,-50%) scale(1.04);opacity:.28}}
+@keyframes cosmicBorderGlowV485{0%,100%{opacity:.58;filter:brightness(1)}50%{opacity:1;filter:brightness(1.35)}}
+@keyframes cosmicTitleSweepV485{0%{transform:translateX(-130%);opacity:0}26%{opacity:.7}60%,100%{transform:translateX(130%);opacity:0}}
+@keyframes cosmicShootV485{0%,58%{opacity:0;transform:translate(0,0) rotate(-24deg)}68%{opacity:.9}100%{opacity:0;transform:translate(-280px,150px) rotate(-24deg)}}
+@keyframes cosmicAuthRevealV485{0%{opacity:0;transform:translateY(24px) scale(.97);filter:blur(8px)}100%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+
+#cosmic-preloader-v484 .cosmic-loader-grid-v486{
+  position:absolute;
+  z-index:1;
+  left:50%;
+  bottom:-16%;
+  width:120vmax;
+  height:44vmax;
+  transform:translateX(-50%) perspective(420px) rotateX(62deg);
+  background:
+    linear-gradient(rgba(0,240,255,.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,240,255,.16) 1px, transparent 1px);
+  background-size:52px 52px;
+  opacity:.34;
+  animation:cosmicGridMoveV486 4.8s linear infinite;
+  mask-image:linear-gradient(to top, rgba(0,0,0,.9), transparent 78%);
+}
+#cosmic-preloader-v484 .cosmic-loader-nebula-v486{
+  position:absolute;
+  z-index:0;
+  inset:-12%;
+  background:
+    radial-gradient(circle at 22% 42%, rgba(0,255,210,.18), transparent 24%),
+    radial-gradient(circle at 72% 32%, rgba(170,85,255,.20), transparent 28%),
+    radial-gradient(circle at 54% 76%, rgba(255,170,62,.12), transparent 25%);
+  filter:blur(18px) saturate(1.25);
+  animation:cosmicNebulaDriftV486 9s ease-in-out infinite alternate;
+}
+#cosmic-preloader-v484 .cosmic-loader-ship-v486{
+  position:absolute;
+  z-index:3;
+  left:50%;
+  top:50%;
+  width:72px;
+  height:42px;
+  transform:translate(-50%, 160px) rotate(-8deg);
+  filter:drop-shadow(0 0 18px rgba(0,240,255,.65));
+  animation:cosmicShipHoverV486 2.8s ease-in-out infinite;
+}
+#cosmic-preloader-v484 .cosmic-loader-ship-v486::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  clip-path:polygon(50% 0, 68% 42%, 100% 62%, 64% 72%, 54% 100%, 46% 100%, 36% 72%, 0 62%, 32% 42%);
+  background:linear-gradient(180deg,#effdff,#5defff 45%,#1d4f88 100%);
+  box-shadow:inset 0 -10px 18px rgba(0,0,0,.38);
+}
+#cosmic-preloader-v484 .cosmic-loader-ship-v486::after{
+  content:"";
+  position:absolute;
+  left:28px;
+  top:37px;
+  width:16px;
+  height:38px;
+  border-radius:50%;
+  background:linear-gradient(180deg,rgba(255,221,105,.95),rgba(0,240,255,.2),transparent);
+  filter:blur(2px);
+  animation:cosmicEngineFlameV486 .55s ease-in-out infinite alternate;
+}
+.cosmic-preloader-box-v484::after{
+  content:"";
+  position:absolute;
+  inset:10px;
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,.045);
+  background:linear-gradient(180deg, rgba(255,255,255,.055), transparent 18%, transparent 82%, rgba(0,240,255,.045));
+  pointer-events:none;
+}
+.cosmic-loader-ring-v484::before,
+.cosmic-loader-ring-v484::after{
+  content:"";
+  position:absolute;
+}
+.cosmic-loader-ring-v484{position:relative;}
+.cosmic-loader-ring-v484::before{
+  inset:14px;
+  border-radius:50%;
+  border:1px dashed rgba(255,210,106,.38);
+  animation:cosmicLoaderSpinV484 3.2s linear infinite reverse;
+}
+.cosmic-loader-ring-v484::after{
+  left:50%;top:50%;
+  width:10px;height:10px;
+  border-radius:50%;
+  background:#ffd26a;
+  box-shadow:0 0 18px rgba(255,210,106,.85);
+  transform:translate(26px,-50%);
+}
+@keyframes cosmicGridMoveV486{to{background-position:0 52px,52px 0}}
+@keyframes cosmicNebulaDriftV486{0%{transform:translate3d(-1%,0,0) scale(1)}100%{transform:translate3d(1.4%,-1.2%,0) scale(1.04)}}
+@keyframes cosmicShipHoverV486{0%,100%{transform:translate(-50%,160px) rotate(-8deg)}50%{transform:translate(-50%,146px) rotate(7deg)}}
+@keyframes cosmicEngineFlameV486{0%{height:28px;opacity:.65}100%{height:48px;opacity:1}}
+
+</style>
+
 </head>
 
 <body>
-
-<!-- ===== V494 SINGLE CLEAN CINEMATIC LOADER ===== -->
-<div id="cosmic-loader-v494">
-  <div class="space-bg-v494"></div>
-  <div class="nebula-v494"></div>
-  <div class="stars-v494"></div>
-
-  <div class="orbit-field-v494">
-    <div class="orbit-v494 o1"></div>
-    <div class="orbit-v494 o2"></div>
-    <div class="orbit-v494 o3"></div>
-    <div class="orbit-v494 o4"></div>
-    <div class="orbit-v494 o5"></div>
-  </div>
-
-  <div class="sun-v494"></div>
-  <div class="planet-v494 p1"></div>
-  <div class="planet-v494 p2"></div>
-  <div class="planet-v494 p3"></div>
-  <div class="planet-v494 p4"></div>
-  <div class="comet-v494"></div>
-
-  <div class="title-v494">COSMIC<span>CLICKER <b>★</b></span></div>
-
-  <div class="panel-v494">
-    <div class="status-v494" id="loader-status-v494">Запускаем солнечную систему...</div>
-    <div class="bar-v494"><div class="fill-v494"></div></div>
-    <button type="button" class="ready-v494" id="loader-ready-v494" disabled>ГОТОВО</button>
-  </div>
-</div>
-
-<div class="v492-sun"></div>
-  <div class="v492-planet v492-p1"></div>
-  <div class="v492-planet v492-p2"></div>
-  <div class="v492-planet v492-p3"></div>
-  <div class="v492-planet v492-p4"></div>
-  <div class="v492-comet"></div>
-
-  <div class="v492-title">COSMIC<span>CLICKER <b>★</b></span></div>
-
-  <div class="v492-panel">
-    <div class="v492-status" id="loader-status-v492">Запускаем солнечную систему...</div>
-    <div class="v492-bar"><div class="v492-fill"></div></div>
-    <button type="button" class="v492-ready" id="loader-ready-v492">Готово</button>
-  </div>
-</div>
-
-<div class="cloud-v491"></div>
-  <div class="stars-v491"></div>
-  <div class="orbit-stage-v491">
-    <div class="orbit-v491 o1"></div>
-    <div class="orbit-v491 o2"></div>
-    <div class="orbit-v491 o3"></div>
-    <div class="orbit-v491 o4"></div>
-    <div class="orbit-v491 o5"></div>
-  </div>
-  <div class="sun-v491"></div>
-  <div class="planet-v491 p1"></div>
-  <div class="planet-v491 p2"></div>
-  <div class="planet-v491 p3"></div>
-  <div class="planet-v491 p4"></div>
-  <div class="comet-v491"></div>
-  <div class="title-v491">COSMIC<span>CLICKER <b>★</b></span></div>
-  <div class="panel-v491">
-    <div class="status-v491" id="loader-status-v491">Запускаем солнечную систему...</div>
-    <div class="bar-v491"><div class="fill-v491"></div></div>
-    <button type="button" class="ready-v491" id="loader-ready-v491">Готово</button>
-  </div>
-</div>
-
 <div id="kill-feed"></div>
 <div id='premium-bar'>
   <div id="premium-account-info">
@@ -8499,7 +8505,10 @@ body.cosmic-auth-passed.cosmic-in-lobby #lobby-screen{
 </div>
 
 <div id="auth-screen">
-<div class="cosmic-loader-grid-v486"></div>
+
+  <div id="cosmic-preloader-v484" aria-live="polite">
+    <div class="cosmic-loader-nebula-v486"></div>
+    <div class="cosmic-loader-grid-v486"></div>
     <span class="cosmic-shooting-star-v485 s1"></span>
     <span class="cosmic-shooting-star-v485 s2"></span>
     <span class="cosmic-shooting-star-v485 s3"></span>
