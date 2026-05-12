@@ -1,4 +1,4 @@
-<!-- COSMIC CLICKER v486 - 7 SEC EXPERIMENTAL CINEMATIC PRE AUTH LOADER -->
+<!-- COSMIC CLICKER v488 - SOLAR SYSTEM SCOPE INSPIRED LOADER -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7340,111 +7340,289 @@ shop-main-head{
 }
 
 
-/* ===== V487 DEEP SPACE LOADER ===== */
-#cosmic-cinematic-loader-v487{
-position:fixed;
-inset:0;
-z-index:999999;
-overflow:hidden;
-background:
-radial-gradient(circle at center, rgba(255,180,60,0.12), transparent 20%),
-radial-gradient(circle at 20% 30%, rgba(0,180,255,0.22), transparent 35%),
-radial-gradient(circle at 80% 20%, rgba(180,120,255,0.20), transparent 40%),
-#01040b;
-}
-.cosmic-nebula-v487{
-position:absolute;
-inset:-10%;
-background:
-radial-gradient(circle at 30% 40%, rgba(0,180,255,0.18), transparent 28%),
-radial-gradient(circle at 70% 30%, rgba(180,120,255,0.16), transparent 30%);
-filter:blur(35px);
-animation:nebulaDriftV487 24s ease-in-out infinite alternate;
-}
-.cosmic-stars-v487{
-position:absolute;
-inset:0;
-background-image:
-radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.9), transparent),
-radial-gradient(2px 2px at 140px 80px, rgba(120,220,255,0.8), transparent),
-radial-gradient(1px 1px at 260px 120px, rgba(255,255,255,0.8), transparent);
-background-size:700px 400px;
-animation:starsMoveV487 60s linear infinite;
-}
-.cosmic-sun-v487{
-position:absolute;
-width:380px;
-height:380px;
-border-radius:50%;
-right:-90px;
-top:-70px;
-background:radial-gradient(circle at center,#fff7c7 0%,#ffd15a 28%,#ff8c1a 58%,rgba(255,120,20,0.0) 78%);
-box-shadow:0 0 120px rgba(255,180,40,0.9);
-}
-.cosmic-planet-v487{
-position:absolute;
-width:170px;
-height:170px;
-border-radius:50%;
-left:11%;
-bottom:12%;
-background:radial-gradient(circle at 35% 30%, #7be8ff 0%, #2660b8 42%, #0c1633 80%);
-}
-.cosmic-title-v487{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-font-size:74px;
-font-weight:900;
-letter-spacing:10px;
-text-transform:uppercase;
-color:#dff7ff;
-text-shadow:0 0 12px rgba(120,220,255,0.9),0 0 30px rgba(0,180,255,0.7);
-font-family:Orbitron, Arial, sans-serif;
-animation:titleGlowV487 3s ease-in-out infinite alternate;
-}
-.cosmic-loader-sub-v487{
-position:absolute;
-top:calc(50% + 72px);
-left:50%;
-transform:translateX(-50%);
-font-size:18px;
-letter-spacing:4px;
-color:#9fe8ff;
-}
-.cosmic-loading-bar-wrap-v487{
-position:absolute;
-bottom:80px;
-left:50%;
-transform:translateX(-50%);
-width:420px;
-height:12px;
-border-radius:999px;
-background:rgba(255,255,255,0.08);
-overflow:hidden;
-}
-.cosmic-loading-bar-v487{
-width:0%;
-height:100%;
-background:linear-gradient(90deg,#5ee7ff,#9b7bff,#5ee7ff);
-animation:loadingProgressV487 7s linear forwards;
-}
-@keyframes nebulaDriftV487{
-from{ transform:translate3d(-2%,0,0) scale(1); }
-to{ transform:translate3d(2%,-1%,0) scale(1.08); }
-}
-@keyframes starsMoveV487{
-from{ transform:translateY(0px); }
-to{ transform:translateY(120px); }
-}
-@keyframes titleGlowV487{
-from{ opacity:0.88; }
-to{ opacity:1; }
-}
-@keyframes loadingProgressV487{
-from{ width:0%; }
 to{ width:100%; }
+}
+
+
+/* ===== V488 SOLAR SYSTEM SCOPE INSPIRED LOADER ===== */
+
+#cosmic-solar-loader-v488{
+  position:fixed;
+  inset:0;
+  z-index:999999;
+  overflow:hidden;
+  background:#02040b;
+  color:#eaffff;
+  font-family:Arial, sans-serif;
+}
+
+#cosmic-solar-loader-v488::before{
+  content:"";
+  position:absolute;
+  inset:-16%;
+  background:
+    radial-gradient(ellipse at 22% 48%, rgba(28, 180, 255, 0.28), transparent 32%),
+    radial-gradient(ellipse at 72% 30%, rgba(166, 82, 255, 0.30), transparent 35%),
+    radial-gradient(ellipse at 54% 78%, rgba(255, 122, 42, 0.16), transparent 34%),
+    radial-gradient(ellipse at 36% 20%, rgba(30, 255, 210, 0.14), transparent 28%),
+    linear-gradient(135deg, #03101b 0%, #06091a 35%, #100824 68%, #02030a 100%);
+  filter:saturate(1.25);
+  animation:cosmicNebulaFlowV488 18s ease-in-out infinite alternate;
+}
+
+#cosmic-solar-loader-v488::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:
+    radial-gradient(1px 1px at 4% 12%, rgba(255,255,255,.9), transparent),
+    radial-gradient(2px 2px at 12% 42%, rgba(210,245,255,.95), transparent),
+    radial-gradient(1px 1px at 22% 18%, rgba(255,255,255,.72), transparent),
+    radial-gradient(2px 2px at 30% 74%, rgba(160,230,255,.85), transparent),
+    radial-gradient(1px 1px at 44% 22%, rgba(255,255,255,.82), transparent),
+    radial-gradient(2px 2px at 57% 61%, rgba(255,255,255,.8), transparent),
+    radial-gradient(1px 1px at 66% 13%, rgba(180,220,255,.76), transparent),
+    radial-gradient(2px 2px at 82% 36%, rgba(255,255,255,.9), transparent),
+    radial-gradient(1px 1px at 93% 81%, rgba(255,255,255,.7), transparent);
+  opacity:.95;
+  animation:cosmicStarDriftV488 34s linear infinite;
+}
+
+.solar-sun-v488{
+  position:absolute;
+  left:50%;
+  top:52%;
+  width:170px;
+  height:170px;
+  margin-left:-85px;
+  margin-top:-85px;
+  border-radius:50%;
+  z-index:2;
+  background:
+    radial-gradient(circle at 38% 36%, #fff9c9 0%, #ffd866 20%, #ff9f25 44%, #f55a16 70%, rgba(255,90,10,0) 82%);
+  box-shadow:
+    0 0 50px rgba(255,220,110,.95),
+    0 0 120px rgba(255,132,30,.72),
+    0 0 230px rgba(255,96,0,.38);
+  animation:solarPulseV488 4.5s ease-in-out infinite alternate;
+}
+
+.solar-orbits-v488{
+  position:absolute;
+  left:50%;
+  top:52%;
+  width:1550px;
+  height:1550px;
+  margin-left:-775px;
+  margin-top:-775px;
+  z-index:1;
+  transform:rotateX(62deg) rotateZ(-18deg);
+  pointer-events:none;
+}
+
+.solar-orbits-v488 span{
+  position:absolute;
+  left:50%;
+  top:50%;
+  border:1px solid rgba(125,230,255,.18);
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  box-shadow:0 0 18px rgba(70,220,255,.08);
+}
+
+.solar-orbits-v488 span:nth-child(1){ width:260px; height:260px; }
+.solar-orbits-v488 span:nth-child(2){ width:440px; height:440px; }
+.solar-orbits-v488 span:nth-child(3){ width:650px; height:650px; }
+.solar-orbits-v488 span:nth-child(4){ width:900px; height:900px; }
+.solar-orbits-v488 span:nth-child(5){ width:1180px; height:1180px; }
+
+.solar-planet-v488{
+  position:absolute;
+  z-index:3;
+  border-radius:50%;
+  box-shadow:inset -12px -16px 24px rgba(0,0,0,.50), 0 0 28px rgba(110,220,255,.30);
+}
+
+.planet-a-v488{
+  width:34px; height:34px;
+  left:calc(50% + 146px);
+  top:calc(52% - 42px);
+  background:radial-gradient(circle at 35% 30%, #9ffcff, #237bd3 55%, #0b2248);
+  animation:planetFloatA488 9s ease-in-out infinite alternate;
+}
+
+.planet-b-v488{
+  width:58px; height:58px;
+  left:calc(50% - 420px);
+  top:calc(52% + 86px);
+  background:radial-gradient(circle at 35% 30%, #ffd98d, #c46f25 56%, #48210e);
+  animation:planetFloatB488 12s ease-in-out infinite alternate;
+}
+
+.planet-c-v488{
+  width:86px; height:86px;
+  right:13%;
+  bottom:18%;
+  background:radial-gradient(circle at 30% 26%, #b6fff4, #2b69d8 48%, #101a51 78%);
+  box-shadow:inset -18px -24px 38px rgba(0,0,0,.55), 0 0 54px rgba(50,210,255,.34);
+  animation:planetFloatC488 14s ease-in-out infinite alternate;
+}
+
+.solar-comet-v488{
+  position:absolute;
+  z-index:4;
+  left:-15%;
+  top:22%;
+  width:180px;
+  height:2px;
+  background:linear-gradient(90deg, transparent, rgba(150,240,255,.9), rgba(255,255,255,.98));
+  box-shadow:0 0 22px rgba(120,230,255,.9);
+  transform:rotate(-16deg);
+  animation:cometFlyV488 7s ease-in-out infinite;
+}
+
+.solar-title-v488{
+  position:absolute;
+  z-index:7;
+  left:50%;
+  top:11%;
+  transform:translateX(-50%);
+  text-align:center;
+  font-family:"Orbitron","Arial Black",Arial,sans-serif;
+  font-size:clamp(44px, 7vw, 108px);
+  line-height:.88;
+  font-weight:900;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:#eaffff;
+  text-shadow:
+    0 0 10px rgba(160,245,255,.95),
+    0 0 24px rgba(0,210,255,.85),
+    0 0 58px rgba(70,140,255,.72),
+    0 0 92px rgba(178,90,255,.48);
+  animation:titleBreathV488 3.8s ease-in-out infinite alternate;
+}
+
+.solar-title-v488 .solar-clicker-v488{
+  display:block;
+  margin-top:14px;
+  color:#78f7ff;
+}
+
+.solar-title-v488 .solar-star-v488{
+  color:#ffd56b;
+  margin-left:.08em;
+  text-shadow:0 0 20px rgba(255,205,80,.95), 0 0 48px rgba(255,150,30,.75);
+}
+
+.solar-loader-panel-v488{
+  position:absolute;
+  z-index:8;
+  left:50%;
+  bottom:44px;
+  transform:translateX(-50%);
+  width:min(620px, calc(100vw - 44px));
+  padding:18px 22px;
+  border-radius:24px;
+  background:linear-gradient(180deg, rgba(5,15,32,.50), rgba(2,8,18,.30));
+  border:1px solid rgba(115,230,255,.30);
+  box-shadow:0 0 34px rgba(0,210,255,.18), inset 0 0 28px rgba(120,220,255,.08);
+  backdrop-filter:blur(8px);
+  text-align:center;
+}
+
+.solar-loader-status-v488{
+  font-size:16px;
+  color:#dffbff;
+  text-shadow:0 0 10px rgba(120,230,255,.45);
+  margin-bottom:12px;
+}
+
+.solar-loader-bar-v488{
+  height:11px;
+  border-radius:999px;
+  background:rgba(255,255,255,.09);
+  overflow:hidden;
+  border:1px solid rgba(160,230,255,.22);
+}
+
+.solar-loader-fill-v488{
+  width:0%;
+  height:100%;
+  background:linear-gradient(90deg,#50f7ff,#8d7bff,#ffe070,#50f7ff);
+  box-shadow:0 0 22px rgba(120,240,255,.88);
+  animation:solarLoadingFillV488 7s linear forwards;
+}
+
+.solar-ready-btn-v488{
+  display:none;
+  margin:16px auto 0;
+  padding:12px 34px;
+  border-radius:999px;
+  border:1px solid rgba(160,245,255,.68);
+  color:#eaffff;
+  background:linear-gradient(180deg, rgba(20,70,110,.82), rgba(5,20,44,.88));
+  box-shadow:0 0 24px rgba(0,220,255,.35), inset 0 0 18px rgba(130,240,255,.12);
+  cursor:pointer;
+  font-weight:800;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+#cosmic-solar-loader-v488.ready .solar-ready-btn-v488{
+  display:inline-block;
+  animation:readyPulseV488 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes cosmicNebulaFlowV488{
+  from{ transform:translate3d(-2%, -1%, 0) scale(1); filter:saturate(1.2) hue-rotate(0deg); }
+  to{ transform:translate3d(2%, 1%, 0) scale(1.08); filter:saturate(1.55) hue-rotate(12deg); }
+}
+
+@keyframes cosmicStarDriftV488{
+  from{ transform:translateY(0); }
+  to{ transform:translateY(90px); }
+}
+
+@keyframes solarPulseV488{
+  from{ transform:scale(1); }
+  to{ transform:scale(1.06); }
+}
+
+@keyframes planetFloatA488{
+  from{ transform:translate3d(0,0,0); }
+  to{ transform:translate3d(18px,-12px,0); }
+}
+
+@keyframes planetFloatB488{
+  from{ transform:translate3d(0,0,0); }
+  to{ transform:translate3d(-20px,14px,0); }
+}
+
+@keyframes planetFloatC488{
+  from{ transform:translate3d(0,0,0) scale(1); }
+  to{ transform:translate3d(-16px,-18px,0) scale(1.04); }
+}
+
+@keyframes cometFlyV488{
+  0%,45%{ transform:translateX(0) rotate(-16deg); opacity:0; }
+  55%{ opacity:1; }
+  100%{ transform:translateX(140vw) rotate(-16deg); opacity:0; }
+}
+
+@keyframes titleBreathV488{
+  from{ opacity:.88; transform:translateX(-50%) scale(.985); }
+  to{ opacity:1; transform:translateX(-50%) scale(1.025); }
+}
+
+@keyframes solarLoadingFillV488{
+  from{ width:0%; }
+  to{ width:100%; }
+}
+
+@keyframes readyPulseV488{
+  from{ transform:translateY(0); }
+  to{ transform:translateY(-2px); box-shadow:0 0 36px rgba(0,220,255,.58), inset 0 0 20px rgba(130,240,255,.2); }
 }
 
 </style>
