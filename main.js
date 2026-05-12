@@ -24049,3 +24049,15 @@ try{
     window.switchState = switchState;
   }
 }catch(_){ }
+
+
+// ===== V487 DEEP SPACE LOADER =====
+window.addEventListener('load', () => {
+const loader = document.getElementById('cosmic-cinematic-loader-v487');
+if(!loader) return;
+setTimeout(() => {
+loader.style.transition='opacity 1.4s ease';
+loader.style.opacity='0';
+setTimeout(()=>loader.remove(),1600);
+},7000);
+});
