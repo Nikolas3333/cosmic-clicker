@@ -1,4 +1,4 @@
-// COSMIC CLICKER v486 - 7 SEC EXPERIMENTAL CINEMATIC PRE AUTH LOADER
+// COSMIC CLICKER v488 - SOLAR SYSTEM SCOPE INSPIRED LOADER
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -6098,15 +6098,7 @@ document.addEventListener('click', (event) => {
 window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
 
-// ===== V486 PRE-AUTH GAME PRELOADER =====
-function setCosmicPreloaderStageV485(stageIndex = 0){
-    try{
-        document.querySelectorAll('[data-loader-stage-v485]').forEach((node) => {
-            const idx = Number(node.getAttribute('data-loader-stage-v485') || 0);
-            node.classList.toggle('done', idx < stageIndex);
-            node.classList.toggle('active', idx === stageIndex);
-        });
-        const tip = document.getElementById('cosmic-loader-tip-v485');
+const tip = document.getElementById('cosmic-loader-tip-v485');
         if(tip){
             const tips = [
                 'Связываемся с Supabase и прогреваем ядро галактики.',
@@ -24051,13 +24043,47 @@ try{
 }catch(_){ }
 
 
-// ===== V487 DEEP SPACE LOADER =====
+
+
+// ===== V488 SOLAR SYSTEM SCOPE INSPIRED LOADER =====
 window.addEventListener('load', () => {
-const loader = document.getElementById('cosmic-cinematic-loader-v487');
-if(!loader) return;
-setTimeout(() => {
-loader.style.transition='opacity 1.4s ease';
-loader.style.opacity='0';
-setTimeout(()=>loader.remove(),1600);
-},7000);
+  const loader = document.getElementById('cosmic-solar-loader-v488');
+  if(!loader) return;
+
+  const status = document.getElementById('solar-loader-status-v488');
+  const readyBtn = document.getElementById('solar-ready-btn-v488');
+
+  const steps = [
+    'Запускаем солнечную систему...',
+    'Прокладываем орбиты планет...',
+    'Поднимаем туманность и звёздную пыль...',
+    'Синхронизируем Supabase...',
+    'Прогреваем комнаты и онлайн игроков...',
+    'Галактика готова. Нажмите «Готово».'
+  ];
+
+  let indexV488 = 0;
+  const stepTimerV488 = setInterval(() => {
+    indexV488 = Math.min(indexV488 + 1, steps.length - 1);
+    if(status) status.textContent = steps[indexV488];
+    if(indexV488 >= steps.length - 1) clearInterval(stepTimerV488);
+  }, 1200);
+
+  setTimeout(() => {
+    loader.classList.add('ready');
+    if(status) status.textContent = steps[steps.length - 1];
+  }, 7000);
+
+  function closeSolarLoaderV488(){
+    loader.style.transition = 'opacity 1.3s ease, transform 1.3s ease';
+    loader.style.opacity = '0';
+    loader.style.transform = 'scale(1.025)';
+    setTimeout(() => {
+      try{ loader.remove(); }catch(_){}
+    }, 1400);
+  }
+
+  if(readyBtn){
+    readyBtn.addEventListener('click', closeSolarLoaderV488);
+  }
 });
