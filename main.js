@@ -6098,20 +6098,7 @@ document.addEventListener('click', (event) => {
 window.cosmicLoginNow = loginLocalAccount;
 window.cosmicRegisterNow = registerLocalAccount;
 
-const tip = document.getElementById('cosmic-loader-tip-v485');
-        if(tip){
-            const tips = [
-                'Связываемся с Supabase и прогреваем ядро галактики.',
-                'Синхронизируем пилотов, онлайн и статусы.',
-                'Сканируем комнаты, карты и активные зоны.',
-                'Разогреваем текстуры, корабли и звёздный фон.',
-                'Собираем панель входа и стабилизируем интерфейс.',
-                'Галактика готова. Добро пожаловать на борт, пилот.'
-            ];
-            tip.textContent = tips[Math.max(0, Math.min(tips.length - 1, stageIndex))];
-        }
-    }catch(_){}
-}
+
 
 function setCosmicPreloaderStatusV484(text = '', progress = null, stageIndex = null){
     try{
