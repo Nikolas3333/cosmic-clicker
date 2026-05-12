@@ -22968,41 +22968,47 @@ setInterval(function(){
 
 
 
-// ===== V492 CLEAN SOLAR SYSTEM LOADER ONLY =====
+
+
+// ===== V493 REALISTIC SPACE LOADER =====
 window.addEventListener('DOMContentLoaded', () => {
-  const loader = document.getElementById('cosmic-loader-v492');
-  if(!loader) return;
+const loader = document.getElementById('cosmic-loader-v493');
+if(!loader) return;
 
-  const status = document.getElementById('loader-status-v492');
-  const ready = document.getElementById('loader-ready-v492');
+const status = document.getElementById('v493-status');
+const ready = document.getElementById('v493-ready');
 
-  const steps = [
-    'Запускаем солнечную систему...',
-    'Прокладываем орбиты планет...',
-    'Поднимаем туманность и звёздную пыль...',
-    'Синхронизируем Supabase...',
-    'Прогреваем комнаты и онлайн игроков...',
-    'Галактика готова. Нажмите «Готово».'
-  ];
+const steps = [
+'Запускаем солнечную систему...',
+'Создаём орбиты планет...',
+'Поднимаем туманность...',
+'Синхронизируем сервер...',
+'Прогреваем комнаты...',
+'Галактика готова.'
+];
 
-  let step = 0;
-  const timer = setInterval(() => {
-    step = Math.min(step + 1, steps.length - 1);
-    if(status) status.textContent = steps[step];
-    if(step >= steps.length - 1) clearInterval(timer);
-  }, 1200);
+let i = 0;
 
-  setTimeout(() => {
-    loader.classList.add('ready');
-    if(status) status.textContent = steps[steps.length - 1];
-  }, 7000);
+const timer = setInterval(() => {
+i = Math.min(i + 1, steps.length - 1);
+if(status) status.textContent = steps[i];
+if(i >= steps.length - 1) clearInterval(timer);
+}, 1200);
 
-  function closeLoaderV492(){
-    loader.style.transition = 'opacity 1.2s ease, transform 1.2s ease';
-    loader.style.opacity = '0';
-    loader.style.transform = 'scale(1.035)';
-    setTimeout(() => { try{ loader.remove(); }catch(_){} }, 1300);
-  }
+setTimeout(() => {
+loader.classList.add('ready');
+if(status) status.textContent = 'Галактика готова. Нажмите ГОТОВО.';
+}, 7000);
 
-  if(ready) ready.addEventListener('click', closeLoaderV492);
+function closeLoader(){
+loader.style.transition = 'opacity 1.2s ease';
+loader.style.opacity = '0';
+setTimeout(() => {
+try{loader.remove();}catch(_){}
+}, 1200);
+}
+
+if(ready){
+ready.addEventListener('click', closeLoader);
+}
 });
