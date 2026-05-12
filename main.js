@@ -1,4 +1,4 @@
-// COSMIC CLICKER v488 - SOLAR SYSTEM SCOPE INSPIRED LOADER
+// COSMIC CLICKER v490 - TRUE FULLSCREEN SOLAR SYSTEM LOADER
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -24032,13 +24032,15 @@ try{
 
 
 
-// ===== V488 SOLAR SYSTEM SCOPE INSPIRED LOADER =====
-window.addEventListener('load', () => {
-  const loader = document.getElementById('cosmic-solar-loader-v488');
+
+
+// ===== V490 TRUE FULLSCREEN SOLAR SYSTEM LOADER =====
+window.addEventListener('DOMContentLoaded', () => {
+  const loader = document.getElementById('cosmic-loader-v490');
   if(!loader) return;
 
-  const status = document.getElementById('solar-loader-status-v488');
-  const readyBtn = document.getElementById('solar-ready-btn-v488');
+  const status = document.getElementById('loader-status-v490');
+  const ready = document.getElementById('loader-ready-v490');
 
   const steps = [
     'Запускаем солнечную систему...',
@@ -24049,11 +24051,11 @@ window.addEventListener('load', () => {
     'Галактика готова. Нажмите «Готово».'
   ];
 
-  let indexV488 = 0;
-  const stepTimerV488 = setInterval(() => {
-    indexV488 = Math.min(indexV488 + 1, steps.length - 1);
-    if(status) status.textContent = steps[indexV488];
-    if(indexV488 >= steps.length - 1) clearInterval(stepTimerV488);
+  let i = 0;
+  const timer = setInterval(() => {
+    i = Math.min(i + 1, steps.length - 1);
+    if(status) status.textContent = steps[i];
+    if(i >= steps.length - 1) clearInterval(timer);
   }, 1200);
 
   setTimeout(() => {
@@ -24061,16 +24063,12 @@ window.addEventListener('load', () => {
     if(status) status.textContent = steps[steps.length - 1];
   }, 7000);
 
-  function closeSolarLoaderV488(){
-    loader.style.transition = 'opacity 1.3s ease, transform 1.3s ease';
+  function closeLoader(){
+    loader.style.transition = 'opacity 1.2s ease, transform 1.2s ease';
     loader.style.opacity = '0';
-    loader.style.transform = 'scale(1.025)';
-    setTimeout(() => {
-      try{ loader.remove(); }catch(_){}
-    }, 1400);
+    loader.style.transform = 'scale(1.035)';
+    setTimeout(() => { try{ loader.remove(); }catch(_){} }, 1300);
   }
 
-  if(readyBtn){
-    readyBtn.addEventListener('click', closeSolarLoaderV488);
-  }
+  if(ready) ready.addEventListener('click', closeLoader);
 });
