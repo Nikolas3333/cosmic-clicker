@@ -1,4 +1,4 @@
-// COSMIC CLICKER v490 - TRUE FULLSCREEN SOLAR SYSTEM LOADER
+// COSMIC CLICKER v491 - REAL SOLAR SYSTEM LOADER REPLACE OLD PRELOADER
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 
@@ -24034,13 +24034,13 @@ try{
 
 
 
-// ===== V490 TRUE FULLSCREEN SOLAR SYSTEM LOADER =====
+// ===== V491 REAL SOLAR SYSTEM LOADER =====
 window.addEventListener('DOMContentLoaded', () => {
-  const loader = document.getElementById('cosmic-loader-v490');
+  const loader = document.getElementById('cosmic-loader-v491');
   if(!loader) return;
 
-  const status = document.getElementById('loader-status-v490');
-  const ready = document.getElementById('loader-ready-v490');
+  const status = document.getElementById('loader-status-v491');
+  const ready = document.getElementById('loader-ready-v491');
 
   const steps = [
     'Запускаем солнечную систему...',
@@ -24051,11 +24051,11 @@ window.addEventListener('DOMContentLoaded', () => {
     'Галактика готова. Нажмите «Готово».'
   ];
 
-  let i = 0;
+  let step = 0;
   const timer = setInterval(() => {
-    i = Math.min(i + 1, steps.length - 1);
-    if(status) status.textContent = steps[i];
-    if(i >= steps.length - 1) clearInterval(timer);
+    step = Math.min(step + 1, steps.length - 1);
+    if(status) status.textContent = steps[step];
+    if(step >= steps.length - 1) clearInterval(timer);
   }, 1200);
 
   setTimeout(() => {
@@ -24063,12 +24063,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if(status) status.textContent = steps[steps.length - 1];
   }, 7000);
 
-  function closeLoader(){
+  function closeLoaderV491(){
     loader.style.transition = 'opacity 1.2s ease, transform 1.2s ease';
     loader.style.opacity = '0';
     loader.style.transform = 'scale(1.035)';
     setTimeout(() => { try{ loader.remove(); }catch(_){} }, 1300);
   }
 
-  if(ready) ready.addEventListener('click', closeLoader);
+  if(ready) ready.addEventListener('click', closeLoaderV491);
 });
